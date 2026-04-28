@@ -1,0 +1,36 @@
+{
+  "open_tasks": [
+    {
+      "id": "release-signing-certificate-provisioning",
+      "type": "config",
+      "status": "blocked",
+      "risk": "high",
+      "priority": "high",
+      "context": "Provide a trusted Windows code-signing certificate with private key before any signed release can be completed. Put the PFX under certificates/app/OnlyRag-CodeSigning.pfx for local signing, or install the certificate in Cert:\\CurrentUser\\My / Cert:\\LocalMachine\\My and record its SHA1 thumbprint. Do not commit certificate files, passwords, recovery keys, or vendor exports."
+    },
+    {
+      "id": "release-signed-installer-build",
+      "type": "test",
+      "status": "blocked",
+      "risk": "high",
+      "priority": "high",
+      "context": "After certificate provisioning, run scripts/Sign-Release.ps1 with either -CertificatePath certificates/app/OnlyRag-CodeSigning.pfx or -CertificateThumbprint <SHA1 thumbprint>. The script must build the installer through scripts/Build-Installer.ps1, sign it with SHA-256 and RFC 3161 timestamping, verify it with signtool /pa /v, and produce a signed artifact under artifacts/installer. Blocked until release-signing-certificate-provisioning is complete."
+    },
+    {
+      "id": "release-signed-lifecycle-verification",
+      "type": "test",
+      "status": "blocked",
+      "risk": "high",
+      "priority": "high",
+      "context": "After a signed installer exists, run scripts/Test-InstallerRelease.ps1 -InstallerPath <signed installer> -RequireSigned -RunInstallLifecycle on a clean Windows verification machine. Evidence must show valid signature, install path, app executable, Start Menu shortcut, desktop shortcut, app launch, optional component status, uninstall cleanup, and preserved user data. Blocked until release-signed-installer-build is complete."
+    },
+    {
+      "id": "release-smartscreen-smoke-check",
+      "type": "test",
+      "status": "blocked",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "After signed lifecycle verification passes, download or copy the signed installer to a Windows machine that has not previously installed this build and perform a manual SmartScreen launch check. Record whether Windows allows execution, warns due to unknown reputation, or blocks execution. Blocked until release-signed-lifecycle-verification is complete."
+    }
+  ]
+}

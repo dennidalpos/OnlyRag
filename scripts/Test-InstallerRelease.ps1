@@ -1,0 +1,291 @@
+#requires -Version 7.0
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)]
+    [string]$InstallerPath,
+
+    [string]$UpgradeInstallerPath,
+
+    [string]$RollbackInstallerPath,
+
+    [string]$OutputRoot,
+
+    [switch]$RunInstallLifecycle,
+
+    [switch]$RequireSigned
+)
+
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$supportScript = Join-Path $PSScriptRoot "internal\BuildSupport.ps1"
+. $supportScript
+
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $OutputRoot = Join-Path $repoRoot "artifacts\release-verification"
+}
+
+$outputRootPath = [System.IO.Path]::GetFullPath($OutputRoot)
+Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $outputRootPath
+New-Item -ItemType Directory -Force -Path $outputRootPath | Out-Null
+
+$installDir = Join-Path $env:LOCALAPPDATA "Programs\OnlyRag"
+$dataDir = Join-Path $env:LOCALAPPDATA "OnlyRag"
+$startMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\OnlyRag\OnlyRag.lnk"
+$desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "OnlyRag.lnk"
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$evidencePath = Join-Path $outputRootPath "OnlyRag-release-verification-$timestamp.json"
+$script:Checks = [System.Collections.Generic.List[object]]::new()
+
+function Add-Check {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Id,
+        [ValidateSet("pass", "fail", "skip", "warn")]
+        [string]$Status,
+        [Parameter(Mandatory)]
+        [string]$Message,
+        [object]$Data = $null
+    )
+
+    $script:Checks.Add([ordered]@{
+        id = $Id
+        status = $Status
+        message = $Message
+        data = $Data
+        atUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    })
+
+    $color = switch ($Status) {
+        "pass" { "Green" }
+        "warn" { "Yellow" }
+        "fail" { "Red" }
+        default { "DarkYellow" }
+    }
+    Write-Host "[$Status] $Id - $Message" -ForegroundColor $color
+}
+
+function Resolve-Installer {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "$Label installer not found: $Path"
+    }
+
+    return (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Invoke-Installer {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$LogName,
+        [string[]]$ExtraArguments = @()
+    )
+
+    $logPath = Join-Path $outputRootPath $LogName
+    $arguments = @(
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/LOG=$logPath"
+    ) + $ExtraArguments
+
+    $process = Start-Process -FilePath $Path -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
+    return [ordered]@{
+        exitCode = $process.ExitCode
+        logPath = $logPath
+        arguments = $arguments
+    }
+}
+
+function Stop-OnlyRagProcesses {
+    Get-Process -Name "OnlyRag.App" -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Test-PathExpectation {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Id,
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$Kind
+    )
+
+    $pathType = if ($Kind -eq "file") { "Leaf" } else { "Container" }
+    if (Test-Path -LiteralPath $Path -PathType $pathType) {
+        Add-Check -Id $Id -Status "pass" -Message "$Kind exists: $Path"
+    }
+    else {
+        Add-Check -Id $Id -Status "fail" -Message "$kind missing: $Path"
+    }
+}
+
+function Test-InstallerSignature {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $signature = Get-AuthenticodeSignature -FilePath $Path
+    $status = if ($signature.Status -eq "Valid") { "pass" } elseif ($RequireSigned) { "fail" } else { "warn" }
+    Add-Check -Id "signing-status" -Status $status -Message "Signature status: $($signature.Status)." -Data @{
+        signer = $signature.SignerCertificate?.Subject
+        statusMessage = $signature.StatusMessage
+    }
+}
+
+function Test-OptionalComponents {
+    $ocrPython = Join-Path $env:LOCALAPPDATA "OnlyRag\ocr-python\.venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $ocrPython -PathType Leaf) {
+        Add-Check -Id "optional-ocr-python" -Status "pass" -Message "OCR Python environment found." -Data @{ path = $ocrPython }
+    }
+    else {
+        Add-Check -Id "optional-ocr-python" -Status "warn" -Message "OCR Python environment not found; OCR should report a configurable optional dependency."
+    }
+
+    $libreOffice = @(
+        (Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program\soffice.exe")
+    ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($libreOffice) {
+        Add-Check -Id "optional-libreoffice" -Status "pass" -Message "LibreOffice found." -Data @{ path = $libreOffice }
+    }
+    else {
+        Add-Check -Id "optional-libreoffice" -Status "warn" -Message "LibreOffice not found; legacy Office conversion should remain optional."
+    }
+
+    try {
+        $response = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -UseBasicParsing -TimeoutSec 5
+        Add-Check -Id "optional-ollama" -Status "pass" -Message "Ollama endpoint reachable." -Data @{ statusCode = $response.StatusCode }
+    }
+    catch {
+        Add-Check -Id "optional-ollama" -Status "warn" -Message "Ollama endpoint not reachable; model features should remain configurable."
+    }
+}
+
+function Test-AppLaunch {
+    $exe = Join-Path $installDir "OnlyRag.App.exe"
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+        Add-Check -Id "app-launch" -Status "fail" -Message "App executable missing: $exe"
+        return
+    }
+
+    Stop-OnlyRagProcesses
+    $process = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 8
+    if ($process.HasExited) {
+        Add-Check -Id "app-launch" -Status "fail" -Message "App process exited during launch." -Data @{ exitCode = $process.ExitCode }
+    }
+    else {
+        Add-Check -Id "app-launch" -Status "pass" -Message "App process remained alive after launch." -Data @{ processId = $process.Id }
+    }
+    Stop-OnlyRagProcesses
+}
+
+$resolvedInstaller = Resolve-Installer -Path $InstallerPath -Label "Primary"
+$resolvedUpgradeInstaller = if ($UpgradeInstallerPath) { Resolve-Installer -Path $UpgradeInstallerPath -Label "Upgrade" } else { $null }
+$resolvedRollbackInstaller = if ($RollbackInstallerPath) { Resolve-Installer -Path $RollbackInstallerPath -Label "Rollback" } else { $null }
+
+Add-Check -Id "installer-file" -Status "pass" -Message "Primary installer found." -Data @{
+    path = $resolvedInstaller
+    bytes = (Get-Item -LiteralPath $resolvedInstaller).Length
+}
+Test-InstallerSignature -Path $resolvedInstaller
+Test-OptionalComponents
+
+if (-not $RunInstallLifecycle) {
+    Add-Check -Id "install-lifecycle" -Status "skip" -Message "Install/upgrade/uninstall lifecycle not executed. Rerun with -RunInstallLifecycle on a Windows release verification machine."
+}
+else {
+    Stop-OnlyRagProcesses
+
+    $install = Invoke-Installer -Path $resolvedInstaller -LogName "install-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+    Add-Check -Id "fresh-install-exit" -Status ($(if ($install.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Fresh install exit code $($install.exitCode)." -Data $install
+    Test-PathExpectation -Id "install-path" -Path $installDir -Kind "directory"
+    Test-PathExpectation -Id "app-executable" -Path (Join-Path $installDir "OnlyRag.App.exe") -Kind "file"
+    Test-PathExpectation -Id "start-menu-shortcut" -Path $startMenuShortcut -Kind "file"
+    Test-PathExpectation -Id "desktop-shortcut" -Path $desktopShortcut -Kind "file"
+    Test-AppLaunch
+    if (Test-Path -LiteralPath $dataDir -PathType Container) {
+        Add-Check -Id "data-location" -Status "pass" -Message "User data root exists under %LOCALAPPDATA%." -Data @{ path = $dataDir }
+    }
+    else {
+        Add-Check -Id "data-location" -Status "warn" -Message "User data root was not created before app activity required storage." -Data @{ path = $dataDir }
+    }
+
+    if ($resolvedUpgradeInstaller) {
+        $upgrade = Invoke-Installer -Path $resolvedUpgradeInstaller -LogName "upgrade-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+        Add-Check -Id "upgrade-exit" -Status ($(if ($upgrade.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Upgrade install exit code $($upgrade.exitCode)." -Data $upgrade
+        Test-AppLaunch
+    }
+    else {
+        Add-Check -Id "upgrade" -Status "skip" -Message "No -UpgradeInstallerPath supplied."
+    }
+
+    if ($resolvedRollbackInstaller) {
+        $rollback = Invoke-Installer -Path $resolvedRollbackInstaller -LogName "rollback-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+        $status = if ($rollback.exitCode -eq 0) { "pass" } else { "warn" }
+        Add-Check -Id "rollback-downgrade" -Status $status -Message "Rollback/downgrade installer exit code $($rollback.exitCode)." -Data $rollback
+        if ($rollback.exitCode -eq 0) {
+            Test-AppLaunch
+        }
+    }
+    else {
+        Add-Check -Id "rollback-downgrade" -Status "skip" -Message "No -RollbackInstallerPath supplied."
+    }
+
+    $uninstallExe = Join-Path $installDir "unins000.exe"
+    if (Test-Path -LiteralPath $uninstallExe -PathType Leaf) {
+        $uninstall = Invoke-Installer -Path $uninstallExe -LogName "uninstall-$timestamp.log"
+        Add-Check -Id "uninstall-exit" -Status ($(if ($uninstall.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Uninstall exit code $($uninstall.exitCode)." -Data $uninstall
+        if (Test-Path -LiteralPath $installDir -PathType Container) {
+            Add-Check -Id "uninstall-install-dir-cleanup" -Status "fail" -Message "Install directory still exists after uninstall." -Data @{ path = $installDir }
+        }
+        else {
+            Add-Check -Id "uninstall-install-dir-cleanup" -Status "pass" -Message "Install directory removed after uninstall." -Data @{ path = $installDir }
+        }
+        if (Test-Path -LiteralPath $dataDir -PathType Container) {
+            Add-Check -Id "uninstall-data-preserved" -Status "pass" -Message "User data directory preserved after uninstall." -Data @{ path = $dataDir }
+        }
+        else {
+            Add-Check -Id "uninstall-data-preserved" -Status "warn" -Message "User data directory not present after uninstall." -Data @{ path = $dataDir }
+        }
+    }
+    else {
+        Add-Check -Id "uninstall-exe" -Status "fail" -Message "Uninstaller not found: $uninstallExe"
+    }
+}
+
+$failureCount = @($script:Checks | Where-Object { $_.status -eq "fail" }).Count
+$warningCount = @($script:Checks | Where-Object { $_.status -eq "warn" }).Count
+$payload = [ordered]@{
+    tool = "OnlyRag release verification"
+    createdAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    machine = [Environment]::MachineName
+    user = [Environment]::UserName
+    installerPath = $resolvedInstaller
+    upgradeInstallerPath = $resolvedUpgradeInstaller
+    rollbackInstallerPath = $resolvedRollbackInstaller
+    installLifecycleExecuted = [bool]$RunInstallLifecycle
+    installDir = $installDir
+    dataDir = $dataDir
+    failureCount = $failureCount
+    warningCount = $warningCount
+    checks = $script:Checks
+}
+
+$payload | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+Write-Host "Evidence artifact: $evidencePath" -ForegroundColor Cyan
+
+if ($failureCount -gt 0) {
+    exit 1
+}
+
+exit 0

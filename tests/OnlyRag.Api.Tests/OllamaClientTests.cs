@@ -1,0 +1,269 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using OnlyRag.Api.Ollama;
+using OnlyRag.Core;
+
+namespace OnlyRag.Api.Tests;
+
+public sealed class OllamaClientTests
+{
+    [Fact]
+    public async Task ListModelsAsync_ReturnsInstalledModels()
+    {
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("http://localhost:11434/api/tags", request.RequestUri?.ToString());
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    models = new[]
+                    {
+                        new
+                        {
+                            name = "gemma3:4b",
+                            model = "gemma3:4b",
+                            modified_at = "2026-04-25T00:00:00Z",
+                            size = 3338801804L,
+                            digest = "sha256",
+                            details = new
+                            {
+                                family = "gemma",
+                                parameter_size = "4.3B",
+                                quantization_level = "Q4_K_M"
+                            }
+                        }
+                    }
+                })
+            });
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        IReadOnlyList<OllamaModelSummary> models = await client.ListModelsAsync();
+
+        Assert.Single(models);
+        Assert.Equal("gemma3:4b", models[0].Name);
+        Assert.Equal("gemma", models[0].Family);
+        Assert.Equal("4.3B", models[0].ParameterSize);
+    }
+
+    [Fact]
+    public async Task PullModelAsync_SendsModelNameAndNonStreamingFlag()
+    {
+        StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("http://localhost:11434/api/pull", request.RequestUri?.ToString());
+
+            PullRequestBody? body = await request.Content!.ReadFromJsonAsync<PullRequestBody>(cancellationToken);
+            Assert.NotNull(body);
+            Assert.Equal("gemma3:4b", body.Model);
+            Assert.False(body.Stream);
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { status = "success" })
+            };
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        await client.PullModelAsync("gemma3:4b");
+    }
+
+    [Fact]
+    public async Task DeleteModelAsync_ThrowsModelNotFoundForMissingModel()
+    {
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = JsonContent.Create(new { error = "model 'missing' not found" })
+            }));
+
+        OllamaClient client = CreateClient(handler);
+
+        OllamaApiException exception = await Assert.ThrowsAsync<OllamaApiException>(() => client.DeleteModelAsync("missing"));
+
+        Assert.Equal(OllamaErrorKind.ModelNotFound, exception.Kind);
+    }
+
+    [Fact]
+    public async Task ListModelsAsync_ThrowsTimeoutWhenRequestIsCancelledInternally()
+    {
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(new OperationCanceledException()));
+
+        OllamaClient client = CreateClient(
+            handler,
+            new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                null,
+                null,
+                60,
+                1));
+
+        OllamaApiException exception = await Assert.ThrowsAsync<OllamaApiException>(() => client.ListModelsAsync());
+
+        Assert.Equal(OllamaErrorKind.Timeout, exception.Kind);
+    }
+
+    [Fact]
+    public async Task ChatSmokeAsync_AcceptsCompletedResponse()
+    {
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { done = true })
+            }));
+
+        OllamaClient client = CreateClient(handler);
+
+        await client.ChatSmokeAsync("gemma3:4b");
+    }
+
+    [Fact]
+    public async Task GenerateChatAsync_SendsMessagesAndReturnsAssistantContent()
+    {
+        StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("http://localhost:11434/api/chat", request.RequestUri?.ToString());
+
+            JsonDocument body = await JsonDocument.ParseAsync(
+                await request.Content!.ReadAsStreamAsync(cancellationToken),
+                cancellationToken: cancellationToken);
+            Assert.Equal("gemma3:4b", body.RootElement.GetProperty("model").GetString());
+            Assert.False(body.RootElement.GetProperty("stream").GetBoolean());
+            JsonElement messages = body.RootElement.GetProperty("messages");
+            Assert.Equal("system", messages[0].GetProperty("role").GetString());
+            Assert.Equal("regole", messages[0].GetProperty("content").GetString());
+            Assert.Equal("domanda", messages[1].GetProperty("content").GetString());
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    done = true,
+                    message = new
+                    {
+                        role = "assistant",
+                        content = "risposta"
+                    }
+                })
+            };
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        string response = await client.GenerateChatAsync(
+            "gemma3:4b",
+            [new OllamaChatMessage("system", "regole"), new OllamaChatMessage("user", "domanda")]);
+
+        Assert.Equal("risposta", response);
+    }
+
+    [Fact]
+    public async Task GenerateEmbeddingsAsync_SendsChunkBatchAndReturnsVectors()
+    {
+        StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("http://localhost:11434/api/embed", request.RequestUri?.ToString());
+
+            JsonDocument body = await JsonDocument.ParseAsync(
+                await request.Content!.ReadAsStreamAsync(cancellationToken),
+                cancellationToken: cancellationToken);
+            Assert.Equal("nomic-embed-text:latest", body.RootElement.GetProperty("model").GetString());
+            JsonElement input = body.RootElement.GetProperty("input");
+            Assert.Equal(JsonValueKind.Array, input.ValueKind);
+            Assert.Equal("chunk one", input[0].GetString());
+            Assert.Equal("chunk two", input[1].GetString());
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    embeddings = new[]
+                    {
+                        new[] { 1f, 0f, 0f },
+                        new[] { 0f, 1f, 0f }
+                    }
+                })
+            };
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        IReadOnlyList<IReadOnlyList<float>> embeddings = await client.GenerateEmbeddingsAsync(
+            "nomic-embed-text:latest",
+            ["chunk one", "chunk two"]);
+
+        Assert.Equal(2, embeddings.Count);
+        Assert.Equal(3, embeddings[0].Count);
+        Assert.Equal(1f, embeddings[0][0]);
+    }
+
+    private static OllamaClient CreateClient(
+        HttpMessageHandler handler,
+        OllamaSettings? settings = null)
+    {
+        return new OllamaClient(
+            new HttpClient(handler),
+            new StubOllamaSettingsService(settings ?? new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                null,
+                null,
+                60,
+                1)));
+    }
+
+    private sealed record PullRequestBody(string Model, bool Stream);
+
+    private sealed class StubOllamaSettingsService : IOllamaSettingsService
+    {
+        private readonly OllamaSettings settings;
+
+        public StubOllamaSettingsService(OllamaSettings settings)
+        {
+            this.settings = settings;
+        }
+
+        public Task ClearMissingDefaultModelAsync(string modelName, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<OllamaSettings> GetAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(settings);
+        }
+
+        public Task<OllamaSettings> UpdateAsync(OllamaSettings settings, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler;
+
+        public StubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+        {
+            this.handler = handler;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return handler(request, cancellationToken);
+        }
+    }
+}

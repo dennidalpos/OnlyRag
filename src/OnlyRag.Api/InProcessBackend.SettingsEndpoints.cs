@@ -1,0 +1,198 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using OnlyRag.Api.Ollama;
+using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ingestion;
+using OnlyRag.Infrastructure.Ocr;
+
+namespace OnlyRag.Api;
+
+public static partial class InProcessBackend
+{
+    private static void MapSettingsEndpoints(WebApplication app)
+    {
+        app.MapGet("/api/settings/ollama", async (IOllamaSettingsService settings, CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/ollama", async (
+            OllamaSettings request,
+            IOllamaSettingsService settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapGet("/api/settings/performance", async (
+            IPerformanceSettingsService settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/performance", async (
+            PerformanceSettings request,
+            IPerformanceSettingsService settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapGet("/api/settings/ocr", async (
+            OcrSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/ocr", async (
+            OcrSettings request,
+            OcrSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
+
+        app.MapGet("/api/settings/office-conversion", async (
+            OfficeConversionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapGet("/api/ocr/languages", () => Results.Ok(OcrLanguages.All));
+
+        app.MapPut("/api/settings/office-conversion", async (
+            OfficeConversionSettings request,
+            OfficeConversionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
+            }
+            catch (OfficeConversionException ex)
+            {
+                return MapOfficeConversionException(ex);
+            }
+        });
+
+        app.MapGet("/api/office-converter/status", async (
+            IOfficeConversionService converter,
+            OfficeConversionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+        {
+            OfficeConversionSettings currentSettings = await settings.GetAsync(cancellationToken);
+            OfficeConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
+            return Results.Ok(CreateOfficeConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds));
+        });
+
+        app.MapPost("/api/office-converter/test", async (
+            IOfficeConversionService converter,
+            OfficeConversionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+        {
+            OfficeConversionSettings currentSettings = await settings.GetAsync(cancellationToken);
+            OfficeConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
+            return Results.Ok(CreateOfficeConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds));
+        });
+
+        app.MapGet("/api/ollama/status", async (
+            IOllamaClient ollamaClient,
+            IOllamaSettingsService settings,
+            CancellationToken cancellationToken) =>
+        {
+            OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
+
+            try
+            {
+                IReadOnlyList<OllamaModelSummary> models = await ollamaClient.ListModelsAsync(cancellationToken);
+                return Results.Ok(new OllamaStatusResponse(
+                    "Online",
+                    true,
+                    currentSettings.OllamaBaseUrl,
+                    models.Count,
+                    models.Count == 0
+                        ? "Connessione riuscita. Ollama e disponibile ma non ci sono modelli installati."
+                        : $"Connessione riuscita. Modelli disponibili: {models.Count}.",
+                    models.Count == 0
+                        ? "Apri Impostazioni e installa almeno un modello prima di usare Chat o Traduzione."
+                        : null));
+            }
+            catch (OllamaApiException ex)
+            {
+                return Results.Ok(CreateStatusResponse(currentSettings.OllamaBaseUrl, ex));
+            }
+        });
+
+        app.MapGet("/api/ollama/models", async (IOllamaClient ollamaClient, CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                IReadOnlyList<OllamaModelSummary> models = await ollamaClient.ListModelsAsync(cancellationToken);
+                return Results.Ok(new OllamaModelsResponse(models));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapPost("/api/ollama/models/pull", async (
+            PullOllamaModelRequest request,
+            IOllamaClient ollamaClient,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                string modelName = OllamaSettingsService.NormalizeRequiredModelName(request.Name);
+                await ollamaClient.PullModelAsync(modelName, cancellationToken);
+                return Results.Ok(new OperationMessageResponse($"Modello {modelName} installato."));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapDelete("/api/ollama/models/{name}", async (
+            string name,
+            IOllamaClient ollamaClient,
+            IOllamaSettingsService settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                string modelName = OllamaSettingsService.NormalizeRequiredModelName(name);
+                await ollamaClient.DeleteModelAsync(modelName, cancellationToken);
+                await settings.ClearMissingDefaultModelAsync(modelName, cancellationToken);
+                return Results.Ok(new OperationMessageResponse($"Modello {modelName} rimosso."));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapGet("/api/ollama/models/{name}/details", async (
+            string name,
+            IOllamaClient ollamaClient,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                OllamaModelDetails details = await ollamaClient.ShowModelAsync(name, cancellationToken);
+                return Results.Ok(details);
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+    }
+}

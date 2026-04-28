@@ -1,0 +1,37 @@
+{
+  "strategy": "per-user-online-venv",
+  "installRoot": "%LOCALAPPDATA%\\OnlyRag\\ocr-python",
+  "pythonMinimumVersion": "3.10.0",
+  "minimumFreeDiskBytes": 5368709120,
+  "modelCacheLocations": [
+    "%USERPROFILE%\\.paddlex",
+    "%USERPROFILE%\\.paddleocr"
+  ],
+  "packages": [
+    {
+      "name": "paddleocr",
+      "version": "3.5.0",
+      "importName": "paddleocr"
+    },
+    {
+      "name": "paddlepaddle",
+      "version": "3.3.1",
+      "importName": "paddle"
+    },
+    {
+      "name": "pillow",
+      "version": "12.2.0",
+      "importName": "PIL"
+    },
+    {
+      "name": "pypdfium2",
+      "version": "5.7.1",
+      "importName": "pypdfium2"
+    },
+    {
+      "name": "opencv-python",
+      "version": "4.13.0.92",
+      "importName": "cv2"
+    }
+  ]
+}

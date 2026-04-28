@@ -1,0 +1,268 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  apiRequest,
+  markBackendOffline,
+  markBackendOnline,
+  resolveBackendBaseUrlDirect,
+  type OllamaModel,
+  type OllamaModelsResponse,
+  type OllamaSettings,
+  type OllamaStatusResponse
+} from "./api";
+import { initializeAppLifecycleBridge } from "./appLifecycle";
+import { AppHeader } from "./components/AppHeader";
+import { ChatSection } from "./components/ChatSection";
+import { DocumentsSection } from "./components/DocumentsSection";
+import { JobsSection } from "./components/JobsSection";
+import { OllamaSetupGate } from "./components/OllamaSetupGate";
+import { SectionId, Sidebar } from "./components/Sidebar";
+import { SettingsSection } from "./components/SettingsSection";
+import { TranslationSection } from "./components/TranslationSection";
+
+type AppStatusResponse = {
+  backend: string;
+  database: string;
+  jobQueue: string;
+  ollama: string;
+  startedAtUtc: string;
+  lowResourceMode: boolean;
+};
+
+type StatusTone = "online" | "offline" | "warning";
+
+export type BackendStatus = {
+  backendValue: string;
+  backendTone: StatusTone;
+  ollamaValue: string;
+  ollamaTone: StatusTone;
+  jobsValue: string;
+  jobsTone: StatusTone;
+  lowResourceMode: boolean;
+};
+
+const sectionLabels: Record<SectionId, string> = {
+  chat: "Chat",
+  documents: "Documenti",
+  jobs: "Operazioni",
+  translation: "Traduzione",
+  settings: "Impostazioni"
+};
+
+const offlineStatus: BackendStatus = {
+  backendValue: "Offline",
+  backendTone: "offline",
+  ollamaValue: "Offline",
+  ollamaTone: "offline",
+  jobsValue: "0",
+  jobsTone: "offline",
+  lowResourceMode: false
+};
+
+export default function App() {
+  const [activeSection, setActiveSection] = useState<SectionId>("chat");
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>(offlineStatus);
+  const [statusChecked, setStatusChecked] = useState(false);
+  const [ollamaSettings, setOllamaSettings] = useState<OllamaSettings | null>(null);
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusResponse | null>(null);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
+  const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
+
+  async function refreshBackendStatus() {
+    const baseUrl = resolveBackendBaseUrlDirect();
+    if (!baseUrl) {
+      setBackendStatus(offlineStatus);
+      setStatusChecked(true);
+      return;
+    }
+
+    try {
+      const response = await fetch(new URL("/api/app/status", baseUrl));
+      if (!response.ok) {
+        throw new Error();
+      }
+
+      const status = (await response.json()) as AppStatusResponse;
+      markBackendOnline();
+      setBackendStatus((current) => ({
+        ...current,
+        backendValue: status.backend,
+        backendTone: "online",
+        jobsValue: status.jobQueue,
+        jobsTone: "online",
+        lowResourceMode: status.lowResourceMode
+      }));
+    } catch {
+      markBackendOffline();
+      setBackendStatus(offlineStatus);
+    } finally {
+      setStatusChecked(true);
+    }
+  }
+
+  async function refreshOllamaData() {
+    try {
+      const [settings, status] = await Promise.all([
+        apiRequest<OllamaSettings>("/api/settings/ollama"),
+        apiRequest<OllamaStatusResponse>("/api/ollama/status")
+      ]);
+
+      setOllamaSettings(settings);
+      setOllamaStatus(status);
+      setBackendStatus((current) => ({
+        ...current,
+        ollamaValue: formatOllamaBadge(status),
+        ollamaTone: getOllamaTone(status)
+      }));
+
+      if (status.isReachable) {
+        const modelsResponse = await apiRequest<OllamaModelsResponse>("/api/ollama/models");
+        setOllamaModels(modelsResponse.models);
+        setOllamaLoadError(null);
+      } else {
+        setOllamaModels([]);
+        setOllamaLoadError(status.suggestion ?? status.message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossibile leggere lo stato di Ollama.";
+      setOllamaStatus(null);
+      setOllamaModels([]);
+      setOllamaLoadError(message);
+      setBackendStatus((current) => ({
+        ...current,
+        ollamaValue: "Errore",
+        ollamaTone: "offline"
+      }));
+    }
+  }
+
+  async function handleRecheckOllama() {
+    setIsRecheckingOllama(true);
+    try {
+      await refreshOllamaData();
+    } finally {
+      setIsRecheckingOllama(false);
+    }
+  }
+
+  useEffect(() => {
+    initializeAppLifecycleBridge();
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function load() {
+      await refreshBackendStatus();
+      if (isCancelled) {
+        return;
+      }
+
+      await refreshOllamaData();
+      if (!isCancelled) {
+        setInitialCheckDone(true);
+      }
+    }
+
+    void load();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handle = setInterval(() => {
+      void refreshBackendStatus();
+    }, 10_000);
+    return () => clearInterval(handle);
+  }, []);
+
+  const previousSectionRef = useRef<SectionId>(activeSection);
+  useEffect(() => {
+    if (previousSectionRef.current === "settings" && activeSection !== "settings") {
+      void refreshOllamaData();
+    }
+    previousSectionRef.current = activeSection;
+  }, [activeSection]);
+
+  return (
+    <div className="desktop-shell">
+      <Sidebar
+        activeSection={activeSection}
+        sections={sectionLabels}
+        onSectionChange={setActiveSection}
+        activeJobCount={parseInt(backendStatus.jobsValue, 10) || 0}
+      />
+      <main className="workspace">
+        <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} />
+        <section className={`workspace-content workspace-content--${activeSection}`} aria-label={sectionLabels[activeSection]}>
+          {statusChecked && backendStatus.backendTone === "offline" && (
+            <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
+              Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l&apos;applicazione.
+            </div>
+          )}
+          {activeSection === "chat" && (
+            <ChatSection
+              models={ollamaModels}
+              defaultModel={ollamaSettings?.defaultChatModel ?? null}
+              ollamaStatus={ollamaStatus}
+              loadError={ollamaLoadError}
+            />
+          )}
+          {activeSection === "documents" && <DocumentsSection />}
+          {activeSection === "jobs" && (
+            <JobsSection onJobsChanged={() => void refreshBackendStatus()} />
+          )}
+          {activeSection === "translation" && (
+            <TranslationSection
+              models={ollamaModels}
+              defaultModel={ollamaSettings?.defaultTranslationModel ?? null}
+              ollamaStatus={ollamaStatus}
+              loadError={ollamaLoadError}
+            />
+          )}
+          {activeSection === "settings" && (
+            <SettingsSection
+              settings={ollamaSettings}
+              status={ollamaStatus}
+              models={ollamaModels}
+              loadError={ollamaLoadError}
+              onDataChanged={async () => {
+                await refreshBackendStatus();
+                await refreshOllamaData();
+              }}
+            />
+          )}
+        </section>
+      </main>
+      {initialCheckDone && activeSection !== "settings" && (
+        <OllamaSetupGate
+          ollamaStatus={ollamaStatus}
+          ollamaSettings={ollamaSettings}
+          ollamaModels={ollamaModels}
+          isChecking={isRecheckingOllama}
+          onOpenSettings={() => setActiveSection("settings")}
+          onRecheck={() => void handleRecheckOllama()}
+        />
+      )}
+    </div>
+  );
+}
+
+function formatOllamaBadge(status: OllamaStatusResponse): string {
+  if (!status.isReachable) {
+    return "Offline";
+  }
+
+  return status.installedModelCount === 0 ? "Nessun modello" : `${status.installedModelCount} modelli`;
+}
+
+function getOllamaTone(status: OllamaStatusResponse): StatusTone {
+  if (!status.isReachable) {
+    return "offline";
+  }
+
+  return status.installedModelCount === 0 ? "warning" : "online";
+}

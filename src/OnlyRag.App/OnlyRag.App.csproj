@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\OnlyRag.Core\OnlyRag.Core.csproj" />
+    <ProjectReference Include="..\OnlyRag.Infrastructure\OnlyRag.Infrastructure.csproj" />
+    <ProjectReference Include="..\OnlyRag.Api\OnlyRag.Api.csproj" />
+    <ProjectReference Include="..\OnlyRag.Worker\OnlyRag.Worker.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\OnlyRag.ico" />
+    <Resource Include="Assets\OnlyRag.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\OnlyRag.Web\dist\**\*">
+      <Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ApplicationIcon>Assets\OnlyRag.ico</ApplicationIcon>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>
