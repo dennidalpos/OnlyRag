@@ -33,6 +33,54 @@
       "context": "After signed lifecycle verification passes, download or copy the signed installer to a Windows machine that has not previously installed this build and perform a manual SmartScreen launch check. Record whether Windows allows execution, warns due to unknown reputation, or blocks execution. Blocked until release-signed-lifecycle-verification is complete."
     },
     {
+      "id": "settings-ui-chat-translation-browser-verification",
+      "type": "test",
+      "status": "todo",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Run the web UI with the in-process backend and verify Settings > Ollama in a real browser. Execution order: select a chat model, confirm the chat num_ctx bar appears, toggle Automatico on and off, move the slider, save, reload settings, and confirm the manual value persists; repeat the same flow for the translation model. Also verify that Automatico sends null for chatNumCtx and translationNumCtx and that the visual bar moves according to the selected manual value relative to the detected native model context."
+    },
+    {
+      "id": "settings-docs-chat-translation-numctx",
+      "type": "docs",
+      "status": "todo",
+      "risk": "low",
+      "priority": "low",
+      "context": "After browser verification, update concise Windows-valid documentation for the new Ollama chat and translation num_ctx settings. Document that Automatico stores null and lets Ollama use the model/default context, while manual mode persists chatNumCtx or translationNumCtx and passes num_ctx to chat generation or document translation."
+    },
+    {
+      "id": "settings-ollama-chat-translation-numctx-contracts",
+      "type": "config",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Extend Ollama settings with nullable chatNumCtx and translationNumCtx alongside embeddingNumCtx. Persist them as ollama.chatNumCtx and ollama.translationNumCtx, normalize values with the shared num_ctx clamp 64..131072, and keep null as the Automatico state."
+    },
+    {
+      "id": "settings-ollama-chat-translation-runtime",
+      "type": "refactor",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Pass persisted chatNumCtx to ChatService requests and translationNumCtx to DocumentTranslationJobHandler requests through IOllamaClient.GenerateChatAsync. When the setting is null, omit num_ctx so Ollama uses its automatic/default behavior."
+    },
+    {
+      "id": "settings-ui-chat-translation-dynamic-bars",
+      "type": "refactor",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Use the same adjustable model context bar pattern for chat, embeddings, and translation. The bar must display native model context when detected, expose the Automatico checkbox, show the slider only in manual mode, and move the fill width according to the saved manual value relative to native num_ctx."
+    },
+    {
+      "id": "settings-ollama-chat-translation-tests",
+      "type": "test",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Update API and frontend build coverage for chatNumCtx and translationNumCtx plumbing. Required commands: dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj; npm run build from src\\OnlyRag.Web."
+    },
+    {
       "id": "settings-ingestion-ocr-contracts",
       "type": "config",
       "status": "done",
