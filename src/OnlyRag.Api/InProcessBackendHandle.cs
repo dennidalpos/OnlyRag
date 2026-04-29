@@ -28,7 +28,9 @@ public sealed class InProcessBackendHandle : IAsyncDisposable
         using CancellationTokenSource shutdownTimeout = new(TimeSpan.FromSeconds(15));
         try
         {
-            await application.StopAsync(shutdownTimeout.Token);
+            await Task.Run(
+                () => application.StopAsync(shutdownTimeout.Token),
+                CancellationToken.None).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -36,7 +38,9 @@ public sealed class InProcessBackendHandle : IAsyncDisposable
         }
         finally
         {
-            await application.DisposeAsync();
+            await Task.Run(
+                async () => await application.DisposeAsync().ConfigureAwait(false),
+                CancellationToken.None).ConfigureAwait(false);
         }
 
         BackendLog.Write(Descriptor.StoragePaths, "In-process backend stopped.");

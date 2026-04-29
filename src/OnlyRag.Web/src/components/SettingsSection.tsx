@@ -68,6 +68,36 @@ const emptyOcrSettings: OcrSettings = {
   device: "cpu"
 };
 
+const ocrProfilePresets: Record<string, OcrSettings> = {
+  fast: {
+    ...emptyOcrSettings,
+    profile: "fast",
+    pdfDpi: 150,
+    detectionSideLimit: 736,
+    detectionThreshold: 0.35,
+    detectionBoxThreshold: 0.65,
+    detectionUnclipRatio: 1.4,
+    recognitionScoreThreshold: 0.55,
+    recognitionBatchSize: 4,
+    cpuThreads: 1
+  },
+  balanced: emptyOcrSettings,
+  accurate: {
+    ...emptyOcrSettings,
+    profile: "accurate",
+    pdfDpi: 300,
+    detectionSideLimit: 1280,
+    detectionThreshold: 0.25,
+    detectionBoxThreshold: 0.55,
+    detectionUnclipRatio: 1.7,
+    recognitionScoreThreshold: 0.45,
+    useDocumentOrientationClassification: true,
+    useDocumentUnwarping: true,
+    recognitionBatchSize: 8,
+    cpuThreads: 4
+  }
+};
+
 const PADDLE_OCR_MODEL_PRESETS = ["PP-OCRv5"];
 const PADDLE_OCR_MODEL_VERSIONS = ["PP-OCRv5"];
 
@@ -377,6 +407,15 @@ export function SettingsSection({
     } finally {
       setIsBusy(false);
     }
+  }
+
+  function applyOcrProfile(profile: string) {
+    const preset = ocrProfilePresets[profile];
+    setOcrFormState((current) => (preset ? { ...preset } : { ...current, profile: "custom" }));
+  }
+
+  function updateOcrSettings(patch: Partial<OcrSettings>) {
+    setOcrFormState((current) => ({ ...current, ...patch, profile: "custom" }));
   }
 
   async function saveOfficeSettings() {
@@ -697,13 +736,12 @@ export function SettingsSection({
                 <select
                   id="ocr-profile"
                   value={ocrFormState.profile}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, profile: event.target.value }))
-                  }
+                  onChange={(event) => applyOcrProfile(event.target.value)}
                 >
                   <option value="fast">Veloce</option>
                   <option value="balanced">Bilanciato</option>
                   <option value="accurate">Accurato</option>
+                  <option value="custom">Personalizzato</option>
                 </select>
               </label>
               <label className="field-group" htmlFor="ocr-device">
@@ -714,9 +752,7 @@ export function SettingsSection({
                 <select
                   id="ocr-device"
                   value={ocrFormState.device}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, device: event.target.value }))
-                  }
+                  onChange={(event) => updateOcrSettings({ device: event.target.value })}
                 >
                   <option value="cpu">CPU</option>
                   <option value="gpu">GPU</option>
@@ -729,7 +765,7 @@ export function SettingsSection({
                 min={96}
                 max={400}
                 value={ocrFormState.pdfDpi}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, pdfDpi: value }))}
+                onChange={(value) => updateOcrSettings({ pdfDpi: value })}
               />
               <label className="field-group" htmlFor="ocr-model-preset">
                 <OcrFieldLabel
@@ -739,9 +775,7 @@ export function SettingsSection({
                 <select
                   id="ocr-model-preset"
                   value={ocrFormState.modelPreset}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, modelPreset: event.target.value }))
-                  }
+                  onChange={(event) => updateOcrSettings({ modelPreset: event.target.value })}
                 >
                   {getOcrSelectOptions(ocrFormState.modelPreset, PADDLE_OCR_MODEL_PRESETS).map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -756,9 +790,7 @@ export function SettingsSection({
                 <select
                   id="ocr-model-version"
                   value={ocrFormState.modelVersion}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, modelVersion: event.target.value }))
-                  }
+                  onChange={(event) => updateOcrSettings({ modelVersion: event.target.value })}
                 >
                   {getOcrSelectOptions(ocrFormState.modelVersion, PADDLE_OCR_MODEL_VERSIONS).map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -772,7 +804,7 @@ export function SettingsSection({
                 min={320}
                 max={4096}
                 value={ocrFormState.detectionSideLimit}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionSideLimit: value }))}
+                onChange={(value) => updateOcrSettings({ detectionSideLimit: value })}
               />
               <OcrRangeField
                 id="ocr-detection-threshold"
@@ -783,7 +815,7 @@ export function SettingsSection({
                 step={0.01}
                 value={ocrFormState.detectionThreshold}
                 formatValue={formatOcrDecimal}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionThreshold: value }))}
+                onChange={(value) => updateOcrSettings({ detectionThreshold: value })}
               />
               <OcrRangeField
                 id="ocr-detection-box-threshold"
@@ -794,7 +826,7 @@ export function SettingsSection({
                 step={0.01}
                 value={ocrFormState.detectionBoxThreshold}
                 formatValue={formatOcrDecimal}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionBoxThreshold: value }))}
+                onChange={(value) => updateOcrSettings({ detectionBoxThreshold: value })}
               />
               <OcrRangeField
                 id="ocr-detection-unclip-ratio"
@@ -805,7 +837,7 @@ export function SettingsSection({
                 step={0.05}
                 value={ocrFormState.detectionUnclipRatio}
                 formatValue={formatOcrDecimal}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionUnclipRatio: value }))}
+                onChange={(value) => updateOcrSettings({ detectionUnclipRatio: value })}
               />
               <OcrRangeField
                 id="ocr-recognition-score-threshold"
@@ -816,9 +848,7 @@ export function SettingsSection({
                 step={0.01}
                 value={ocrFormState.recognitionScoreThreshold}
                 formatValue={formatOcrDecimal}
-                onChange={(value) =>
-                  setOcrFormState((current) => ({ ...current, recognitionScoreThreshold: value }))
-                }
+                onChange={(value) => updateOcrSettings({ recognitionScoreThreshold: value })}
               />
               <OcrRangeField
                 id="ocr-recognition-batch-size"
@@ -827,7 +857,7 @@ export function SettingsSection({
                 min={1}
                 max={32}
                 value={ocrFormState.recognitionBatchSize}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, recognitionBatchSize: value }))}
+                onChange={(value) => updateOcrSettings({ recognitionBatchSize: value })}
               />
               <OcrRangeField
                 id="ocr-cpu-threads"
@@ -836,7 +866,7 @@ export function SettingsSection({
                 min={1}
                 max={16}
                 value={ocrFormState.cpuThreads}
-                onChange={(value) => setOcrFormState((current) => ({ ...current, cpuThreads: value }))}
+                onChange={(value) => updateOcrSettings({ cpuThreads: value })}
               />
             </div>
             <label className="toggle-row" htmlFor="ocr-textline-orientation">
@@ -845,10 +875,7 @@ export function SettingsSection({
                 type="checkbox"
                 checked={ocrFormState.useTextlineOrientation}
                 onChange={(event) =>
-                  setOcrFormState((current) => ({
-                    ...current,
-                    useTextlineOrientation: event.target.checked
-                  }))
+                  updateOcrSettings({ useTextlineOrientation: event.target.checked })
                 }
               />
               <span>Orientamento righe testo</span>
@@ -859,10 +886,7 @@ export function SettingsSection({
                 type="checkbox"
                 checked={ocrFormState.useDocumentOrientationClassification}
                 onChange={(event) =>
-                  setOcrFormState((current) => ({
-                    ...current,
-                    useDocumentOrientationClassification: event.target.checked
-                  }))
+                  updateOcrSettings({ useDocumentOrientationClassification: event.target.checked })
                 }
               />
               <span>Classificazione orientamento documento</span>
@@ -873,10 +897,7 @@ export function SettingsSection({
                 type="checkbox"
                 checked={ocrFormState.useDocumentUnwarping}
                 onChange={(event) =>
-                  setOcrFormState((current) => ({
-                    ...current,
-                    useDocumentUnwarping: event.target.checked
-                  }))
+                  updateOcrSettings({ useDocumentUnwarping: event.target.checked })
                 }
               />
               <span>Correzione deformazione documento</span>

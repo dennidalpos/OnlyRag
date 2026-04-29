@@ -117,6 +117,41 @@ OnlyRag only targets its own peer processes during exit. It does not directly te
 external processes such as `python.exe`, `soffice.exe`, or Ollama; job handlers receive cancellation
 through the app and are responsible for stopping child work they started.
 
+If `OnlyRag.App.exe` remains in Task Manager after the window is closed, first confirm whether it is
+an OnlyRag process and whether it still owns child processes:
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.Name -eq "OnlyRag.App.exe" } |
+  Select-Object ProcessId, ParentProcessId, CreationDate, ExecutablePath, CommandLine
+```
+
+If the process has no window and `%LOCALAPPDATA%\OnlyRag\logs\backend.log` ends with
+`Stopping in-process backend` but not `In-process backend stopped`, the app is likely blocked while
+disposing the in-process backend. Verify that the running binary includes the shutdown fix by
+rebuilding or republishing the app:
+
+```powershell
+dotnet build .\OnlyRag.sln -c Release
+dotnet publish .\src\OnlyRag.App\OnlyRag.App.csproj -c Release -r win-x64 --self-contained false `
+  -o .\artifacts\publish\OnlyRag\win-x64 /p:PublishSingleFile=false
+```
+
+After confirming the path belongs to OnlyRag, terminate the stale process and relaunch from the
+updated output:
+
+```powershell
+Stop-Process -Id <ProcessId> -Force
+```
+
+For code changes in this area, keep `InProcessBackendHandle.DisposeAsync` independent from the WPF
+dispatcher and keep `MainWebView.Dispose()` in the window `Closed` path. Run the API regression tests
+before shipping:
+
+```powershell
+dotnet test .\tests\OnlyRag.Api.Tests\OnlyRag.Api.Tests.csproj -c Release
+```
+
 ## Ollama
 
 Ollama must be running locally or reachable on the LAN before using chat, embeddings, or

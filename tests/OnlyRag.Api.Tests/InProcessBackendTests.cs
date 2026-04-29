@@ -44,6 +44,30 @@ public sealed class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DisposeAsync_CompletesWhenCallerBlocksWithSynchronizationContext()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(
+            new LocalJobQueueDescriptor("dispose-sync-context-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SynchronizationContext? previousContext = SynchronizationContext.Current;
+
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
+            Task disposeTask = backend.DisposeAsync().AsTask();
+
+#pragma warning disable xUnit1031 // This regression test intentionally blocks like WPF OnExit.
+            Assert.True(disposeTask.Wait(TimeSpan.FromSeconds(5)));
+            disposeTask.GetAwaiter().GetResult();
+#pragma warning restore xUnit1031
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+    }
+
+    [Fact]
     public async Task AppStatus_AllowsStaticWebViewOrigin()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
@@ -436,12 +460,13 @@ public sealed class InProcessBackendTests
         using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/ocr", request);
         OcrSettings? saved = await putResponse.Content.ReadFromJsonAsync<OcrSettings>();
         OcrSettings? current = await httpClient.GetFromJsonAsync<OcrSettings>("/api/settings/ocr");
+        OcrSettings expected = OcrSettings.Normalize(request);
 
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
         Assert.NotNull(saved);
         Assert.NotNull(current);
-        Assert.Equal(request, saved);
-        Assert.Equal(request, current);
+        Assert.Equal(expected, saved);
+        Assert.Equal(expected, current);
     }
 
     [Fact]
@@ -763,6 +788,17 @@ public sealed class InProcessBackendTests
     private sealed record SeededTranslation(
         StoredTranslation Translation,
         IReadOnlyList<StoredTranslationUnit> Units);
+
+    private sealed class NonPumpingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+        }
+
+        public override void Send(SendOrPostCallback d, object? state)
+        {
+        }
+    }
 
     private sealed class TempBackendDescriptor : IDisposable
     {

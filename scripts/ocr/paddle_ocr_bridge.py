@@ -254,7 +254,6 @@ def main():
     parser.add_argument("--output-dir")
     parser.add_argument("--preprocess-version", default="onlyrag-preprocess-v1")
     parser.add_argument("--language", default="it")
-    parser.add_argument("--profile", choices=["fast", "balanced", "accurate"], default="balanced")
     parser.add_argument("--model-preset", default="PP-OCRv5")
     parser.add_argument("--model-version", default="PP-OCRv5")
     parser.add_argument("--detection-side-limit", type=int, default=960)

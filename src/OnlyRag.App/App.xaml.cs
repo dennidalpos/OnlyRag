@@ -27,7 +27,7 @@ public partial class App : Application
             isDisposingBackend = true;
             try
             {
-                backend.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                backend.DisposeAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
             }
             catch
             {

@@ -113,7 +113,6 @@ public sealed class PaddleOcrEngine : IOcrEngine
             "--mode", "ocr",
             "--input", request.PreparedImagePath,
             "--language", request.Language,
-            "--profile", settings.Profile,
             "--model-preset", settings.ModelPreset,
             "--model-version", settings.ModelVersion,
             "--detection-side-limit", settings.DetectionSideLimit.ToString(CultureInfo.InvariantCulture),

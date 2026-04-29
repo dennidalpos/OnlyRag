@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         Loaded += OnLoaded;
         Closing += OnClosingAsync;
+        Closed += OnClosed;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -146,6 +147,12 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _ = ConfirmAndCloseAsync();
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        Closed -= OnClosed;
+        MainWebView.Dispose();
     }
 
     private async Task ConfirmAndCloseAsync()

@@ -35,29 +35,75 @@ public sealed record OcrSettings(
     public const int DefaultCpuThreads = 2;
     public const string DefaultDevice = "cpu";
 
-    public static OcrSettings Default { get; } = new(
-        DefaultProfile,
-        DefaultPdfDpi,
-        DefaultModelPreset,
-        DefaultModelVersion,
-        DefaultDetectionSideLimit,
-        DefaultDetectionThreshold,
-        DefaultDetectionBoxThreshold,
-        DefaultDetectionUnclipRatio,
-        DefaultRecognitionScoreThreshold,
-        DefaultUseTextlineOrientation,
-        DefaultUseDocumentOrientationClassification,
-        DefaultUseDocumentUnwarping,
-        DefaultRecognitionBatchSize,
-        DefaultCpuThreads,
-        DefaultDevice);
+    public static OcrSettings Default { get; } = ForProfile(DefaultProfile);
+
+    public static OcrSettings ForProfile(string profile)
+    {
+        return NormalizeProfile(profile) switch
+        {
+            "fast" => new OcrSettings(
+                "fast",
+                150,
+                DefaultModelPreset,
+                DefaultModelVersion,
+                736,
+                0.35d,
+                0.65d,
+                1.40d,
+                0.55d,
+                true,
+                false,
+                false,
+                4,
+                1,
+                DefaultDevice),
+            "accurate" => new OcrSettings(
+                "accurate",
+                300,
+                DefaultModelPreset,
+                DefaultModelVersion,
+                1280,
+                0.25d,
+                0.55d,
+                1.70d,
+                0.45d,
+                true,
+                true,
+                true,
+                8,
+                4,
+                DefaultDevice),
+            _ => new OcrSettings(
+                DefaultProfile,
+                DefaultPdfDpi,
+                DefaultModelPreset,
+                DefaultModelVersion,
+                DefaultDetectionSideLimit,
+                DefaultDetectionThreshold,
+                DefaultDetectionBoxThreshold,
+                DefaultDetectionUnclipRatio,
+                DefaultRecognitionScoreThreshold,
+                DefaultUseTextlineOrientation,
+                DefaultUseDocumentOrientationClassification,
+                DefaultUseDocumentUnwarping,
+                DefaultRecognitionBatchSize,
+                DefaultCpuThreads,
+                DefaultDevice)
+        };
+    }
 
     public static OcrSettings Normalize(OcrSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        string profile = NormalizeProfile(settings.Profile);
+        if (profile is not "custom")
+        {
+            return ForProfile(profile);
+        }
+
         return new OcrSettings(
-            NormalizeProfile(settings.Profile),
+            profile,
             Math.Clamp(settings.PdfDpi, 96, 400),
             NormalizeToken(settings.ModelPreset, DefaultModelPreset, 64),
             NormalizeToken(settings.ModelVersion, DefaultModelVersion, 64),
@@ -79,7 +125,6 @@ public sealed record OcrSettings(
         OcrSettings normalized = Normalize(this);
         return string.Join(
             '|',
-            normalized.Profile,
             normalized.PdfDpi.ToString(CultureInfo.InvariantCulture),
             normalized.ModelPreset,
             normalized.ModelVersion,
@@ -99,7 +144,7 @@ public sealed record OcrSettings(
     private static string NormalizeProfile(string value)
     {
         string normalized = NormalizeToken(value, DefaultProfile, 32).ToLowerInvariant();
-        return normalized is "fast" or "balanced" or "accurate"
+        return normalized is "fast" or "balanced" or "accurate" or "custom"
             ? normalized
             : DefaultProfile;
     }
