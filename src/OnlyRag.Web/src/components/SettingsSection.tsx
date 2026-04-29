@@ -32,7 +32,9 @@ const emptySettings: OllamaSettings = {
   defaultTranslationModel: null,
   requestTimeoutSeconds: 120,
   embeddingBatchSize: 1,
-  embeddingNumCtx: null
+  embeddingNumCtx: null,
+  chatNumCtx: null,
+  translationNumCtx: null
 };
 
 const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
@@ -247,6 +249,14 @@ export function SettingsSection({
   const embeddingRecommendations = useMemo(
     () => buildEmbeddingRecommendations(embeddingModelDetails?.numCtx ?? null),
     [embeddingModelDetails]
+  );
+  const chatNumCtxRecommendation = useMemo(
+    () => buildNumCtxRecommendation(chatModelDetails?.numCtx ?? null),
+    [chatModelDetails]
+  );
+  const translationNumCtxRecommendation = useMemo(
+    () => buildNumCtxRecommendation(translationModelDetails?.numCtx ?? null),
+    [translationModelDetails]
   );
   const recommendedMaxContextChunks = useMemo(
     () => buildContextChunkRecommendation(chatModelDetails?.numCtx ?? embeddingModelDetails?.numCtx ?? null),
@@ -1206,10 +1216,23 @@ export function SettingsSection({
               </select>
             </label>
             {formState.defaultChatModel && (
-              <ModelDetailsNote
+              <AdjustableModelContextBar
+                title="Finestra di contesto chat (num_ctx)"
+                sliderLabel="num_ctx chat"
                 loading={chatModelDetailsLoading}
                 details={chatModelDetails}
                 fallbackText="Dettagli chat non disponibili."
+                value={formState.chatNumCtx}
+                recommendedValue={chatNumCtxRecommendation}
+                onAutoChange={(isAutomatic) =>
+                  setFormState((current) => ({
+                    ...current,
+                    chatNumCtx: isAutomatic ? null : chatNumCtxRecommendation ?? 2048
+                  }))
+                }
+                onValueChange={(value) =>
+                  setFormState((current) => ({ ...current, chatNumCtx: value }))
+                }
               />
             )}
             <label className="field-group" htmlFor="default-embedding-model">
@@ -1234,74 +1257,24 @@ export function SettingsSection({
             </label>
 
             {formState.defaultEmbeddingModel && (
-              <div className="model-context-bar">
-                <div className="model-context-bar__label">
-                  <span>Finestra di contesto embedding (num_ctx)</span>
-                  {embeddingModelDetailsLoading && <span className="model-context-bar__hint">Caricamento...</span>}
-                  {!embeddingModelDetailsLoading && embeddingModelDetails?.numCtx && (
-                    <span className="model-context-bar__hint">
-                      Finestra nativa: {embeddingModelDetails.numCtx.toLocaleString()} token
-                    </span>
-                  )}
-                </div>
-                <label className="toggle-row" htmlFor="embedding-num-ctx-auto">
-                  <input
-                    id="embedding-num-ctx-auto"
-                    type="checkbox"
-                    checked={formState.embeddingNumCtx == null}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        embeddingNumCtx: event.target.checked
-                          ? null
-                          : embeddingRecommendations?.embeddingNumCtx ?? 2048
-                      }))
-                    }
-                  />
-                  <span>Automatico</span>
-                </label>
-                {formState.embeddingNumCtx != null && (
-                  <SettingsRangeField
-                    id="embedding-num-ctx"
-                    label="num_ctx embedding"
-                    min={64}
-                    max={131072}
-                    step={64}
-                    value={formState.embeddingNumCtx}
-                    formatValue={(value) => `${value.toLocaleString("it-IT")} token`}
-                    hint={embeddingRecommendations ? `Suggerito: ${embeddingRecommendations.embeddingNumCtx}` : null}
-                    onChange={(value) =>
-                      setFormState((current) => ({ ...current, embeddingNumCtx: value }))
-                    }
-                  />
-                )}
-                {embeddingModelDetails?.numCtx && formState.embeddingNumCtx == null && (
-                  <div className="model-context-bar__track">
-                    <div
-                      className="model-context-bar__fill"
-                      style={{ width: "100%" }}
-                      title={`Finestra nativa: ${embeddingModelDetails.numCtx.toLocaleString()} token`}
-                    />
-                    <span className="model-context-bar__track-label">
-                      {embeddingModelDetails.numCtx.toLocaleString()} token (nativo)
-                    </span>
-                  </div>
-                )}
-                {formState.embeddingNumCtx != null && embeddingModelDetails?.numCtx && (
-                  <div className="model-context-bar__track">
-                    <div
-                      className="model-context-bar__fill"
-                      style={{
-                        width: `${Math.min(100, Math.round((formState.embeddingNumCtx / embeddingModelDetails.numCtx) * 100))}%`
-                      }}
-                      title={`${formState.embeddingNumCtx.toLocaleString()} / ${embeddingModelDetails.numCtx.toLocaleString()} token`}
-                    />
-                    <span className="model-context-bar__track-label">
-                      {formState.embeddingNumCtx.toLocaleString()} / {embeddingModelDetails.numCtx.toLocaleString()} token
-                    </span>
-                  </div>
-                )}
-              </div>
+              <AdjustableModelContextBar
+                title="Finestra di contesto embedding (num_ctx)"
+                sliderLabel="num_ctx embedding"
+                loading={embeddingModelDetailsLoading}
+                details={embeddingModelDetails}
+                fallbackText="Dettagli embedding non disponibili."
+                value={formState.embeddingNumCtx}
+                recommendedValue={embeddingRecommendations?.embeddingNumCtx ?? null}
+                onAutoChange={(isAutomatic) =>
+                  setFormState((current) => ({
+                    ...current,
+                    embeddingNumCtx: isAutomatic ? null : embeddingRecommendations?.embeddingNumCtx ?? 2048
+                  }))
+                }
+                onValueChange={(value) =>
+                  setFormState((current) => ({ ...current, embeddingNumCtx: value }))
+                }
+              />
             )}
             <label className="field-group" htmlFor="default-translation-model">
               <span>Traduzione</span>
@@ -1324,10 +1297,23 @@ export function SettingsSection({
               </select>
             </label>
             {formState.defaultTranslationModel && (
-              <ModelDetailsNote
+              <AdjustableModelContextBar
+                title="Finestra di contesto traduzione (num_ctx)"
+                sliderLabel="num_ctx traduzione"
                 loading={translationModelDetailsLoading}
                 details={translationModelDetails}
                 fallbackText="Dettagli traduzione non disponibili."
+                value={formState.translationNumCtx}
+                recommendedValue={translationNumCtxRecommendation}
+                onAutoChange={(isAutomatic) =>
+                  setFormState((current) => ({
+                    ...current,
+                    translationNumCtx: isAutomatic ? null : translationNumCtxRecommendation ?? 2048
+                  }))
+                }
+                onValueChange={(value) =>
+                  setFormState((current) => ({ ...current, translationNumCtx: value }))
+                }
               />
             )}
             {unavailableDefaults.length > 0 && (
@@ -1585,34 +1571,92 @@ function SettingsRangeField({
   );
 }
 
-function ModelDetailsNote({
+function AdjustableModelContextBar({
+  title,
+  sliderLabel,
   loading,
   details,
-  fallbackText
+  fallbackText,
+  value,
+  recommendedValue,
+  onAutoChange,
+  onValueChange
 }: {
+  title: string;
+  sliderLabel: string;
   loading: boolean;
   details: OllamaModelDetails | null;
   fallbackText: string;
+  value: number | null;
+  recommendedValue: number | null;
+  onAutoChange: (isAutomatic: boolean) => void;
+  onValueChange: (value: number) => void;
 }) {
-  if (loading) {
-    return (
-      <div className="panel-note">
-        <p>Lettura dettagli modello in corso.</p>
-      </div>
-    );
-  }
-
-  if (!details?.numCtx) {
-    return (
-      <div className="panel-note">
-        <p>{fallbackText}</p>
-      </div>
-    );
-  }
+  const nativeNumCtx = details?.numCtx ?? null;
+  const activeValue = value ?? nativeNumCtx;
+  const trackLabel = value == null
+    ? nativeNumCtx
+      ? `${nativeNumCtx.toLocaleString("it-IT")} token (nativo)`
+      : "Automatico"
+    : nativeNumCtx
+      ? `${value.toLocaleString("it-IT")} / ${nativeNumCtx.toLocaleString("it-IT")} token`
+      : `${value.toLocaleString("it-IT")} token`;
+  const trackTitle = value == null
+    ? nativeNumCtx
+      ? `Finestra nativa: ${nativeNumCtx.toLocaleString("it-IT")} token`
+      : "Automatico"
+    : nativeNumCtx
+      ? `${value.toLocaleString("it-IT")} / ${nativeNumCtx.toLocaleString("it-IT")} token`
+      : `${value.toLocaleString("it-IT")} token`;
 
   return (
-    <div className="panel-note">
-      <p>num_ctx nativo: {details.numCtx.toLocaleString("it-IT")} token.</p>
+    <div className="model-context-bar">
+      <div className="model-context-bar__label">
+        <span>{title}</span>
+        {loading && <span className="model-context-bar__hint">Caricamento...</span>}
+        {!loading && details?.numCtx && (
+          <span className="model-context-bar__hint">
+            Finestra nativa: {details.numCtx.toLocaleString("it-IT")} token
+          </span>
+        )}
+        {!loading && !details?.numCtx && (
+          <span className="model-context-bar__hint">{fallbackText}</span>
+        )}
+      </div>
+      <label className="toggle-row" htmlFor={`${sliderLabel.replaceAll(" ", "-")}-auto`}>
+        <input
+          id={`${sliderLabel.replaceAll(" ", "-")}-auto`}
+          type="checkbox"
+          checked={value == null}
+          onChange={(event) => onAutoChange(event.target.checked)}
+        />
+        <span>Automatico</span>
+      </label>
+      {value != null && (
+        <SettingsRangeField
+          id={sliderLabel.replaceAll(" ", "-")}
+          label={sliderLabel}
+          min={64}
+          max={131072}
+          step={64}
+          value={value}
+          formatValue={(currentValue) => `${currentValue.toLocaleString("it-IT")} token`}
+          hint={recommendedValue ? `Suggerito: ${recommendedValue}` : null}
+          onChange={onValueChange}
+        />
+      )}
+      {activeValue && (
+        <div className="model-context-bar__track">
+          <div
+            className="model-context-bar__fill"
+            style={{ width: `${nativeNumCtx && value != null ? Math.min(100, Math.round((value / nativeNumCtx) * 100)) : 100}%` }}
+            title={trackTitle}
+          />
+          <span className="model-context-bar__track-label">
+            {trackLabel}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1690,7 +1734,9 @@ function normalizeOllamaSettings(settings: OllamaSettings): OllamaSettings {
     defaultTranslationModel: normalizeOptionalValue(settings.defaultTranslationModel),
     requestTimeoutSeconds: Number(settings.requestTimeoutSeconds),
     embeddingBatchSize: Number(settings.embeddingBatchSize),
-    embeddingNumCtx: settings.embeddingNumCtx != null ? Number(settings.embeddingNumCtx) : null
+    embeddingNumCtx: settings.embeddingNumCtx != null ? Number(settings.embeddingNumCtx) : null,
+    chatNumCtx: settings.chatNumCtx != null ? Number(settings.chatNumCtx) : null,
+    translationNumCtx: settings.translationNumCtx != null ? Number(settings.translationNumCtx) : null
   };
 }
 
@@ -1848,6 +1894,14 @@ function buildEmbeddingRecommendations(numCtx: number | null): {
   );
 
   return { embeddingNumCtx, chunkMinimum, chunkMaximum };
+}
+
+function buildNumCtxRecommendation(numCtx: number | null): number | null {
+  if (!numCtx || numCtx <= 0) {
+    return null;
+  }
+
+  return clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
 }
 
 function buildContextChunkRecommendation(numCtx: number | null): number | null {

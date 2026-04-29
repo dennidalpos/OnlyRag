@@ -18,8 +18,10 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
     private const string RequestTimeoutSecondsKey = "ollama.requestTimeoutSeconds";
     private const string EmbeddingBatchSizeKey = "ollama.embeddingBatchSize";
     private const string EmbeddingNumCtxKey = "ollama.embeddingNumCtx";
-    private const int MinEmbeddingNumCtx = 64;
-    private const int MaxEmbeddingNumCtx = 131072;
+    private const string ChatNumCtxKey = "ollama.chatNumCtx";
+    private const string TranslationNumCtxKey = "ollama.translationNumCtx";
+    private const int MinNumCtx = 64;
+    private const int MaxNumCtx = 131072;
 
     private readonly ISettingsRepository settingsRepository;
 
@@ -41,6 +43,8 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         string? requestTimeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
         string? embeddingBatchSizeValue = await settingsRepository.GetValueAsync(EmbeddingBatchSizeKey, cancellationToken);
         string? embeddingNumCtxValue = await settingsRepository.GetValueAsync(EmbeddingNumCtxKey, cancellationToken);
+        string? chatNumCtxValue = await settingsRepository.GetValueAsync(ChatNumCtxKey, cancellationToken);
+        string? translationNumCtxValue = await settingsRepository.GetValueAsync(TranslationNumCtxKey, cancellationToken);
 
         return new OllamaSettings(
             baseUrl,
@@ -49,7 +53,9 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             defaultTranslationModel,
             ParseRequestTimeoutSeconds(requestTimeoutValue),
             ParseEmbeddingBatchSize(embeddingBatchSizeValue),
-            ParseEmbeddingNumCtx(embeddingNumCtxValue));
+            ParseNumCtx(embeddingNumCtxValue),
+            ParseNumCtx(chatNumCtxValue),
+            ParseNumCtx(translationNumCtxValue));
     }
 
     public async Task<OllamaSettings> UpdateAsync(OllamaSettings settings, CancellationToken cancellationToken = default)
@@ -61,6 +67,8 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         string? defaultTranslationModel = NormalizeOptionalValue(settings.DefaultTranslationModel);
         int embeddingBatchSize = ValidateEmbeddingBatchSize(settings.EmbeddingBatchSize);
         int? embeddingNumCtx = ValidateEmbeddingNumCtx(settings.EmbeddingNumCtx);
+        int? chatNumCtx = ValidateNumCtx(settings.ChatNumCtx, "chat");
+        int? translationNumCtx = ValidateNumCtx(settings.TranslationNumCtx, "traduzione");
 
         await settingsRepository.UpsertAsync(BaseUrlKey, normalizedBaseUrl, cancellationToken);
         await settingsRepository.UpsertAsync(RequestTimeoutSecondsKey, normalizedTimeout.ToString(), cancellationToken);
@@ -69,6 +77,8 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         await settingsRepository.UpsertAsync(DefaultEmbeddingModelKey, defaultEmbeddingModel ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(DefaultTranslationModelKey, defaultTranslationModel ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(EmbeddingNumCtxKey, embeddingNumCtx?.ToString() ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(ChatNumCtxKey, chatNumCtx?.ToString() ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(TranslationNumCtxKey, translationNumCtx?.ToString() ?? string.Empty, cancellationToken);
 
         return new OllamaSettings(
             normalizedBaseUrl,
@@ -77,7 +87,9 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             defaultTranslationModel,
             normalizedTimeout,
             embeddingBatchSize,
-            embeddingNumCtx);
+            embeddingNumCtx,
+            chatNumCtx,
+            translationNumCtx);
     }
 
     public async Task ClearMissingDefaultModelAsync(string modelName, CancellationToken cancellationToken = default)
@@ -205,24 +217,29 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
 
     internal static int? ValidateEmbeddingNumCtx(int? embeddingNumCtx)
     {
-        if (embeddingNumCtx is null) return null;
+        return ValidateNumCtx(embeddingNumCtx, "embedding");
+    }
 
-        if (embeddingNumCtx.Value < MinEmbeddingNumCtx || embeddingNumCtx.Value > MaxEmbeddingNumCtx)
+    internal static int? ValidateNumCtx(int? numCtx, string scope)
+    {
+        if (numCtx is null) return null;
+
+        if (numCtx.Value < MinNumCtx || numCtx.Value > MaxNumCtx)
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                $"La finestra di contesto embedding deve essere compresa tra {MinEmbeddingNumCtx} e {MaxEmbeddingNumCtx} token, oppure lasciata su Automatico.");
+                $"La finestra di contesto {scope} deve essere compresa tra {MinNumCtx} e {MaxNumCtx} token, oppure lasciata su Automatico.");
         }
 
-        return embeddingNumCtx.Value;
+        return numCtx.Value;
     }
 
-    private static int? ParseEmbeddingNumCtx(string? embeddingNumCtxValue)
+    private static int? ParseNumCtx(string? numCtxValue)
     {
-        if (string.IsNullOrWhiteSpace(embeddingNumCtxValue)) return null;
-        return int.TryParse(embeddingNumCtxValue, out int parsed)
-            && parsed >= MinEmbeddingNumCtx
-            && parsed <= MaxEmbeddingNumCtx
+        if (string.IsNullOrWhiteSpace(numCtxValue)) return null;
+        return int.TryParse(numCtxValue, out int parsed)
+            && parsed >= MinNumCtx
+            && parsed <= MaxNumCtx
             ? parsed
             : null;
     }

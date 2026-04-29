@@ -269,6 +269,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
         public Task<string> GenerateChatAsync(
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
@@ -332,6 +333,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
         public Task<string> GenerateChatAsync(
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

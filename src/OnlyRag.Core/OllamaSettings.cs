@@ -7,4 +7,6 @@ public sealed record OllamaSettings(
     string? DefaultTranslationModel,
     int RequestTimeoutSeconds,
     int EmbeddingBatchSize,
-    int? EmbeddingNumCtx = null);
+    int? EmbeddingNumCtx = null,
+    int? ChatNumCtx = null,
+    int? TranslationNumCtx = null);

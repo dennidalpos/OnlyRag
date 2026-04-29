@@ -116,6 +116,7 @@ internal sealed class OllamaClient : IOllamaClient
     public async Task<string> GenerateChatAsync(
         string modelName,
         IReadOnlyList<OllamaChatMessage> messages,
+        int? numCtx = null,
         CancellationToken cancellationToken = default)
     {
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
@@ -134,11 +135,19 @@ internal sealed class OllamaClient : IOllamaClient
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
-        OllamaChatResponse response = await SendAsync<OllamaChatResponse>(
-            HttpMethod.Post,
-            context,
-            "api/chat",
-            new
+        object requestBody = numCtx.HasValue
+            ? new
+            {
+                model = normalizedModelName,
+                stream = false,
+                messages = messages.Select(message => new
+                {
+                    role = message.Role,
+                    content = message.Content
+                }),
+                options = new { num_ctx = numCtx.Value }
+            }
+            : (object)new
             {
                 model = normalizedModelName,
                 stream = false,
@@ -147,7 +156,12 @@ internal sealed class OllamaClient : IOllamaClient
                     role = message.Role,
                     content = message.Content
                 })
-            },
+            };
+        OllamaChatResponse response = await SendAsync<OllamaChatResponse>(
+            HttpMethod.Post,
+            context,
+            "api/chat",
+            requestBody,
             cancellationToken);
 
         string content = response.Message?.Content?.Trim() ?? string.Empty;

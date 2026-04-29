@@ -19,6 +19,7 @@ internal interface IOllamaClient
     Task<string> GenerateChatAsync(
         string modelName,
         IReadOnlyList<OllamaChatMessage> messages,
+        int? numCtx = null,
         CancellationToken cancellationToken = default);
 
     Task<OllamaModelDetails> ShowModelAsync(string modelName, CancellationToken cancellationToken = default);

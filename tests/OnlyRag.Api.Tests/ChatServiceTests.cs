@@ -14,7 +14,7 @@ public sealed class ChatServiceTests
         FakeOllamaClient ollama = new("gemma3:4b", "Risposta generale.");
         ThrowingRetrievalService retrieval = new();
         InMemoryChatHistoryRepository history = new();
-        ChatService service = new(ollama, retrieval, history);
+        ChatService service = new(ollama, retrieval, history, new StubOllamaSettingsService());
 
         ChatResponse response = await service.SendAsync(new ChatRequest(
             "Ciao",
@@ -36,7 +36,7 @@ public sealed class ChatServiceTests
         FakeOllamaClient ollama = new("gemma3:4b", "Risposta con fonte.");
         StaticRetrievalService retrieval = new(CreateSearchResponse("Manuale.pdf", "Codice ABC-123 nel contratto."));
         InMemoryChatHistoryRepository history = new();
-        ChatService service = new(ollama, retrieval, history);
+        ChatService service = new(ollama, retrieval, history, new StubOllamaSettingsService());
 
         ChatResponse response = await service.SendAsync(new ChatRequest(
             "Quale codice e presente?",
@@ -58,7 +58,7 @@ public sealed class ChatServiceTests
         const string wholeDocumentText = "DOCUMENTO INTERO DA NON INVIARE AL MODELLO";
         FakeOllamaClient ollama = new("gemma3:4b", "Risposta con snippet.");
         StaticRetrievalService retrieval = new(CreateSearchResponse("Policy.docx", "Snippet selezionato dal retrieval."));
-        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository());
+        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository(), new StubOllamaSettingsService());
 
         await service.SendAsync(new ChatRequest(
             "Riassumi la policy",
@@ -82,7 +82,7 @@ public sealed class ChatServiceTests
             "mock",
             "mock",
             8000));
-        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository());
+        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository(), new StubOllamaSettingsService());
 
         ChatResponse response = await service.SendAsync(new ChatRequest(
             "Domanda assente",
@@ -146,6 +146,7 @@ public sealed class ChatServiceTests
         public Task<string> GenerateChatAsync(
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
             CancellationToken cancellationToken = default)
         {
             LastMessages = messages;
@@ -180,6 +181,30 @@ public sealed class ChatServiceTests
         public Task TestConnectionAsync(CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubOllamaSettingsService : IOllamaSettingsService
+    {
+        public Task ClearMissingDefaultModelAsync(string modelName, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<OllamaSettings> GetAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                null,
+                null,
+                60,
+                1));
+        }
+
+        public Task<OllamaSettings> UpdateAsync(OllamaSettings settings, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 
@@ -246,4 +271,3 @@ public sealed class ChatServiceTests
         }
     }
 }
-

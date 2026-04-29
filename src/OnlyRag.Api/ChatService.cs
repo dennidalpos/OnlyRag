@@ -18,15 +18,18 @@ internal sealed class ChatService
     private readonly IOllamaClient ollamaClient;
     private readonly IHybridRetrievalService retrieval;
     private readonly IChatHistoryRepository chatHistory;
+    private readonly IOllamaSettingsService settingsService;
 
     public ChatService(
         IOllamaClient ollamaClient,
         IHybridRetrievalService retrieval,
-        IChatHistoryRepository chatHistory)
+        IChatHistoryRepository chatHistory,
+        IOllamaSettingsService settingsService)
     {
         this.ollamaClient = ollamaClient;
         this.retrieval = retrieval;
         this.chatHistory = chatHistory;
+        this.settingsService = settingsService;
     }
 
     public async Task<ChatResponse> SendAsync(
@@ -87,7 +90,8 @@ internal sealed class ChatService
             searchResponse,
             history);
 
-        string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, cancellationToken);
+        int? chatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
+        string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, chatNumCtx, cancellationToken);
         await PersistTurnAsync(conversationId, model, message, answer, sources, cancellationToken);
 
         return new ChatResponse(conversationId, model, answer, useDocuments, sources, notices);

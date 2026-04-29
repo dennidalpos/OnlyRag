@@ -100,7 +100,8 @@ public sealed class DocumentTranslationJobHandlerTests
         DocumentTranslationJobHandler handler = new(
             translationRepository,
             ollamaClient,
-            performanceSettings);
+            performanceSettings,
+            new StubOllamaSettingsService());
 
         await handler.ExecuteAsync(leased, queue, CancellationToken.None);
 
@@ -226,6 +227,7 @@ public sealed class DocumentTranslationJobHandlerTests
         public Task<string> GenerateChatAsync(
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
@@ -265,6 +267,30 @@ public sealed class DocumentTranslationJobHandlerTests
             }
 
             return prompt[(start + 1)..end].Trim();
+        }
+    }
+
+    private sealed class StubOllamaSettingsService : IOllamaSettingsService
+    {
+        public Task ClearMissingDefaultModelAsync(string modelName, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<OllamaSettings> GetAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                null,
+                null,
+                60,
+                1));
+        }
+
+        public Task<OllamaSettings> UpdateAsync(OllamaSettings settings, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 

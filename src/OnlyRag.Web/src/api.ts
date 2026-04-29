@@ -12,6 +12,8 @@ export type OllamaSettings = {
   requestTimeoutSeconds: number;
   embeddingBatchSize: number;
   embeddingNumCtx: number | null;
+  chatNumCtx: number | null;
+  translationNumCtx: number | null;
 };
 
 export type OllamaModelDetails = {

@@ -13,15 +13,18 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
     private readonly ITranslationRepository translations;
     private readonly IOllamaClient ollamaClient;
     private readonly IPerformanceSettingsService performanceSettings;
+    private readonly IOllamaSettingsService settingsService;
 
     public DocumentTranslationJobHandler(
         ITranslationRepository translations,
         IOllamaClient ollamaClient,
-        IPerformanceSettingsService performanceSettings)
+        IPerformanceSettingsService performanceSettings,
+        IOllamaSettingsService settingsService)
     {
         this.translations = translations;
         this.ollamaClient = ollamaClient;
         this.performanceSettings = performanceSettings;
+        this.settingsService = settingsService;
     }
 
     public string Type => DocumentTranslationJobType;
@@ -45,13 +48,14 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         string model = OllamaSettingsService.NormalizeRequiredModelName(payload.Model);
         DocumentTranslationPromptBuilder.NormalizeLanguage(payload.TargetLanguage);
         int batchSize = (await performanceSettings.GetAsync(cancellationToken)).TranslationBatchSize;
+        int? translationNumCtx = (await settingsService.GetAsync(cancellationToken)).TranslationNumCtx;
         TranslationCheckpoint checkpoint = ReadCheckpoint(job.CheckpointJson, payload.TranslationId, model);
 
         try
         {
             await EnsureModelIsInstalledAsync(model, cancellationToken);
             await translations.UpdateTranslationJobAsync(payload.TranslationId, job.Id, "Running", null, cancellationToken);
-            await TranslateFromCheckpointAsync(payload, model, batchSize, checkpoint, job, queue, cancellationToken);
+            await TranslateFromCheckpointAsync(payload, model, batchSize, translationNumCtx, checkpoint, job, queue, cancellationToken);
             await translations.RefreshProgressAsync(payload.TranslationId, "Completed", null, cancellationToken);
         }
         catch (OllamaApiException ex)
@@ -86,6 +90,7 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         DocumentTranslationJobPayload payload,
         string model,
         int batchSize,
+        int? translationNumCtx,
         TranslationCheckpoint checkpoint,
         LocalJob job,
         ILocalJobQueue queue,
@@ -124,7 +129,7 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                 IReadOnlyList<OllamaChatMessage> messages = DocumentTranslationPromptBuilder.BuildMessages(
                     payload.TargetLanguage,
                     unit);
-                string translatedText = StripDelimiters(await ollamaClient.GenerateChatAsync(model, messages, cancellationToken));
+                string translatedText = StripDelimiters(await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken));
                 TranslationValidationResult validation = TranslationOutputValidator.Validate(unit.SourceText, translatedText);
                 if (!validation.IsValid)
                 {
