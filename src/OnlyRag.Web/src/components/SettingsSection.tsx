@@ -33,6 +33,7 @@ const emptySettings: OllamaSettings = {
 };
 
 const NUM_CTX_PRESETS = [512, 1024, 2048, 4096, 8192, 16384, 32768];
+const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
 
 const emptyOfficeSettings: OfficeConversionSettings = {
   libreOfficePath: null,
@@ -66,6 +67,9 @@ const emptyOcrSettings: OcrSettings = {
   cpuThreads: 2,
   device: "cpu"
 };
+
+const PADDLE_OCR_MODEL_PRESETS = ["PP-OCRv5"];
+const PADDLE_OCR_MODEL_VERSIONS = ["PP-OCRv5"];
 
 export function SettingsSection({
   settings,
@@ -250,6 +254,10 @@ export function SettingsSection({
     } finally {
       setIsBusy(false);
     }
+  }
+
+  function openOllamaModelLibrary() {
+    window.open(OLLAMA_MODEL_LIBRARY_URL, "_blank", "noopener,noreferrer");
   }
 
   async function refreshOfficeConverter() {
@@ -682,7 +690,10 @@ export function SettingsSection({
           <div className="settings-form">
             <div className="settings-grid">
               <label className="field-group" htmlFor="ocr-profile">
-                <span>Profilo</span>
+                <OcrFieldLabel
+                  text="Profilo"
+                  tooltip="Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
+                />
                 <select
                   id="ocr-profile"
                   value={ocrFormState.profile}
@@ -696,7 +707,10 @@ export function SettingsSection({
                 </select>
               </label>
               <label className="field-group" htmlFor="ocr-device">
-                <span>Dispositivo</span>
+                <OcrFieldLabel
+                  text="Dispositivo"
+                  tooltip="CPU e' piu compatibile. GPU richiede un ambiente PaddleOCR configurato per accelerazione hardware."
+                />
                 <select
                   id="ocr-device"
                   value={ocrFormState.device}
@@ -708,136 +722,122 @@ export function SettingsSection({
                   <option value="gpu">GPU</option>
                 </select>
               </label>
-              <label className="field-group" htmlFor="ocr-pdf-dpi">
-                <span>DPI PDF</span>
-                <input
-                  id="ocr-pdf-dpi"
-                  type="number"
-                  min={96}
-                  max={400}
-                  value={ocrFormState.pdfDpi}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, pdfDpi: Number(event.target.value) }))
-                  }
-                />
-              </label>
+              <OcrRangeField
+                id="ocr-pdf-dpi"
+                label="DPI PDF"
+                tooltip="Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
+                min={96}
+                max={400}
+                value={ocrFormState.pdfDpi}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, pdfDpi: value }))}
+              />
               <label className="field-group" htmlFor="ocr-model-preset">
-                <span>Preset modello</span>
-                <input
+                <OcrFieldLabel
+                  text="Preset modello"
+                  tooltip="Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
+                />
+                <select
                   id="ocr-model-preset"
-                  type="text"
                   value={ocrFormState.modelPreset}
                   onChange={(event) =>
                     setOcrFormState((current) => ({ ...current, modelPreset: event.target.value }))
                   }
-                />
+                >
+                  {getOcrSelectOptions(ocrFormState.modelPreset, PADDLE_OCR_MODEL_PRESETS).map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </label>
               <label className="field-group" htmlFor="ocr-model-version">
-                <span>Versione modello</span>
-                <input
+                <OcrFieldLabel
+                  text="Versione modello"
+                  tooltip="Versione OCR passata a PaddleOCR come ocr_version quando supportata. Il valore salvato resta selezionabile anche se non e' nell'elenco noto."
+                />
+                <select
                   id="ocr-model-version"
-                  type="text"
                   value={ocrFormState.modelVersion}
                   onChange={(event) =>
                     setOcrFormState((current) => ({ ...current, modelVersion: event.target.value }))
                   }
-                />
+                >
+                  {getOcrSelectOptions(ocrFormState.modelVersion, PADDLE_OCR_MODEL_VERSIONS).map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </label>
-              <label className="field-group" htmlFor="ocr-detection-side-limit">
-                <span>Lato massimo detection</span>
-                <input
-                  id="ocr-detection-side-limit"
-                  type="number"
-                  min={320}
-                  max={4096}
-                  value={ocrFormState.detectionSideLimit}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, detectionSideLimit: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-detection-threshold">
-                <span>Soglia detection</span>
-                <input
-                  id="ocr-detection-threshold"
-                  type="number"
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
-                  value={ocrFormState.detectionThreshold}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, detectionThreshold: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-detection-box-threshold">
-                <span>Soglia box</span>
-                <input
-                  id="ocr-detection-box-threshold"
-                  type="number"
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
-                  value={ocrFormState.detectionBoxThreshold}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, detectionBoxThreshold: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-detection-unclip-ratio">
-                <span>Unclip ratio</span>
-                <input
-                  id="ocr-detection-unclip-ratio"
-                  type="number"
-                  min={1}
-                  max={3}
-                  step={0.05}
-                  value={ocrFormState.detectionUnclipRatio}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, detectionUnclipRatio: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-recognition-score-threshold">
-                <span>Soglia riconoscimento</span>
-                <input
-                  id="ocr-recognition-score-threshold"
-                  type="number"
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
-                  value={ocrFormState.recognitionScoreThreshold}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, recognitionScoreThreshold: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-recognition-batch-size">
-                <span>Batch riconoscimento</span>
-                <input
-                  id="ocr-recognition-batch-size"
-                  type="number"
-                  min={1}
-                  max={32}
-                  value={ocrFormState.recognitionBatchSize}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, recognitionBatchSize: Number(event.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-cpu-threads">
-                <span>Thread CPU</span>
-                <input
-                  id="ocr-cpu-threads"
-                  type="number"
-                  min={1}
-                  max={16}
-                  value={ocrFormState.cpuThreads}
-                  onChange={(event) =>
-                    setOcrFormState((current) => ({ ...current, cpuThreads: Number(event.target.value) }))
-                  }
-                />
-              </label>
+              <OcrRangeField
+                id="ocr-detection-side-limit"
+                label="Lato massimo detection"
+                tooltip="Dimensione massima usata dal detector testo. Valori bassi riducono tempo e memoria, valori alti aiutano pagine grandi o dettagli fini."
+                min={320}
+                max={4096}
+                value={ocrFormState.detectionSideLimit}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionSideLimit: value }))}
+              />
+              <OcrRangeField
+                id="ocr-detection-threshold"
+                label="Soglia detection"
+                tooltip="Confidenza minima per proporre aree di testo. Valori bassi rilevano piu elementi, valori alti scartano rumore."
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                value={ocrFormState.detectionThreshold}
+                formatValue={formatOcrDecimal}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionThreshold: value }))}
+              />
+              <OcrRangeField
+                id="ocr-detection-box-threshold"
+                label="Soglia box"
+                tooltip="Filtro sui riquadri rilevati. Valori bassi sono piu permissivi, valori alti tengono solo box piu affidabili."
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                value={ocrFormState.detectionBoxThreshold}
+                formatValue={formatOcrDecimal}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionBoxThreshold: value }))}
+              />
+              <OcrRangeField
+                id="ocr-detection-unclip-ratio"
+                label="Unclip ratio"
+                tooltip="Espansione dei box di testo rilevati. Valori bassi sono piu stretti, valori alti includono piu margine intorno al testo."
+                min={1}
+                max={3}
+                step={0.05}
+                value={ocrFormState.detectionUnclipRatio}
+                formatValue={formatOcrDecimal}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, detectionUnclipRatio: value }))}
+              />
+              <OcrRangeField
+                id="ocr-recognition-score-threshold"
+                label="Soglia riconoscimento"
+                tooltip="Confidenza minima delle parole riconosciute. Valori bassi mantengono piu testo, valori alti privilegiano risultati piu affidabili."
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                value={ocrFormState.recognitionScoreThreshold}
+                formatValue={formatOcrDecimal}
+                onChange={(value) =>
+                  setOcrFormState((current) => ({ ...current, recognitionScoreThreshold: value }))
+                }
+              />
+              <OcrRangeField
+                id="ocr-recognition-batch-size"
+                label="Batch riconoscimento"
+                tooltip="Numero di crop di testo riconosciuti insieme. Valori bassi consumano meno memoria, valori alti possono accelerare su hardware adeguato."
+                min={1}
+                max={32}
+                value={ocrFormState.recognitionBatchSize}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, recognitionBatchSize: value }))}
+              />
+              <OcrRangeField
+                id="ocr-cpu-threads"
+                label="Thread CPU"
+                tooltip="Thread CPU dedicati a PaddleOCR. Valori bassi lasciano il PC piu reattivo, valori alti possono ridurre i tempi OCR."
+                min={1}
+                max={16}
+                value={ocrFormState.cpuThreads}
+                onChange={(value) => setOcrFormState((current) => ({ ...current, cpuThreads: value }))}
+              />
             </div>
             <label className="toggle-row" htmlFor="ocr-textline-orientation">
               <input
@@ -1130,6 +1130,13 @@ export function SettingsSection({
               >
                 Installa
               </button>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={openOllamaModelLibrary}
+              >
+                Elenco modelli Ollama
+              </button>
             </div>
             <div className="model-list" aria-label="Modelli installati">
               {models.length === 0 && (
@@ -1225,6 +1232,78 @@ export function SettingsSection({
       </div>
     </div>
   );
+}
+
+type OcrRangeFieldProps = {
+  id: string;
+  label: string;
+  tooltip: string;
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  formatValue?: (value: number) => string;
+  onChange: (value: number) => void;
+};
+
+function OcrRangeField({
+  id,
+  label,
+  tooltip,
+  min,
+  max,
+  step = 1,
+  value,
+  formatValue = formatOcrInteger,
+  onChange
+}: OcrRangeFieldProps) {
+  return (
+    <label className="field-group ocr-range-field" htmlFor={id}>
+      <OcrFieldLabel text={label} tooltip={tooltip} />
+      <span className="ocr-range-field__value">{formatValue(value)}</span>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        title={tooltip}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <span className="ocr-range-field__scale" aria-hidden="true">
+        <span>Veloce</span>
+        <span>Accurato</span>
+      </span>
+    </label>
+  );
+}
+
+function OcrFieldLabel({ text, tooltip }: { text: string; tooltip: string }) {
+  return (
+    <span className="ocr-field-label">
+      <span>{text}</span>
+      <span className="ocr-tooltip" title={tooltip} aria-label={tooltip}>?</span>
+    </span>
+  );
+}
+
+function getOcrSelectOptions(currentValue: string, knownValues: string[]): string[] {
+  const current = currentValue.trim();
+  const options = new Set(knownValues);
+  if (current.length > 0) {
+    options.add(current);
+  }
+
+  return [...options];
+}
+
+function formatOcrInteger(value: number): string {
+  return Math.round(value).toLocaleString("it-IT");
+}
+
+function formatOcrDecimal(value: number): string {
+  return value.toFixed(2);
 }
 
 function normalizeOptionalValue(value: string | null): string | null {

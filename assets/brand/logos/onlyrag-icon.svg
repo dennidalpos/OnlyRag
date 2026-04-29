@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="OnlyRag icon">
+  <defs>
+    <linearGradient id="bg" x1="28" y1="22" x2="222" y2="234" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#123044"/>
+      <stop offset="1" stop-color="#0b1826"/>
+    </linearGradient>
+    <linearGradient id="doc" x1="77" y1="54" x2="176" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe8f0"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="120" y1="115" x2="195" y2="204" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#58d5c9"/>
+      <stop offset="1" stop-color="#21a5a2"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <path d="M78 48h68l34 34v88c0 13-8 21-21 21H78c-13 0-21-8-21-21V69c0-13 8-21 21-21Z" fill="url(#doc)"/>
+  <path d="M145 49v31c0 5 4 9 9 9h27" fill="#b9c8d6"/>
+  <path d="M83 104h65M83 128h52M83 152h42" stroke="#5f7184" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="157" cy="153" r="34" fill="none" stroke="url(#lens)" stroke-width="16"/>
+  <path d="M182 179l25 25" stroke="#f2c14e" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="93" cy="103" r="6" fill="#f2c14e"/>
+  <circle cx="128" cy="103" r="6" fill="#58d5c9"/>
+  <circle cx="145" cy="151" r="5" fill="#58d5c9"/>
+</svg>
+

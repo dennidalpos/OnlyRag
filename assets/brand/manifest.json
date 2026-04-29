@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-04-29T12:05:45",
+  "sourceIcon": "src/OnlyRag.App/Assets/OnlyRag.svg",
+  "outputRoot": "assets/brand",
+  "categories": {
+    "logos": [
+      "logos/onlyrag-icon.svg",
+      "logos/onlyrag-logo-horizontal.svg",
+      "logos/onlyrag-logo-stacked.svg",
+      "logos/onlyrag-mark-mono.svg",
+      "logos/onlyrag-icon-16.png",
+      "logos/onlyrag-icon-32.png",
+      "logos/onlyrag-icon-48.png",
+      "logos/onlyrag-icon-64.png",
+      "logos/onlyrag-icon-128.png",
+      "logos/onlyrag-icon-256.png",
+      "logos/onlyrag-icon-512.png",
+      "logos/onlyrag-icon-1024.png",
+      "logos/onlyrag-logo-horizontal-1200x400.png",
+      "logos/onlyrag-logo-horizontal-2400x800.png",
+      "logos/onlyrag-logo-stacked-1024x512.png"
+    ],
+    "social": [
+      "social/open-graph-1200x630.png",
+      "social/github-social-preview-1280x640.png",
+      "social/x-twitter-card-1600x900.png",
+      "social/linkedin-share-1200x627.png",
+      "social/instagram-square-1080x1080.png",
+      "social/instagram-portrait-1080x1350.png",
+      "social/story-reel-1080x1920.png",
+      "social/youtube-thumbnail-1280x720.png"
+    ],
+    "setup": [
+      "setup/onlyrag-setup-wizard-image-164x314.png",
+      "setup/onlyrag-setup-wizard-image-164x314.bmp",
+      "setup/onlyrag-setup-wizard-small-55x55.png",
+      "setup/onlyrag-setup-wizard-small-55x55.bmp",
+      "setup/onlyrag-setup-banner-493x58.png",
+      "setup/onlyrag-setup-header-1500x500.png"
+    ],
+    "posts": [
+      "posts/post-local-first-rag-1080x1080.png",
+      "posts/post-document-library-1200x1200.png",
+      "posts/post-ollama-ocr-1080x1350.png",
+      "posts/post-translation-export-1080x1350.png",
+      "posts/post-release-setup-1200x630.png"
+    ]
+  }
+}
