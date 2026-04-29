@@ -161,6 +161,10 @@ Supported operations use the configured Ollama endpoint for model listing, model
 and chat. The app sends retrieved snippets or unit text as needed; it does not send full documents
 for RAG answers.
 
+Settings > Ollama stores separate nullable `num_ctx` overrides for chat, embeddings, and document
+translation. Automatic mode stores `null` and omits `num_ctx` from Ollama requests; manual mode
+persists the selected value and passes it to the relevant generation or embedding request.
+
 ## Packaging Status
 
 Windows packaging uses Inno Setup 6 and a per-user install under

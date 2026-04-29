@@ -81,6 +81,14 @@ selected documents) is preserved in `sessionStorage` on the frontend to survive 
 The service never sends full document text to Ollama, only retrieved snippets within the
 configured context budget.
 
+Chat context size is configured independently from embedding context size:
+
+- `ollama.chatNumCtx`: nullable chat `num_ctx` override.
+- `null` / automatic mode omits `num_ctx` from chat generation requests so Ollama uses its model or
+  server default.
+- Manual mode persists the selected value and passes it to Ollama chat generation.
+- Values are normalized by the backend with the shared `64..131072` clamp.
+
 ## Known Limits
 
 - Vector search depends on the Windows native `vec0.dll` copied from the `sqlite-vec` NuGet

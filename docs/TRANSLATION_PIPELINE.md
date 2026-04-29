@@ -15,6 +15,17 @@ Current stages:
 7. Capture source layout metadata for each translation unit.
 8. Export translated text to local filesystem formats.
 
+## Runtime Settings
+
+The translation model and endpoint are configured in Settings > Ollama. Translation context size is
+configured separately from chat and embedding context size:
+
+- `ollama.translationNumCtx`: nullable translation `num_ctx` override.
+- `null` / automatic mode omits `num_ctx` from translation generation requests so Ollama uses its
+  model or server default.
+- Manual mode persists the selected value and passes it to each translation generation request.
+- Values are normalized by the backend with the shared `64..131072` clamp.
+
 Manual corrections:
 
 - `translation_units.machine_translated_text` keeps the latest generated text.

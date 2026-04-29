@@ -5,16 +5,16 @@
 </p>
 
 OnlyRag is a Windows desktop app for building a local document library and using it with
-Ollama-backed chat, retrieval, OCR, and translation workflows.
+Ollama-backed search, chat, OCR, and translation workflows.
 
-The app is local-first. Documents, indexes, jobs, settings, chat history, OCR cache, logs, and
-exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or on a trusted LAN endpoint;
-OnlyRag sends retrieved snippets or translation units, not full documents for RAG answers.
+The app is local-first: documents, indexes, jobs, settings, chat history, OCR cache, logs, and
+exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or on a trusted LAN endpoint.
+For RAG answers, OnlyRag sends retrieved snippets to the model, not full source documents.
 
-## Verified Features
+## What Works
 
 - Import TXT, Markdown, PDF, DOCX, XLSX, PPTX, and image files into a local library.
-- Convert legacy Office files (`.doc`, `.xls`, `.ppt`) through optional LibreOffice.
+- Convert `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
   are prepared.
 - Generate embeddings through a configured Ollama endpoint and store vectors locally in SQLite.
@@ -22,40 +22,63 @@ OnlyRag sends retrieved snippets or translation units, not full documents for RA
 - Chat with selected documents and show source snippets for grounded answers.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
+- Configure Ollama endpoint, chat/embedding/translation models, `num_ctx` behavior, ingestion,
+  OCR, Office conversion, and performance settings from the desktop UI.
 - Track ingestion, embedding, OCR, and translation jobs in the desktop UI.
 - Confirm app exit when local jobs or unsaved UI work exist; confirmed exit saves available work,
-  cancels active local jobs, and closes other OnlyRag instances softly.
-- Build, test, publish, and package a per-user Windows installer with the repository scripts.
+  cancels active local jobs, and stops the in-process backend.
+- Build, test, publish, sign, and package Windows installer candidates with repository scripts.
 
-## Minimum Setup
+## Requirements
 
-Required for development:
+Development:
 
 - Windows 10 1809 or newer.
 - PowerShell 7 (`pwsh`).
 - .NET 10 SDK.
-- Node.js matching `^20.19.0 || >=22.12.0` with npm.
+- Node.js `^20.19.0 || >=22.12.0` with npm.
 - Microsoft Edge WebView2 Runtime.
 
-Required for model features:
+Model features:
 
-- Ollama, reachable locally or on the LAN.
+- Ollama, reachable locally or on a trusted LAN endpoint.
 
-Optional:
+Optional features:
 
 - LibreOffice for legacy Office conversion and PDF export.
-- Python for the PaddleOCR bridge.
+- Python 3.10+ for the PaddleOCR bridge.
 - Inno Setup 6 for installer generation.
 - Windows SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
 
-## Main Commands
+## Setup
 
-Run commands from the repository root in PowerShell 7.
+Run from the repository root in PowerShell 7:
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
+```
+
+The bootstrap verifies prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
+installs web dependencies with `npm ci`, and prepares the optional OCR Python environment when
+Python is available. It does not install system software.
+
+## Commands
+
+Build the web UI:
+
+```powershell
 pwsh .\scripts\Build-Web.ps1
+```
+
+Build the .NET solution:
+
+```powershell
 pwsh .\scripts\Build-App.ps1 -Configuration Release
+```
+
+Run the canonical repository checks:
+
+```powershell
 pwsh .\scripts\Test-All.ps1 -Configuration Release
 ```
 
@@ -81,15 +104,15 @@ No lint script or formatter configuration is currently defined.
 
 ## Project Status
 
-OnlyRag is an implementation-stage Windows desktop application. The repository currently supports
-setup, dependency install, web build, .NET build, tests, local run, unsigned installer packaging,
-scripted release signing, and non-invasive installer evidence generation.
+OnlyRag is an implementation-stage Windows desktop application. The repository supports setup,
+dependency install, web build, .NET build, tests, local run, unsigned installer packaging, scripted
+release signing, and non-invasive installer evidence generation.
 
 Signed release completion is blocked until a trusted Windows code-signing certificate is provided
-and full installer lifecycle verification is run on a clean Windows verification machine. Open
+and full installer lifecycle verification is run on a clean Windows verification machine. Real
 residual work is tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
 
-## Technical Documentation
+## Documentation
 
 - [Documentation index](docs/README.md)
 - [Operations](docs/OPERATIONS.md)
