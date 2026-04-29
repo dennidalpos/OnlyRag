@@ -470,6 +470,58 @@ public sealed class InProcessBackendTests
     }
 
     [Fact]
+    public async Task IngestionSettings_CanBeSavedAndReadBackNormalized()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        IngestionSettings request = new(
+            ChunkSizeTokens: 80,
+            OverlapTokens: 900);
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/ingestion", request);
+        IngestionSettings? saved = await putResponse.Content.ReadFromJsonAsync<IngestionSettings>();
+        IngestionSettings? current = await httpClient.GetFromJsonAsync<IngestionSettings>("/api/settings/ingestion");
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        Assert.NotNull(saved);
+        Assert.NotNull(current);
+        Assert.Equal(new IngestionSettings(100, 50), saved);
+        Assert.Equal(saved, current);
+    }
+
+    [Fact]
+    public async Task OcrProcessingSettings_CanBeSavedAndReadBackNormalized()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        OcrProcessingSettings request = new(
+            Language: "de",
+            MaxRetries: 7,
+            PageTimeoutSeconds: 900,
+            LowConfidenceThreshold: 0);
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/ocr-processing", request);
+        OcrProcessingSettings? saved = await putResponse.Content.ReadFromJsonAsync<OcrProcessingSettings>();
+        OcrProcessingSettings? current = await httpClient.GetFromJsonAsync<OcrProcessingSettings>("/api/settings/ocr-processing");
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        Assert.NotNull(saved);
+        Assert.NotNull(current);
+        Assert.Equal(new OcrProcessingSettings("de", 2, 600, 0.01d), saved);
+        Assert.Equal(saved, current);
+    }
+
+    [Fact]
     public async Task OfficeConversionSettings_InvalidPathReturnsRequiresAdditionalComponentStatus()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

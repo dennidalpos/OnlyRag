@@ -24,6 +24,18 @@ export type OfficeConversionSettings = {
   conversionTimeoutSeconds: number;
 };
 
+export type IngestionSettings = {
+  chunkSizeTokens: number;
+  overlapTokens: number;
+};
+
+export type OcrProcessingSettings = {
+  language: string;
+  maxRetries: number;
+  pageTimeoutSeconds: number;
+  lowConfidenceThreshold: number;
+};
+
 export type PerformanceSettings = {
   maxParallelJobs: number;
   maxOcrParallelPages: number;

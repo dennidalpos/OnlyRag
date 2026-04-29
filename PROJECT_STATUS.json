@@ -31,6 +31,62 @@
       "risk": "medium",
       "priority": "medium",
       "context": "After signed lifecycle verification passes, download or copy the signed installer to a Windows machine that has not previously installed this build and perform a manual SmartScreen launch check. Record whether Windows allows execution, warns due to unknown reputation, or blocks execution. Blocked until release-signed-lifecycle-verification is complete."
+    },
+    {
+      "id": "settings-ingestion-ocr-contracts",
+      "type": "config",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Add typed settings contracts and stores for ingestion chunking and OCR processing before changing UI. Persist existing keys without migration: ingestion.chunkSizeTokens, ingestion.overlapTokens, ocr.language, ocr.maxRetries, ocr.pageTimeoutSeconds, ocr.lowConfidenceThreshold. Preserve current defaults and clamps: chunk 800 tokens, overlap 120 tokens, chunk range 100..4000, overlap max min(1000, chunkSize/2), OCR retries 0..2 default 2, OCR page timeout 15..600 seconds default 180, low-confidence threshold 0.01..0.99 default 0.55."
+    },
+    {
+      "id": "settings-ingestion-ocr-api-endpoints",
+      "type": "config",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Expose GET/PUT /api/settings/ingestion and GET/PUT /api/settings/ocr-processing after settings-ingestion-ocr-contracts. Endpoints must return normalized values, reject no extra invented keys, and keep using the existing settings repository pattern used by Ollama, performance, OCR, and Office conversion settings."
+    },
+    {
+      "id": "ingestion-use-typed-settings",
+      "type": "refactor",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Refactor DocumentIngestionService to load chunking and OCR runtime settings through the new typed stores instead of direct string parsing. Behavior must remain unchanged for existing persisted settings and defaults. OCR model/profile parameters remain in OcrSettingsStore; OCR processing settings cover only language, retries, page timeout, and low-confidence threshold."
+    },
+    {
+      "id": "settings-ui-slider-conversion",
+      "type": "refactor",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Convert numeric settings UI from manual number inputs to sliders with visible values. Cover performance sliders, Office conversion timeout, embedding num_ctx when not Auto, ingestion chunk size, ingestion overlap, OCR retries, OCR page timeout, and OCR low-confidence threshold. Keep URL, filesystem path, model names, language, device, preset/model selectors as text/select controls."
+    },
+    {
+      "id": "settings-ui-model-based-recommendations",
+      "type": "config",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Add visual recommendations based on default Ollama model details without changing backend min/max or overwriting saved values. On startup and default model changes, use /api/ollama/models/{name}/details for embedding, chat, and translation models when set. Use embedding numCtx to suggest embeddingNumCtx and chunk range. Use chat numCtx, falling back to embedding numCtx, to suggest maxContextChunks. Do not derive batch or parallelism ranges from model metadata."
+    },
+    {
+      "id": "settings-ingestion-ocr-tests",
+      "type": "test",
+      "status": "done",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Add focused backend tests for new settings normalization, GET/PUT endpoints, and DocumentIngestionService behavior with stored chunking/OCR processing values. Add frontend type/build verification for new API types and slider payload normalization. Required commands: dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj; dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj; npm run build from src\\OnlyRag.Web."
+    },
+    {
+      "id": "settings-docs-ingestion-ocr-advanced",
+      "type": "docs",
+      "status": "done",
+      "risk": "low",
+      "priority": "low",
+      "context": "Update concise Windows-valid documentation only after implementation if user-visible settings change setup or operation. Document ingestion chunk size/overlap, OCR processing retry/timeout/low-confidence behavior, and clarify that model-based ranges are recommendations only and do not modify saved settings automatically."
     }
   ]
 }

@@ -14,6 +14,16 @@ Implemented stages:
 6. Retrieve relevant chunks from selected documents through hybrid keyword/vector search.
 7. Generate answers with cited local context via `POST /api/chat`.
 
+## Ingestion Settings
+
+Chunking is configured in Settings and persisted under `%LOCALAPPDATA%\OnlyRag` with these keys:
+
+- `ingestion.chunkSizeTokens`: default `800`, clamped to `100..4000`.
+- `ingestion.overlapTokens`: default `120`, clamped to `0..min(1000, chunkSize / 2)`.
+
+The settings UI can show model-based suggestions from the selected embedding model context
+window. Suggestions are visual only and do not change saved values automatically.
+
 ## Embeddings
 
 `POST /api/documents/{id}/embed` enqueues a persistent `document-embedding` job for an

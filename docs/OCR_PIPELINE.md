@@ -18,6 +18,18 @@ Implemented stages:
 9. Chunk OCR text into the existing RAG ingestion flow.
 10. Save a job checkpoint after every page.
 
+## Runtime Settings
+
+OCR processing settings are persisted with existing keys and normalized by the backend:
+
+- `ocr.language`: default OCR language.
+- `ocr.maxRetries`: default `2`, clamped to `0..2`.
+- `ocr.pageTimeoutSeconds`: default `180`, clamped to `15..600`.
+- `ocr.lowConfidenceThreshold`: default `0.55`, clamped to `0.01..0.99`.
+
+These runtime settings are separate from the PaddleOCR profile/model settings. Model context
+recommendations shown in Settings are visual only and do not modify saved values automatically.
+
 Bridge and prerequisites:
 
 - Bridge script: `scripts\ocr\paddle_ocr_bridge.py`.

@@ -206,6 +206,26 @@ public sealed class OcrPipelineTests
     }
 
     [Fact]
+    public async Task OcrProcessingSettingsStore_PersistsNormalizedSettings()
+    {
+        using TempStorage storage = await TempStorage.CreateInitializedAsync();
+        OcrProcessingSettingsStore store = new(storage.Settings);
+
+        OcrProcessingSettings saved = await store.UpdateAsync(new OcrProcessingSettings(
+            Language: "fr",
+            MaxRetries: 9,
+            PageTimeoutSeconds: 1,
+            LowConfidenceThreshold: 2));
+        OcrProcessingSettings loaded = await store.GetAsync();
+
+        Assert.Equal("fr", saved.Language);
+        Assert.Equal(2, saved.MaxRetries);
+        Assert.Equal(15, saved.PageTimeoutSeconds);
+        Assert.Equal(0.99d, saved.LowConfidenceThreshold);
+        Assert.Equal(saved, loaded);
+    }
+
+    [Fact]
     public void PaddleOcrEngine_BuildRecognizeArgumentsIncludesConfiguredControls()
     {
         OcrSettings settings = OcrSettings.Default with
@@ -409,6 +429,29 @@ public sealed class OcrPipelineTests
             ocrLanguage: "fr");
 
         Assert.Equal("fr", engine.LastLanguage);
+    }
+
+    [Fact]
+    public async Task IngestAsync_Image_UsesStoredOcrProcessingSettings()
+    {
+        using TempStorage storage = await TempStorage.CreateInitializedAsync();
+        OcrProcessingSettingsStore settingsStore = new(storage.Settings);
+        await settingsStore.UpdateAsync(new OcrProcessingSettings(
+            Language: "en",
+            MaxRetries: 0,
+            PageTimeoutSeconds: 15,
+            LowConfidenceThreshold: 0.99d));
+        ImportedDocument document = await storage.CreateBinaryDocumentAsync("scan-runtime.png", Encoding.UTF8.GetBytes("fake-image"));
+        FakeOcrEngine engine = new("runtime text", 0.20d);
+        DocumentIngestionService service = storage.CreateIngestionService(engine);
+
+        await service.IngestAsync(
+            document,
+            checkpoint: null,
+            (_, _) => Task.CompletedTask);
+
+        Assert.Equal("en", engine.LastLanguage);
+        Assert.Equal(1, engine.RecognizeCount);
     }
 
     [Fact]

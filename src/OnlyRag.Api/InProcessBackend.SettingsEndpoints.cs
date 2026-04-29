@@ -60,6 +60,28 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
 
+        app.MapGet("/api/settings/ingestion", async (
+            IngestionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/ingestion", async (
+            IngestionSettings request,
+            IngestionSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
+
+        app.MapGet("/api/settings/ocr-processing", async (
+            OcrProcessingSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/ocr-processing", async (
+            OcrProcessingSettings request,
+            OcrProcessingSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
+
         app.MapGet("/api/settings/office-conversion", async (
             OfficeConversionSettingsStore settings,
             CancellationToken cancellationToken) =>

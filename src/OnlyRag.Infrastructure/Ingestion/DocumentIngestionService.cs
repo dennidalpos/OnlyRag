@@ -11,12 +11,6 @@ namespace OnlyRag.Infrastructure.Ingestion;
 public sealed class DocumentIngestionService : IDocumentIngestionService
 {
     private const int TextBlockTargetCharacters = 64 * 1024;
-    private const string ChunkSizeSettingKey = "ingestion.chunkSizeTokens";
-    private const string OverlapSettingKey = "ingestion.overlapTokens";
-    private const string OcrLanguageSettingKey = "ocr.language";
-    private const string OcrMaxRetriesSettingKey = "ocr.maxRetries";
-    private const string OcrPageTimeoutSettingKey = "ocr.pageTimeoutSeconds";
-    private const string OcrLowConfidenceSettingKey = "ocr.lowConfidenceThreshold";
     private const string OcrMaxParallelPagesSettingKey = "performance.maxOcrParallelPages";
 
     private readonly IDocumentRepository documents;
@@ -28,6 +22,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
     private readonly IOcrCacheRepository? ocrCache;
     private readonly OcrRetryPolicy ocrRetryPolicy;
     private readonly OcrSettingsStore ocrSettingsStore;
+    private readonly IngestionSettingsStore ingestionSettingsStore;
+    private readonly OcrProcessingSettingsStore ocrProcessingSettingsStore;
     private readonly LocalSqliteStoreDescriptor? descriptor;
 
     public DocumentIngestionService(
@@ -40,7 +36,9 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         OcrRetryPolicy? ocrRetryPolicy = null,
         LocalSqliteStoreDescriptor? descriptor = null,
         IOfficeConversionService? officeConversion = null,
-        OcrSettingsStore? ocrSettingsStore = null)
+        OcrSettingsStore? ocrSettingsStore = null,
+        IngestionSettingsStore? ingestionSettingsStore = null,
+        OcrProcessingSettingsStore? ocrProcessingSettingsStore = null)
     {
         this.documents = documents;
         this.settings = settings;
@@ -51,6 +49,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         this.ocrCache = ocrCache;
         this.ocrRetryPolicy = ocrRetryPolicy ?? new OcrRetryPolicy();
         this.ocrSettingsStore = ocrSettingsStore ?? new OcrSettingsStore(settings);
+        this.ingestionSettingsStore = ingestionSettingsStore ?? new IngestionSettingsStore(settings);
+        this.ocrProcessingSettingsStore = ocrProcessingSettingsStore ?? new OcrProcessingSettingsStore(settings);
         this.descriptor = descriptor;
     }
 
@@ -87,39 +87,23 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
     private async Task<DocumentIngestionOptions> LoadOptionsAsync(CancellationToken cancellationToken)
     {
-        string? chunkSizeValue = await settings.GetValueAsync(ChunkSizeSettingKey, cancellationToken);
-        string? overlapValue = await settings.GetValueAsync(OverlapSettingKey, cancellationToken);
-
-        int chunkSize = int.TryParse(chunkSizeValue, out int parsedChunkSize)
-            ? parsedChunkSize
-            : DocumentIngestionOptions.DefaultChunkSizeTokens;
-        int overlap = int.TryParse(overlapValue, out int parsedOverlap)
-            ? parsedOverlap
-            : DocumentIngestionOptions.DefaultOverlapTokens;
-
-        return DocumentIngestionOptions.Normalize(chunkSize, overlap);
+        IngestionSettings ingestionSettings = await ingestionSettingsStore.GetAsync(cancellationToken);
+        return IngestionSettingsStore.ToOptions(ingestionSettings);
     }
 
     private async Task<OcrPipelineOptions> LoadOcrOptionsAsync(
         string? languageOverride,
         CancellationToken cancellationToken)
     {
-        string? language = string.IsNullOrWhiteSpace(languageOverride)
-            ? await settings.GetValueAsync(OcrLanguageSettingKey, cancellationToken)
-            : languageOverride;
-        string? retriesValue = await settings.GetValueAsync(OcrMaxRetriesSettingKey, cancellationToken);
-        string? timeoutValue = await settings.GetValueAsync(OcrPageTimeoutSettingKey, cancellationToken);
-        string? lowConfidenceValue = await settings.GetValueAsync(OcrLowConfidenceSettingKey, cancellationToken);
         string? maxParallelPagesValue = await settings.GetValueAsync(OcrMaxParallelPagesSettingKey, cancellationToken);
+        OcrProcessingSettings processingSettings = await ocrProcessingSettingsStore.GetAsync(cancellationToken);
         OcrSettings ocrSettings = await ocrSettingsStore.GetAsync(cancellationToken);
 
         return OcrPipelineOptions.Normalize(
-            language,
-            int.TryParse(retriesValue, out int retries) ? retries : null,
-            int.TryParse(timeoutValue, out int timeout) ? timeout : null,
-            double.TryParse(lowConfidenceValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double confidence)
-                ? confidence
-                : null,
+            string.IsNullOrWhiteSpace(languageOverride) ? processingSettings.Language : languageOverride,
+            processingSettings.MaxRetries,
+            processingSettings.PageTimeoutSeconds,
+            processingSettings.LowConfidenceThreshold,
             int.TryParse(maxParallelPagesValue, out int maxParallelPages) ? maxParallelPages : null,
             ocrSettings);
     }

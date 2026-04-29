@@ -95,6 +95,28 @@ public sealed class DocumentIngestionServiceTests
     }
 
     [Fact]
+    public async Task IngestAsync_TextFile_UsesStoredIngestionChunkingSettings()
+    {
+        using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
+        IngestionSettingsStore settingsStore = new(tempStorage.Settings);
+        await settingsStore.UpdateAsync(new IngestionSettings(100, 0));
+        string text = string.Join(
+            "\n\n",
+            Enumerable.Range(0, 6).Select(block =>
+                string.Join(' ', Enumerable.Range(0, 80).Select(index => $"chunk{block}_{index}"))));
+        ImportedDocument document = await tempStorage.CreateDocumentAsync("chunked.txt", text);
+        DocumentIngestionService service = tempStorage.CreateIngestionService();
+
+        DocumentIngestionResult result = await service.IngestAsync(
+            document,
+            checkpoint: null,
+            (_, _) => Task.CompletedTask);
+
+        Assert.True(result.ChunkCount >= 3);
+        Assert.Equal(result.ChunkCount, await tempStorage.ReadChunkCountAsync(document.Id));
+    }
+
+    [Fact]
     public async Task IngestAsync_MarkdownFile_SavesChunks()
     {
         using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();

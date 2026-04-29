@@ -113,8 +113,10 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         builder.Services.AddSingleton<IOcrCacheRepository, SqliteOcrCacheRepository>();
         builder.Services.AddSingleton<OcrSettingsStore>();
+        builder.Services.AddSingleton<OcrProcessingSettingsStore>();
         builder.Services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
         builder.Services.AddSingleton<OcrRetryPolicy>();
+        builder.Services.AddSingleton<IngestionSettingsStore>();
         builder.Services.AddSingleton<OfficeConversionSettingsStore>();
         builder.Services.AddSingleton<IOfficeConversionService, LibreOfficeConversionService>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();

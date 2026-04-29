@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   apiRequest,
   type DiagnosticsResponse,
+  type IngestionSettings,
   type OfficeConversionSettings,
   type OfficeConverterStatusResponse,
+  type OcrLanguage,
+  type OcrProcessingSettings,
   type OcrSettings,
   type OllamaModel,
   type OllamaModelDetails,
@@ -32,7 +35,6 @@ const emptySettings: OllamaSettings = {
   embeddingNumCtx: null
 };
 
-const NUM_CTX_PRESETS = [512, 1024, 2048, 4096, 8192, 16384, 32768];
 const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
 
 const emptyOfficeSettings: OfficeConversionSettings = {
@@ -48,6 +50,18 @@ const emptyPerformanceSettings: PerformanceSettings = {
   maxContextChunks: 8,
   requestTimeoutSeconds: 120,
   enableLowResourceMode: false
+};
+
+const emptyIngestionSettings: IngestionSettings = {
+  chunkSizeTokens: 800,
+  overlapTokens: 120
+};
+
+const emptyOcrProcessingSettings: OcrProcessingSettings = {
+  language: "it",
+  maxRetries: 2,
+  pageTimeoutSeconds: 180,
+  lowConfidenceThreshold: 0.55
 };
 
 const emptyOcrSettings: OcrSettings = {
@@ -114,8 +128,15 @@ export function SettingsSection({
   const [savedOfficeFormState, setSavedOfficeFormState] = useState<OfficeConversionSettings>(emptyOfficeSettings);
   const [performanceFormState, setPerformanceFormState] = useState<PerformanceSettings>(emptyPerformanceSettings);
   const [savedPerformanceFormState, setSavedPerformanceFormState] = useState<PerformanceSettings>(emptyPerformanceSettings);
+  const [ingestionFormState, setIngestionFormState] = useState<IngestionSettings>(emptyIngestionSettings);
+  const [savedIngestionFormState, setSavedIngestionFormState] = useState<IngestionSettings>(emptyIngestionSettings);
+  const [ocrProcessingFormState, setOcrProcessingFormState] =
+    useState<OcrProcessingSettings>(emptyOcrProcessingSettings);
+  const [savedOcrProcessingFormState, setSavedOcrProcessingFormState] =
+    useState<OcrProcessingSettings>(emptyOcrProcessingSettings);
   const [ocrFormState, setOcrFormState] = useState<OcrSettings>(emptyOcrSettings);
   const [savedOcrFormState, setSavedOcrFormState] = useState<OcrSettings>(emptyOcrSettings);
+  const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>([]);
   const [officeStatus, setOfficeStatus] = useState<OfficeConverterStatusResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
@@ -123,7 +144,11 @@ export function SettingsSection({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [embeddingModelDetails, setEmbeddingModelDetails] = useState<OllamaModelDetails | null>(null);
+  const [chatModelDetails, setChatModelDetails] = useState<OllamaModelDetails | null>(null);
+  const [translationModelDetails, setTranslationModelDetails] = useState<OllamaModelDetails | null>(null);
   const [embeddingModelDetailsLoading, setEmbeddingModelDetailsLoading] = useState(false);
+  const [chatModelDetailsLoading, setChatModelDetailsLoading] = useState(false);
+  const [translationModelDetailsLoading, setTranslationModelDetailsLoading] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -146,7 +171,10 @@ export function SettingsSection({
   useEffect(() => {
     void refreshOfficeConverter();
     void refreshPerformanceSettings();
+    void refreshIngestionSettings();
+    void refreshOcrProcessingSettings();
     void refreshOcrSettings();
+    void refreshOcrLanguages();
     void refreshDiagnostics();
   }, []);
 
@@ -167,6 +195,40 @@ export function SettingsSection({
     return () => { cancelled = true; };
   }, [formState.defaultEmbeddingModel]);
 
+  useEffect(() => {
+    const modelName = formState.defaultChatModel;
+    if (!modelName) {
+      setChatModelDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    setChatModelDetailsLoading(true);
+    apiRequest<OllamaModelDetails>(`/api/ollama/models/${encodeURIComponent(modelName)}/details`)
+      .then((details) => { if (!cancelled) { setChatModelDetails(details); } })
+      .catch(() => { if (!cancelled) { setChatModelDetails(null); } })
+      .finally(() => { if (!cancelled) { setChatModelDetailsLoading(false); } });
+
+    return () => { cancelled = true; };
+  }, [formState.defaultChatModel]);
+
+  useEffect(() => {
+    const modelName = formState.defaultTranslationModel;
+    if (!modelName) {
+      setTranslationModelDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    setTranslationModelDetailsLoading(true);
+    apiRequest<OllamaModelDetails>(`/api/ollama/models/${encodeURIComponent(modelName)}/details`)
+      .then((details) => { if (!cancelled) { setTranslationModelDetails(details); } })
+      .catch(() => { if (!cancelled) { setTranslationModelDetails(null); } })
+      .finally(() => { if (!cancelled) { setTranslationModelDetailsLoading(false); } });
+
+    return () => { cancelled = true; };
+  }, [formState.defaultTranslationModel]);
+
   const installedModelNames = useMemo(() => models.map((model) => model.name), [models]);
   const unavailableDefaults = useMemo(
     () =>
@@ -182,15 +244,33 @@ export function SettingsSection({
       installedModelNames
     ]
   );
+  const embeddingRecommendations = useMemo(
+    () => buildEmbeddingRecommendations(embeddingModelDetails?.numCtx ?? null),
+    [embeddingModelDetails]
+  );
+  const recommendedMaxContextChunks = useMemo(
+    () => buildContextChunkRecommendation(chatModelDetails?.numCtx ?? embeddingModelDetails?.numCtx ?? null),
+    [chatModelDetails, embeddingModelDetails]
+  );
   const hasDirtyOllamaSettings = !areOllamaSettingsEqual(formState, savedFormState);
   const hasDirtyOfficeSettings = !areOfficeSettingsEqual(officeFormState, savedOfficeFormState);
   const hasDirtyPerformanceSettings = !arePerformanceSettingsEqual(
     performanceFormState,
     savedPerformanceFormState
   );
+  const hasDirtyIngestionSettings = !areIngestionSettingsEqual(ingestionFormState, savedIngestionFormState);
+  const hasDirtyOcrProcessingSettings = !areOcrProcessingSettingsEqual(
+    ocrProcessingFormState,
+    savedOcrProcessingFormState
+  );
   const hasDirtyOcrSettings = !areOcrSettingsEqual(ocrFormState, savedOcrFormState);
   const hasPendingChanges =
-    hasDirtyOllamaSettings || hasDirtyOfficeSettings || hasDirtyPerformanceSettings || hasDirtyOcrSettings;
+    hasDirtyOllamaSettings
+    || hasDirtyOfficeSettings
+    || hasDirtyPerformanceSettings
+    || hasDirtyIngestionSettings
+    || hasDirtyOcrProcessingSettings
+    || hasDirtyOcrSettings;
 
   async function saveSettings() {
     setIsBusy(true);
@@ -316,6 +396,28 @@ export function SettingsSection({
     }
   }
 
+  async function refreshIngestionSettings() {
+    try {
+      const ingestion = await apiRequest<IngestionSettings>("/api/settings/ingestion");
+      const normalizedIngestion = normalizeIngestionSettings(ingestion);
+      setIngestionFormState(normalizedIngestion);
+      setSavedIngestionFormState(normalizedIngestion);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni ingestion.");
+    }
+  }
+
+  async function refreshOcrProcessingSettings() {
+    try {
+      const processing = await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing");
+      const normalizedProcessing = normalizeOcrProcessingSettings(processing);
+      setOcrProcessingFormState(normalizedProcessing);
+      setSavedOcrProcessingFormState(normalizedProcessing);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni OCR runtime.");
+    }
+  }
+
   async function refreshOcrSettings() {
     try {
       const ocr = await apiRequest<OcrSettings>("/api/settings/ocr");
@@ -324,6 +426,15 @@ export function SettingsSection({
       setSavedOcrFormState(normalizedOcr);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni OCR.");
+    }
+  }
+
+  async function refreshOcrLanguages() {
+    try {
+      const languages = await apiRequest<OcrLanguage[]>("/api/ocr/languages");
+      setOcrLanguages(languages);
+    } catch {
+      setOcrLanguages([]);
     }
   }
 
@@ -381,6 +492,52 @@ export function SettingsSection({
       await onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le prestazioni.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function saveIngestionSettings() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const saved = await apiRequest<IngestionSettings>("/api/settings/ingestion", {
+        method: "PUT",
+        body: JSON.stringify(buildIngestionSettingsPayload(ingestionFormState))
+      });
+
+      const normalizedSaved = normalizeIngestionSettings(saved);
+      setIngestionFormState(normalizedSaved);
+      setSavedIngestionFormState(normalizedSaved);
+      setInfoMessage("Impostazioni ingestion salvate.");
+      await onDataChanged();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare ingestion.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function saveOcrProcessingSettings() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const saved = await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {
+        method: "PUT",
+        body: JSON.stringify(buildOcrProcessingSettingsPayload(ocrProcessingFormState))
+      });
+
+      const normalizedSaved = normalizeOcrProcessingSettings(saved);
+      setOcrProcessingFormState(normalizedSaved);
+      setSavedOcrProcessingFormState(normalizedSaved);
+      setInfoMessage("Impostazioni OCR runtime salvate.");
+      await onDataChanged();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare OCR runtime.");
     } finally {
       setIsBusy(false);
     }
@@ -507,6 +664,28 @@ export function SettingsSection({
       setSavedOfficeFormState(savedOffice);
     }
 
+    if (hasDirtyIngestionSettings) {
+      const savedIngestion = normalizeIngestionSettings(
+        await apiRequest<IngestionSettings>("/api/settings/ingestion", {
+          method: "PUT",
+          body: JSON.stringify(buildIngestionSettingsPayload(ingestionFormState))
+        })
+      );
+      setIngestionFormState(savedIngestion);
+      setSavedIngestionFormState(savedIngestion);
+    }
+
+    if (hasDirtyOcrProcessingSettings) {
+      const savedProcessing = normalizeOcrProcessingSettings(
+        await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {
+          method: "PUT",
+          body: JSON.stringify(buildOcrProcessingSettingsPayload(ocrProcessingFormState))
+        })
+      );
+      setOcrProcessingFormState(savedProcessing);
+      setSavedOcrProcessingFormState(savedProcessing);
+    }
+
     if (hasDirtyOcrSettings) {
       const savedOcr = normalizeOcrSettings(
         await apiRequest<OcrSettings>("/api/settings/ocr", {
@@ -532,13 +711,17 @@ export function SettingsSection({
     };
   }, [
     formState,
+    hasDirtyIngestionSettings,
     hasDirtyOfficeSettings,
     hasDirtyOllamaSettings,
+    hasDirtyOcrProcessingSettings,
     hasDirtyOcrSettings,
     hasDirtyPerformanceSettings,
     hasPendingChanges,
     isBusy,
+    ingestionFormState,
     ocrFormState,
+    ocrProcessingFormState,
     officeFormState,
     performanceFormState
   ]);
@@ -612,107 +795,78 @@ export function SettingsSection({
               </div>
             )}
             <div className="settings-grid">
-              <label className="field-group" htmlFor="max-parallel-jobs">
-                <span>Job paralleli</span>
-                <input
-                  id="max-parallel-jobs"
-                  type="number"
-                  min={1}
-                  max={4}
-                  value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxParallelJobs}
-                  disabled={performanceFormState.enableLowResourceMode}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      maxParallelJobs: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="ocr-parallel-pages">
-                <span>Pagine OCR parallele</span>
-                <input
-                  id="ocr-parallel-pages"
-                  type="number"
-                  min={1}
-                  max={4}
-                  value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxOcrParallelPages}
-                  disabled={performanceFormState.enableLowResourceMode}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      maxOcrParallelPages: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="performance-embedding-batch">
-                <span>Batch embedding</span>
-                <input
-                  id="performance-embedding-batch"
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.embeddingBatchSize}
-                  disabled={performanceFormState.enableLowResourceMode}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      embeddingBatchSize: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="translation-batch-size">
-                <span>Batch traduzione</span>
-                <input
-                  id="translation-batch-size"
-                  type="number"
-                  min={1}
-                  max={4}
-                  value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.translationBatchSize}
-                  disabled={performanceFormState.enableLowResourceMode}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      translationBatchSize: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="max-context-chunks">
-                <span>Chunk contesto</span>
-                <input
-                  id="max-context-chunks"
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={performanceFormState.maxContextChunks}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      maxContextChunks: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="field-group" htmlFor="performance-request-timeout">
-                <span>Timeout richieste</span>
-                <input
-                  id="performance-request-timeout"
-                  type="number"
-                  min={5}
-                  max={600}
-                  value={performanceFormState.requestTimeoutSeconds}
-                  onChange={(event) =>
-                    setPerformanceFormState((current) => ({
-                      ...current,
-                      requestTimeoutSeconds: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
+              <SettingsRangeField
+                id="max-parallel-jobs"
+                label="Job paralleli"
+                min={1}
+                max={4}
+                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxParallelJobs}
+                disabled={performanceFormState.enableLowResourceMode}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, maxParallelJobs: value }))
+                }
+              />
+              <SettingsRangeField
+                id="ocr-parallel-pages"
+                label="Pagine OCR parallele"
+                min={1}
+                max={4}
+                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxOcrParallelPages}
+                disabled={performanceFormState.enableLowResourceMode}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, maxOcrParallelPages: value }))
+                }
+              />
+              <SettingsRangeField
+                id="performance-embedding-batch"
+                label="Batch embedding"
+                min={1}
+                max={8}
+                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.embeddingBatchSize}
+                disabled={performanceFormState.enableLowResourceMode}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, embeddingBatchSize: value }))
+                }
+              />
+              <SettingsRangeField
+                id="translation-batch-size"
+                label="Batch traduzione"
+                min={1}
+                max={4}
+                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.translationBatchSize}
+                disabled={performanceFormState.enableLowResourceMode}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, translationBatchSize: value }))
+                }
+              />
+              <SettingsRangeField
+                id="max-context-chunks"
+                label="Chunk contesto"
+                min={1}
+                max={24}
+                value={performanceFormState.maxContextChunks}
+                hint={recommendedMaxContextChunks ? `Suggerito: ${recommendedMaxContextChunks}` : null}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, maxContextChunks: value }))
+                }
+              />
+              <SettingsRangeField
+                id="performance-request-timeout"
+                label="Timeout richieste"
+                min={5}
+                max={600}
+                value={performanceFormState.requestTimeoutSeconds}
+                formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
+                onChange={(value) =>
+                  setPerformanceFormState((current) => ({ ...current, requestTimeoutSeconds: value }))
+                }
+              />
             </div>
+            {(chatModelDetailsLoading || embeddingModelDetailsLoading) && (
+              <div className="panel-note">
+                <p>Lettura dettagli modello in corso.</p>
+              </div>
+            )}
             <div className="settings-actions">
               <button type="button" onClick={savePerformanceSettings} disabled={isBusy}>
                 Salva prestazioni
@@ -911,6 +1065,121 @@ export function SettingsSection({
           </div>
         </div>
 
+        <div className="settings-card">
+          <div className="settings-card__header">
+            <h3>Ingestion</h3>
+            {embeddingRecommendations && (
+              <span className="status-chip status-chip--muted">
+                {embeddingRecommendations.chunkMinimum.toLocaleString("it-IT")}-
+                {embeddingRecommendations.chunkMaximum.toLocaleString("it-IT")}
+              </span>
+            )}
+          </div>
+          <div className="settings-form">
+            <SettingsRangeField
+              id="ingestion-chunk-size"
+              label="Dimensione chunk"
+              min={100}
+              max={4000}
+              step={50}
+              value={ingestionFormState.chunkSizeTokens}
+              formatValue={(value) => `${value.toLocaleString("it-IT")} token`}
+              hint={embeddingRecommendations ? `Suggerito: ${embeddingRecommendations.chunkMinimum}-${embeddingRecommendations.chunkMaximum}` : null}
+              onChange={(value) =>
+                setIngestionFormState((current) => {
+                  const nextChunkSize = value;
+                  return {
+                    chunkSizeTokens: nextChunkSize,
+                    overlapTokens: Math.min(current.overlapTokens, Math.min(1000, Math.floor(nextChunkSize / 2)))
+                  };
+                })
+              }
+            />
+            <SettingsRangeField
+              id="ingestion-overlap"
+              label="Overlap chunk"
+              min={0}
+              max={Math.min(1000, Math.floor(ingestionFormState.chunkSizeTokens / 2))}
+              step={10}
+              value={ingestionFormState.overlapTokens}
+              formatValue={(value) => `${value.toLocaleString("it-IT")} token`}
+              onChange={(value) =>
+                setIngestionFormState((current) => ({ ...current, overlapTokens: value }))
+              }
+            />
+            <div className="settings-actions">
+              <button type="button" onClick={saveIngestionSettings} disabled={isBusy}>
+                Salva ingestion
+              </button>
+              {hasDirtyIngestionSettings && <span className="dirty-hint">Modifiche non salvate</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-card">
+          <div className="settings-card__header">
+            <h3>OCR runtime</h3>
+          </div>
+          <div className="settings-form">
+            <label className="field-group" htmlFor="ocr-processing-language">
+              <span>Lingua OCR</span>
+              <select
+                id="ocr-processing-language"
+                value={ocrProcessingFormState.language}
+                onChange={(event) =>
+                  setOcrProcessingFormState((current) => ({ ...current, language: event.target.value }))
+                }
+              >
+                {getOcrLanguageOptions(ocrProcessingFormState.language, ocrLanguages).map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <SettingsRangeField
+              id="ocr-processing-retries"
+              label="Retry OCR"
+              min={0}
+              max={2}
+              value={ocrProcessingFormState.maxRetries}
+              onChange={(value) =>
+                setOcrProcessingFormState((current) => ({ ...current, maxRetries: value }))
+              }
+            />
+            <SettingsRangeField
+              id="ocr-processing-timeout"
+              label="Timeout pagina"
+              min={15}
+              max={600}
+              step={15}
+              value={ocrProcessingFormState.pageTimeoutSeconds}
+              formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
+              onChange={(value) =>
+                setOcrProcessingFormState((current) => ({ ...current, pageTimeoutSeconds: value }))
+              }
+            />
+            <SettingsRangeField
+              id="ocr-processing-low-confidence"
+              label="Soglia bassa confidenza"
+              min={0.01}
+              max={0.99}
+              step={0.01}
+              value={ocrProcessingFormState.lowConfidenceThreshold}
+              formatValue={(value) => value.toFixed(2)}
+              onChange={(value) =>
+                setOcrProcessingFormState((current) => ({ ...current, lowConfidenceThreshold: value }))
+              }
+            />
+            <div className="settings-actions">
+              <button type="button" onClick={saveOcrProcessingSettings} disabled={isBusy}>
+                Salva OCR runtime
+              </button>
+              {hasDirtyOcrProcessingSettings && <span className="dirty-hint">Modifiche non salvate</span>}
+            </div>
+          </div>
+        </div>
+
         <div className="settings-card settings-card--wide">
           <div className="settings-card__header">
             <h3>Modelli predefiniti</h3>
@@ -936,6 +1205,13 @@ export function SettingsSection({
                 ))}
               </select>
             </label>
+            {formState.defaultChatModel && (
+              <ModelDetailsNote
+                loading={chatModelDetailsLoading}
+                details={chatModelDetails}
+                fallbackText="Dettagli chat non disponibili."
+              />
+            )}
             <label className="field-group" htmlFor="default-embedding-model">
               <span>Embeddings</span>
               <select
@@ -968,45 +1244,37 @@ export function SettingsSection({
                     </span>
                   )}
                 </div>
-                <div className="model-context-selector">
-                  <select
-                    id="embedding-num-ctx"
-                    value={formState.embeddingNumCtx ?? "auto"}
-                    onChange={(event) => {
-                      const val = event.target.value;
+                <label className="toggle-row" htmlFor="embedding-num-ctx-auto">
+                  <input
+                    id="embedding-num-ctx-auto"
+                    type="checkbox"
+                    checked={formState.embeddingNumCtx == null}
+                    onChange={(event) =>
                       setFormState((current) => ({
                         ...current,
-                        embeddingNumCtx: val === "auto" ? null : Number(val)
-                      }));
-                    }}
-                  >
-                    <option value="auto">Automatico (adatta al chunk più lungo)</option>
-                    {NUM_CTX_PRESETS.map((p) => (
-                      <option key={p} value={p}>{p.toLocaleString()} token</option>
-                    ))}
-                    {formState.embeddingNumCtx != null
-                      && !NUM_CTX_PRESETS.includes(formState.embeddingNumCtx) && (
-                      <option value={formState.embeddingNumCtx}>
-                        {formState.embeddingNumCtx.toLocaleString()} token (personalizzato)
-                      </option>
-                    )}
-                  </select>
-                  <input
-                    type="number"
-                    className="model-context-custom-input"
+                        embeddingNumCtx: event.target.checked
+                          ? null
+                          : embeddingRecommendations?.embeddingNumCtx ?? 2048
+                      }))
+                    }
+                  />
+                  <span>Automatico</span>
+                </label>
+                {formState.embeddingNumCtx != null && (
+                  <SettingsRangeField
+                    id="embedding-num-ctx"
+                    label="num_ctx embedding"
                     min={64}
                     max={131072}
-                    placeholder="Valore personalizzato"
-                    value={formState.embeddingNumCtx ?? ""}
-                    onChange={(event) => {
-                      const val = event.target.value;
-                      setFormState((current) => ({
-                        ...current,
-                        embeddingNumCtx: val === "" ? null : Number(val)
-                      }));
-                    }}
+                    step={64}
+                    value={formState.embeddingNumCtx}
+                    formatValue={(value) => `${value.toLocaleString("it-IT")} token`}
+                    hint={embeddingRecommendations ? `Suggerito: ${embeddingRecommendations.embeddingNumCtx}` : null}
+                    onChange={(value) =>
+                      setFormState((current) => ({ ...current, embeddingNumCtx: value }))
+                    }
                   />
-                </div>
+                )}
                 {embeddingModelDetails?.numCtx && formState.embeddingNumCtx == null && (
                   <div className="model-context-bar__track">
                     <div
@@ -1055,6 +1323,13 @@ export function SettingsSection({
                 ))}
               </select>
             </label>
+            {formState.defaultTranslationModel && (
+              <ModelDetailsNote
+                loading={translationModelDetailsLoading}
+                details={translationModelDetails}
+                fallbackText="Dettagli traduzione non disponibili."
+              />
+            )}
             {unavailableDefaults.length > 0 && (
               <div className="panel-note panel-note--warning" role="alert">
                 <p>Alcuni modelli salvati non sono piu presenti in Ollama: {unavailableDefaults.join(", ")}.</p>
@@ -1094,22 +1369,18 @@ export function SettingsSection({
                 placeholder="C:\Program Files\LibreOffice\program\soffice.exe"
               />
             </label>
-            <label className="field-group" htmlFor="office-conversion-timeout">
-              <span>Timeout conversione (secondi)</span>
-              <input
-                id="office-conversion-timeout"
-                type="number"
-                min={10}
-                max={900}
-                value={officeFormState.conversionTimeoutSeconds}
-                onChange={(event) =>
-                  setOfficeFormState((current) => ({
-                    ...current,
-                    conversionTimeoutSeconds: Number(event.target.value)
-                  }))
-                }
-              />
-            </label>
+            <SettingsRangeField
+              id="office-conversion-timeout"
+              label="Timeout conversione"
+              min={10}
+              max={900}
+              step={10}
+              value={officeFormState.conversionTimeoutSeconds}
+              formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
+              onChange={(value) =>
+                setOfficeFormState((current) => ({ ...current, conversionTimeoutSeconds: value }))
+              }
+            />
             <div className="settings-actions">
               <button type="button" onClick={saveOfficeSettings} disabled={isBusy}>
                 Salva
@@ -1267,6 +1538,85 @@ type OcrRangeFieldProps = {
   onChange: (value: number) => void;
 };
 
+type SettingsRangeFieldProps = {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  disabled?: boolean;
+  hint?: string | null;
+  formatValue?: (value: number) => string;
+  onChange: (value: number) => void;
+};
+
+function SettingsRangeField({
+  id,
+  label,
+  min,
+  max,
+  step = 1,
+  value,
+  disabled = false,
+  hint = null,
+  formatValue = formatOcrInteger,
+  onChange
+}: SettingsRangeFieldProps) {
+  const normalizedValue = Math.min(max, Math.max(min, value));
+  return (
+    <label className="field-group settings-range-field" htmlFor={id}>
+      <span>{label}</span>
+      <span className="settings-range-field__value">
+        {formatValue(normalizedValue)}
+        {hint && <small>{hint}</small>}
+      </span>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={normalizedValue}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function ModelDetailsNote({
+  loading,
+  details,
+  fallbackText
+}: {
+  loading: boolean;
+  details: OllamaModelDetails | null;
+  fallbackText: string;
+}) {
+  if (loading) {
+    return (
+      <div className="panel-note">
+        <p>Lettura dettagli modello in corso.</p>
+      </div>
+    );
+  }
+
+  if (!details?.numCtx) {
+    return (
+      <div className="panel-note">
+        <p>{fallbackText}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel-note">
+      <p>num_ctx nativo: {details.numCtx.toLocaleString("it-IT")} token.</p>
+    </div>
+  );
+}
+
 function OcrRangeField({
   id,
   label,
@@ -1363,6 +1713,23 @@ function normalizePerformanceSettings(settings: PerformanceSettings): Performanc
   };
 }
 
+function normalizeIngestionSettings(settings: IngestionSettings): IngestionSettings {
+  const chunkSizeTokens = clampNumber(Number(settings.chunkSizeTokens), 100, 4000);
+  return {
+    chunkSizeTokens,
+    overlapTokens: clampNumber(Number(settings.overlapTokens), 0, Math.min(1000, Math.floor(chunkSizeTokens / 2)))
+  };
+}
+
+function normalizeOcrProcessingSettings(settings: OcrProcessingSettings): OcrProcessingSettings {
+  return {
+    language: normalizeOptionalValue(settings.language) ?? "it",
+    maxRetries: clampNumber(Number(settings.maxRetries), 0, 2),
+    pageTimeoutSeconds: clampNumber(Number(settings.pageTimeoutSeconds), 15, 600),
+    lowConfidenceThreshold: clampNumber(Number(settings.lowConfidenceThreshold), 0.01, 0.99)
+  };
+}
+
 function normalizeOcrSettings(settings: OcrSettings): OcrSettings {
   return {
     profile: settings.profile.trim(),
@@ -1406,6 +1773,18 @@ function buildPerformanceSettingsPayload(
   return normalizePerformanceSettings(performanceFormState);
 }
 
+function buildIngestionSettingsPayload(
+  ingestionFormState: IngestionSettings
+): IngestionSettings {
+  return normalizeIngestionSettings(ingestionFormState);
+}
+
+function buildOcrProcessingSettingsPayload(
+  ocrProcessingFormState: OcrProcessingSettings
+): OcrProcessingSettings {
+  return normalizeOcrProcessingSettings(ocrProcessingFormState);
+}
+
 function buildOcrSettingsPayload(ocrFormState: OcrSettings): OcrSettings {
   return normalizeOcrSettings(ocrFormState);
 }
@@ -1425,8 +1804,66 @@ function arePerformanceSettingsEqual(left: PerformanceSettings, right: Performan
   return JSON.stringify(normalizePerformanceSettings(left)) === JSON.stringify(normalizePerformanceSettings(right));
 }
 
+function areIngestionSettingsEqual(left: IngestionSettings, right: IngestionSettings): boolean {
+  return JSON.stringify(normalizeIngestionSettings(left)) === JSON.stringify(normalizeIngestionSettings(right));
+}
+
+function areOcrProcessingSettingsEqual(left: OcrProcessingSettings, right: OcrProcessingSettings): boolean {
+  return JSON.stringify(normalizeOcrProcessingSettings(left)) === JSON.stringify(normalizeOcrProcessingSettings(right));
+}
+
 function areOcrSettingsEqual(left: OcrSettings, right: OcrSettings): boolean {
   return JSON.stringify(normalizeOcrSettings(left)) === JSON.stringify(normalizeOcrSettings(right));
+}
+
+function getOcrLanguageOptions(currentValue: string, languages: OcrLanguage[]): OcrLanguage[] {
+  if (languages.length === 0) {
+    return [{ code: currentValue || "it", label: currentValue || "it", scriptGroup: "custom", isDefault: false }];
+  }
+
+  if (languages.some((language) => language.code === currentValue)) {
+    return languages;
+  }
+
+  return [
+    ...languages,
+    { code: currentValue, label: currentValue, scriptGroup: "custom", isDefault: false }
+  ];
+}
+
+function buildEmbeddingRecommendations(numCtx: number | null): {
+  embeddingNumCtx: number;
+  chunkMinimum: number;
+  chunkMaximum: number;
+} | null {
+  if (!numCtx || numCtx <= 0) {
+    return null;
+  }
+
+  const embeddingNumCtx = clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
+  const chunkMinimum = clampNumber(Math.round(numCtx * 0.1 / 50) * 50, 100, 4000);
+  const chunkMaximum = Math.max(
+    chunkMinimum,
+    clampNumber(Math.round(numCtx * 0.35 / 50) * 50, 100, 4000)
+  );
+
+  return { embeddingNumCtx, chunkMinimum, chunkMaximum };
+}
+
+function buildContextChunkRecommendation(numCtx: number | null): number | null {
+  if (!numCtx || numCtx <= 0) {
+    return null;
+  }
+
+  return clampNumber(Math.round(numCtx / 1024), 1, 24);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, value));
 }
 
 function formatModelSize(size: number): string {
