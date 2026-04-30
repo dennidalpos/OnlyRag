@@ -34,7 +34,8 @@ Bridge and prerequisites:
 
 - Bridge script: `scripts\ocr\paddle_ocr_bridge.py`.
 - Requirements: `scripts\ocr\requirements.txt`.
-- Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` prepares the local OCR environment when Python is available; use `-SkipOcr` to skip it.
+- End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
+- Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup; use `-SkipOcr` to skip it.
 - Default OCR Python path: `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv\Scripts\python.exe`.
 - Override Python with `ONLYRAG_OCR_PYTHON`.
 - Override bridge path with `ONLYRAG_OCR_BRIDGE`.
@@ -51,6 +52,6 @@ Notes:
 - The real PaddleOCR engine is not exercised by unit tests. Tests use a fake `IOcrEngine` for
   cache, retry, checkpoint, and ingestion behavior.
 - The installer does not bundle OCR Python packages or PaddleOCR models. The supported delivery
-  model is per-user provisioning through `scripts\Bootstrap-Prerequisites.ps1`, which prepares and
-  verifies `%LOCALAPPDATA%\OnlyRag\ocr-python` when Python is available. PaddleOCR may download
-  models on first OCR use into the user profile cache.
+  model is per-user provisioning from **Configura OCR** in Settings, which prepares and verifies
+  `%LOCALAPPDATA%\OnlyRag\ocr-python` when Python is available. PaddleOCR may download models on
+  first OCR use into the user profile cache.

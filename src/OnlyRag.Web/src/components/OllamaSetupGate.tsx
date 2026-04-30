@@ -1,31 +1,48 @@
 import { useRef } from "react";
-import type { OllamaModel, OllamaSettings, OllamaStatusResponse } from "../api";
+import type { OllamaInstallStatus, OllamaModel, OllamaSettings, OllamaStatusResponse } from "../api";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
 type OllamaSetupGateProps = {
   ollamaStatus: OllamaStatusResponse | null;
+  ollamaInstallStatus: OllamaInstallStatus | null;
   ollamaSettings: OllamaSettings | null;
   ollamaModels: OllamaModel[];
   isChecking: boolean;
   onOpenSettings: () => void;
+  onInstallOllama: () => void;
   onRecheck: () => void;
 };
 
 type SetupIssue = {
   title: string;
   detail: string;
+  installCommand?: string | null;
+  networkAccessHint?: string | null;
+  canInstallOllama?: boolean;
 };
 
 function detectIssue(
   ollamaStatus: OllamaStatusResponse | null,
+  ollamaInstallStatus: OllamaInstallStatus | null,
   ollamaSettings: OllamaSettings | null,
   ollamaModels: OllamaModel[]
 ): SetupIssue | null {
+  if (ollamaInstallStatus && !ollamaInstallStatus.cliInstalled) {
+    return {
+      title: "Ollama non installato",
+      detail: "Installa Ollama per usare chat, embedding e traduzione con modelli locali.",
+      installCommand: ollamaInstallStatus.installCommand,
+      networkAccessHint: ollamaInstallStatus.networkAccessHint,
+      canInstallOllama: true
+    };
+  }
+
   if (!ollamaStatus || !ollamaStatus.isReachable) {
     return {
       title: "Ollama non raggiungibile",
       detail:
-        "L'app non riesce a connettersi a Ollama. Assicurati che Ollama sia avviato, poi verifica l'indirizzo nelle Impostazioni."
+        "L'app non riesce a connettersi a Ollama. Avvia Ollama, poi verifica l'indirizzo nelle Impostazioni.",
+      networkAccessHint: ollamaInstallStatus?.networkAccessHint ?? null
     };
   }
 
@@ -72,14 +89,16 @@ function detectIssue(
 
 export function OllamaSetupGate({
   ollamaStatus,
+  ollamaInstallStatus,
   ollamaSettings,
   ollamaModels,
   isChecking,
   onOpenSettings,
+  onInstallOllama,
   onRecheck
 }: OllamaSetupGateProps) {
   const modalRef = useRef<HTMLDivElement | null>(null);
-  const issue = detectIssue(ollamaStatus, ollamaSettings, ollamaModels);
+  const issue = detectIssue(ollamaStatus, ollamaInstallStatus, ollamaSettings, ollamaModels);
 
   useModalFocusTrap(modalRef, Boolean(issue));
 
@@ -93,7 +112,16 @@ export function OllamaSetupGate({
         <h2 id="setup-gate-title">Configurazione iniziale richiesta</h2>
         <h3>{issue.title}</h3>
         <p>{issue.detail}</p>
+        {issue.installCommand && (
+          <p>Comando usato: <code>{issue.installCommand}</code></p>
+        )}
+        {issue.networkAccessHint && <p>{issue.networkAccessHint}</p>}
         <div className="settings-actions">
+          {issue.canInstallOllama && (
+            <button type="button" onClick={onInstallOllama} disabled={isChecking}>
+              Installa Ollama
+            </button>
+          )}
           <button type="button" onClick={onOpenSettings}>
             Apri Impostazioni
           </button>

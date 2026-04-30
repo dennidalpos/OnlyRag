@@ -359,8 +359,10 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         if (!availability.IsConfigured)
         {
             throw new InvalidOperationException(
-                availability.Message
-                ?? "PaddleOCR non configurato. Esegui scripts\\Bootstrap-Prerequisites.ps1 oppure imposta ONLYRAG_OCR_PYTHON.");
+                string.IsNullOrWhiteSpace(availability.Message)
+                    || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
+                    ? "PaddleOCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR."
+                    : availability.Message);
         }
 
         OcrPipelineOptions ocrOptions = await LoadOcrOptionsAsync(ocrLanguage, cancellationToken);

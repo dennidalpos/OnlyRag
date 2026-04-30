@@ -4,6 +4,8 @@ import {
   markBackendOffline,
   markBackendOnline,
   resolveBackendBaseUrlDirect,
+  type DependencyActionResponse,
+  type OllamaInstallStatus,
   type OllamaModel,
   type OllamaModelsResponse,
   type OllamaSettings,
@@ -64,6 +66,7 @@ export default function App() {
   const [statusChecked, setStatusChecked] = useState(false);
   const [ollamaSettings, setOllamaSettings] = useState<OllamaSettings | null>(null);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusResponse | null>(null);
+  const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
@@ -107,9 +110,12 @@ export default function App() {
         apiRequest<OllamaSettings>("/api/settings/ollama"),
         apiRequest<OllamaStatusResponse>("/api/ollama/status")
       ]);
+      const dependencyStatus = await apiRequest<OllamaInstallStatus>("/api/dependencies/ollama")
+        .catch(() => null);
 
       setOllamaSettings(settings);
       setOllamaStatus(status);
+      setOllamaInstallStatus(dependencyStatus);
       setBackendStatus((current) => ({
         ...current,
         ollamaValue: formatOllamaBadge(status),
@@ -127,6 +133,7 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossibile leggere lo stato di Ollama.";
       setOllamaStatus(null);
+      setOllamaInstallStatus(null);
       setOllamaModels([]);
       setOllamaLoadError(message);
       setBackendStatus((current) => ({
@@ -140,6 +147,18 @@ export default function App() {
   async function handleRecheckOllama() {
     setIsRecheckingOllama(true);
     try {
+      await refreshOllamaData();
+    } finally {
+      setIsRecheckingOllama(false);
+    }
+  }
+
+  async function handleInstallOllama() {
+    setIsRecheckingOllama(true);
+    try {
+      await apiRequest<DependencyActionResponse>("/api/dependencies/ollama/install", {
+        method: "POST"
+      });
       await refreshOllamaData();
     } finally {
       setIsRecheckingOllama(false);
@@ -240,10 +259,12 @@ export default function App() {
       {initialCheckDone && activeSection !== "settings" && (
         <OllamaSetupGate
           ollamaStatus={ollamaStatus}
+          ollamaInstallStatus={ollamaInstallStatus}
           ollamaSettings={ollamaSettings}
           ollamaModels={ollamaModels}
           isChecking={isRecheckingOllama}
           onOpenSettings={() => setActiveSection("settings")}
+          onInstallOllama={() => void handleInstallOllama()}
           onRecheck={() => void handleRecheckOllama()}
         />
       )}

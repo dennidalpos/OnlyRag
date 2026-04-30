@@ -23,7 +23,21 @@ Optional:
   Office files that cannot be read directly.
 - Python plus OCR requirements for the PaddleOCR bridge when scanned PDF/image OCR is needed.
 
-## Bootstrap
+## End-user dependency setup
+
+Optional dependencies are configured from **Settings** in the desktop app:
+
+- **Ollama**: when the CLI is missing, the app shows the command
+  `irm https://ollama.com/install.ps1 | iex` and can start it in PowerShell.
+- **LibreOffice**: when missing, the app opens the official LibreOffice download page.
+- **OCR**: **Configura OCR** creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`
+  and installs the pinned PaddleOCR requirements shipped with the app.
+
+For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
+with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
+**Settings > Ollama**.
+
+## Developer bootstrap
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
@@ -43,14 +57,14 @@ pwsh .\scripts\Bootstrap-Prerequisites.ps1 -SkipOllamaCheck
 pwsh .\scripts\Bootstrap-Prerequisites.ps1 -NonInteractive
 ```
 
-The bootstrap does not install system software. .NET, WebView2 Runtime, Node.js, Ollama,
-LibreOffice, and Python remain manual installs when missing.
+The bootstrap is intended for development and verification. End-user setup should use the app
+settings actions above.
 
 ## Canonical Commands
 
 | Task | Command | Notes |
 |---|---|---|
-| Setup / dependency install | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` | Verifies prerequisites, restores .NET packages, and installs web dependencies when the lockfile is present. |
+| Developer setup / dependency install | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` | Verifies prerequisites, restores .NET packages, and installs web dependencies when the lockfile is present. |
 | Web dependency install only | `npm ci` from `src\OnlyRag.Web` | npm is the supported package manager; `package-lock.json` is authoritative. |
 | .NET build | `pwsh .\scripts\Build-App.ps1` | Runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. |
 | Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. |
@@ -98,7 +112,7 @@ Runtime data lives under `%LOCALAPPDATA%\OnlyRag`:
 | `data\onlyrag.db` | SQLite database for documents, chunks, embeddings, jobs, chat history, translations, and settings. |
 | `documents\originals\` | Local copies of imported source files. |
 | `documents\exports\` | Translation export files. |
-| `ocr-python\` | PaddleOCR Python environment prepared by bootstrap when Python is available. |
+| `ocr-python\` | PaddleOCR Python environment prepared by **Configura OCR** in Settings or by developer bootstrap. |
 | `logs\` | Application log files. |
 
 The SQLite schema is initialized automatically at startup for a fresh database. OnlyRag is treated
@@ -190,13 +204,13 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
 - Backend is offline in the UI: run the app from PowerShell and inspect `%LOCALAPPDATA%\OnlyRag\logs`.
 - Web UI is blank in Debug: run `pwsh .\scripts\Build-Web.ps1`, or start `npm run dev` in
   `src\OnlyRag.Web`.
-- Ollama is offline: confirm the endpoint in **Settings > Ollama** and that the Ollama process is
-  reachable from Windows.
+- Ollama is offline: confirm the endpoint in **Settings > Ollama**, start Ollama, and for LAN
+  endpoints configure Ollama network access with `OLLAMA_HOST`.
 - Embeddings or chat model missing: install a compatible model from **Settings > Ollama** or with
   Ollama directly.
-- Legacy Office import requires LibreOffice: configure `soffice.exe` in Settings or set
-  `ONLYRAG_LIBREOFFICE_PATH`.
-- OCR reports missing prerequisites: use the bootstrap without `-SkipOcr` after Python is
+- Legacy Office import requires LibreOffice: use **Scarica LibreOffice** in Settings, configure
+  `soffice.exe`, or set `ONLYRAG_LIBREOFFICE_PATH`.
+- OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10+ is
   available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`.
 - App closes while work is active: confirm the running build includes the WPF shutdown flow and
   inspect `%LOCALAPPDATA%\OnlyRag\logs` for `Shutdown preparation` entries.

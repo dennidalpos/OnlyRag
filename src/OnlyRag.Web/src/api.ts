@@ -103,6 +103,25 @@ export type OperationMessageResponse = {
   message: string;
 };
 
+export type OllamaInstallStatus = {
+  cliInstalled: boolean;
+  apiReachable: boolean;
+  installCommand: string;
+  networkAccessHint: string;
+};
+
+export type DependencyActionResponse = {
+  started: boolean;
+  message: string;
+};
+
+export type OcrProvisionStatus = {
+  isConfigured: boolean;
+  isRunning: boolean;
+  message: string;
+  lastError: string | null;
+};
+
 export type OcrLanguage = {
   code: string;
   label: string;

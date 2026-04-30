@@ -162,7 +162,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             throw new OcrEngineUnavailableException(
-                $"Python OCR non configurato. Esegui scripts\\Bootstrap-Prerequisites.ps1 oppure imposta {PythonEnvVar}.",
+                $"Python OCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR, oppure imposta {PythonEnvVar}.",
                 ex);
         }
 

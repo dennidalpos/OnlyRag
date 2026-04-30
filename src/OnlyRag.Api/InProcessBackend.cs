@@ -121,6 +121,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOfficeConversionService, LibreOfficeConversionService>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
+        builder.Services.AddSingleton<DependencyProvisioningService>();
         builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
         builder.Services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         builder.Services.AddSingleton<DocumentTextChunker>();
@@ -184,6 +185,7 @@ public static partial class InProcessBackend
         MapAppEndpoints(app);
         MapRetrievalEndpoints(app);
         MapSettingsEndpoints(app);
+        MapDependencyEndpoints(app);
         MapJobEndpoints(app);
         MapDocumentEndpoints(app);
         MapTranslationEndpoints(app);

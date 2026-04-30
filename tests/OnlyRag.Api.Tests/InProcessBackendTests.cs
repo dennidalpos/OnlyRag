@@ -549,6 +549,40 @@ public sealed class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DependencyOllamaStatus_ReturnsInstallCommandAndNetworkHint()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        OllamaInstallStatus? status = await httpClient.GetFromJsonAsync<OllamaInstallStatus>("/api/dependencies/ollama");
+
+        Assert.NotNull(status);
+        Assert.Equal("irm https://ollama.com/install.ps1 | iex", status.InstallCommand);
+        Assert.Contains("OLLAMA_HOST", status.NetworkAccessHint);
+    }
+
+    [Fact]
+    public async Task DependencyOcrStatus_DoesNotExposeDeveloperBootstrapInstruction()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        OcrProvisionStatus? status = await httpClient.GetFromJsonAsync<OcrProvisionStatus>("/api/dependencies/ocr");
+
+        Assert.NotNull(status);
+        Assert.DoesNotContain("Bootstrap", status.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Bootstrap", status.LastError ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task TranslationCompare_ReturnsPageUnitsAndSavesManualCorrection()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

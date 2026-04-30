@@ -6,7 +6,8 @@ directly are converted through LibreOffice headless when the converter is availa
 
 ## Converter
 
-LibreOffice is an optional dependency. OnlyRag does not install it automatically.
+LibreOffice is an optional dependency. OnlyRag does not install it silently; when LibreOffice is
+missing, Settings shows **Scarica LibreOffice** and opens the official download page.
 
 Detection order:
 
@@ -26,8 +27,8 @@ processed by the existing PDF pipeline. The conversion has a configurable timeou
 120 seconds, and is checkpointed before conversion and during the downstream PDF ingestion.
 
 If LibreOffice is not available, the document is marked as `RequiresAdditionalComponent` and
-the UI shows a simple message that LibreOffice is required. Conversion errors are logged in
-`%LOCALAPPDATA%\OnlyRag\logs\backend.log`.
+the UI shows a download action plus the path configuration field. Conversion errors are logged
+in `%LOCALAPPDATA%\OnlyRag\logs\backend.log`.
 
 Packaging, installer delivery, upgrade, uninstall, and signing for LibreOffice are not part of
 this repository. Any bundled or consent-based installer flow must be designed separately.

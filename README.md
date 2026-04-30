@@ -52,7 +52,7 @@ Optional features:
 
 ## Setup
 
-Run from the repository root in PowerShell 7:
+Developer setup from the repository root in PowerShell 7:
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
@@ -60,7 +60,15 @@ pwsh .\scripts\Bootstrap-Prerequisites.ps1
 
 The bootstrap verifies prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
 installs web dependencies with `npm ci`, and prepares the optional OCR Python environment when
-Python is available. It does not install system software.
+Python is available.
+
+End users configure optional dependencies from **Settings** in the app:
+
+- **Ollama**: if missing, the UI can start the official PowerShell install command
+  `irm https://ollama.com/install.ps1 | iex`.
+- **LibreOffice**: if missing, the UI opens the LibreOffice download page.
+- **OCR**: the **Configura OCR** button prepares the per-user PaddleOCR environment under
+  `%LOCALAPPDATA%\OnlyRag\ocr-python`.
 
 ## Commands
 

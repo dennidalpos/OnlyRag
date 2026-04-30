@@ -43,7 +43,7 @@ Required before installation:
 External and configurable:
 
 - Ollama is not bundled. Install and configure it separately for model features.
-- OCR/PaddleOCR runtime packages and OCR models are optional and are not bundled in the installer. The supported strategy is a per-user Python virtual environment under `%LOCALAPPDATA%\OnlyRag\ocr-python`, prepared by `scripts\Bootstrap-Prerequisites.ps1` from pinned `scripts\ocr\requirements.txt` versions and verified against `scripts\ocr\runtime-manifest.json`.
+- OCR/PaddleOCR runtime packages and OCR models are optional and are not bundled in the installer. The supported strategy is a per-user Python virtual environment under `%LOCALAPPDATA%\OnlyRag\ocr-python`, prepared from **Configura OCR** in Settings or by the developer bootstrap from pinned `scripts\ocr\requirements.txt` versions and verified against `scripts\ocr\runtime-manifest.json`.
 
 Build-time prerequisites:
 

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   apiRequest,
+  type DependencyActionResponse,
   type DiagnosticsResponse,
   type IngestionSettings,
   type OfficeConversionSettings,
   type OfficeConverterStatusResponse,
   type OcrLanguage,
   type OcrProcessingSettings,
+  type OcrProvisionStatus,
   type OcrSettings,
+  type OllamaInstallStatus,
   type OllamaModel,
   type OllamaModelDetails,
   type OllamaSettings,
@@ -141,6 +144,8 @@ export function SettingsSection({
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>([]);
   const [officeStatus, setOfficeStatus] = useState<OfficeConverterStatusResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
+  const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
+  const [ocrProvisionStatus, setOcrProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -178,6 +183,7 @@ export function SettingsSection({
     void refreshOcrSettings();
     void refreshOcrLanguages();
     void refreshDiagnostics();
+    void refreshDependencyStatus();
   }, []);
 
   useEffect(() => {
@@ -325,6 +331,7 @@ export function SettingsSection({
         setErrorMessage(response.suggestion);
       }
 
+      await refreshDependencyStatus();
       await onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Test connessione non riuscito.");
@@ -454,6 +461,72 @@ export function SettingsSection({
       setDiagnostics(data);
     } catch {
       // Diagnostics are non-critical; silence the error to avoid overwriting other messages.
+    }
+  }
+
+  async function refreshDependencyStatus() {
+    try {
+      const [ollamaDependency, ocrDependency] = await Promise.all([
+        apiRequest<OllamaInstallStatus>("/api/dependencies/ollama"),
+        apiRequest<OcrProvisionStatus>("/api/dependencies/ocr")
+      ]);
+      setOllamaInstallStatus(ollamaDependency);
+      setOcrProvisionStatus(ocrDependency);
+    } catch {
+      // Dependency helpers are non-critical; the rest of Settings must remain usable.
+    }
+  }
+
+  async function installOllama() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ollama/install", {
+        method: "POST"
+      });
+      setInfoMessage(response.message);
+      await refreshDependencyStatus();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Installazione Ollama non avviata.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function openLibreOfficeDownload() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/libreoffice/open-download", {
+        method: "POST"
+      });
+      setInfoMessage(response.message);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Download LibreOffice non aperto.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function configureOcrRuntime() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/provision", {
+        method: "POST"
+      });
+      setInfoMessage(response.message);
+      await refreshDependencyStatus();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Configurazione OCR non avviata.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -736,6 +809,19 @@ export function SettingsSection({
     performanceFormState
   ]);
 
+  useEffect(() => {
+    if (!ocrProvisionStatus?.isRunning) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshDependencyStatus();
+      void refreshDiagnostics();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [ocrProvisionStatus?.isRunning]);
+
   return (
     <div className="section-layout settings-layout">
       <div className="section-copy settings-copy">
@@ -769,10 +855,21 @@ export function SettingsSection({
               <button type="button" className="button-secondary" onClick={testConnection} disabled={isBusy}>
                 Test connessione
               </button>
+              {ollamaInstallStatus && !ollamaInstallStatus.cliInstalled && (
+                <button type="button" className="button-secondary" onClick={installOllama} disabled={isBusy}>
+                  Installa Ollama
+                </button>
+              )}
             </div>
             <div className="panel-note">
               <p>{status?.message ?? loadError ?? "Configura l'indirizzo Ollama e testa la connessione."}</p>
               {status?.suggestion && <p>{status.suggestion}</p>}
+              {ollamaInstallStatus && !ollamaInstallStatus.cliInstalled && (
+                <p>Ollama non risulta installato. Il pulsante usa: <code>{ollamaInstallStatus.installCommand}</code></p>
+              )}
+              {ollamaInstallStatus && (
+                <p>{ollamaInstallStatus.networkAccessHint}</p>
+              )}
             </div>
           </div>
         </div>
@@ -1371,6 +1468,11 @@ export function SettingsSection({
               <button type="button" onClick={saveOfficeSettings} disabled={isBusy}>
                 Salva
               </button>
+              {officeStatus && !officeStatus.isAvailable && (
+                <button type="button" className="button-secondary" onClick={openLibreOfficeDownload} disabled={isBusy}>
+                  Scarica LibreOffice
+                </button>
+              )}
             </div>
             {officeStatus?.executablePath && (
               <div className="panel-note">
@@ -1480,7 +1582,13 @@ export function SettingsSection({
                 </div>
                 {!diagnostics.ocrIsConfigured && (
                   <div className="panel-note panel-note--warning" role="alert">
-                    <p>Esegui <code>scripts\Bootstrap-Prerequisites.ps1</code> per abilitare OCR.</p>
+                    <p>{ocrProvisionStatus?.message ?? "OCR non configurato. Configura le dipendenze locali per abilitare OCR."}</p>
+                    {ocrProvisionStatus?.lastError && <p>{ocrProvisionStatus.lastError}</p>}
+                  </div>
+                )}
+                {ocrProvisionStatus?.isRunning && (
+                  <div className="panel-note" role="status">
+                    <p>{ocrProvisionStatus.message}</p>
                   </div>
                 )}
               </>
@@ -1500,6 +1608,14 @@ export function SettingsSection({
               </button>
               <button type="button" onClick={() => void openLogsFolder()} disabled={isBusy}>
                 Apri cartella log
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => void configureOcrRuntime()}
+                disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
+              >
+                {ocrProvisionStatus?.isRunning ? "Configurazione OCR..." : "Configura OCR"}
               </button>
             </div>
           </div>

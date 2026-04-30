@@ -39,6 +39,14 @@
       "risk": "medium",
       "priority": "medium",
       "context": "Run the web UI with the in-process backend and verify Settings > Ollama in a real browser. Execution order: select a chat model, confirm the chat num_ctx bar appears, toggle Automatico on and off, move the slider, save, reload settings, and confirm the manual value persists; repeat the same flow for the translation model. Also verify that Automatico sends null for chatNumCtx and translationNumCtx and that the visual bar moves according to the selected manual value relative to the detected native model context."
+    },
+    {
+      "id": "settings-dependency-actions-manual-verification",
+      "type": "test",
+      "status": "todo",
+      "risk": "medium",
+      "priority": "medium",
+      "context": "Run the desktop app on Windows and manually verify the new Settings dependency actions that were not executed during implementation: Installa Ollama starts PowerShell with `irm https://ollama.com/install.ps1 | iex` when Ollama is missing, Scarica LibreOffice opens the official LibreOffice download page when LibreOffice is missing, and Configura OCR provisions `%LOCALAPPDATA%\\OnlyRag\\ocr-python` after Python 3.10+ is available. Confirm status refresh, actionable errors, and that no user-facing OCR message tells the user to run bootstrap."
     }
   ]
 }

@@ -14,7 +14,7 @@ public sealed class UnavailableOcrEngine : IOcrEngine
             false,
             EngineName,
             EngineVersion,
-            "PaddleOCR non configurato. Esegui scripts\\Bootstrap-Prerequisites.ps1 oppure imposta ONLYRAG_OCR_PYTHON."));
+            "PaddleOCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR, oppure imposta ONLYRAG_OCR_PYTHON."));
     }
 
     public Task<OcrPagePreparation> PreparePageAsync(
