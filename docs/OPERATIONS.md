@@ -13,6 +13,13 @@ Required for development:
 - Node.js matching `^20.19.0 || >=22.12.0` with npm for `src\OnlyRag.Web`.
 - Microsoft Edge WebView2 Runtime.
 
+Required on an end-user machine before setup can complete:
+
+- Windows 10 1809 or newer, or Windows 11.
+- Microsoft Edge WebView2 Runtime. The setup blocks before installation when this runtime is missing and explains how to install the official Microsoft Evergreen Runtime and verify it.
+
+The installer is self-contained for OnlyRag's required .NET runtime components. End users do not need to install .NET 10 separately for the packaged app.
+
 Required for model features:
 
 - Ollama, available locally or on the LAN. Default endpoint: `http://localhost:11434`.
@@ -69,16 +76,16 @@ settings actions above.
 | .NET build | `pwsh .\scripts\Build-App.ps1` | Runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. |
 | Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. |
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
-| Test | `pwsh .\scripts\Test-All.ps1` | Runs `dotnet test` for the solution and web typecheck. |
+| Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, web typecheck, .NET tests, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
+| Installer prerequisite self-test | `pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest` | Simulates present and missing blocking prerequisites and verifies the expected message content. |
 | Package installer | `pwsh .\scripts\Build-Installer.ps1` | Builds web, publishes WPF, validates publish output, and compiles Inno Setup installer when `ISCC.exe` is installed. Pass `-SigningCertificateThumbprint` for signed release candidates. |
 | Verify installer release | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe` | Produces release evidence without installing. Add `-RunInstallLifecycle` on a clean verification machine to test install, shortcuts, launch, upgrade, uninstall, rollback/downgrade, optional components, and signing status. |
 
 No lint script or formatter configuration is currently defined.
 
-The full script inventory and non-canonical script folders are documented in
-[`scripts\README.md`](../scripts/README.md). Top-level scripts are reserved for supported setup,
-build, test, package, signing, and installer verification flows. Shared helpers live under
-`scripts\internal`, and agent/local gates live under `scripts\agents`.
+The full script inventory is documented in [`scripts\script.md`](../scripts/script.md). Top-level
+scripts are reserved for supported setup, build, test, package, signing, installer verification,
+brand asset generation, and the repository gate. Shared helpers live under `scripts\support`.
 
 ## Run Locally
 
@@ -147,7 +154,7 @@ rebuilding or republishing the app:
 
 ```powershell
 dotnet build .\OnlyRag.sln -c Release
-dotnet publish .\src\OnlyRag.App\OnlyRag.App.csproj -c Release -r win-x64 --self-contained false `
+dotnet publish .\src\OnlyRag.App\OnlyRag.App.csproj -c Release -r win-x64 --self-contained true `
   -o .\artifacts\publish\OnlyRag\win-x64 /p:PublishSingleFile=false
 ```
 
@@ -182,13 +189,14 @@ persists the selected value and passes it to the relevant generation or embeddin
 ## Packaging Status
 
 Windows packaging uses Inno Setup 6 and a per-user install under
-`%LOCALAPPDATA%\Programs\OnlyRag`.
+`%LOCALAPPDATA%\Programs\OnlyRag`. The publish payload is self-contained for required .NET
+runtime components; setup blocks only for missing Microsoft Edge WebView2 Runtime.
 
 ```powershell
 pwsh .\scripts\Build-Installer.ps1
 ```
 
-The packaging script builds the React UI, publishes the WPF app as a framework-dependent `win-x64`
+The packaging script builds the React UI, publishes the WPF app as a self-contained `win-x64`
 package, validates the publish payload, and compiles an unsigned installer when Inno Setup
 `ISCC.exe` is installed. For a release candidate, pass `-SigningCertificateThumbprint` with a
 trusted code-signing certificate; the build signs with `signtool`, applies a timestamp, and verifies

@@ -28,17 +28,16 @@ For the complete certificate-folder and scripted signing pipeline, see [`docs\SI
 - Privileges: no elevation requested.
 - Installation directory: `%LOCALAPPDATA%\Programs\OnlyRag`.
 - Runtime identifier: `win-x64`.
-- Publish mode: framework-dependent; Microsoft runtimes are prerequisites and are not bundled.
+- Publish mode: self-contained for the required .NET runtime components.
 
 ## Prerequisites
 
 Required before installation:
 
 - Windows 10 1809 or newer.
-- .NET 10 x64 runtime.
-- .NET 10 Windows Desktop x64 runtime.
-- .NET 10 ASP.NET Core x64 runtime.
 - Microsoft Edge WebView2 Runtime.
+
+The setup checks WebView2 before copying files. If WebView2 is missing, installation is blocked with the software name, supported version, reason, official Microsoft install location, and verification method. The packaged app includes the required .NET runtime components, so .NET 10 runtime, Windows Desktop runtime, and ASP.NET Core runtime are not end-user prerequisites for the installer build.
 
 External and configurable:
 
@@ -58,8 +57,11 @@ Build-time prerequisites:
 - Published WPF desktop app.
 - In-process backend assemblies.
 - React static assets under `wwwroot`.
+- Required .NET runtime components from the self-contained `win-x64` publish.
 - Required application assemblies and native runtime assets from `dotnet publish`.
 - OCR bridge scripts copied by the existing project file.
+- Installer icon from `src\OnlyRag.App\Assets\OnlyRag.ico`.
+- Inno Setup wizard artwork from `assets\brand\setup\onlyrag-setup-wizard-image-164x314.bmp` and `assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp`.
 
 ## Not Included
 
@@ -72,7 +74,13 @@ Build-time prerequisites:
 
 ## Verification Status
 
-`scripts\Build-Installer.ps1` verifies React build, `dotnet publish`, basic publish payload completeness, and absence of known user-data paths in the publish output. Installer generation is verified only when Inno Setup is installed.
+`scripts\Build-Installer.ps1` verifies React build, self-contained `dotnet publish`, basic publish payload completeness, and absence of known user-data paths in the publish output. Installer generation is verified only when Inno Setup is installed.
+
+Installer prerequisite messaging can be checked without installing:
+
+```powershell
+pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest
+```
 
 Installation, upgrade, uninstall, rollback/downgrade, optional component status, and signing evidence are verified by:
 
@@ -89,7 +97,6 @@ Execute these through `scripts\Test-InstallerRelease.ps1 -RunInstallLifecycle` o
 
 **Prerequisites**
 
-- [ ] .NET 10 runtime, Windows Desktop Runtime, and ASP.NET Core Runtime are installed
 - [ ] Microsoft Edge WebView2 Runtime is installed
 - [ ] No previous OnlyRag installation is present
 

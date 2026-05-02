@@ -18,6 +18,14 @@
 #define AppIcon "..\src\OnlyRag.App\Assets\OnlyRag.ico"
 #endif
 
+#ifndef WizardImage
+#define WizardImage "..\assets\brand\setup\onlyrag-setup-wizard-image-164x314.bmp"
+#endif
+
+#ifndef WizardSmallImage
+#define WizardSmallImage "..\assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp"
+#endif
+
 #define AppName "OnlyRag"
 #define AppExeName "OnlyRag.App.exe"
 
@@ -35,6 +43,8 @@ DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=OnlyRag-Setup-{#AppVersion}-{#RuntimeIdentifier}
 SetupIconFile={#AppIcon}
+WizardImageFile={#WizardImage}
+WizardSmallImageFile={#WizardSmallImage}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -62,21 +72,6 @@ Name: "{autodesktop}\OnlyRag"; Filename: "{app}\{#AppExeName}"; Tasks: desktopic
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,OnlyRag}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function HasSharedFramework(FrameworkName: String): Boolean;
-var
-  BasePath: String;
-  FindRec: TFindRec;
-begin
-  Result := False;
-  BasePath := ExpandConstant('{commonpf64}') + '\dotnet\shared\' + FrameworkName;
-
-  if FindFirst(BasePath + '\10.*', FindRec) then
-  begin
-    Result := True;
-    FindClose(FindRec);
-  end;
-end;
-
 function HasWebView2Runtime(): Boolean;
 var
   Version: String;
@@ -90,30 +85,18 @@ begin
 end;
 
 function InitializeSetup(): Boolean;
-var
-  Missing: String;
 begin
-  Missing := '';
-
-  if not HasSharedFramework('Microsoft.NETCore.App') then
-    Missing := Missing + '- .NET 10 Runtime x64' + #13#10;
-
-  if not HasSharedFramework('Microsoft.WindowsDesktop.App') then
-    Missing := Missing + '- .NET 10 Windows Desktop Runtime x64' + #13#10;
-
-  if not HasSharedFramework('Microsoft.AspNetCore.App') then
-    Missing := Missing + '- .NET 10 ASP.NET Core Runtime x64' + #13#10;
-
   if not HasWebView2Runtime() then
-    Missing := Missing + '- Microsoft Edge WebView2 Runtime' + #13#10;
-
-  if Missing <> '' then
   begin
     MsgBox(
-      'OnlyRag cannot be installed because required runtime prerequisites are missing:' + #13#10 + #13#10 +
-      Missing + #13#10 +
-      'Install the missing Microsoft runtimes, then run this installer again.' + #13#10 + #13#10 +
-      'Ollama is not bundled and must be installed/configured separately for model features. OCR/PaddleOCR runtime packages are optional and are not bundled by this installer.',
+      'OnlyRag cannot be installed because a required Windows runtime is missing:' + #13#10 + #13#10 +
+      '- Software: Microsoft Edge WebView2 Runtime' + #13#10 +
+      '- Minimum supported version: current Evergreen Runtime for Windows 10 1809 or newer / Windows 11' + #13#10 +
+      '- Why it is required: OnlyRag is a WPF desktop app that renders its bundled React UI through Microsoft WebView2. Without WebView2 the app can install but cannot show the first window reliably.' + #13#10 +
+      '- Install: download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/' + #13#10 +
+      '- Verify: open Settings > Apps and confirm "Microsoft Edge WebView2 Runtime" is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application.' + #13#10 + #13#10 +
+      'After installing WebView2, run this OnlyRag setup again.' + #13#10 + #13#10 +
+      'The OnlyRag installer includes the required .NET runtime components in the application package. Ollama, LibreOffice, and OCR/PaddleOCR Python packages are optional feature dependencies configured from the app settings.',
       mbError,
       MB_OK);
     Result := False;

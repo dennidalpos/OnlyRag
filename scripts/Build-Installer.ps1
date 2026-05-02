@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$supportScript = Join-Path $PSScriptRoot "internal\BuildSupport.ps1"
+$supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 . $supportScript
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -69,7 +69,7 @@ Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot
     "--runtime",
     $RuntimeIdentifier,
     "--self-contained",
-    "false",
+    "true",
     "--output",
     $publishDir,
     "/p:Version=$Version",

@@ -1,8 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$BrandRoot = $PSScriptRoot
-$RepoRoot = (Resolve-Path (Join-Path $BrandRoot "..\..")).Path
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$BrandRoot = Join-Path $RepoRoot "assets\brand"
 $SourceIconPath = Join-Path $RepoRoot "src\OnlyRag.App\Assets\OnlyRag.svg"
 
 Add-Type -AssemblyName PresentationCore
@@ -356,7 +356,10 @@ $LogoDir = Join-Path $BrandRoot "logos"
 $SocialDir = Join-Path $BrandRoot "social"
 $SetupDir = Join-Path $BrandRoot "setup"
 $PostsDir = Join-Path $BrandRoot "posts"
-@($LogoDir, $SocialDir, $SetupDir, $PostsDir) | ForEach-Object { New-AssetDirectory $_ }
+$WebPublicDir = Join-Path $RepoRoot "src\OnlyRag.Web\public"
+$WebSocialDir = Join-Path $WebPublicDir "social"
+$GitHubAssetsDir = Join-Path $RepoRoot ".github\assets"
+@($LogoDir, $SocialDir, $SetupDir, $PostsDir, $WebPublicDir, $WebSocialDir, $GitHubAssetsDir) | ForEach-Object { New-AssetDirectory $_ }
 
 $sourceIcon = Get-Content -LiteralPath $SourceIconPath -Raw
 $iconInner = ($sourceIcon -replace '(?s)^<svg[^>]*>', '' -replace '(?s)</svg>\s*$', '').Trim()
@@ -398,7 +401,7 @@ $monoSvg = @"
 "@
 Set-Content -LiteralPath (Join-Path $LogoDir "onlyrag-mark-mono.svg") -Value $monoSvg -Encoding utf8NoBOM
 
-16, 32, 48, 64, 128, 256, 512, 1024 | ForEach-Object {
+16, 32, 48, 64, 128, 180, 192, 256, 512, 1024 | ForEach-Object {
     Save-LogoIconPng -Path (Join-Path $LogoDir "onlyrag-icon-$_.png") -Size $_
 }
 Save-HorizontalLogoPng -Path (Join-Path $LogoDir "onlyrag-logo-horizontal-1200x400.png") -Width 1200 -Height 400
@@ -467,6 +470,42 @@ Save-RasterAsset -Path (Join-Path $SetupDir "onlyrag-setup-header-1500x500.png")
     Draw-Text -Context $context -Text "Install local-first document search, chat, OCR, and translation workflows." -X 120 -Y 285 -Size 36 -Color $Colors.Ink -MaxWidth 720 -Weight "Bold" -MaxHeight 100
 }
 
+$appIconPath = Join-Path $RepoRoot "src\OnlyRag.App\Assets\OnlyRag.ico"
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon.svg") -Destination (Join-Path $WebPublicDir "favicon.svg") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon-32.png") -Destination (Join-Path $WebPublicDir "favicon-32x32.png") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon-180.png") -Destination (Join-Path $WebPublicDir "apple-touch-icon.png") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon-192.png") -Destination (Join-Path $WebPublicDir "icon-192.png") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon-512.png") -Destination (Join-Path $WebPublicDir "icon-512.png") -Force
+Copy-Item -LiteralPath $appIconPath -Destination (Join-Path $WebPublicDir "favicon.ico") -Force
+Copy-Item -LiteralPath (Join-Path $SocialDir "open-graph-1200x630.png") -Destination (Join-Path $WebSocialDir "open-graph-1200x630.png") -Force
+Copy-Item -LiteralPath (Join-Path $SocialDir "x-twitter-card-1600x900.png") -Destination (Join-Path $WebSocialDir "x-twitter-card-1600x900.png") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon.svg") -Destination (Join-Path $GitHubAssetsDir "onlyrag-icon.svg") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-icon-512.png") -Destination (Join-Path $GitHubAssetsDir "onlyrag-icon.png") -Force
+Copy-Item -LiteralPath (Join-Path $LogoDir "onlyrag-logo-horizontal-1200x400.png") -Destination (Join-Path $GitHubAssetsDir "onlyrag-logo-horizontal.png") -Force
+
+$webManifest = [ordered]@{
+    name = "OnlyRag"
+    short_name = "OnlyRag"
+    description = "Local-first document RAG for Windows."
+    start_url = "."
+    display = "standalone"
+    background_color = "#f3f6f8"
+    theme_color = "#123044"
+    icons = @(
+        [ordered]@{
+            src = "/icon-192.png"
+            sizes = "192x192"
+            type = "image/png"
+        },
+        [ordered]@{
+            src = "/icon-512.png"
+            sizes = "512x512"
+            type = "image/png"
+        }
+    )
+}
+$webManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $WebPublicDir "site.webmanifest") -Encoding utf8NoBOM
+
 $manifest = [ordered]@{
     generatedAt = (Get-Date).ToString("s")
     sourceIcon = "src/OnlyRag.App/Assets/OnlyRag.svg"
@@ -482,6 +521,8 @@ $manifest = [ordered]@{
             "logos/onlyrag-icon-48.png",
             "logos/onlyrag-icon-64.png",
             "logos/onlyrag-icon-128.png",
+            "logos/onlyrag-icon-180.png",
+            "logos/onlyrag-icon-192.png",
             "logos/onlyrag-icon-256.png",
             "logos/onlyrag-icon-512.png",
             "logos/onlyrag-icon-1024.png",
@@ -513,6 +554,20 @@ $manifest = [ordered]@{
             "posts/post-ollama-ocr-1080x1350.png",
             "posts/post-translation-export-1080x1350.png",
             "posts/post-release-setup-1200x630.png"
+        )
+        integrations = @(
+            ".github/assets/onlyrag-icon.svg",
+            ".github/assets/onlyrag-icon.png",
+            ".github/assets/onlyrag-logo-horizontal.png",
+            "src/OnlyRag.Web/public/favicon.ico",
+            "src/OnlyRag.Web/public/favicon.svg",
+            "src/OnlyRag.Web/public/favicon-32x32.png",
+            "src/OnlyRag.Web/public/apple-touch-icon.png",
+            "src/OnlyRag.Web/public/icon-192.png",
+            "src/OnlyRag.Web/public/icon-512.png",
+            "src/OnlyRag.Web/public/site.webmanifest",
+            "src/OnlyRag.Web/public/social/open-graph-1200x630.png",
+            "src/OnlyRag.Web/public/social/x-twitter-card-1600x900.png"
         )
     }
 }

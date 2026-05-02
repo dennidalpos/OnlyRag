@@ -1,7 +1,7 @@
 # OnlyRag
 
 <p align="center">
-  <img src=".github/assets/onlyrag-icon.svg" width="96" alt="OnlyRag icon">
+  <img src=".github/assets/onlyrag-logo-horizontal.png" width="360" alt="OnlyRag">
 </p>
 
 OnlyRag is a Windows desktop app for building a local document library and using it with
@@ -50,6 +50,12 @@ Optional features:
 - Inno Setup 6 for installer generation.
 - Windows SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
 
+Installed app:
+
+- Windows 10 1809 or newer, or Windows 11.
+- Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions.
+- The installer package is self-contained for the required .NET runtime components; end users do not need to install .NET separately.
+
 ## Setup
 
 Developer setup from the repository root in PowerShell 7:
@@ -84,10 +90,10 @@ Build the .NET solution:
 pwsh .\scripts\Build-App.ps1 -Configuration Release
 ```
 
-Run the canonical repository checks:
+Run the canonical repository gate:
 
 ```powershell
-pwsh .\scripts\Test-All.ps1 -Configuration Release
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
 Run the desktop app:
@@ -100,6 +106,12 @@ Build an unsigned installer:
 
 ```powershell
 pwsh .\scripts\Build-Installer.ps1 -Configuration Release
+```
+
+Check installer prerequisite messaging:
+
+```powershell
+pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest
 ```
 
 Create installer evidence without installing:
@@ -125,7 +137,8 @@ residual work is tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
 - [Documentation index](docs/README.md)
 - [Operations](docs/OPERATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Scripts](scripts/README.md)
+- [Scripts](scripts/script.md)
+- [Brand assets](docs/BRAND_ASSETS.md)
 - [RAG pipeline](docs/RAG_PIPELINE.md)
 - [OCR pipeline](docs/OCR_PIPELINE.md)
 - [Office ingestion](docs/OFFICE_INGESTION.md)

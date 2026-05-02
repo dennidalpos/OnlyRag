@@ -13,7 +13,7 @@ export function Sidebar({ activeSection, sections, onSectionChange, activeJobCou
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">OR</div>
+        <img className="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
         <p>OnlyRag</p>
       </div>
       <nav className="navigation" aria-label="Sezioni principali">

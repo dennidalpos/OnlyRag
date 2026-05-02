@@ -1,22 +1,22 @@
-# OnlyRag brand assets
+# OnlyRag Brand Assets
 
 This directory contains generated visual assets for release, setup, social previews, and post templates.
 The assets are derived from `src/OnlyRag.App/Assets/OnlyRag.svg` and can be regenerated on Windows with:
 
 ```powershell
-pwsh .\assets\brand\Generate-BrandAssets.ps1
+pwsh .\scripts\Generate-BrandAssets.ps1
 ```
 
 ## Contents
 
-- `logos/`: SVG logo sources plus PNG icons and wordmark exports.
-- `social/`: common provider preview sizes, including Open Graph, GitHub, X/Twitter, LinkedIn, Instagram, stories/reels, and YouTube.
-- `setup/`: Windows installer-oriented artwork, including Inno Setup wizard image and small image BMP/PNG exports.
-- `posts/`: ready-to-use product post templates in common square, portrait, and landscape formats.
-- `manifest.json`: generated inventory with relative file paths.
+- `logos/`: SVG logo sources plus PNG icons and wordmark exports. Icon exports are `16`, `32`, `48`, `64`, `128`, `180`, `192`, `256`, `512`, and `1024` px.
+- `social/`: Open Graph, GitHub, X/Twitter, LinkedIn, Instagram, stories/reels, and YouTube preview images.
+- `setup/`: Inno Setup wizard image and small image BMP/PNG exports.
+- `posts/`: product post templates in common square, portrait, and landscape formats.
+- `manifest.json`: generated inventory with brand source, output groups, and integration copies.
 
 ## Notes
 
 - Files are generated deterministically by the PowerShell/WPF script; no external image dependency is required.
 - The Inno Setup BMP exports match the classic `WizardImageFile` (`164x314`) and `WizardSmallImageFile` (`55x55`) dimensions.
-- The current installer script still uses the application icon only. Wire the setup artwork into `packaging/OnlyRag.iss` only when the release packaging scope requires it.
+- The generator also updates web favicon/apple/manifest assets under `src\OnlyRag.Web\public`, GitHub-facing images under `.github\assets`, and social metadata images under `src\OnlyRag.Web\public\social`.

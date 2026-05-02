@@ -32,7 +32,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$supportScript = Join-Path $PSScriptRoot "internal\BuildSupport.ps1"
+$supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 . $supportScript
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {

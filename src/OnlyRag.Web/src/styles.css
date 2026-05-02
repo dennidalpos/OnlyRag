@@ -91,13 +91,8 @@ textarea {
 .brand-mark {
   width: 42px;
   height: 42px;
-  display: grid;
-  place-items: center;
+  display: block;
   border-radius: 8px;
-  background: #16324f;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .brand p,

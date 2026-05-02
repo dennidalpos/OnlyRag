@@ -11,6 +11,8 @@ product-facing and concise; keep operational and implementation details here.
   core service responsibilities.
 - [Packaging](../packaging/README.md): Inno Setup model, installer contents, prerequisites, and
   pre-release checks.
+- [Brand assets](BRAND_ASSETS.md): logo, favicon, installer, social/media assets, naming, and
+  regeneration procedure.
 - [Signing](SIGNING.md): certificate placement, signing script pipeline, and release verification
   steps.
 

@@ -23,6 +23,6 @@ jobs:
         run: npm ci
         working-directory: src/OnlyRag.Web
 
-      - name: Run repository checks
+      - name: Run repository gate
         shell: pwsh
-        run: .\scripts\Test-All.ps1 -Configuration Release
+        run: .\scripts\Invoke-Gate.ps1 -Configuration Release
