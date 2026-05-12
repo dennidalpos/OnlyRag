@@ -2,7 +2,7 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-12T19:32:00+02:00",
+  "last_updated": "2026-05-12T19:50:00+02:00",
   "production_target": true,
   "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
   "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, verify installer wizard visual layout, run interactive runtime checks, and make the final release decision.",
@@ -54,10 +54,11 @@
       ],
       "execution": [
         "Place signing material in the approved external location, not in source control.",
+        "For enterprise self-signed deployment, export only the public .cer with scripts\\Export-EnterpriseSigningCertificate.ps1 and distribute it through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher.",
         "Run scripts\\Sign-Release.ps1 with the trusted certificate and versioned installer artifact.",
-        "Confirm the installer Authenticode signature is valid and timestamped."
+        "Confirm the installer Authenticode signature is valid and timestamped on a machine where the enterprise trust policy has applied."
       ],
-      "completion_criteria": "artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is signed by the trusted publisher and signature verification passes.",
+      "completion_criteria": "artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is signed and signature verification passes on target machines after enterprise certificate trust deployment.",
       "status": "pending"
     },
     {
@@ -216,6 +217,8 @@
     "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
     "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
     "build": "Set-Location .\\src\\OnlyRag.Web; npm run build; Set-Location ..\\..; dotnet build .\\OnlyRag.sln --configuration Release --no-restore",
+    "export_enterprise_signing_certificate": "pwsh .\\scripts\\Export-EnterpriseSigningCertificate.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -OutputPath .\\certificates\\app\\OnlyRag-Enterprise-CodeSigning.cer",
+    "verify_enterprise_signing_trust": "pwsh .\\scripts\\Test-EnterpriseSigningTrust.ps1 -CertificateThumbprint 1E4A238A06A117710F11816DAB0C1833AC775712 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
     "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
   },
   "environment": {
@@ -231,7 +234,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "last_completed_work": "Recorded the deployment decision to support self-signed certificate trust only through enterprise Group Policy distribution; public release remains dependent on a CA-trusted code-signing certificate.",
+  "last_completed_work": "Added enterprise self-signed signing support scripts and documentation: public .cer export from installer signer, target-machine trust verification for LocalMachine Root/TrustedPublisher, and signing documentation updates.",
   "open_questions": [],
-  "handoff_notes": "Optional OCR verification is complete for this machine. Do not call this a signed production release until the remaining P0 tasks are complete: installer signed with validated trusted publisher material and clean-machine signed installer lifecycle verification passed. Before tagging a public release, also complete the installer wizard visual layout verification across DPI/font scenarios and populated desktop UI runtime verification."
+  "handoff_notes": "Optional OCR verification is complete for this machine. The enterprise self-signed path now has scripts and documentation, but trust verification still fails on this machine until the public .cer is deployed through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not call this a production enterprise release until trust verification and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
 }

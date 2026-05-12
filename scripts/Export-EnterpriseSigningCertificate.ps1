@@ -5,6 +5,8 @@ param(
 
     [string]$CertificateThumbprint,
 
+    [string]$InstallerPath,
+
     [string]$OutputPath
 )
 
@@ -23,10 +25,17 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $outputFullPath
 
-if ([string]::IsNullOrWhiteSpace($CertificatePath) -and [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
+if (-not [string]::IsNullOrWhiteSpace($InstallerPath) -and
+    (-not [string]::IsNullOrWhiteSpace($CertificatePath) -or -not [string]::IsNullOrWhiteSpace($CertificateThumbprint))) {
+    throw "Pass only one source: -InstallerPath, -CertificatePath, or -CertificateThumbprint."
+}
+
+if ([string]::IsNullOrWhiteSpace($InstallerPath) -and
+    [string]::IsNullOrWhiteSpace($CertificatePath) -and
+    [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
     $certificates = @(Get-ChildItem -LiteralPath $certificateRoot -Filter "*.pfx" -File | Sort-Object Name)
     if ($certificates.Count -eq 0) {
-        throw "No .pfx certificate found in '$certificateRoot'. Pass -CertificatePath or -CertificateThumbprint."
+        throw "No .pfx certificate found in '$certificateRoot'. Pass -InstallerPath, -CertificatePath, or -CertificateThumbprint."
     }
     if ($certificates.Count -gt 1) {
         $names = ($certificates | Select-Object -ExpandProperty Name) -join ", "
@@ -37,10 +46,24 @@ if ([string]::IsNullOrWhiteSpace($CertificatePath) -and [string]::IsNullOrWhiteS
 }
 
 if (-not [string]::IsNullOrWhiteSpace($CertificatePath) -and -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
-    throw "Pass either -CertificatePath or -CertificateThumbprint, not both."
+    throw "Pass only one source: -InstallerPath, -CertificatePath, or -CertificateThumbprint."
 }
 
-if (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
+if (-not [string]::IsNullOrWhiteSpace($InstallerPath)) {
+    $installerFullPath = [System.IO.Path]::GetFullPath($InstallerPath)
+    Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $installerFullPath
+    if (-not (Test-Path -LiteralPath $installerFullPath -PathType Leaf)) {
+        throw "Installer not found: $installerFullPath"
+    }
+
+    $signature = Get-AuthenticodeSignature -FilePath $installerFullPath
+    if (-not $signature.SignerCertificate) {
+        throw "Installer does not contain a signer certificate: $installerFullPath"
+    }
+
+    $certificate = $signature.SignerCertificate
+}
+elseif (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
     if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
         throw "Certificate file not found: $CertificatePath"
     }
@@ -79,7 +102,7 @@ else {
 }
 
 if (-not $certificate.HasPrivateKey -and -not [string]::IsNullOrWhiteSpace($CertificatePath)) {
-    throw "The supplied PFX did not expose a private key. Confirm this is the signing certificate."
+    Write-Warning "The supplied certificate did not expose a private key. Continuing because only the public certificate is exported."
 }
 
 $outputDirectory = Split-Path -Parent $outputFullPath

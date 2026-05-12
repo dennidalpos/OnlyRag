@@ -59,6 +59,51 @@ pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint "<SHA1 thumbprint>" -Vers
 
 Use this option when the certificate is managed by Windows, a hardware token, or a CI runner certificate store.
 
+## Enterprise Self-Signed Distribution
+
+For public distribution, use a CA-trusted code-signing certificate. A self-signed certificate is
+acceptable only for controlled enterprise deployment where target Windows machines receive trust
+through Group Policy or an equivalent device-management policy.
+
+Do not distribute the PFX or its password. Export and distribute only the public `.cer`:
+
+```powershell
+pwsh .\scripts\Export-EnterpriseSigningCertificate.ps1 `
+  -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe `
+  -OutputPath .\certificates\app\OnlyRag-Enterprise-CodeSigning.cer
+```
+
+Deploy the exported `.cer` through Group Policy to both stores:
+
+- `Computer Configuration > Policies > Windows Settings > Security Settings > Public Key Policies > Trusted Root Certification Authorities`
+- `Computer Configuration > Policies > Windows Settings > Security Settings > Public Key Policies > Trusted Publishers`
+
+After Group Policy applies on a target machine, verify enterprise trust:
+
+```powershell
+pwsh .\scripts\Test-EnterpriseSigningTrust.ps1 `
+  -CertificateThumbprint "1E4A238A06A117710F11816DAB0C1833AC775712" `
+  -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe
+```
+
+Then run the installer release verification:
+
+```powershell
+pwsh .\scripts\Test-InstallerRelease.ps1 `
+  -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe `
+  -RequireSigned
+```
+
+For release sign-off, repeat lifecycle verification on a clean domain-joined machine after the GPO
+has applied:
+
+```powershell
+pwsh .\scripts\Test-InstallerRelease.ps1 `
+  -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe `
+  -RequireSigned `
+  -RunInstallLifecycle
+```
+
 ## Non-Interactive Runs
 
 For local automation, set the PFX password in the current PowerShell session before invoking the script:
@@ -102,4 +147,3 @@ This verifies the signature, install, launch, shortcuts, optional component stat
 - `No .pfx certificate found`: put a single `.pfx` in `.\certificates\app\` or pass `-CertificatePath`.
 - `Signature status is NotSigned`: rerun through `scripts\Sign-Release.ps1` and verify the certificate has a private key.
 - `UnknownError` or timestamp failure: retry with network access or pass another RFC 3161 timestamp server through `-TimestampServer`.
-
