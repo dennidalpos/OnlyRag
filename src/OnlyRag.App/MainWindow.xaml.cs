@@ -355,10 +355,7 @@ public partial class MainWindow : Window
 
             List<BackendJob>? jobs = await httpClient.GetFromJsonAsync<List<BackendJob>>(
                 "/api/jobs?limit=500",
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                ExitStateJsonOptions);
 
             return jobs?.Count(job => job.Status is "Pending" or "Running" or "Paused") ?? 0;
         }
@@ -430,10 +427,7 @@ public partial class MainWindow : Window
                     : detail);
         }
 
-        return await response.Content.ReadFromJsonAsync<AppShutdownPreparationResponse>(new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        return await response.Content.ReadFromJsonAsync<AppShutdownPreparationResponse>(ExitStateJsonOptions);
     }
 
     internal async Task NotifyBackendOfflineAsync()

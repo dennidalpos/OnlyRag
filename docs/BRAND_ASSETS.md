@@ -55,6 +55,8 @@ Typography follows the app stack in `src\OnlyRag.Web\src\styles.css`: `"Segoe UI
 | Source post kit | `assets\brand\posts\*.png` | PNG square/portrait/landscape | Announcement drafts and package listings. |
 | Installer wizard image | `assets\brand\setup\onlyrag-setup-wizard-image-164x314.bmp` | BMP `164x314` | `packaging\OnlyRag.iss` `WizardImageFile`. |
 | Installer wizard small image | `assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp` | BMP `55x55` | `packaging\OnlyRag.iss` `WizardSmallImageFile`. |
+| Payhip listing copy | `assets\payhip\payhip-listing-it.md` | Markdown | Italian listing draft and screenshot ordering for the current Payhip asset folder. |
+| Payhip screenshots | `assets\payhip\Screenshot_1.png`, `Screenshot_2.png`, `Screenshot_3.png` | PNG | Current product listing screenshots. |
 
 ## Naming
 

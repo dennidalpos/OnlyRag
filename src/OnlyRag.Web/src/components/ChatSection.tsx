@@ -366,9 +366,9 @@ export function ChatSection({
       ref={chatLayoutRef}
       style={{ "--chat-documents-width": `${documentsPanelWidth}px` } as CSSProperties}
     >
-      <aside className="chat-documents-panel">
+      <section className="chat-documents-panel" aria-labelledby="chat-documents-title">
         <div className="settings-card__header">
-          <h3>Documenti</h3>
+          <h2 id="chat-documents-title">Documenti</h2>
         </div>
 
         {documentsError && <div className="feedback-banner feedback-banner--error" role="alert">{documentsError}</div>}
@@ -400,7 +400,7 @@ export function ChatSection({
             ))
           )}
         </div>
-      </aside>
+      </section>
 
       <div
         className="chat-resize-handle"

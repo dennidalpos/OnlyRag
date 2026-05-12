@@ -232,12 +232,14 @@ Invoke-GateStep ".NET build" {
 
 if ($IncludeInstaller) {
     Invoke-GateStep "installer package" {
-        $arguments = @("-Configuration", $Configuration)
+        $installerArguments = @{
+            Configuration = $Configuration
+        }
         if (-not [string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
-            $arguments += @("-InnoSetupCompiler", $InnoSetupCompiler)
+            $installerArguments.InnoSetupCompiler = $InnoSetupCompiler
         }
 
-        & $buildInstallerScript @arguments
+        & $buildInstallerScript @installerArguments
     }
 }
 

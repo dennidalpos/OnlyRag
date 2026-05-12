@@ -60,7 +60,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         CancellationToken cancellationToken)
     {
         await using SqliteCommand command = connection.CreateCommand();
-        string documentParameters = AddInParameters(command, "$doc", documentIds.Distinct().ToArray());
+        string documentParameters = command.AddInParameters("$doc", documentIds.Distinct().ToArray());
         command.CommandText =
             $$"""
             SELECT c.id, c.document_id, c.chunk_index, fts.rank
@@ -89,7 +89,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         CancellationToken cancellationToken)
     {
         await using SqliteCommand command = connection.CreateCommand();
-        string documentParameters = AddInParameters(command, "$doc", documentIds.Distinct().ToArray());
+        string documentParameters = command.AddInParameters("$doc", documentIds.Distinct().ToArray());
         command.CommandText =
             $$"""
             SELECT c.id, c.document_id, c.chunk_index
@@ -184,21 +184,5 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             .Where(term => term.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(12);
-    }
-
-    private static string AddInParameters(
-        SqliteCommand command,
-        string prefix,
-        IReadOnlyList<long> values)
-    {
-        string[] names = new string[values.Count];
-        for (int index = 0; index < values.Count; index++)
-        {
-            string name = $"{prefix}{index}";
-            names[index] = name;
-            command.AddParameter(name, values[index]);
-        }
-
-        return string.Join(", ", names);
     }
 }

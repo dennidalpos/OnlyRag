@@ -16,6 +16,7 @@ export function ProgressBar({ label, value, indeterminate = false }: ProgressBar
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={indeterminate ? undefined : roundedValue}
+      aria-valuetext={indeterminate ? "In corso" : `${roundedValue}%`}
     >
       {!indeterminate && <div className="progress-fill" style={{ width: `${normalizedValue}%` }} />}
     </div>

@@ -44,7 +44,7 @@ public static partial class InProcessBackend
             {
                 return Results.Problem(
                     title: "Import troppo grande",
-                    detail: $"La richiesta supera il limite di {FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
+                    detail: $"La richiesta supera il limite di {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
                     statusCode: StatusCodes.Status413PayloadTooLarge);
             }
 
@@ -548,12 +548,5 @@ public static partial class InProcessBackend
             title: exception.Title,
             detail: exception.Message,
             statusCode: statusCode);
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        return bytes >= LocalDocumentLibraryLimits.GiB
-            ? $"{bytes / (double)LocalDocumentLibraryLimits.GiB:0.#} GB"
-            : $"{bytes / (double)LocalDocumentLibraryLimits.MiB:0.#} MB";
     }
 }

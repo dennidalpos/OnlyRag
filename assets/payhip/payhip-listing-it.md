@@ -88,12 +88,12 @@ OnlyRag e' progettato per Ollama locale o per un endpoint LAN fidato. Evita endp
 ## Tag suggeriti Payhip
 Windows app, AI documents, local AI, RAG, Ollama, OCR, PDF, document chat, document translation, productivity, desktop software
 
-## Immagini vetrina generate
-- `onlyrag-showcase-chat-sources.png`: libreria documenti, chat e fonti.
-- `onlyrag-showcase-ocr-jobs.png`: OCR, indicizzazione e coda operazioni.
-- `onlyrag-showcase-translation-export.png`: traduzione, revisione unita' ed export.
+## Immagini vetrina presenti
+- `Screenshot_1.png`: screenshot prodotto per la scheda Payhip corrente.
+- `Screenshot_2.png`: screenshot prodotto per la scheda Payhip corrente.
+- `Screenshot_3.png`: screenshot prodotto per la scheda Payhip corrente.
 
 ## Ordine consigliato immagini Payhip
-1. `onlyrag-showcase-chat-sources.png`
-2. `onlyrag-showcase-translation-export.png`
-3. `onlyrag-showcase-ocr-jobs.png`
+1. `Screenshot_1.png`
+2. `Screenshot_2.png`
+3. `Screenshot_3.png`

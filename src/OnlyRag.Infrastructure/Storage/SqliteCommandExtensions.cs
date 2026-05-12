@@ -25,4 +25,20 @@ internal static class SqliteCommandExtensions
         command.Parameters.Add(parameter);
         return parameter;
     }
+
+    public static string AddInParameters(
+        this SqliteCommand command,
+        string prefix,
+        IReadOnlyList<long> values)
+    {
+        string[] names = new string[values.Count];
+        for (int index = 0; index < values.Count; index++)
+        {
+            string name = $"{prefix}{index}";
+            names[index] = name;
+            command.AddParameter(name, values[index]);
+        }
+
+        return string.Join(", ", names);
+    }
 }

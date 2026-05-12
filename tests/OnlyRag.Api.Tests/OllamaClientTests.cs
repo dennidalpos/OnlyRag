@@ -135,6 +135,26 @@ public sealed class OllamaClientTests
     }
 
     [Fact]
+    public async Task ListModelsAsync_TruncatesLargeExternalErrorBodies()
+    {
+        string tailMarker = "tail-marker-after-limit";
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent(new string('x', 5000) + "\u0000" + tailMarker)
+            }));
+
+        OllamaClient client = CreateClient(handler);
+
+        OllamaApiException exception = await Assert.ThrowsAsync<OllamaApiException>(() => client.ListModelsAsync());
+
+        Assert.Equal(OllamaErrorKind.UnexpectedResponse, exception.Kind);
+        Assert.DoesNotContain(tailMarker, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain('\u0000', exception.Message);
+        Assert.Contains("risposta troncata", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ListModelsAsync_ThrowsTimeoutWhenRequestIsCancelledInternally()
     {
         StubHttpMessageHandler handler = new((request, cancellationToken) =>

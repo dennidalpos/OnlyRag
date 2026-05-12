@@ -31,6 +31,15 @@ const phaseStateIcon: Record<PhaseState, string> = {
   Todo: "○",
   Obsolete: "⚠"
 };
+
+const phaseStateLabels: Record<PhaseState, string> = {
+  Completed: "completato",
+  InProgress: "in corso",
+  Failed: "errore",
+  Skipped: "saltato",
+  Todo: "da fare",
+  Obsolete: "da aggiornare"
+};
 // ---------------------------------------------------------------------------
 // OCR choice dialog
 // ---------------------------------------------------------------------------
@@ -424,19 +433,38 @@ type PhaseKey = "import" | "analysis" | "ocr" | "textExtraction" | "chunking" | 
 
 export function PipelineVisual({ status }: { status: DocumentPipelineStatus }) {
   const phases: PhaseKey[] = ["import", "analysis", "ocr", "textExtraction", "chunking", "embedding"];
+  const hasActivePhase = phases.some((phase) => {
+    const info = status[phase as keyof DocumentPipelineStatus] as { state: PhaseState } | undefined;
+    return info?.state === "InProgress";
+  });
 
   return (
-    <div className="pipeline-visual" aria-label="Stato elaborazione documento">
+    <div
+      className="pipeline-visual"
+      role="list"
+      aria-label="Stato elaborazione documento"
+      aria-live={hasActivePhase ? "polite" : undefined}
+    >
       {phases.map((phase) => {
         const info = status[phase as keyof DocumentPipelineStatus] as { state: PhaseState; error: string | null } | undefined;
         if (!info || typeof info !== "object") return null;
         const phaseState = info.state;
+        const phaseLabel = phaseLabels[phase] ?? phase;
+        const stateLabel = phaseStateLabels[phaseState];
         return (
-          <div key={phase} className={`pipeline-phase pipeline-phase--${phaseState.toLowerCase()}`}>
+          <div
+            key={phase}
+            className={`pipeline-phase pipeline-phase--${phaseState.toLowerCase()}`}
+            role="listitem"
+            aria-label={`${phaseLabel}: ${stateLabel}${info.error ? `. ${info.error}` : ""}`}
+          >
             <span className="pipeline-phase__icon" aria-hidden="true">
               {phaseStateIcon[phaseState]}
             </span>
-            <span className="pipeline-phase__label">{phaseLabels[phase] ?? phase}</span>
+            <span className="pipeline-phase__label">
+              {phaseLabel}
+              <span className="sr-only">: {stateLabel}</span>
+            </span>
             {phaseState === "InProgress" && (
               <span className="pipeline-phase__progress-dot" aria-hidden="true" />
             )}

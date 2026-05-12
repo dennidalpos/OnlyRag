@@ -107,8 +107,15 @@ export function OllamaSetupGate({
   }
 
   return (
-    <div className="setup-gate-backdrop" role="dialog" aria-modal="true" aria-labelledby="setup-gate-title">
-      <div className="setup-gate-modal" ref={modalRef} tabIndex={-1}>
+    <div className="setup-gate-backdrop">
+      <div
+        className="setup-gate-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-gate-title"
+        ref={modalRef}
+        tabIndex={-1}
+      >
         <h2 id="setup-gate-title">Configurazione iniziale richiesta</h2>
         <h3>{issue.title}</h3>
         <p>{issue.detail}</p>

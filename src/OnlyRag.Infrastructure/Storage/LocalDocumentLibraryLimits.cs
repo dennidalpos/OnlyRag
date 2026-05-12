@@ -18,4 +18,11 @@ public sealed record LocalDocumentLibraryLimits
     public long MinimumFreeDiskBytes { get; init; } = 1 * GiB;
 
     public long MaxRequestBodySizeBytes => MaxBatchSizeBytes + MiB;
+
+    public static string FormatBytes(long bytes)
+    {
+        return bytes >= GiB
+            ? $"{bytes / (double)GiB:0.#} GB"
+            : $"{bytes / (double)MiB:0.#} MB";
+    }
 }

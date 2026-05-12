@@ -85,6 +85,8 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
                         key={pn}
                         className={pn === selectedPage ? "preview-page-btn preview-page-btn--active" : "preview-page-btn"}
                         type="button"
+                        aria-current={pn === selectedPage ? "page" : undefined}
+                        aria-label={`Vai alla pagina ${pn}`}
                         onClick={() => onPageChange(pn)}
                       >
                         <span>{pn}</span>

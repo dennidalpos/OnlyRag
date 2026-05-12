@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OnlyRag.Core;
@@ -8,6 +9,8 @@ namespace OnlyRag.Api.Ollama;
 
 internal sealed class OllamaClient : IOllamaClient
 {
+    private const int MaxErrorResponseCharacters = 4096;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -371,7 +374,17 @@ internal sealed class OllamaClient : IOllamaClient
 
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        string content = await response.Content.ReadAsStringAsync(cancellationToken);
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using StreamReader reader = new(
+            stream,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: true,
+            bufferSize: 1024,
+            leaveOpen: false);
+        char[] buffer = GC.AllocateUninitializedArray<char>(MaxErrorResponseCharacters + 1);
+        int read = await reader.ReadBlockAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        bool truncated = read > MaxErrorResponseCharacters;
+        string content = NormalizeExternalErrorText(new string(buffer, 0, Math.Min(read, MaxErrorResponseCharacters)));
         if (string.IsNullOrWhiteSpace(content))
         {
             return string.Empty;
@@ -382,14 +395,34 @@ internal sealed class OllamaClient : IOllamaClient
             OllamaErrorResponse? error = JsonSerializer.Deserialize<OllamaErrorResponse>(content, JsonOptions);
             if (!string.IsNullOrWhiteSpace(error?.Error))
             {
-                return error.Error;
+                return NormalizeExternalErrorText(error.Error);
             }
         }
         catch (JsonException)
         {
         }
 
-        return content.Trim();
+        return truncated
+            ? $"{content.Trim()} [risposta troncata]"
+            : content.Trim();
+    }
+
+    private static string NormalizeExternalErrorText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new(text.Length);
+        foreach (char character in text)
+        {
+            builder.Append(char.IsControl(character) && character is not ('\r' or '\n' or '\t')
+                ? ' '
+                : character);
+        }
+
+        return builder.ToString().Trim();
     }
 
     private sealed record OllamaRequestContext(Uri BaseUri, TimeSpan Timeout);

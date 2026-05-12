@@ -451,6 +451,8 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile. Riavviare l'applicazione.");
   }
 
+  const requestUrl = resolveBackendRequestUrl(path, baseUrl);
+
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -465,7 +467,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   let response: Response;
   try {
-    response = await fetch(new URL(path, baseUrl), { ...init, headers });
+    response = await fetch(requestUrl, { ...init, headers });
   } catch {
     markBackendOffline();
     throw new Error("Il backend locale non è raggiungibile. Riavviare l'applicazione.");
@@ -480,6 +482,16 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   }
 
   return (await response.json()) as T;
+}
+
+function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
+  const url = new URL(path, baseUrl);
+  const backendOrigin = new URL(baseUrl).origin;
+  if (url.origin !== backendOrigin || !url.pathname.startsWith("/api/")) {
+    throw new Error("Percorso API locale non valido.");
+  }
+
+  return url;
 }
 
 async function readProblemMessage(response: Response): Promise<string> {

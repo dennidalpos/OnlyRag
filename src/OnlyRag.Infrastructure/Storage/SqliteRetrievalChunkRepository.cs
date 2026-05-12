@@ -23,7 +23,7 @@ public sealed class SqliteRetrievalChunkRepository : IRetrievalChunkRepository
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
-        string parameters = AddInParameters(command, "$chunk", chunkIds.Distinct().ToArray());
+        string parameters = command.AddInParameters("$chunk", chunkIds.Distinct().ToArray());
         command.CommandText =
             $$"""
             SELECT c.id, c.document_id, d.original_file_name, c.chunk_index,
@@ -49,21 +49,5 @@ public sealed class SqliteRetrievalChunkRepository : IRetrievalChunkRepository
         }
 
         return chunks;
-    }
-
-    private static string AddInParameters(
-        SqliteCommand command,
-        string prefix,
-        IReadOnlyList<long> values)
-    {
-        string[] names = new string[values.Count];
-        for (int index = 0; index < values.Count; index++)
-        {
-            string name = $"{prefix}{index}";
-            names[index] = name;
-            command.AddParameter(name, values[index]);
-        }
-
-        return string.Join(", ", names);
     }
 }

@@ -15,7 +15,7 @@ For RAG answers, OnlyRag sends retrieved snippets to the model, not full source 
 
 ## What Works
 
-- Import TXT, Markdown, PDF, DOCX, XLSX, PPTX, and image files into a local library.
+- Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, and image files into a local library.
 - Convert `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
   are prepared.
@@ -58,17 +58,26 @@ Installed app:
 - Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions. Direct app launch also checks this before loading the UI.
 - The installer package is self-contained for the required .NET runtime components and includes the required `sqlite-vec` native asset; end users do not need to install .NET separately.
 
-## Setup
+## Fresh Install
 
-Developer setup from the repository root in PowerShell 7:
+From a clean checkout on Windows, run PowerShell 7 from the repository root:
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
+pwsh .\scripts\Build-Web.ps1
+dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
 The bootstrap verifies prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
 installs web dependencies with `npm ci`, and prepares the optional OCR Python environment when
-Python is available.
+Python is available. `Build-Web.ps1` produces the static UI consumed by the WPF app when the Vite
+development server is not running.
+
+To verify a fresh checkout before packaging or handoff:
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+```
 
 End users configure optional dependencies from **Settings** in the app:
 
@@ -104,6 +113,7 @@ Run web lint and formatter checks directly:
 
 ```powershell
 Set-Location .\src\OnlyRag.Web
+npm run typecheck
 npm run lint
 npm run format:check
 ```

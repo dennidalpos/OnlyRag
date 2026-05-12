@@ -53,7 +53,29 @@ Ollama non locale** is enabled. Enable it only for an Ollama service you control
 network because chat, embeddings, and translation send snippets or translation units to that
 endpoint.
 
-## Developer bootstrap
+## Fresh Install From a Clean Checkout
+
+Use this path when setting up the repository on a new Windows development machine:
+
+```powershell
+git clone https://github.com/dennidalpos/OnlyRag.git
+Set-Location .\OnlyRag
+pwsh .\scripts\Bootstrap-Prerequisites.ps1
+pwsh .\scripts\Build-Web.ps1
+dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
+```
+
+The first run creates `%LOCALAPPDATA%\OnlyRag` automatically. Run the repository gate before
+handoff, packaging, or release work:
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+```
+
+`npm` is the frontend package manager because `src\OnlyRag.Web\package-lock.json` is present.
+Do not switch package managers without changing the lockfile and documentation in the same change.
+
+## Developer Bootstrap
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
@@ -107,9 +129,19 @@ Set-Location ..\..
 dotnet list .\OnlyRag.sln package --vulnerable --include-transitive --format json
 ```
 
-The full script inventory is documented in [`scripts\script.md`](../scripts/script.md). Top-level
+The full script inventory is documented in [scripts/script.md](../scripts/script.md). Top-level
 scripts are reserved for supported setup, build, test, package, signing, installer verification,
 brand asset generation, and the repository gate. Shared helpers live under `scripts\support`.
+
+## CI
+
+GitHub Actions is configured in `.github\workflows\ci.yml`. The `verify` job runs on
+`windows-latest`, installs .NET `10.0.x`, installs the current Node.js LTS line with npm cache
+backed by `src\OnlyRag.Web\package-lock.json`, then runs:
+
+```powershell
+.\scripts\Invoke-Gate.ps1 -Configuration Release
+```
 
 ## Run Locally
 

@@ -58,9 +58,10 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
             throw new InvalidOperationException($"Impossibile avviare {fileName}: {ex.Message}", ex);
         }
 
-        string stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        string stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-        return new LocalProcessResult(process.ExitCode, stdout, stderr);
+        string[] output = await Task.WhenAll(stdoutTask, stderrTask);
+        return new LocalProcessResult(process.ExitCode, output[0], output[1]);
     }
 }

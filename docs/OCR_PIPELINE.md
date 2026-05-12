@@ -5,7 +5,9 @@ PaddleOCR directly and remains responsive while the background worker processes 
 
 Implemented stages:
 
-1. Queue document ingestion or forced OCR from the local job queue. (The UI provides a separate 'Forza OCR' button that passes `?force=true` to explicitly bypass the cache).
+1. Queue document ingestion or forced OCR from the local job queue. The document UI exposes
+   **Rileggi tutto con OCR**, which calls `POST /api/documents/{id}/ocr?force=true` to bypass the
+   OCR cache explicitly.
 2. For textual PDFs, use embedded text first unless forced OCR is requested.
 3. For scanned PDF pages and images, prepare a page image through the isolated Python bridge.
 4. Apply preprocessing in the bridge: RGB/grayscale normalization, light denoise, optional deskew
@@ -42,7 +44,8 @@ Bridge and prerequisites:
 
 Supported OCR inputs:
 
-- Images: `.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff` when Pillow can open them.
+- Images: `.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff`, `.bmp`, `.gif`, and `.webp` when Pillow can
+  open them.
 - PDFs: scanned pages rendered by `pypdfium2` in the bridge.
 
 Notes:

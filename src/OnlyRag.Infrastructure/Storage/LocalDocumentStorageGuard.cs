@@ -21,7 +21,7 @@ public sealed class LocalDocumentStorageGuard
             throw new DocumentStorageLimitException(
                 DocumentStorageLimitKind.FileTooLarge,
                 "File troppo grande",
-                $"Il file '{fileName}' supera il limite di {FormatBytes(Limits.MaxFileSizeBytes)}.");
+                $"Il file '{fileName}' supera il limite di {LocalDocumentLibraryLimits.FormatBytes(Limits.MaxFileSizeBytes)}.");
         }
     }
 
@@ -40,7 +40,7 @@ public sealed class LocalDocumentStorageGuard
             throw new DocumentStorageLimitException(
                 DocumentStorageLimitKind.BatchTooLarge,
                 "Import troppo grande",
-                $"La dimensione totale dell'import supera il limite di {FormatBytes(Limits.MaxBatchSizeBytes)}.");
+                $"La dimensione totale dell'import supera il limite di {LocalDocumentLibraryLimits.FormatBytes(Limits.MaxBatchSizeBytes)}.");
         }
     }
 
@@ -52,7 +52,7 @@ public sealed class LocalDocumentStorageGuard
             throw new DocumentStorageLimitException(
                 DocumentStorageLimitKind.LibraryQuotaExceeded,
                 "Quota libreria superata",
-                $"La libreria locale supererebbe la quota di {FormatBytes(Limits.LibraryQuotaBytes)}.");
+                $"La libreria locale supererebbe la quota di {LocalDocumentLibraryLimits.FormatBytes(Limits.LibraryQuotaBytes)}.");
         }
 
         string root = descriptor.Paths.DataRoot;
@@ -63,7 +63,7 @@ public sealed class LocalDocumentStorageGuard
             throw new DocumentStorageLimitException(
                 DocumentStorageLimitKind.LowDiskSpace,
                 "Spazio disco insufficiente",
-                $"Mantieni almeno {FormatBytes(Limits.MinimumFreeDiskBytes)} liberi sul disco della libreria.");
+                $"Mantieni almeno {LocalDocumentLibraryLimits.FormatBytes(Limits.MinimumFreeDiskBytes)} liberi sul disco della libreria.");
         }
     }
 
@@ -91,12 +91,5 @@ public sealed class LocalDocumentStorageGuard
                     return 0;
                 }
             });
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        return bytes >= LocalDocumentLibraryLimits.GiB
-            ? $"{bytes / (double)LocalDocumentLibraryLimits.GiB:0.#} GB"
-            : $"{bytes / (double)LocalDocumentLibraryLimits.MiB:0.#} MB";
     }
 }
