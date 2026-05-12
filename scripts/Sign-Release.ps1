@@ -110,20 +110,20 @@ try {
     }
 
     $buildScript = Join-Path $PSScriptRoot "Build-Installer.ps1"
-    $buildArguments = @(
-        "-Configuration", $Configuration,
-        "-RuntimeIdentifier", $RuntimeIdentifier,
-        "-Version", $Version,
-        "-OutputRoot", $outputRootPath,
-        "-SigningCertificateThumbprint", $signingThumbprint,
-        "-TimestampServer", $TimestampServer
-    )
+    $buildArguments = @{
+        Configuration = $Configuration
+        RuntimeIdentifier = $RuntimeIdentifier
+        Version = $Version
+        OutputRoot = $outputRootPath
+        SigningCertificateThumbprint = $signingThumbprint
+        TimestampServer = $TimestampServer
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
-        $buildArguments += @("-InnoSetupCompiler", $InnoSetupCompiler)
+        $buildArguments.InnoSetupCompiler = $InnoSetupCompiler
     }
     if (-not [string]::IsNullOrWhiteSpace($SignToolPath)) {
-        $buildArguments += @("-SignToolPath", $SignToolPath)
+        $buildArguments.SignToolPath = $SignToolPath
     }
 
     Write-Host "Building and signing OnlyRag installer..." -ForegroundColor Cyan

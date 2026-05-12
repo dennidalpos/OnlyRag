@@ -2,7 +2,7 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-12T19:02:00+02:00",
+  "last_updated": "2026-05-12T19:32:00+02:00",
   "production_target": true,
   "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
   "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, verify installer wizard visual layout, run interactive runtime checks, and make the final release decision.",
@@ -30,6 +30,12 @@
       "date": "2026-05-12T10:43:16+02:00",
       "decision": "Do not promote installer artifacts as release artifacts until a trusted code-signing certificate, signtool, Inno Setup, and signed lifecycle verification are available.",
       "impact": "Packaging can be verified separately from release; signed release tasks remain blocked."
+    },
+    {
+      "id": "enterprise-self-signed-gpo-distribution",
+      "date": "2026-05-12T19:32:00+02:00",
+      "decision": "Treat self-signed certificate trust as an enterprise-managed deployment option only when the certificate is distributed to target machines through Group Policy.",
+      "impact": "Self-signed installer artifacts can be considered only for controlled domain environments after GPO trust deployment and clean-machine lifecycle verification; public release still requires a CA-trusted code-signing certificate."
     }
   ],
   "current_tasks": [
@@ -139,7 +145,7 @@
   "blockers": [
     {
       "id": "signed-release-blocked",
-      "reason": "A local PFX is present under the ignored certificates\\app directory, but trusted publisher status has not been validated and secure password delivery through ONLYRAG_CERT_PASSWORD or an interactive secure prompt is not available in this run.",
+      "reason": "The installer has an Authenticode signature and RFC 3161 timestamp, but the signer certificate is self-signed/untrusted until deployed to target machines through an enterprise trust mechanism such as Group Policy.",
       "blocked_release": true
     },
     {
@@ -152,7 +158,7 @@
     {
       "id": "unsigned-installer",
       "severity": "high",
-      "description": "The installer is valid only as an unsigned package artifact, not as a signed release candidate."
+      "description": "The installer is signed with a local self-signed certificate, but Windows does not trust the certificate chain until the enterprise root/trust policy is deployed and verified on target machines."
     },
     {
       "id": "interactive-runtime-not-run",
@@ -225,7 +231,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "last_completed_work": "Completed optional OCR release-readiness verification: bootstrap passed, pinned OCR packages and bridge check passed, pip-audit found no known vulnerabilities in scripts\\ocr\\requirements.txt, a representative OCR sample was recognized successfully, and OCR-focused infrastructure tests passed.",
+  "last_completed_work": "Recorded the deployment decision to support self-signed certificate trust only through enterprise Group Policy distribution; public release remains dependent on a CA-trusted code-signing certificate.",
   "open_questions": [],
   "handoff_notes": "Optional OCR verification is complete for this machine. Do not call this a signed production release until the remaining P0 tasks are complete: installer signed with validated trusted publisher material and clean-machine signed installer lifecycle verification passed. Before tagging a public release, also complete the installer wizard visual layout verification across DPI/font scenarios and populated desktop UI runtime verification."
 }
