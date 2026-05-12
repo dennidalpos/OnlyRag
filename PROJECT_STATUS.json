@@ -2,14 +2,15 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-12T18:06:00+02:00",
+  "last_updated": "2026-05-12T19:02:00+02:00",
   "production_target": true,
   "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
-  "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, run interactive runtime checks, verify optional OCR, and make the final release decision.",
+  "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, verify installer wizard visual layout, run interactive runtime checks, and make the final release decision.",
   "assumptions": [
     "Generated outputs under bin, obj, dist, node_modules, and artifacts are build artifacts, not source state.",
     "OCR runtime preparation and live Ollama model workflows are optional feature paths unless included in the intended release scope.",
-    "Interactive desktop launch and installer lifecycle checks require a Windows desktop session or clean Windows verification machine."
+    "Interactive desktop launch and installer lifecycle checks require a Windows desktop session or clean Windows verification machine.",
+    "Installer wizard visual layout checks require a visible Windows session at representative DPI scaling and accessibility font settings; they are not covered by non-invasive installer evidence."
   ],
   "decisions": [
     {
@@ -76,6 +77,27 @@
     {
       "order": 4,
       "priority": "P1",
+      "task": "Run installer wizard visual layout verification across display scaling and font settings.",
+      "addresses": [
+        "installer-wizard-visual-layout-not-run"
+      ],
+      "prerequisites": [
+        "Signed installer from task 2",
+        "Clean Windows verification machine or equivalent disposable VM",
+        "Visible interactive desktop session with configurable display scaling"
+      ],
+      "execution": [
+        "Run the signed installer visibly and verify prerequisite dialogs, destination, additional tasks, ready, installing, and finished pages do not clip or overlap.",
+        "Repeat visible wizard passes at Windows display scaling 100%, 125%, 150%, and 200%.",
+        "Repeat at least one visible pass with a non-default Windows UI font or accessibility text setting when available.",
+        "Record screenshots or exact observations for any clipped text, overlapping controls, or wizard artwork collisions."
+      ],
+      "completion_criteria": "Installer wizard pages and prerequisite dialogs render without clipping or overlap across the documented display scaling and font scenarios.",
+      "status": "pending"
+    },
+    {
+      "order": 5,
+      "priority": "P1",
       "task": "Run interactive desktop and populated browser UI verification.",
       "addresses": [
         "interactive-runtime-not-run"
@@ -95,35 +117,14 @@
       "status": "pending"
     },
     {
-      "order": 5,
-      "priority": "P1",
-      "task": "Verify optional OCR setup and Python OCR dependency security posture.",
-      "addresses": [
-        "optional-ocr-bootstrap-not-run",
-        "python-ocr-dependency-audit-tool-unavailable"
-      ],
-      "prerequisites": [
-        "Machine intended to support OCR",
-        "Python 3.10+",
-        "pip-audit or safety available without compromising dependency policy"
-      ],
-      "execution": [
-        "Run pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 without -SkipOcr.",
-        "Audit scripts\\ocr\\requirements.txt with pip-audit or safety when one is available.",
-        "Verify OCR processing on representative scanned documents."
-      ],
-      "completion_criteria": "OCR bootstrap succeeds, OCR dependency audit has no unresolved high-severity findings, and representative OCR processing works.",
-      "status": "pending"
-    },
-    {
       "order": 6,
       "priority": "P2",
       "task": "Finalize release readiness decision.",
       "addresses": [
         "signed-release-blocked",
         "clean-machine-installer-lifecycle-not-run",
-        "interactive-runtime-not-run",
-        "optional-ocr-bootstrap-not-run"
+        "installer-wizard-visual-layout-not-run",
+        "interactive-runtime-not-run"
       ],
       "execution": [
         "Re-run the canonical gate after any fixes made during residual verification.",
@@ -138,7 +139,7 @@
   "blockers": [
     {
       "id": "signed-release-blocked",
-      "reason": "No code-signing certificate/private key is present under certificates\\app; the generated installer is unsigned.",
+      "reason": "A local PFX is present under the ignored certificates\\app directory, but trusted publisher status has not been validated and secure password delivery through ONLYRAG_CERT_PASSWORD or an interactive secure prompt is not available in this run.",
       "blocked_release": true
     },
     {
@@ -159,9 +160,14 @@
       "description": "The WPF desktop app and populated live UI workflows still need interactive verification."
     },
     {
-      "id": "optional-ocr-bootstrap-not-run",
+      "id": "installer-wizard-visual-layout-not-run",
       "severity": "medium",
-      "description": "OCR runtime setup and Python OCR dependency audit remain unverified for OCR release support."
+      "description": "The installer pre-release checklist requires visible wizard layout checks at 100%, 125%, 150%, and 200% display scaling plus at least one non-default UI font or accessibility text setting; current scripts do not automate this visual verification."
+    },
+    {
+      "id": "local-signing-secret-file-present",
+      "severity": "medium",
+      "description": "A local signing password file is present under the ignored certificate directory. Do not commit it; prefer ONLYRAG_CERT_PASSWORD or an interactive secure prompt, and remove or rotate local secret material after signing."
     }
   ],
   "dependencies": {
@@ -219,7 +225,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "last_completed_work": "Stabilized repository state for release readiness: reviewed the working tree, confirmed only PROJECT_STATUS.json changed, and recorded the remaining release blockers explicitly.",
+  "last_completed_work": "Completed optional OCR release-readiness verification: bootstrap passed, pinned OCR packages and bridge check passed, pip-audit found no known vulnerabilities in scripts\\ocr\\requirements.txt, a representative OCR sample was recognized successfully, and OCR-focused infrastructure tests passed.",
   "open_questions": [],
-  "handoff_notes": "Repository state has been stabilized for the current release-readiness pass. Do not call this a signed production release until the remaining P0 tasks are complete: installer signed and clean-machine signed installer lifecycle verification passed."
+  "handoff_notes": "Optional OCR verification is complete for this machine. Do not call this a signed production release until the remaining P0 tasks are complete: installer signed with validated trusted publisher material and clean-machine signed installer lifecycle verification passed. Before tagging a public release, also complete the installer wizard visual layout verification across DPI/font scenarios and populated desktop UI runtime verification."
 }
