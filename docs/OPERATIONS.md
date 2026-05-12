@@ -18,7 +18,13 @@ Required on an end-user machine before setup can complete:
 - Windows 10 1809 or newer, or Windows 11.
 - Microsoft Edge WebView2 Runtime. The setup blocks before installation when this runtime is missing and explains how to install the official Microsoft Evergreen Runtime and verify it.
 
-The installer is self-contained for OnlyRag's required .NET runtime components. End users do not need to install .NET 10 separately for the packaged app.
+The installer blocks explicitly when Windows is older than Windows 10 version 1809/build 17763.
+Direct app startup repeats the Windows and WebView2 checks so manual/portable launches fail early
+with the same kind of prerequisite message instead of a generic first-window failure.
+
+The installer is self-contained for OnlyRag's required .NET runtime components and packages the
+required `sqlite-vec` native asset (`vec0.dll`). End users do not need to install .NET 10
+separately for the packaged app.
 
 Required for model features:
 
@@ -42,7 +48,10 @@ Optional dependencies are configured from **Settings** in the desktop app:
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
-**Settings > Ollama**.
+**Settings > Ollama**. Non-local endpoints are blocked until **Considera attendibile questo endpoint
+Ollama non locale** is enabled. Enable it only for an Ollama service you control on a trusted
+network because chat, embeddings, and translation send snippets or translation units to that
+endpoint.
 
 ## Developer bootstrap
 
@@ -73,15 +82,30 @@ settings actions above.
 |---|---|---|
 | Developer setup / dependency install | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` | Verifies prerequisites, restores .NET packages, and installs web dependencies when the lockfile is present. |
 | Web dependency install only | `npm ci` from `src\OnlyRag.Web` | npm is the supported package manager; `package-lock.json` is authoritative. |
-| .NET build | `pwsh .\scripts\Build-App.ps1` | Runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. |
-| Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. |
+| .NET build | `pwsh .\scripts\Build-App.ps1` | Runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. Use `-NoRestore` only after a completed .NET restore in the same workspace. |
+| Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. Use `-SkipInstallWhenUpToDate` only after a completed npm restore in the same workspace. |
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
-| Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, web typecheck, .NET tests, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
+| Web lint | `npm run lint` from `src\OnlyRag.Web` | Runs ESLint over the React/Vite workspace. |
+| Web format check | `npm run format:check` from `src\OnlyRag.Web` | Runs Prettier in check mode without rewriting files. |
+| Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, npm production dependency audit, NuGet transitive vulnerability audit, web typecheck, web lint, web format check, .NET tests, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
 | Installer prerequisite self-test | `pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest` | Simulates present and missing blocking prerequisites and verifies the expected message content. |
 | Package installer | `pwsh .\scripts\Build-Installer.ps1` | Builds web, publishes WPF, validates publish output, and compiles Inno Setup installer when `ISCC.exe` is installed. Pass `-SigningCertificateThumbprint` for signed release candidates. |
 | Verify installer release | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe` | Produces release evidence without installing. Add `-RunInstallLifecycle` on a clean verification machine to test install, shortcuts, launch, upgrade, uninstall, rollback/downgrade, optional components, and signing status. |
 
-No lint script or formatter configuration is currently defined.
+ESLint and Prettier configuration live under `src\OnlyRag.Web`. The gate uses check mode only;
+run formatter writes deliberately as a separate local maintenance step when needed.
+
+.NET analyzers are enabled solution-wide through `Directory.Build.props`. Release builds and CI
+treat warnings as errors, so warning fixes should land with the change that introduces them.
+
+Security audit commands can also be run directly:
+
+```powershell
+Set-Location .\src\OnlyRag.Web
+npm audit --omit=dev --audit-level=moderate
+Set-Location ..\..
+dotnet list .\OnlyRag.sln package --vulnerable --include-transitive --format json
+```
 
 The full script inventory is documented in [`scripts\script.md`](../scripts/script.md). Top-level
 scripts are reserved for supported setup, build, test, package, signing, installer verification,
@@ -118,13 +142,27 @@ Runtime data lives under `%LOCALAPPDATA%\OnlyRag`:
 |---|---|
 | `data\onlyrag.db` | SQLite database for documents, chunks, embeddings, jobs, chat history, translations, and settings. |
 | `documents\originals\` | Local copies of imported source files. |
+| `documents\renders\` | Generated OCR page render assets used by document ingestion. |
+| `documents\ocr-cache\` | OCR cache artifacts and metadata referenced by the local SQLite store. |
 | `documents\exports\` | Translation export files. |
 | `ocr-python\` | PaddleOCR Python environment prepared by **Configura OCR** in Settings or by developer bootstrap. |
 | `logs\` | Application log files. |
+| `temp\` | App-scoped temporary work directories such as Office conversion and PDF export staging. |
 
-The SQLite schema is initialized automatically at startup for a fresh database. OnlyRag is treated
-as a new app in this repository: unsupported pre-existing schemas are rejected instead of migrated,
-and there is no separate migration command.
+Document import is bounded to protect the local machine from storage exhaustion. Default backend
+limits are 50 files per import, 100 MB per file, 500 MB per multipart request, a 10 GB local
+document-originals quota, and at least 1 GB free disk preserved on the library drive. Requests that
+exceed these limits are rejected before files are promoted into `documents\originals\`.
+
+The SQLite schema is initialized automatically at startup for a fresh database. Supported older
+OnlyRag schema versions are upgraded in place at startup after creating a pre-migration backup under
+`%LOCALAPPDATA%\OnlyRag\data\backups`. Unsupported unversioned schemas are rejected instead of
+migrated, and there is no separate migration command.
+
+The in-process backend requires a random per-session API token for every non-health `/api` request.
+The WPF shell injects this token into the trusted WebView bridge. Endpoints that launch local
+processes, such as opening Explorer, PowerShell, browser downloads, or OCR provisioning, also
+require an explicit UI confirmation payload.
 
 ## App Exit and Jobs
 
@@ -182,6 +220,9 @@ Supported operations use the configured Ollama endpoint for model listing, model
 and chat. The app sends retrieved snippets or unit text as needed; it does not send full documents
 for RAG answers.
 
+Loopback endpoints such as `http://localhost:11434` work by default. Any non-loopback endpoint,
+including LAN addresses, must be explicitly trusted in Settings before it can be saved or used.
+
 Settings > Ollama stores separate nullable `num_ctx` overrides for chat, embeddings, and document
 translation. Automatic mode stores `null` and omits `num_ctx` from Ollama requests; manual mode
 persists the selected value and passes it to the relevant generation or embedding request.
@@ -190,7 +231,8 @@ persists the selected value and passes it to the relevant generation or embeddin
 
 Windows packaging uses Inno Setup 6 and a per-user install under
 `%LOCALAPPDATA%\Programs\OnlyRag`. The publish payload is self-contained for required .NET
-runtime components; setup blocks only for missing Microsoft Edge WebView2 Runtime.
+runtime components; setup blocks for unsupported Windows builds and missing Microsoft Edge WebView2
+Runtime.
 
 ```powershell
 pwsh .\scripts\Build-Installer.ps1
@@ -210,6 +252,14 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
 ## Troubleshooting
 
 - Backend is offline in the UI: run the app from PowerShell and inspect `%LOCALAPPDATA%\OnlyRag\logs`.
+- Backend is offline immediately after first launch with a `sqlite-vec vec0.dll` message: reinstall
+  from a complete installer or rebuild the publish payload, then verify `vec0.dll` exists next to
+  `OnlyRag.App.exe`.
+- Setup blocks for Windows version: run `winver` and update to Windows 10 version 1809/build 17763
+  or newer, or use Windows 11.
+- Setup or startup blocks for WebView2: install Microsoft Edge WebView2 Evergreen Runtime from the
+  official Microsoft page, then verify it in Settings > Apps or under
+  `Program Files\Microsoft\EdgeWebView\Application`.
 - Web UI is blank in Debug: run `pwsh .\scripts\Build-Web.ps1`, or start `npm run dev` in
   `src\OnlyRag.Web`.
 - Ollama is offline: confirm the endpoint in **Settings > Ollama**, start Ollama, and for LAN

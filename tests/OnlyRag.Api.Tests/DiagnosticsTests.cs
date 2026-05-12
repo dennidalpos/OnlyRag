@@ -21,7 +21,7 @@ public sealed class DiagnosticsTests
     {
         using TempDiagDescriptor temp = TempDiagDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
-        using HttpClient httpClient = new() { BaseAddress = backend.BaseUri };
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         DiagnosticsResponse? diag = await httpClient.GetFromJsonAsync<DiagnosticsResponse>("/api/diagnostics", JsonOptions);
 
@@ -37,7 +37,7 @@ public sealed class DiagnosticsTests
     {
         using TempDiagDescriptor temp = TempDiagDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
-        using HttpClient httpClient = new() { BaseAddress = backend.BaseUri };
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         await httpClient.PutAsJsonAsync(
             "/api/settings/ollama",
@@ -55,7 +55,7 @@ public sealed class DiagnosticsTests
     {
         using TempDiagDescriptor temp = TempDiagDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
-        using HttpClient httpClient = new() { BaseAddress = backend.BaseUri };
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         await httpClient.PutAsJsonAsync(
             "/api/settings/ollama",
@@ -71,7 +71,7 @@ public sealed class DiagnosticsTests
     {
         using TempDiagDescriptor temp = TempDiagDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
-        using HttpClient httpClient = new() { BaseAddress = backend.BaseUri };
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         await httpClient.PutAsJsonAsync(
             "/api/settings/ollama",
@@ -191,6 +191,16 @@ public sealed class DiagnosticsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    private static HttpClient CreateAuthenticatedClient(InProcessBackendHandle backend)
+    {
+        HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+        httpClient.DefaultRequestHeaders.Add(OnlyRagApiHeaders.SessionTokenHeaderName, backend.SessionToken);
+        return httpClient;
     }
 
     private sealed class TempDiagDescriptor : IDisposable

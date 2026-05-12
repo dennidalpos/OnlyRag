@@ -16,6 +16,18 @@ public partial class MainWindow : Window
 {
     private const string DefaultViteDevServerUrl = "http://127.0.0.1:5173/";
     private const string DevServerEnvironmentVariable = "ONLYRAG_WEB_DEV_SERVER";
+    private const int MinimumWindowsBuild = 17763;
+    private static readonly JsonSerializerOptions ExitStateJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly JsonSerializerOptions BackendBridgeJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly BackendWebSettings backendSettings;
     private bool isExitConfirmed;
     private bool isExitFlowInProgress;
@@ -35,6 +47,13 @@ public partial class MainWindow : Window
 
         try
         {
+            StartupPrerequisiteStatus prerequisites = CheckStartupPrerequisites();
+            if (!prerequisites.IsSatisfied)
+            {
+                ShowStartupError(prerequisites.Title, prerequisites.Message);
+                return;
+            }
+
             await MainWebView.EnsureCoreWebView2Async();
             await MainWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(CreateBackendBridgeScript(backendSettings));
             MainWebView.Source = await ResolveStartupUriAsync();
@@ -43,7 +62,7 @@ public partial class MainWindow : Window
         {
             ShowStartupError(
                 "WebView2 non e installato",
-                "OnlyRag richiede Microsoft Edge WebView2 Runtime per mostrare l'interfaccia. Installa il runtime WebView2 e riavvia l'applicazione.");
+                BuildWebView2MissingMessage());
         }
         catch (FileNotFoundException ex)
         {
@@ -70,6 +89,45 @@ public partial class MainWindow : Window
 #endif
 
         return MapStaticWebRoot();
+    }
+
+    private static StartupPrerequisiteStatus CheckStartupPrerequisites()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, MinimumWindowsBuild))
+        {
+            return StartupPrerequisiteStatus.Blocked(
+                "Windows non supportato",
+                "OnlyRag non puo avviarsi perche questa versione di Windows non e supportata.\n\n" +
+                "- Software: Microsoft Windows\n" +
+                "- Versione minima supportata: Windows 10 versione 1809, build 17763, oppure Windows 11\n" +
+                "- Perche serve: OnlyRag usa WPF, WebView2 e componenti .NET Windows validati per Windows 10 1809 o versioni successive.\n" +
+                "- Istruzione: aggiorna Windows da Impostazioni > Windows Update oppure usa un client Windows 10/11 supportato.\n" +
+                "- Verifica: premi Win+R, esegui winver e controlla versione/build.");
+        }
+
+        try
+        {
+            _ = CoreWebView2Environment.GetAvailableBrowserVersionString();
+        }
+        catch (WebView2RuntimeNotFoundException)
+        {
+            return StartupPrerequisiteStatus.Blocked(
+                "WebView2 non e installato",
+                BuildWebView2MissingMessage());
+        }
+
+        return StartupPrerequisiteStatus.Satisfied();
+    }
+
+    private static string BuildWebView2MissingMessage()
+    {
+        return
+            "OnlyRag non puo avviarsi perche un runtime Windows richiesto non e installato.\n\n" +
+            "- Software: Microsoft Edge WebView2 Runtime\n" +
+            "- Versione minima supportata: Evergreen Runtime corrente per Windows 10 1809 o versioni successive / Windows 11\n" +
+            "- Perche serve: OnlyRag e una app desktop WPF che mostra la UI React inclusa tramite Microsoft WebView2.\n" +
+            "- Istruzione: installa il Microsoft Edge WebView2 Evergreen Runtime dal sito ufficiale Microsoft e riavvia OnlyRag.\n" +
+            "- Verifica: apri Impostazioni > App e controlla che Microsoft Edge WebView2 Runtime sia presente, oppure verifica msedgewebview2.exe sotto Program Files\\Microsoft\\EdgeWebView\\Application.";
     }
 
     private static Uri GetDevServerUri()
@@ -276,10 +334,7 @@ public partial class MainWindow : Window
         string raw = await MainWebView.ExecuteScriptAsync(script);
         return string.IsNullOrWhiteSpace(raw) || raw == "null"
             ? null
-            : JsonSerializer.Deserialize<AppExitState>(raw, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            : JsonSerializer.Deserialize<AppExitState>(raw, ExitStateJsonOptions);
     }
 
     private async Task<int> TryGetBackendActiveJobCountAsync()
@@ -296,6 +351,7 @@ public partial class MainWindow : Window
                 BaseAddress = new Uri(backendSettings.BaseUrl),
                 Timeout = TimeSpan.FromSeconds(5)
             };
+            AddBackendSessionToken(httpClient);
 
             List<BackendJob>? jobs = await httpClient.GetFromJsonAsync<List<BackendJob>>(
                 "/api/jobs?limit=500",
@@ -362,6 +418,7 @@ public partial class MainWindow : Window
             BaseAddress = new Uri(backendSettings.BaseUrl),
             Timeout = TimeSpan.FromSeconds(15)
         };
+        AddBackendSessionToken(httpClient);
 
         using HttpResponseMessage response = await httpClient.PostAsync("/api/app/prepare-shutdown", content: null);
         if (!response.IsSuccessStatusCode)
@@ -392,13 +449,17 @@ public partial class MainWindow : Window
 
     private static string CreateBackendBridgeScript(BackendWebSettings settings)
     {
-        string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
-        {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        string json = JsonSerializer.Serialize(settings, BackendBridgeJsonOptions);
 
         return $"window.__ONLYRAG_BACKEND__ = {json};";
+    }
+
+    private void AddBackendSessionToken(HttpClient httpClient)
+    {
+        if (!string.IsNullOrWhiteSpace(backendSettings.ApiToken))
+        {
+            httpClient.DefaultRequestHeaders.Add(backendSettings.ApiTokenHeaderName, backendSettings.ApiToken);
+        }
     }
 
     private sealed class AppExitState
@@ -415,6 +476,22 @@ public partial class MainWindow : Window
     private sealed class BackendJob
     {
         public string Status { get; init; } = string.Empty;
+    }
+
+    private sealed record StartupPrerequisiteStatus(
+        bool IsSatisfied,
+        string Title,
+        string Message)
+    {
+        public static StartupPrerequisiteStatus Satisfied()
+        {
+            return new StartupPrerequisiteStatus(true, string.Empty, string.Empty);
+        }
+
+        public static StartupPrerequisiteStatus Blocked(string title, string message)
+        {
+            return new StartupPrerequisiteStatus(false, title, message);
+        }
     }
 
     private sealed class AppShutdownPreparationResponse

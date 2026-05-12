@@ -12,15 +12,18 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
     private readonly LocalSqliteStoreDescriptor descriptor;
     private readonly IDocumentRepository documents;
     private readonly ILocalJobQueue jobQueue;
+    private readonly LocalDocumentStorageGuard storageGuard;
 
     public LocalDocumentLibraryService(
         LocalSqliteStoreDescriptor descriptor,
         IDocumentRepository documents,
-        ILocalJobQueue jobQueue)
+        ILocalJobQueue jobQueue,
+        LocalDocumentStorageGuard storageGuard)
     {
         this.descriptor = descriptor;
         this.documents = documents;
         this.jobQueue = jobQueue;
+        this.storageGuard = storageGuard;
     }
 
     public Task<IReadOnlyList<ImportedDocument>> ListAsync(CancellationToken cancellationToken = default)
@@ -53,6 +56,13 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
                 nameof(fileName));
         }
 
+        long expectedBytes = source.CanSeek ? Math.Max(0, source.Length - source.Position) : 0;
+        if (expectedBytes > 0)
+        {
+            storageGuard.EnsureFileWithinLimits(safeFileName, expectedBytes);
+            storageGuard.EnsureStorageAvailableForBytes(expectedBytes);
+        }
+
         Directory.CreateDirectory(descriptor.Paths.DocumentOriginalsDirectory);
 
         string temporaryPath = SafeDocumentPath.ResolveWithinRoot(
@@ -62,7 +72,9 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
         (string sha256, long fileSizeBytes) = await CopyToTemporaryFileAndHashAsync(
             source,
             temporaryPath,
+            storageGuard.Limits.MaxFileSizeBytes,
             cancellationToken);
+        storageGuard.EnsureStorageAvailableForBytes(fileSizeBytes);
 
         ImportedDocument? existing = await documents.FindBySha256Async(sha256, cancellationToken);
         if (existing is not null)
@@ -231,34 +243,55 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
     private static async Task<(string Sha256, long FileSizeBytes)> CopyToTemporaryFileAndHashAsync(
         Stream source,
         string temporaryPath,
+        long maxFileSizeBytes,
         CancellationToken cancellationToken)
     {
         byte[] buffer = GC.AllocateUninitializedArray<byte>(1024 * 64);
         long fileSizeBytes = 0;
         using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        await using FileStream destination = new(
-            temporaryPath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            buffer.Length,
-            FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-        while (true)
+        try
         {
-            int read = await source.ReadAsync(buffer, cancellationToken);
-            if (read == 0)
+            await using FileStream destination = new(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                buffer.Length,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+            while (true)
             {
-                break;
+                int read = await source.ReadAsync(buffer, cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                fileSizeBytes += read;
+                if (fileSizeBytes > maxFileSizeBytes)
+                {
+                    throw new DocumentStorageLimitException(
+                        DocumentStorageLimitKind.FileTooLarge,
+                        "File troppo grande",
+                        "Il file supera il limite configurato per singolo documento.");
+                }
+
+                await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                hash.AppendData(buffer, 0, read);
             }
 
-            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-            hash.AppendData(buffer, 0, read);
-            fileSizeBytes += read;
+            await destination.FlushAsync(cancellationToken);
+            string sha256 = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+            return (sha256, fileSizeBytes);
         }
+        catch
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
 
-        await destination.FlushAsync(cancellationToken);
-        string sha256 = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
-        return (sha256, fileSizeBytes);
+            throw;
+        }
     }
 }

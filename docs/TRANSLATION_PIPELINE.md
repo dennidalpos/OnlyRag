@@ -56,8 +56,8 @@ Export endpoint:
 - DOCX export writes page headings with page-break-before after the first page, paragraph units,
   textbox styling, and simple tables for consecutive table-cell units.
 - PDF export creates the same DOCX layout first, then converts it through the configured
-  LibreOffice converter. It requires LibreOffice and inherits the same layout metadata and page
-  break behavior as DOCX.
+  LibreOffice converter using `%LOCALAPPDATA%\OnlyRag\temp\translation-export` for staging. It
+  requires LibreOffice and inherits the same layout metadata and page break behavior as DOCX.
 
 Layout fidelity acceptance criteria:
 

@@ -141,7 +141,8 @@ public sealed class LocalDocumentLibraryServiceTests
             return new LocalDocumentLibraryService(
                 Descriptor,
                 new SqliteDocumentRepository(connectionFactory),
-                CreateQueue());
+                CreateQueue(),
+                new LocalDocumentStorageGuard(Descriptor, LocalDocumentLibraryLimits.Default));
         }
 
         public SqliteLocalJobQueue CreateQueue()

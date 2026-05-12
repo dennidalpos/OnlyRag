@@ -14,6 +14,7 @@ import {
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
+import { buildCompareDraftKey, formatTranslationStatus, formatUnitKind, targetLanguages } from "./TranslationSection.helpers";
 
 type TranslationSectionProps = {
   models: OllamaModel[];
@@ -28,23 +29,6 @@ type FeedbackState = {
 } | null;
 
 type ExportFormat = "txt" | "markdown" | "html" | "docx" | "pdf";
-
-const targetLanguages = [
-  "English",
-  "Spanish",
-  "French",
-  "German",
-  "Italian",
-  "Portuguese",
-  "Dutch",
-  "Polish",
-  "Romanian",
-  "Chinese",
-  "Japanese",
-  "Korean",
-  "Arabic",
-  "Russian"
-];
 
 export function TranslationSection({
   models,
@@ -371,7 +355,7 @@ export function TranslationSection({
     try {
       await apiRequest<OperationMessageResponse>("/api/documents/exports/open-folder", {
         method: "POST",
-        body: JSON.stringify({})
+        body: JSON.stringify({ confirmed: true })
       });
     } catch (error) {
       setFeedback({
@@ -840,40 +824,3 @@ export function TranslationSection({
   );
 }
 
-function formatTranslationStatus(status: string): string {
-  switch (status) {
-    case "Queued":
-      return "In coda";
-    case "Running":
-      return "In corso";
-    case "Completed":
-      return "Completata";
-    case "Corrected":
-      return "Corretta";
-    case "Failed":
-      return "Errore";
-    case "Cancelled":
-      return "Annullata";
-    case "Pending":
-      return "In attesa";
-    default:
-      return status;
-  }
-}
-
-function formatUnitKind(kind: string): string {
-  switch (kind) {
-    case "table-cell":
-      return "Cella";
-    case "textbox":
-      return "Textbox";
-    case "paragraph":
-      return "Paragrafo";
-    default:
-      return "Unità";
-  }
-}
-
-function buildCompareDraftKey(translationId: number | null, unitId: number): string {
-  return `onlyrag.translation.compare.${translationId ?? "unknown"}.${unitId}`;
-}

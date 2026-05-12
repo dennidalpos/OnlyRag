@@ -10,7 +10,8 @@ public sealed record AppStoragePaths(
     string DocumentRendersDirectory,
     string DocumentOcrCacheDirectory,
     string DocumentExportsDirectory,
-    string LogsDirectory)
+    string LogsDirectory,
+    string TempDirectory)
 {
     public const string ProductName = "OnlyRag";
 
@@ -35,7 +36,8 @@ public sealed record AppStoragePaths(
             Path.Combine(documentsRoot, "renders"),
             Path.Combine(documentsRoot, "ocr-cache"),
             Path.Combine(documentsRoot, "exports"),
-            Path.Combine(dataRoot, "logs"));
+            Path.Combine(dataRoot, "logs"),
+            Path.Combine(dataRoot, "temp"));
     }
 
     public IEnumerable<string> EnumerateRequiredDirectories()
@@ -47,5 +49,6 @@ public sealed record AppStoragePaths(
         yield return DocumentOcrCacheDirectory;
         yield return DocumentExportsDirectory;
         yield return LogsDirectory;
+        yield return TempDirectory;
     }
 }

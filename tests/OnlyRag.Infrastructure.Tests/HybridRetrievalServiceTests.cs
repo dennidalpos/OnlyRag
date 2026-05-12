@@ -128,11 +128,11 @@ public sealed class HybridRetrievalServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_UsesLikeFallbackWhenFts5TableIsUnavailable()
+    public async Task SearchAsync_UsesFts4FallbackWhenFts5TableIsUnavailable()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
-        await tempStorage.DropFtsIndexAsync();
+        await tempStorage.ReplaceFtsIndexWithFts4Async();
         TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
         ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "fallback.txt", ["Riferimento contratto CN-445."]);
 
@@ -142,7 +142,7 @@ public sealed class HybridRetrievalServiceTests
         DocumentSearchResult result = Assert.Single(response.Results);
         Assert.Equal(document.Id, result.DocumentId);
         Assert.Contains("CN-445", result.Snippet, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("SQLite LIKE fallback", response.KeywordBackend);
+        Assert.Equal("SQLite FTS indexed fallback", response.KeywordBackend);
     }
 
     private static async Task EmbedDocumentAsync(
@@ -284,7 +284,7 @@ public sealed class HybridRetrievalServiceTests
             return (await documents.GetAsync(document.Id))!;
         }
 
-        public async Task DropFtsIndexAsync()
+        public async Task ReplaceFtsIndexWithFts4Async()
         {
             await using Microsoft.Data.Sqlite.SqliteConnection connection = await CreateConnectionFactory().OpenConnectionAsync();
             await using Microsoft.Data.Sqlite.SqliteCommand command = connection.CreateCommand();
@@ -294,6 +294,27 @@ public sealed class HybridRetrievalServiceTests
                 DROP TRIGGER IF EXISTS chunks_ad;
                 DROP TRIGGER IF EXISTS chunks_au;
                 DROP TABLE IF EXISTS chunks_fts;
+
+                CREATE VIRTUAL TABLE chunks_fts USING fts4(
+                    chunk_id,
+                    content,
+                    notindexed=chunk_id
+                );
+
+                CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+                    INSERT INTO chunks_fts(rowid, chunk_id, content)
+                    VALUES (new.id, new.id, new.content);
+                END;
+
+                CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN
+                    DELETE FROM chunks_fts WHERE rowid = old.id;
+                END;
+
+                CREATE TRIGGER chunks_au AFTER UPDATE OF content ON chunks BEGIN
+                    DELETE FROM chunks_fts WHERE rowid = old.id;
+                    INSERT INTO chunks_fts(rowid, chunk_id, content)
+                    VALUES (new.id, new.id, new.content);
+                END;
                 """;
             await command.ExecuteNonQueryAsync();
         }

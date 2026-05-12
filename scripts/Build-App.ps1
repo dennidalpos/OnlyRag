@@ -2,14 +2,19 @@
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+
+    [switch]$NoRestore
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "OnlyRag.sln"
 
-dotnet restore $solution
+if (-not $NoRestore) {
+    dotnet restore $solution
+}
+
 dotnet build $solution --configuration $Configuration --no-restore

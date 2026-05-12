@@ -9,4 +9,7 @@ public sealed record DocumentPreviewResponse(
     int PageCount,
     int ChunkCount,
     string Status,
+    int PageStart,
+    int PageSize,
+    int ReturnedPageCount,
     IReadOnlyList<DocumentPageInfo> Pages);

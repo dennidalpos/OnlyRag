@@ -69,7 +69,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
 
         OnlyRag.Core.OfficeConversionSettings settings = await settingsStore.GetAsync(cancellationToken);
         int timeoutSeconds = OfficeConversionSettingsStore.ValidateTimeoutSeconds(settings.ConversionTimeoutSeconds);
-        string tempRoot = Path.Combine(descriptor.Paths.DataRoot, "temp", "office-conversion");
+        string tempRoot = Path.Combine(descriptor.Paths.TempDirectory, "office-conversion");
         string workDirectory = Path.Combine(tempRoot, $"{request.DocumentId}-{Guid.NewGuid():N}");
 
         try

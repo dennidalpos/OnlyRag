@@ -44,7 +44,9 @@ embedded chunk count, progress, and the active embedding job when present.
 `IVectorSearchService` is backed by the `sqlite-vec` SQLite extension through the `sqlite-vec`
 NuGet package. Vectors stay persisted as SQLite BLOB values and are searched by SQL through
 `vec_distance_cosine` inside the selected document scope. The native `vec0.dll` asset is copied by
-the infrastructure project for Windows build and packaging.
+the infrastructure project for Windows build and packaging. Packaging validation requires
+`vec0.dll` in the publish payload, and backend startup loads the extension once so an incomplete
+install fails early with a dependency-specific message.
 
 If query embedding or vector search is unavailable for a request, keyword retrieval still runs and
 the response reports vector search as unavailable for that query.
@@ -56,8 +58,7 @@ only the user query to Ollama to generate a query embedding; it never sends full
 the model. Candidate chunks are retrieved through:
 
 - SQLite FTS5 keyword search when the `chunks_fts` virtual table is available.
-- Document-scoped SQLite `LIKE` fallback when FTS5 is unavailable or the FTS query cannot be
-  executed.
+- SQLite FTS4 indexed keyword search when FTS5 is unavailable but the provider supports FTS4.
 - `IVectorSearchService` over stored chunk embeddings for the configured embedding model.
 
 The retrieval service merges keyword and vector candidates, deduplicates by `chunk_id`,
@@ -94,5 +95,5 @@ Chat context size is configured independently from embedding context size:
 - Vector search depends on the Windows native `vec0.dll` copied from the `sqlite-vec` NuGet
   package. Build and packaging validation must keep this file in the published payload.
 - Embedding batch size is capped at 8 chunks to keep the workflow usable on slower Windows PCs.
-- FTS5 availability depends on the SQLite build distributed with `Microsoft.Data.Sqlite`; the
-  LIKE fallback is used automatically when FTS5 is unavailable.
+- FTS5 availability depends on the SQLite build distributed with `Microsoft.Data.Sqlite`; when
+  FTS5 is unavailable, OnlyRag creates an indexed FTS4 fallback if the provider supports it.

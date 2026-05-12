@@ -10,6 +10,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check eslint.config.js .prettierrc.json package.json && node scripts/check-format.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
@@ -17,11 +19,15 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "axe-core": "^4.10.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    "@eslint/js": "^10.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "axe-core": "^4.10.0",
+    "eslint": "^10.3.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.9.0",
+    "typescript-eslint": "^8.59.3",
     "vite": "^7.0.0"
   }
 }

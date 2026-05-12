@@ -56,6 +56,80 @@ function Assert-CommandAvailable {
     Write-Host "  ${Name}: $($command.Source)"
 }
 
+function Get-JsonPropertyValue {
+    param(
+        [object]$Object,
+
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Test-DotNetPackageVulnerabilities {
+    param(
+        [Parameter(Mandatory)]
+        [string]$SolutionPath
+    )
+
+    $global:LASTEXITCODE = 0
+    $output = dotnet list $SolutionPath package --vulnerable --include-transitive --format json 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host $output
+        throw "dotnet package vulnerability audit failed with exit code $LASTEXITCODE."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($output)) {
+        Write-Host "No vulnerable NuGet packages reported."
+        return
+    }
+
+    $report = $output | ConvertFrom-Json
+    $findings = New-Object System.Collections.Generic.List[string]
+
+    foreach ($project in (@(Get-JsonPropertyValue -Object $report -Name "projects") | Where-Object { $null -ne $_ })) {
+        foreach ($framework in (@(Get-JsonPropertyValue -Object $project -Name "frameworks") | Where-Object { $null -ne $_ })) {
+            foreach ($packageSetName in @("topLevelPackages", "transitivePackages")) {
+                foreach ($package in (@(Get-JsonPropertyValue -Object $framework -Name $packageSetName) | Where-Object { $null -ne $_ })) {
+                    $vulnerabilities = @(Get-JsonPropertyValue -Object $package -Name "vulnerabilities") | Where-Object { $null -ne $_ }
+                    if ($vulnerabilities.Count -eq 0) {
+                        continue
+                    }
+
+                    $packageId = Get-JsonPropertyValue -Object $package -Name "id"
+                    $resolvedVersion = Get-JsonPropertyValue -Object $package -Name "resolvedVersion"
+                    foreach ($vulnerability in $vulnerabilities) {
+                        $severity = Get-JsonPropertyValue -Object $vulnerability -Name "severity"
+                        $advisoryUrl = Get-JsonPropertyValue -Object $vulnerability -Name "advisoryUrl"
+                        $findings.Add("$packageId $resolvedVersion [$severity] $advisoryUrl")
+                    }
+                }
+            }
+        }
+    }
+
+    if ($findings.Count -gt 0) {
+        Write-Host "Vulnerable NuGet packages were found:" -ForegroundColor Red
+        foreach ($finding in $findings) {
+            Write-Host "  $finding"
+        }
+
+        throw "NuGet package vulnerability audit failed."
+    }
+
+    Write-Host "No vulnerable NuGet packages reported."
+}
+
 Write-Host "OnlyRag repository gate" -ForegroundColor Cyan
 Write-Host "Repository: $repoRoot"
 Write-Host "Configuration: $Configuration"
@@ -96,10 +170,44 @@ Invoke-GateStep "restore .NET packages" {
     dotnet restore $solution
 }
 
+Invoke-GateStep "npm production dependency audit" {
+    Push-Location $webRoot
+    try {
+        npm audit --omit=dev --audit-level=moderate
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+Invoke-GateStep "NuGet dependency vulnerability audit" {
+    Test-DotNetPackageVulnerabilities -SolutionPath $solution
+}
+
 Invoke-GateStep "web typecheck" {
     Push-Location $webRoot
     try {
         npm run typecheck
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+Invoke-GateStep "web lint" {
+    Push-Location $webRoot
+    try {
+        npm run lint
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+Invoke-GateStep "web format check" {
+    Push-Location $webRoot
+    try {
+        npm run format:check
     }
     finally {
         Pop-Location
@@ -115,11 +223,11 @@ Invoke-GateStep "installer prerequisite checks" {
 }
 
 Invoke-GateStep "web build" {
-    & $buildWebScript
+    & $buildWebScript -SkipInstallWhenUpToDate
 }
 
 Invoke-GateStep ".NET build" {
-    & $buildAppScript -Configuration $Configuration
+    & $buildAppScript -Configuration $Configuration -NoRestore
 }
 
 if ($IncludeInstaller) {

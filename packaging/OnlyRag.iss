@@ -26,17 +26,24 @@
 #define WizardSmallImage "..\assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp"
 #endif
 
+#ifndef AppName
 #define AppName "OnlyRag"
+#endif
+
 #define AppExeName "OnlyRag.App.exe"
+#define PublisherName "OnlyRag"
+#define ProjectUrl "https://github.com/dennidalpos/OnlyRag"
+#define AppCopyright "Copyright (c) 2026 OnlyRag"
 
 [Setup]
 AppId={{04F5D8FC-C732-4F34-8C13-B7E2D6C09F47}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=OnlyRag
-AppPublisherURL=https://github.com/
-AppSupportURL=https://github.com/
-AppUpdatesURL=https://github.com/
+AppPublisher={#PublisherName}
+AppPublisherURL={#ProjectUrl}
+AppSupportURL={#ProjectUrl}/issues
+AppUpdatesURL={#ProjectUrl}/releases
+AppCopyright={#AppCopyright}
 DefaultDirName={localappdata}\Programs\OnlyRag
 DefaultGroupName=OnlyRag
 DisableProgramGroupPage=yes
@@ -52,6 +59,13 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 SetupLogging=yes
 UninstallDisplayIcon={app}\{#AppExeName}
+UninstallDisplayName={#AppName}
+VersionInfoCompany={#PublisherName}
+VersionInfoCopyright={#AppCopyright}
+VersionInfoDescription=OnlyRag Windows desktop setup
+VersionInfoVersion={#AppVersion}
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
 MinVersion=10.0.17763
 
 [Languages]
@@ -64,14 +78,125 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\OnlyRag"; Filename: "{app}\{#AppExeName}"
-Name: "{group}\Uninstall OnlyRag"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\OnlyRag"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
+Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,OnlyRag}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+const
+  InstallerMessageMaxLineLength = 86;
+
+function Spaces(Count: Integer): String;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to Count do
+    Result := Result + ' ';
+end;
+
+function WrappedLine(Prefix: String; Text: String): String;
+var
+  Remaining: String;
+  Word: String;
+  CurrentLine: String;
+  ContinuationPrefix: String;
+  SpacePosition: Integer;
+begin
+  Result := '';
+  CurrentLine := '';
+  ContinuationPrefix := Spaces(Length(Prefix));
+  Remaining := Text;
+
+  while Length(Remaining) > 0 do
+  begin
+    SpacePosition := Pos(' ', Remaining);
+    if SpacePosition = 0 then
+    begin
+      Word := Remaining;
+      Remaining := '';
+    end
+    else
+    begin
+      Word := Copy(Remaining, 1, SpacePosition - 1);
+      Delete(Remaining, 1, SpacePosition);
+    end;
+
+    if Word <> '' then
+    begin
+      if CurrentLine = '' then
+        CurrentLine := Prefix + Word
+      else if Length(CurrentLine) + 1 + Length(Word) <= InstallerMessageMaxLineLength then
+        CurrentLine := CurrentLine + ' ' + Word
+      else
+      begin
+        if Result = '' then
+          Result := CurrentLine
+        else
+          Result := Result + #13#10 + CurrentLine;
+        CurrentLine := ContinuationPrefix + Word;
+      end;
+    end;
+  end;
+
+  if CurrentLine <> '' then
+  begin
+    if Result = '' then
+      Result := CurrentLine
+    else
+      Result := Result + #13#10 + CurrentLine;
+  end;
+end;
+
+function BulletLine(LabelText: String; Text: String): String;
+begin
+  Result := WrappedLine('- ' + LabelText + ': ', Text);
+end;
+
+function ParagraphLine(Text: String): String;
+begin
+  Result := WrappedLine('', Text);
+end;
+
+function UnsupportedWindowsMessage(): String;
+begin
+  Result :=
+    ParagraphLine('{#AppName} cannot be installed because this Windows version is not supported.') + #13#10 + #13#10 +
+    BulletLine('Software', 'Microsoft Windows') + #13#10 +
+    BulletLine('Minimum supported version', 'Windows 10 version 1809, build 17763, or Windows 11') + #13#10 +
+    BulletLine('Why it is required', '{#AppName} is a modern Windows desktop app using WPF, WebView2, and a self-contained .NET Windows runtime payload validated for Windows 10 1809 or newer') + #13#10 +
+    BulletLine('Install', 'Update Windows through Settings > Windows Update, or use a Windows 10/11 client that meets the minimum version') + #13#10 +
+    BulletLine('Verify', 'Press Win+R, run winver, and confirm Windows 10 version 1809/build 17763 or newer, or Windows 11') + #13#10 + #13#10 +
+    ParagraphLine('After updating Windows, run this {#AppName} setup again.');
+end;
+
+function MissingWebView2Message(): String;
+begin
+  Result :=
+    ParagraphLine('{#AppName} cannot be installed because a required Windows runtime is missing.') + #13#10 + #13#10 +
+    BulletLine('Software', 'Microsoft Edge WebView2 Runtime') + #13#10 +
+    BulletLine('Minimum supported version', 'Current Evergreen Runtime for supported Windows versions') + #13#10 +
+    BulletLine('Why it is required', '{#AppName} renders its bundled React UI through Microsoft WebView2') + #13#10 +
+    BulletLine('Install', 'Download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/') + #13#10 +
+    BulletLine('Verify', 'Open Settings > Apps and confirm Microsoft Edge WebView2 Runtime is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application') + #13#10 + #13#10 +
+    ParagraphLine('After installing WebView2, run this {#AppName} setup again.') + #13#10 + #13#10 +
+    ParagraphLine('The installer includes the required .NET runtime components. Ollama, LibreOffice, and OCR/PaddleOCR Python packages remain optional feature dependencies configured from the app settings.');
+end;
+
+function IsSupportedWindowsVersion(): Boolean;
+var
+  Version: TWindowsVersion;
+begin
+  GetWindowsVersionEx(Version);
+  Result :=
+    (Version.Major > 10) or
+    ((Version.Major = 10) and (Version.Minor > 0)) or
+    ((Version.Major = 10) and (Version.Minor = 0) and (Version.Build >= 17763));
+end;
+
 function HasWebView2Runtime(): Boolean;
 var
   Version: String;
@@ -86,19 +211,16 @@ end;
 
 function InitializeSetup(): Boolean;
 begin
+  if not IsSupportedWindowsVersion() then
+  begin
+    MsgBox(UnsupportedWindowsMessage(), mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
   if not HasWebView2Runtime() then
   begin
-    MsgBox(
-      'OnlyRag cannot be installed because a required Windows runtime is missing:' + #13#10 + #13#10 +
-      '- Software: Microsoft Edge WebView2 Runtime' + #13#10 +
-      '- Minimum supported version: current Evergreen Runtime for Windows 10 1809 or newer / Windows 11' + #13#10 +
-      '- Why it is required: OnlyRag is a WPF desktop app that renders its bundled React UI through Microsoft WebView2. Without WebView2 the app can install but cannot show the first window reliably.' + #13#10 +
-      '- Install: download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/' + #13#10 +
-      '- Verify: open Settings > Apps and confirm "Microsoft Edge WebView2 Runtime" is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application.' + #13#10 + #13#10 +
-      'After installing WebView2, run this OnlyRag setup again.' + #13#10 + #13#10 +
-      'The OnlyRag installer includes the required .NET runtime components in the application package. Ollama, LibreOffice, and OCR/PaddleOCR Python packages are optional feature dependencies configured from the app settings.',
-      mbError,
-      MB_OK);
+    MsgBox(MissingWebView2Message(), mbError, MB_OK);
     Result := False;
   end
   else

@@ -17,6 +17,8 @@ pwsh .\scripts\Generate-BrandAssets.ps1
 ```
 
 The script uses WPF drawing APIs available on Windows and does not require external image tooling.
+It also refreshes `assets\brand\manifest.json`, which inventories the app icon source/ICO,
+generated brand outputs, and copied integration assets.
 
 ## Visual Tokens
 

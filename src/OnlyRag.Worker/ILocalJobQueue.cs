@@ -27,7 +27,7 @@ public interface ILocalJobQueue
 
     Task<LocalJob?> FailAsync(
         string id,
-        string error,
+        string errorMessage,
         bool retryable,
         CancellationToken cancellationToken = default);
 

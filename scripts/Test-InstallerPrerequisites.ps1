@@ -4,11 +4,34 @@ param(
     [switch]$SelfTest,
 
     [ValidateSet("Present", "Missing")]
-    [string]$SimulateWebView2
+    [string]$SimulateWebView2,
+
+    [ValidateSet("Supported", "Unsupported")]
+    [string]$SimulateWindows
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+function Test-OnlyRagSupportedWindows {
+    if ($SimulateWindows -eq "Supported") {
+        return $true
+    }
+    if ($SimulateWindows -eq "Unsupported") {
+        return $false
+    }
+
+    if (-not $IsWindows) {
+        return $false
+    }
+
+    $version = [System.Environment]::OSVersion.Version
+    return (
+        $version.Major -gt 10 -or
+        ($version.Major -eq 10 -and $version.Minor -gt 0) -or
+        ($version.Major -eq 10 -and $version.Minor -eq 0 -and $version.Build -ge 17763)
+    )
+}
 
 function Test-OnlyRagWebView2Runtime {
     if ($SimulateWebView2 -eq "Present") {
@@ -54,7 +77,89 @@ function Test-OnlyRagWebView2Runtime {
 }
 
 function Get-OnlyRagInstallerPrerequisiteStatus {
-    param([bool]$WebView2Present)
+    param(
+        [bool]$WindowsSupported,
+        [bool]$WebView2Present,
+        [string]$AppName = "OnlyRag"
+    )
+
+    $maxInstallerMessageLineLength = 86
+
+    function Join-OnlyRagWrappedLine {
+        param(
+            [string]$Prefix,
+
+            [Parameter(Mandatory)]
+            [string]$Text
+        )
+
+        $result = [System.Collections.Generic.List[string]]::new()
+        $currentLine = ""
+        $continuationPrefix = " " * $Prefix.Length
+
+        foreach ($word in ($Text -split "\s+")) {
+            if ([string]::IsNullOrWhiteSpace($word)) {
+                continue
+            }
+
+            if ([string]::IsNullOrWhiteSpace($currentLine)) {
+                $currentLine = "$Prefix$word"
+                continue
+            }
+
+            if (($currentLine.Length + 1 + $word.Length) -le $maxInstallerMessageLineLength) {
+                $currentLine = "$currentLine $word"
+                continue
+            }
+
+            $result.Add($currentLine)
+            $currentLine = "$continuationPrefix$word"
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($currentLine)) {
+            $result.Add($currentLine)
+        }
+
+        return ($result -join [Environment]::NewLine)
+    }
+
+    function New-OnlyRagInstallerBullet {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Label,
+
+            [Parameter(Mandatory)]
+            [string]$Text
+        )
+
+        return Join-OnlyRagWrappedLine -Prefix "- ${Label}: " -Text $Text
+    }
+
+    function New-OnlyRagInstallerParagraph {
+        param([Parameter(Mandatory)][string]$Text)
+
+        return Join-OnlyRagWrappedLine -Prefix "" -Text $Text
+    }
+
+    if (-not $WindowsSupported) {
+        $message = @(
+            New-OnlyRagInstallerParagraph "$AppName cannot be installed because this Windows version is not supported."
+            ""
+            New-OnlyRagInstallerBullet "Software" "Microsoft Windows"
+            New-OnlyRagInstallerBullet "Minimum supported version" "Windows 10 version 1809, build 17763, or Windows 11"
+            New-OnlyRagInstallerBullet "Why it is required" "$AppName is a modern Windows desktop app using WPF, WebView2, and a self-contained .NET Windows runtime payload validated for Windows 10 1809 or newer"
+            New-OnlyRagInstallerBullet "Install" "Update Windows through Settings > Windows Update, or use a Windows 10/11 client that meets the minimum version"
+            New-OnlyRagInstallerBullet "Verify" "Press Win+R, run winver, and confirm Windows 10 version 1809/build 17763 or newer, or Windows 11"
+            ""
+            New-OnlyRagInstallerParagraph "After updating Windows, run this $AppName setup again."
+        ) -join [Environment]::NewLine
+
+        return [pscustomobject]@{
+            CanInstall = $false
+            Missing = @("Microsoft Windows 10 version 1809/build 17763 or newer")
+            Message = $message
+        }
+    }
 
     if ($WebView2Present) {
         return [pscustomobject]@{
@@ -64,21 +169,39 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         }
     }
 
+    $message = @(
+        New-OnlyRagInstallerParagraph "$AppName cannot be installed because a required Windows runtime is missing."
+        ""
+        New-OnlyRagInstallerBullet "Software" "Microsoft Edge WebView2 Runtime"
+        New-OnlyRagInstallerBullet "Minimum supported version" "Current Evergreen Runtime for supported Windows versions"
+        New-OnlyRagInstallerBullet "Why it is required" "$AppName renders its bundled React UI through Microsoft WebView2"
+        New-OnlyRagInstallerBullet "Install" "Download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/"
+        New-OnlyRagInstallerBullet "Verify" "Open Settings > Apps and confirm Microsoft Edge WebView2 Runtime is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application"
+        ""
+        New-OnlyRagInstallerParagraph "After installing WebView2, run this $AppName setup again."
+        ""
+        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components. Ollama, LibreOffice, and OCR/PaddleOCR Python packages remain optional feature dependencies configured from the app settings."
+    ) -join [Environment]::NewLine
+
     return [pscustomobject]@{
         CanInstall = $false
         Missing = @("Microsoft Edge WebView2 Runtime")
-        Message = @"
-OnlyRag cannot be installed because a required Windows runtime is missing:
-
-- Software: Microsoft Edge WebView2 Runtime
-- Minimum supported version: current Evergreen Runtime for Windows 10 1809 or newer / Windows 11
-- Why it is required: OnlyRag is a WPF desktop app that renders its bundled React UI through Microsoft WebView2.
-- Install: download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/
-- Verify: open Settings > Apps and confirm "Microsoft Edge WebView2 Runtime" is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application.
-
-After installing WebView2, run this OnlyRag setup again.
-"@.Trim()
+        Message = $message
     }
+}
+
+function Assert-InstallerMessageLayout {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Message,
+
+        [Parameter(Mandatory)]
+        [string]$Scenario
+    )
+
+    $maxInstallerMessageLineLength = 86
+    $longLines = @($Message -split "\r?\n" | Where-Object { $_.Length -gt $maxInstallerMessageLineLength })
+    Assert-Condition -Condition ($longLines.Count -eq 0) -Message "Expected $Scenario installer message lines to be no longer than $maxInstallerMessageLineLength characters. Long lines: $($longLines -join ' | ')"
 }
 
 function Assert-Condition {
@@ -96,23 +219,38 @@ function Assert-Condition {
 }
 
 if ($SelfTest) {
-    $present = Get-OnlyRagInstallerPrerequisiteStatus -WebView2Present $true
+    $present = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $true -WebView2Present $true
     Assert-Condition -Condition $present.CanInstall -Message "Expected simulated present WebView2 to allow setup."
     Assert-Condition -Condition ($present.Missing.Count -eq 0) -Message "Expected no missing prerequisites for simulated present WebView2."
 
-    $missing = Get-OnlyRagInstallerPrerequisiteStatus -WebView2Present $false
+    $missing = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $true -WebView2Present $false
     Assert-Condition -Condition (-not $missing.CanInstall) -Message "Expected simulated missing WebView2 to block setup."
     Assert-Condition -Condition ($missing.Missing -contains "Microsoft Edge WebView2 Runtime") -Message "Expected missing WebView2 prerequisite name."
     foreach ($expected in @("Microsoft Edge WebView2 Runtime", "current Evergreen Runtime", "Why it is required", "Install:", "Verify:")) {
         Assert-Condition -Condition ($missing.Message -like "*$expected*") -Message "Expected installer message to contain '$expected'."
     }
+    Assert-InstallerMessageLayout -Message $missing.Message -Scenario "missing WebView2"
+
+    $unsupportedWindows = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $false -WebView2Present $true
+    Assert-Condition -Condition (-not $unsupportedWindows.CanInstall) -Message "Expected simulated unsupported Windows to block setup."
+    Assert-Condition -Condition ($unsupportedWindows.Missing -contains "Microsoft Windows 10 version 1809/build 17763 or newer") -Message "Expected missing Windows prerequisite name."
+    foreach ($expected in @("Microsoft Windows", "Windows 10 version 1809", "Why it is required", "Windows Update", "winver")) {
+        Assert-Condition -Condition ($unsupportedWindows.Message -like "*$expected*") -Message "Expected Windows message to contain '$expected'."
+    }
+    Assert-InstallerMessageLayout -Message $unsupportedWindows.Message -Scenario "unsupported Windows"
+
+    $longProductName = "OnlyRag Enterprise Knowledge Workbench With Extended Local Document Intelligence"
+    $longNameMessage = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $true -WebView2Present $false -AppName $longProductName
+    Assert-Condition -Condition ($longNameMessage.Message -like "*$longProductName*") -Message "Expected installer message to preserve long product name."
+    Assert-InstallerMessageLayout -Message $longNameMessage.Message -Scenario "long product name"
 
     Write-Host "Installer prerequisite self-test passed." -ForegroundColor Green
     exit 0
 }
 
+$windowsSupported = Test-OnlyRagSupportedWindows
 $webView2Present = Test-OnlyRagWebView2Runtime
-$status = Get-OnlyRagInstallerPrerequisiteStatus -WebView2Present $webView2Present
+$status = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $windowsSupported -WebView2Present $webView2Present
 
 if ($status.CanInstall) {
     Write-Host $status.Message -ForegroundColor Green

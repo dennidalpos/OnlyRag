@@ -323,7 +323,9 @@ internal sealed class OllamaClient : IOllamaClient
     private async Task<OllamaRequestContext> BuildContextAsync(CancellationToken cancellationToken)
     {
         OllamaSettings settings = await settingsService.GetAsync(cancellationToken);
-        string normalizedBaseUrl = OllamaSettingsService.NormalizeAndValidateBaseUrl(settings.OllamaBaseUrl);
+        string normalizedBaseUrl = OllamaSettingsService.NormalizeAndValidateBaseUrl(
+            settings.OllamaBaseUrl,
+            settings.TrustNonLocalEndpoint);
 
         return new OllamaRequestContext(
             new Uri($"{normalizedBaseUrl.TrimEnd('/')}/", UriKind.Absolute),

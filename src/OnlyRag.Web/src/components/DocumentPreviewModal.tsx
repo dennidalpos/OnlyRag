@@ -7,14 +7,16 @@ type Props = {
   preview: DocumentPreviewResponse | null;
   isLoading: boolean;
   onClose: () => void;
+  onPageChange: (page: number) => void;
 };
 
-export function DocumentPreviewModal({ document, preview, isLoading, onClose }: Props) {
+export function DocumentPreviewModal({ document, preview, isLoading, onClose, onPageChange }: Props) {
   const modalRef = useRef<HTMLDivElement | null>(null);
-  const [selectedPage, setSelectedPage] = useState(1);
+  const selectedPage = preview?.pageStart ?? 1;
   const pages = preview?.pages ?? [];
   const currentPage = pages.find((p) => p.pageNumber === selectedPage) ?? pages[0] ?? null;
-  const pageNumbers = pages.map((p) => p.pageNumber);
+  const totalPages = preview?.pageCount ?? document.pageCount;
+  const pageNumbers = buildVisiblePageNumbers(selectedPage, totalPages);
   useModalFocusTrap(modalRef, true, { onEscape: onClose });
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -83,10 +85,10 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose }: 
                         key={pn}
                         className={pn === selectedPage ? "preview-page-btn preview-page-btn--active" : "preview-page-btn"}
                         type="button"
-                        onClick={() => setSelectedPage(pn)}
+                        onClick={() => onPageChange(pn)}
                       >
                         <span>{pn}</span>
-                        <PageOcrBadge page={pg} />
+                        {pg && <PageOcrBadge page={pg} />}
                       </button>
                     );
                   })}
@@ -111,23 +113,17 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose }: 
                 <button
                   className="button-secondary"
                   type="button"
-                  disabled={selectedPage <= pageNumbers[0]}
-                  onClick={() => {
-                    const idx = pageNumbers.indexOf(selectedPage);
-                    if (idx > 0) setSelectedPage(pageNumbers[idx - 1]);
-                  }}
+                  disabled={selectedPage <= 1 || isLoading}
+                  onClick={() => onPageChange(selectedPage - 1)}
                 >
                   ← Precedente
                 </button>
-                <span>Pagina {selectedPage} di {pageNumbers.length}</span>
+                <span>Pagina {selectedPage} di {totalPages}</span>
                 <button
                   className="button-secondary"
                   type="button"
-                  disabled={selectedPage >= pageNumbers[pageNumbers.length - 1]}
-                  onClick={() => {
-                    const idx = pageNumbers.indexOf(selectedPage);
-                    if (idx < pageNumbers.length - 1) setSelectedPage(pageNumbers[idx + 1]);
-                  }}
+                  disabled={selectedPage >= totalPages || isLoading}
+                  onClick={() => onPageChange(selectedPage + 1)}
                 >
                   Successiva →
                 </button>
@@ -138,6 +134,15 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose }: 
       </div>
     </div>
   );
+}
+
+function buildVisiblePageNumbers(selectedPage: number, totalPages: number): number[] {
+  if (totalPages <= 0) return [];
+
+  const visibleCount = Math.min(totalPages, 11);
+  const halfWindow = Math.floor(visibleCount / 2);
+  const start = Math.max(1, Math.min(selectedPage - halfWindow, totalPages - visibleCount + 1));
+  return Array.from({ length: visibleCount }, (_, index) => start + index);
 }
 
 function PageContent({ page }: { page: DocumentPageInfo }) {

@@ -9,4 +9,5 @@ public sealed record OllamaSettings(
     int EmbeddingBatchSize,
     int? EmbeddingNumCtx = null,
     int? ChatNumCtx = null,
-    int? TranslationNumCtx = null);
+    int? TranslationNumCtx = null,
+    bool TrustNonLocalEndpoint = false);

@@ -210,6 +210,10 @@ else {
     Add-Check -Id "fresh-install-exit" -Status ($(if ($install.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Fresh install exit code $($install.exitCode)." -Data $install
     Test-PathExpectation -Id "install-path" -Path $installDir -Kind "directory"
     Test-PathExpectation -Id "app-executable" -Path (Join-Path $installDir "OnlyRag.App.exe") -Kind "file"
+    Test-PathExpectation -Id "sqlite-vec-native-asset" -Path (Join-Path $installDir "vec0.dll") -Kind "file"
+    Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"
+    Test-PathExpectation -Id "web-ui-entrypoint" -Path (Join-Path $installDir "wwwroot\index.html") -Kind "file"
     Test-PathExpectation -Id "start-menu-shortcut" -Path $startMenuShortcut -Kind "file"
     Test-PathExpectation -Id "desktop-shortcut" -Path $desktopShortcut -Kind "file"
     Test-AppLaunch

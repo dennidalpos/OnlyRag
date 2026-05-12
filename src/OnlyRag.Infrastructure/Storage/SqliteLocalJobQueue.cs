@@ -262,7 +262,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
     public async Task<LocalJob?> FailAsync(
         string id,
-        string error,
+        string errorMessage,
         bool retryable,
         CancellationToken cancellationToken = default)
     {
@@ -297,7 +297,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$status", nextStatus.ToString());
-        command.AddParameter("$error", error);
+        command.AddParameter("$error", errorMessage);
         command.AddParameter("$retryCount", nextRetryCount);
         command.AddParameter("$currentStep", currentStep);
         command.AddParameter("$now", now);

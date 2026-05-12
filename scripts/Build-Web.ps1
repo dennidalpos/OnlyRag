@@ -1,6 +1,8 @@
 #requires -Version 7.0
 [CmdletBinding()]
-param()
+param(
+    [switch]$SkipInstallWhenUpToDate
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -10,4 +12,4 @@ $supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 
 $webRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\src\OnlyRag.Web")).Path
 
-Invoke-OnlyRagWebBuild -WebRoot $webRoot
+Invoke-OnlyRagWebBuild -WebRoot $webRoot -SkipInstallWhenUpToDate:$SkipInstallWhenUpToDate

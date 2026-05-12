@@ -5,6 +5,7 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class SqliteVecVectorSearchService : IVectorSearchService
 {
+    private const string SqliteVecPackageVersion = "0.1.7-alpha.2.1";
     private readonly ISqliteConnectionFactory connectionFactory;
 
     public SqliteVecVectorSearchService(ISqliteConnectionFactory connectionFactory)
@@ -17,6 +18,12 @@ public sealed class SqliteVecVectorSearchService : IVectorSearchService
     public int MaxSearchableVectors => int.MaxValue;
 
     public bool IsVectorStoragePersistent => true;
+
+    public async Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        LoadExtension(connection);
+    }
 
     public async Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
         string model,
@@ -100,13 +107,21 @@ public sealed class SqliteVecVectorSearchService : IVectorSearchService
                 catch (SqliteException nested)
                 {
                     throw new InvalidOperationException(
-                        $"sqlite-vec extension found but could not be loaded from '{nativePath}': {nested.Message}",
+                        "Required native dependency could not be loaded: sqlite-vec vec0.dll. " +
+                        $"Supported package version: sqlite-vec {SqliteVecPackageVersion} for Windows x64. " +
+                        "Why it is required: OnlyRag stores embeddings in SQLite and uses sqlite-vec for semantic retrieval. " +
+                        $"Instruction: reinstall OnlyRag from a complete installer or rebuild the publish payload; vec0.dll was found at '{nativePath}' but failed to load. " +
+                        $"Verify: confirm vec0.dll exists next to OnlyRag.App.exe and can be loaded by the current Windows user. Detail: {nested.Message}",
                         nested);
                 }
             }
 
             throw new InvalidOperationException(
-                $"sqlite-vec extension is not available. Ensure the sqlite-vec NuGet native asset is packaged for Windows x64. Detail: {ex.Message}",
+                "Required native dependency is missing: sqlite-vec vec0.dll. " +
+                $"Supported package version: sqlite-vec {SqliteVecPackageVersion} for Windows x64. " +
+                "Why it is required: OnlyRag stores embeddings in SQLite and uses sqlite-vec for semantic retrieval. " +
+                "Instruction: reinstall OnlyRag from a complete installer or rebuild the publish payload so the sqlite-vec NuGet native asset is included. " +
+                $"Verify: confirm vec0.dll exists next to OnlyRag.App.exe. Detail: {ex.Message}",
                 ex);
         }
     }

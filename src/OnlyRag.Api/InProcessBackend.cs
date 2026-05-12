@@ -1,5 +1,7 @@
 using System.Net;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -39,8 +41,9 @@ public static partial class InProcessBackend
         Directory.CreateDirectory(descriptor.StoragePaths.DataRoot);
         BackendLog.Write(descriptor.StoragePaths, "Starting in-process backend.");
 
+        string sessionToken = ResolveSessionToken(options);
         var runtimeState = new BackendRuntimeState(DateTimeOffset.UtcNow);
-        WebApplication app = BuildApplication(descriptor, options, runtimeState);
+        WebApplication app = BuildApplication(descriptor, options, runtimeState, sessionToken);
 
         try
         {
@@ -58,12 +61,17 @@ public static partial class InProcessBackend
                 BackendLog.Write(descriptor.StoragePaths, $"Recovered {recoveredJobs} interrupted job(s).");
             }
 
+            await app.Services
+                .GetRequiredService<SqliteVecVectorSearchService>()
+                .VerifyAvailabilityAsync(cancellationToken);
+            BackendLog.Write(descriptor.StoragePaths, "sqlite-vec native extension verified.");
+
             await app.StartAsync(cancellationToken);
             Uri baseUri = ResolveBaseUri(app);
             runtimeState.BaseUri = baseUri;
             BackendLog.Write(descriptor.StoragePaths, $"In-process backend listening on {baseUri}.");
 
-            return new InProcessBackendHandle(app, baseUri, descriptor);
+            return new InProcessBackendHandle(app, baseUri, descriptor, sessionToken);
         }
         catch (Exception ex)
         {
@@ -76,7 +84,8 @@ public static partial class InProcessBackend
     private static WebApplication BuildApplication(
         InProcessBackendDescriptor descriptor,
         InProcessBackendOptions options,
-        BackendRuntimeState runtimeState)
+        BackendRuntimeState runtimeState,
+        string sessionToken)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
@@ -87,19 +96,22 @@ public static partial class InProcessBackend
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             kestrel.Listen(options.Address, options.Port);
-            kestrel.Limits.MaxRequestBodySize = null;
+            kestrel.Limits.MaxRequestBodySize = options.DocumentLibraryLimits.MaxRequestBodySizeBytes;
         });
 
         builder.Services.AddSingleton(descriptor);
         builder.Services.AddSingleton(descriptor.Store);
         builder.Services.AddSingleton(descriptor.JobQueue);
+        builder.Services.AddSingleton(options.DocumentLibraryLimits);
+        builder.Services.AddSingleton<ILocalProcessLauncher>(options.ProcessLauncher ?? new LocalProcessLauncher());
         builder.Services.AddSingleton(runtimeState);
         builder.Services.AddSingleton<ISqliteConnectionFactory, LocalSqliteConnectionFactory>();
         builder.Services.AddSingleton<LocalSqliteMigrator>();
         builder.Services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();
         builder.Services.AddSingleton<IDocumentRepository, SqliteDocumentRepository>();
         builder.Services.AddSingleton<IEmbeddingRepository, SqliteEmbeddingRepository>();
-        builder.Services.AddSingleton<IVectorSearchService, SqliteVecVectorSearchService>();
+        builder.Services.AddSingleton<SqliteVecVectorSearchService>();
+        builder.Services.AddSingleton<IVectorSearchService>(services => services.GetRequiredService<SqliteVecVectorSearchService>());
         builder.Services.AddSingleton(HybridRetrievalOptions.Default);
         builder.Services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
         builder.Services.AddSingleton<IRetrievalChunkRepository, SqliteRetrievalChunkRepository>();
@@ -110,6 +122,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<ITranslationRepository, SqliteTranslationRepository>();
         builder.Services.AddSingleton<TranslationExportService>();
         builder.Services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
+        builder.Services.AddSingleton<LocalDocumentStorageGuard>();
         builder.Services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         builder.Services.AddSingleton<IOcrCacheRepository, SqliteOcrCacheRepository>();
         builder.Services.AddSingleton<OcrSettingsStore>();
@@ -133,10 +146,10 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<RunningJobCancellationRegistry>();
         builder.Services.AddSingleton<ApplicationShutdownService>();
         builder.Services.AddHostedService<LocalJobWorkerService>();
-        builder.Services.Configure<FormOptions>(options =>
+        builder.Services.Configure<FormOptions>(formOptions =>
         {
-            options.MultipartBodyLengthLimit = long.MaxValue;
-            options.MemoryBufferThreshold = 1024 * 64;
+            formOptions.MultipartBodyLengthLimit = options.DocumentLibraryLimits.MaxRequestBodySizeBytes;
+            formOptions.MemoryBufferThreshold = 1024 * 64;
         });
         builder.Services.ConfigureHttpJsonOptions(json =>
         {
@@ -147,11 +160,7 @@ public static partial class InProcessBackend
             cors.AddPolicy(WebViewCorsPolicy, policy =>
             {
                 policy
-                    .WithOrigins(
-                        "null",
-                        OnlyRagWebOrigins.StaticWebViewOrigin,
-                        "http://127.0.0.1:5173",
-                        "http://localhost:5173")
+                    .WithOrigins(ResolveAllowedCorsOrigins(options))
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -164,20 +173,103 @@ public static partial class InProcessBackend
             errorApp.Run(async context =>
             {
                 var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+                string correlationId = context.TraceIdentifier;
+                if (exceptionFeature?.Error is Exception exception)
+                {
+                    var appDescriptor = context.RequestServices.GetRequiredService<InProcessBackendDescriptor>();
+                    BackendLog.WriteException(appDescriptor.StoragePaths, correlationId, "Unhandled API exception.", exception);
+                }
+
                 context.Response.StatusCode = 500;
                 context.Response.ContentType = "application/problem+json";
                 await context.Response.WriteAsJsonAsync(new
                 {
                     title = "Errore interno del server.",
-                    detail = exceptionFeature?.Error?.Message ?? "Si e verificato un errore imprevisto.",
+                    detail = CreateUnexpectedErrorDetail(correlationId),
                     status = 500
                 });
             });
         });
         app.UseCors(WebViewCorsPolicy);
+        UseSessionTokenAuthentication(app, sessionToken);
         MapEndpoints(app);
 
         return app;
+    }
+
+    private static string ResolveSessionToken(InProcessBackendOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.SessionToken))
+        {
+            return options.SessionToken;
+        }
+
+        return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string[] ResolveAllowedCorsOrigins(InProcessBackendOptions options)
+    {
+        List<string> origins = [OnlyRagWebOrigins.StaticWebViewOrigin];
+        if (options.EnableDevelopmentCorsOrigins)
+        {
+            origins.Add("http://127.0.0.1:5173");
+            origins.Add("http://localhost:5173");
+        }
+
+        return origins.ToArray();
+    }
+
+    private static void UseSessionTokenAuthentication(WebApplication app, string sessionToken)
+    {
+        app.Use(async (context, next) =>
+        {
+            if (IsHealthRequest(context.Request) || !context.Request.Path.StartsWithSegments("/api"))
+            {
+                await next();
+                return;
+            }
+
+            if (IsValidSessionToken(context.Request, sessionToken))
+            {
+                await next();
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                title = "Non autorizzato",
+                detail = "Token di sessione API mancante o non valido.",
+                status = StatusCodes.Status401Unauthorized
+            });
+        });
+    }
+
+    private static bool IsHealthRequest(HttpRequest request)
+    {
+        return request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase)
+            || request.Path.Equals("/api/health", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsValidSessionToken(HttpRequest request, string sessionToken)
+    {
+        if (!request.Headers.TryGetValue(OnlyRagApiHeaders.SessionTokenHeaderName, out var values)
+            || values.Count != 1)
+        {
+            return false;
+        }
+
+        string? suppliedToken = values[0];
+        if (string.IsNullOrWhiteSpace(suppliedToken))
+        {
+            return false;
+        }
+
+        byte[] suppliedBytes = Encoding.UTF8.GetBytes(suppliedToken);
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(sessionToken);
+        return suppliedBytes.Length == expectedBytes.Length
+            && CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
     }
 
     private static void MapEndpoints(WebApplication app)
@@ -417,6 +509,21 @@ public static partial class InProcessBackend
             title: "Configurazione convertitore Office non valida",
             detail: exception.Message,
             statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static IResult CreateUnexpectedErrorProblem(string title, string? correlationId = null)
+    {
+        return Results.Problem(
+            title: title,
+            detail: CreateUnexpectedErrorDetail(correlationId),
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+
+    private static string CreateUnexpectedErrorDetail(string? correlationId = null)
+    {
+        return string.IsNullOrWhiteSpace(correlationId)
+            ? "Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali."
+            : $"Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali con riferimento {correlationId}.";
     }
 
     private static OfficeConverterStatusResponse CreateOfficeConverterStatusResponse(

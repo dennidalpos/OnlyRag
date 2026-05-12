@@ -36,5 +36,9 @@ public interface IDocumentRepository
 
     Task<ImportedDocument?> DeleteAsync(long id, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<DocumentPageInfo>> GetPagesAsync(long documentId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DocumentPageInfo>> GetPagesAsync(
+        long documentId,
+        int pageStart,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }

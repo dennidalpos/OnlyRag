@@ -19,7 +19,39 @@ import {
   type PerformanceSettings
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
-
+import {
+  AdjustableModelContextBar,
+  OcrFieldLabel,
+  OcrRangeField,
+  SettingsRangeField,
+  areIngestionSettingsEqual,
+  areOfficeSettingsEqual,
+  areOcrProcessingSettingsEqual,
+  areOcrSettingsEqual,
+  areOllamaSettingsEqual,
+  arePerformanceSettingsEqual,
+  buildContextChunkRecommendation,
+  buildEmbeddingRecommendations,
+  buildIngestionSettingsPayload,
+  buildNumCtxRecommendation,
+  buildOcrProcessingSettingsPayload,
+  buildOcrSettingsPayload,
+  buildOfficeSettingsPayload,
+  buildOllamaSettingsPayload,
+  buildPerformanceSettingsPayload,
+  formatModelSize,
+  formatOcrDecimal,
+  getOcrLanguageOptions,
+  getOcrSelectOptions,
+  isNonLocalUrl,
+  normalizeIngestionSettings,
+  normalizeOptionalValue,
+  normalizeOfficeSettings,
+  normalizeOcrProcessingSettings,
+  normalizeOcrSettings,
+  normalizeOllamaSettings,
+  normalizePerformanceSettings
+} from "./SettingsSection.helpers";
 type SettingsSectionProps = {
   settings: OllamaSettings | null;
   status: OllamaStatusResponse | null;
@@ -37,7 +69,8 @@ const emptySettings: OllamaSettings = {
   embeddingBatchSize: 1,
   embeddingNumCtx: null,
   chatNumCtx: null,
-  translationNumCtx: null
+  translationNumCtx: null,
+  trustNonLocalEndpoint: false
 };
 
 const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
@@ -238,6 +271,10 @@ export function SettingsSection({
   }, [formState.defaultTranslationModel]);
 
   const installedModelNames = useMemo(() => models.map((model) => model.name), [models]);
+  const usesNonLocalOllamaEndpoint = useMemo(
+    () => isNonLocalUrl(formState.ollamaBaseUrl),
+    [formState.ollamaBaseUrl]
+  );
   const unavailableDefaults = useMemo(
     () =>
       [
@@ -484,7 +521,8 @@ export function SettingsSection({
 
     try {
       const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ollama/install", {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
       });
       setInfoMessage(response.message);
       await refreshDependencyStatus();
@@ -502,7 +540,8 @@ export function SettingsSection({
 
     try {
       const response = await apiRequest<DependencyActionResponse>("/api/dependencies/libreoffice/open-download", {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
       });
       setInfoMessage(response.message);
     } catch (error) {
@@ -519,7 +558,8 @@ export function SettingsSection({
 
     try {
       const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/provision", {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
       });
       setInfoMessage(response.message);
       await refreshDependencyStatus();
@@ -537,7 +577,8 @@ export function SettingsSection({
 
     try {
       const response = await apiRequest<OperationMessageResponse>("/api/diagnostics/open-logs-folder", {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
       });
       setInfoMessage(response.message);
     } catch (error) {
@@ -671,30 +712,6 @@ export function SettingsSection({
       await refreshOfficeConverter();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare il convertitore Office.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function testOfficeConverter() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await persistOfficeSettings();
-      setOfficeFormState(saved);
-      setSavedOfficeFormState(saved);
-      const response = await apiRequest<OfficeConverterStatusResponse>("/api/office-converter/test", {
-        method: "POST"
-      });
-      setOfficeStatus(response);
-      setInfoMessage(response.message);
-      if (!response.isAvailable && response.suggestion) {
-        setErrorMessage(response.suggestion);
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Test convertitore Office non riuscito.");
     } finally {
       setIsBusy(false);
     }
@@ -848,6 +865,22 @@ export function SettingsSection({
                 placeholder="http://localhost:11434"
               />
             </label>
+            {usesNonLocalOllamaEndpoint && (
+              <label className="toggle-row" htmlFor="trust-non-local-ollama">
+                <input
+                  id="trust-non-local-ollama"
+                  type="checkbox"
+                  checked={formState.trustNonLocalEndpoint}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      trustNonLocalEndpoint: event.target.checked
+                    }))
+                  }
+                />
+                <span>Considera attendibile questo endpoint Ollama non locale</span>
+              </label>
+            )}
             <div className="settings-actions">
               <button type="button" onClick={saveSettings} disabled={isBusy}>
                 Salva impostazioni
@@ -869,6 +902,9 @@ export function SettingsSection({
               )}
               {ollamaInstallStatus && (
                 <p>{ollamaInstallStatus.networkAccessHint}</p>
+              )}
+              {usesNonLocalOllamaEndpoint && (
+                <p>Chat, embedding e traduzione inviano testo all'endpoint configurato. Abilita la fiducia solo per un servizio Ollama che controlli su una rete attendibile.</p>
               )}
             </div>
           </div>
@@ -1628,422 +1664,4 @@ export function SettingsSection({
   );
 }
 
-type OcrRangeFieldProps = {
-  id: string;
-  label: string;
-  tooltip: string;
-  min: number;
-  max: number;
-  step?: number;
-  value: number;
-  formatValue?: (value: number) => string;
-  onChange: (value: number) => void;
-};
 
-type SettingsRangeFieldProps = {
-  id: string;
-  label: string;
-  min: number;
-  max: number;
-  step?: number;
-  value: number;
-  disabled?: boolean;
-  hint?: string | null;
-  formatValue?: (value: number) => string;
-  onChange: (value: number) => void;
-};
-
-function SettingsRangeField({
-  id,
-  label,
-  min,
-  max,
-  step = 1,
-  value,
-  disabled = false,
-  hint = null,
-  formatValue = formatOcrInteger,
-  onChange
-}: SettingsRangeFieldProps) {
-  const normalizedValue = Math.min(max, Math.max(min, value));
-  return (
-    <label className="field-group settings-range-field" htmlFor={id}>
-      <span>{label}</span>
-      <span className="settings-range-field__value">
-        {formatValue(normalizedValue)}
-        {hint && <small>{hint}</small>}
-      </span>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={normalizedValue}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function AdjustableModelContextBar({
-  title,
-  sliderLabel,
-  loading,
-  details,
-  fallbackText,
-  value,
-  recommendedValue,
-  onAutoChange,
-  onValueChange
-}: {
-  title: string;
-  sliderLabel: string;
-  loading: boolean;
-  details: OllamaModelDetails | null;
-  fallbackText: string;
-  value: number | null;
-  recommendedValue: number | null;
-  onAutoChange: (isAutomatic: boolean) => void;
-  onValueChange: (value: number) => void;
-}) {
-  const nativeNumCtx = details?.numCtx ?? null;
-  const activeValue = value ?? nativeNumCtx;
-  const trackLabel = value == null
-    ? nativeNumCtx
-      ? `${nativeNumCtx.toLocaleString("it-IT")} token (nativo)`
-      : "Automatico"
-    : nativeNumCtx
-      ? `${value.toLocaleString("it-IT")} / ${nativeNumCtx.toLocaleString("it-IT")} token`
-      : `${value.toLocaleString("it-IT")} token`;
-  const trackTitle = value == null
-    ? nativeNumCtx
-      ? `Finestra nativa: ${nativeNumCtx.toLocaleString("it-IT")} token`
-      : "Automatico"
-    : nativeNumCtx
-      ? `${value.toLocaleString("it-IT")} / ${nativeNumCtx.toLocaleString("it-IT")} token`
-      : `${value.toLocaleString("it-IT")} token`;
-
-  return (
-    <div className="model-context-bar">
-      <div className="model-context-bar__label">
-        <span>{title}</span>
-        {loading && <span className="model-context-bar__hint">Caricamento...</span>}
-        {!loading && details?.numCtx && (
-          <span className="model-context-bar__hint">
-            Finestra nativa: {details.numCtx.toLocaleString("it-IT")} token
-          </span>
-        )}
-        {!loading && !details?.numCtx && (
-          <span className="model-context-bar__hint">{fallbackText}</span>
-        )}
-      </div>
-      <label className="toggle-row" htmlFor={`${sliderLabel.replaceAll(" ", "-")}-auto`}>
-        <input
-          id={`${sliderLabel.replaceAll(" ", "-")}-auto`}
-          type="checkbox"
-          checked={value == null}
-          onChange={(event) => onAutoChange(event.target.checked)}
-        />
-        <span>Automatico</span>
-      </label>
-      {value != null && (
-        <SettingsRangeField
-          id={sliderLabel.replaceAll(" ", "-")}
-          label={sliderLabel}
-          min={64}
-          max={131072}
-          step={64}
-          value={value}
-          formatValue={(currentValue) => `${currentValue.toLocaleString("it-IT")} token`}
-          hint={recommendedValue ? `Suggerito: ${recommendedValue}` : null}
-          onChange={onValueChange}
-        />
-      )}
-      {activeValue && (
-        <div className="model-context-bar__track">
-          <div
-            className="model-context-bar__fill"
-            style={{ width: `${nativeNumCtx && value != null ? Math.min(100, Math.round((value / nativeNumCtx) * 100)) : 100}%` }}
-            title={trackTitle}
-          />
-          <span className="model-context-bar__track-label">
-            {trackLabel}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OcrRangeField({
-  id,
-  label,
-  tooltip,
-  min,
-  max,
-  step = 1,
-  value,
-  formatValue = formatOcrInteger,
-  onChange
-}: OcrRangeFieldProps) {
-  return (
-    <label className="field-group ocr-range-field" htmlFor={id}>
-      <OcrFieldLabel text={label} tooltip={tooltip} />
-      <span className="ocr-range-field__value">{formatValue(value)}</span>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        title={tooltip}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-      <span className="ocr-range-field__scale" aria-hidden="true">
-        <span>Veloce</span>
-        <span>Accurato</span>
-      </span>
-    </label>
-  );
-}
-
-function OcrFieldLabel({ text, tooltip }: { text: string; tooltip: string }) {
-  return (
-    <span className="ocr-field-label">
-      <span>{text}</span>
-      <span className="ocr-tooltip" title={tooltip} aria-label={tooltip}>?</span>
-    </span>
-  );
-}
-
-function getOcrSelectOptions(currentValue: string, knownValues: string[]): string[] {
-  const current = currentValue.trim();
-  const options = new Set(knownValues);
-  if (current.length > 0) {
-    options.add(current);
-  }
-
-  return [...options];
-}
-
-function formatOcrInteger(value: number): string {
-  return Math.round(value).toLocaleString("it-IT");
-}
-
-function formatOcrDecimal(value: number): string {
-  return value.toFixed(2);
-}
-
-function normalizeOptionalValue(value: string | null): string | null {
-  const normalized = value?.trim() ?? "";
-  return normalized.length === 0 ? null : normalized;
-}
-
-function normalizeOllamaSettings(settings: OllamaSettings): OllamaSettings {
-  return {
-    ollamaBaseUrl: settings.ollamaBaseUrl.trim(),
-    defaultChatModel: normalizeOptionalValue(settings.defaultChatModel),
-    defaultEmbeddingModel: normalizeOptionalValue(settings.defaultEmbeddingModel),
-    defaultTranslationModel: normalizeOptionalValue(settings.defaultTranslationModel),
-    requestTimeoutSeconds: Number(settings.requestTimeoutSeconds),
-    embeddingBatchSize: Number(settings.embeddingBatchSize),
-    embeddingNumCtx: settings.embeddingNumCtx != null ? Number(settings.embeddingNumCtx) : null,
-    chatNumCtx: settings.chatNumCtx != null ? Number(settings.chatNumCtx) : null,
-    translationNumCtx: settings.translationNumCtx != null ? Number(settings.translationNumCtx) : null
-  };
-}
-
-function normalizeOfficeSettings(settings: OfficeConversionSettings): OfficeConversionSettings {
-  return {
-    libreOfficePath: normalizeOptionalValue(settings.libreOfficePath),
-    conversionTimeoutSeconds: Number(settings.conversionTimeoutSeconds)
-  };
-}
-
-function normalizePerformanceSettings(settings: PerformanceSettings): PerformanceSettings {
-  return {
-    maxParallelJobs: Number(settings.maxParallelJobs),
-    maxOcrParallelPages: Number(settings.maxOcrParallelPages),
-    embeddingBatchSize: Number(settings.embeddingBatchSize),
-    translationBatchSize: Number(settings.translationBatchSize),
-    maxContextChunks: Number(settings.maxContextChunks),
-    requestTimeoutSeconds: Number(settings.requestTimeoutSeconds),
-    enableLowResourceMode: settings.enableLowResourceMode
-  };
-}
-
-function normalizeIngestionSettings(settings: IngestionSettings): IngestionSettings {
-  const chunkSizeTokens = clampNumber(Number(settings.chunkSizeTokens), 100, 4000);
-  return {
-    chunkSizeTokens,
-    overlapTokens: clampNumber(Number(settings.overlapTokens), 0, Math.min(1000, Math.floor(chunkSizeTokens / 2)))
-  };
-}
-
-function normalizeOcrProcessingSettings(settings: OcrProcessingSettings): OcrProcessingSettings {
-  return {
-    language: normalizeOptionalValue(settings.language) ?? "it",
-    maxRetries: clampNumber(Number(settings.maxRetries), 0, 2),
-    pageTimeoutSeconds: clampNumber(Number(settings.pageTimeoutSeconds), 15, 600),
-    lowConfidenceThreshold: clampNumber(Number(settings.lowConfidenceThreshold), 0.01, 0.99)
-  };
-}
-
-function normalizeOcrSettings(settings: OcrSettings): OcrSettings {
-  return {
-    profile: settings.profile.trim(),
-    pdfDpi: Number(settings.pdfDpi),
-    modelPreset: settings.modelPreset.trim(),
-    modelVersion: settings.modelVersion.trim(),
-    detectionSideLimit: Number(settings.detectionSideLimit),
-    detectionThreshold: Number(settings.detectionThreshold),
-    detectionBoxThreshold: Number(settings.detectionBoxThreshold),
-    detectionUnclipRatio: Number(settings.detectionUnclipRatio),
-    recognitionScoreThreshold: Number(settings.recognitionScoreThreshold),
-    useTextlineOrientation: settings.useTextlineOrientation,
-    useDocumentOrientationClassification: settings.useDocumentOrientationClassification,
-    useDocumentUnwarping: settings.useDocumentUnwarping,
-    recognitionBatchSize: Number(settings.recognitionBatchSize),
-    cpuThreads: Number(settings.cpuThreads),
-    device: settings.device.trim()
-  };
-}
-
-function buildOllamaSettingsPayload(
-  formState: OllamaSettings,
-  performanceFormState: PerformanceSettings
-): OllamaSettings {
-  return normalizeOllamaSettings({
-    ...formState,
-    requestTimeoutSeconds: Number(performanceFormState.requestTimeoutSeconds),
-    embeddingBatchSize: Number(performanceFormState.embeddingBatchSize)
-  });
-}
-
-function buildOfficeSettingsPayload(
-  officeFormState: OfficeConversionSettings
-): OfficeConversionSettings {
-  return normalizeOfficeSettings(officeFormState);
-}
-
-function buildPerformanceSettingsPayload(
-  performanceFormState: PerformanceSettings
-): PerformanceSettings {
-  return normalizePerformanceSettings(performanceFormState);
-}
-
-function buildIngestionSettingsPayload(
-  ingestionFormState: IngestionSettings
-): IngestionSettings {
-  return normalizeIngestionSettings(ingestionFormState);
-}
-
-function buildOcrProcessingSettingsPayload(
-  ocrProcessingFormState: OcrProcessingSettings
-): OcrProcessingSettings {
-  return normalizeOcrProcessingSettings(ocrProcessingFormState);
-}
-
-function buildOcrSettingsPayload(ocrFormState: OcrSettings): OcrSettings {
-  return normalizeOcrSettings(ocrFormState);
-}
-
-function areOllamaSettingsEqual(left: OllamaSettings, right: OllamaSettings): boolean {
-  return JSON.stringify(normalizeOllamaSettings(left)) === JSON.stringify(normalizeOllamaSettings(right));
-}
-
-function areOfficeSettingsEqual(
-  left: OfficeConversionSettings,
-  right: OfficeConversionSettings
-): boolean {
-  return JSON.stringify(normalizeOfficeSettings(left)) === JSON.stringify(normalizeOfficeSettings(right));
-}
-
-function arePerformanceSettingsEqual(left: PerformanceSettings, right: PerformanceSettings): boolean {
-  return JSON.stringify(normalizePerformanceSettings(left)) === JSON.stringify(normalizePerformanceSettings(right));
-}
-
-function areIngestionSettingsEqual(left: IngestionSettings, right: IngestionSettings): boolean {
-  return JSON.stringify(normalizeIngestionSettings(left)) === JSON.stringify(normalizeIngestionSettings(right));
-}
-
-function areOcrProcessingSettingsEqual(left: OcrProcessingSettings, right: OcrProcessingSettings): boolean {
-  return JSON.stringify(normalizeOcrProcessingSettings(left)) === JSON.stringify(normalizeOcrProcessingSettings(right));
-}
-
-function areOcrSettingsEqual(left: OcrSettings, right: OcrSettings): boolean {
-  return JSON.stringify(normalizeOcrSettings(left)) === JSON.stringify(normalizeOcrSettings(right));
-}
-
-function getOcrLanguageOptions(currentValue: string, languages: OcrLanguage[]): OcrLanguage[] {
-  if (languages.length === 0) {
-    return [{ code: currentValue || "it", label: currentValue || "it", scriptGroup: "custom", isDefault: false }];
-  }
-
-  if (languages.some((language) => language.code === currentValue)) {
-    return languages;
-  }
-
-  return [
-    ...languages,
-    { code: currentValue, label: currentValue, scriptGroup: "custom", isDefault: false }
-  ];
-}
-
-function buildEmbeddingRecommendations(numCtx: number | null): {
-  embeddingNumCtx: number;
-  chunkMinimum: number;
-  chunkMaximum: number;
-} | null {
-  if (!numCtx || numCtx <= 0) {
-    return null;
-  }
-
-  const embeddingNumCtx = clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
-  const chunkMinimum = clampNumber(Math.round(numCtx * 0.1 / 50) * 50, 100, 4000);
-  const chunkMaximum = Math.max(
-    chunkMinimum,
-    clampNumber(Math.round(numCtx * 0.35 / 50) * 50, 100, 4000)
-  );
-
-  return { embeddingNumCtx, chunkMinimum, chunkMaximum };
-}
-
-function buildNumCtxRecommendation(numCtx: number | null): number | null {
-  if (!numCtx || numCtx <= 0) {
-    return null;
-  }
-
-  return clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
-}
-
-function buildContextChunkRecommendation(numCtx: number | null): number | null {
-  if (!numCtx || numCtx <= 0) {
-    return null;
-  }
-
-  return clampNumber(Math.round(numCtx / 1024), 1, 24);
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-
-  return Math.min(max, Math.max(min, value));
-}
-
-function formatModelSize(size: number): string {
-  if (size >= 1_000_000_000) {
-    return `${(size / 1_000_000_000).toFixed(1)} GB`;
-  }
-
-  if (size >= 1_000_000) {
-    return `${(size / 1_000_000).toFixed(1)} MB`;
-  }
-
-  return `${size} B`;
-}

@@ -511,6 +511,10 @@ $manifest = [ordered]@{
     sourceIcon = "src/OnlyRag.App/Assets/OnlyRag.svg"
     outputRoot = "assets/brand"
     categories = [ordered]@{
+        app = @(
+            "src/OnlyRag.App/Assets/OnlyRag.svg",
+            "src/OnlyRag.App/Assets/OnlyRag.ico"
+        )
         logos = @(
             "logos/onlyrag-icon.svg",
             "logos/onlyrag-logo-horizontal.svg",

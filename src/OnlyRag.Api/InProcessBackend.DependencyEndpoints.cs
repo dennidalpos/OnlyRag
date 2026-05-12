@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 
 namespace OnlyRag.Api;
@@ -28,8 +29,18 @@ public static partial class InProcessBackend
             return Results.Ok(dependencies.CreateOllamaStatus(apiReachable));
         });
 
-        app.MapPost("/api/dependencies/ollama/install", (DependencyProvisioningService dependencies) =>
+        app.MapPost("/api/dependencies/ollama/install", (
+            ProcessLaunchRequest request,
+            DependencyProvisioningService dependencies) =>
         {
+            if (!request.Confirmed)
+            {
+                return Results.Problem(
+                    title: "Conferma richiesta",
+                    detail: "L'avvio dell'installazione Ollama richiede una conferma esplicita dalla UI.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             try
             {
                 return Results.Ok(dependencies.StartOllamaInstall());
@@ -43,18 +54,28 @@ public static partial class InProcessBackend
             }
         });
 
-        app.MapPost("/api/dependencies/libreoffice/open-download", (DependencyProvisioningService dependencies) =>
+        app.MapPost("/api/dependencies/libreoffice/open-download", (
+            HttpContext httpContext,
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor,
+            DependencyProvisioningService dependencies) =>
         {
+            if (!request.Confirmed)
+            {
+                return Results.Problem(
+                    title: "Conferma richiesta",
+                    detail: "L'apertura del download LibreOffice richiede una conferma esplicita dalla UI.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             try
             {
                 return Results.Ok(dependencies.OpenLibreOfficeDownload());
             }
             catch (InvalidOperationException ex)
             {
-                return Results.Problem(
-                    title: "Download LibreOffice non aperto",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status500InternalServerError);
+                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open LibreOffice download failed.", ex);
+                return CreateUnexpectedErrorProblem("Download LibreOffice non aperto", httpContext.TraceIdentifier);
             }
         });
 
@@ -64,7 +85,29 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await dependencies.GetOcrStatusAsync(ocrEngine, cancellationToken)));
 
-        app.MapPost("/api/dependencies/ocr/provision", (DependencyProvisioningService dependencies) =>
-            Results.Ok(dependencies.StartOcrProvision()));
+        app.MapPost("/api/dependencies/ocr/provision", (
+            HttpContext httpContext,
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor,
+            DependencyProvisioningService dependencies) =>
+        {
+            if (!request.Confirmed)
+            {
+                return Results.Problem(
+                    title: "Conferma richiesta",
+                    detail: "La configurazione OCR richiede una conferma esplicita dalla UI.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            try
+            {
+                return Results.Ok(dependencies.StartOcrProvision());
+            }
+            catch (InvalidOperationException ex)
+            {
+                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Start OCR provisioning failed.", ex);
+                return CreateUnexpectedErrorProblem("Configurazione OCR non avviata", httpContext.TraceIdentifier);
+            }
+        });
     }
 }

@@ -4,6 +4,8 @@
   <img src=".github/assets/onlyrag-logo-horizontal.png" width="360" alt="OnlyRag">
 </p>
 
+[![CI](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml/badge.svg)](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml)
+
 OnlyRag is a Windows desktop app for building a local document library and using it with
 Ollama-backed search, chat, OCR, and translation workflows.
 
@@ -53,8 +55,8 @@ Optional features:
 Installed app:
 
 - Windows 10 1809 or newer, or Windows 11.
-- Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions.
-- The installer package is self-contained for the required .NET runtime components; end users do not need to install .NET separately.
+- Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions. Direct app launch also checks this before loading the UI.
+- The installer package is self-contained for the required .NET runtime components and includes the required `sqlite-vec` native asset; end users do not need to install .NET separately.
 
 ## Setup
 
@@ -96,6 +98,16 @@ Run the canonical repository gate:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
+The gate includes npm production dependency audit and NuGet transitive vulnerability audit.
+
+Run web lint and formatter checks directly:
+
+```powershell
+Set-Location .\src\OnlyRag.Web
+npm run lint
+npm run format:check
+```
+
 Run the desktop app:
 
 ```powershell
@@ -120,7 +132,7 @@ Create installer evidence without installing:
 pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe
 ```
 
-No lint script or formatter configuration is currently defined.
+The repository gate runs web lint and formatter checks before tests and builds.
 
 ## Project Status
 

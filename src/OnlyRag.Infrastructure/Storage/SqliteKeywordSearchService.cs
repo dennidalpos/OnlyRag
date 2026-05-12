@@ -18,7 +18,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         int limit,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query) || documentIds.Count == 0 || limit <= 0)
+        if (string.IsNullOrWhiteSpace(query) || documentIds.Count == 0 || limit <= 0 || !ExtractTerms(query).Any())
         {
             return new KeywordSearchResponse([], "none");
         }
@@ -26,6 +26,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         if (await TableExistsAsync(connection, "chunks_fts", cancellationToken))
         {
+            bool usesFts5 = await TableSqlContainsAsync(connection, "chunks_fts", "USING fts5", cancellationToken);
             try
             {
                 IReadOnlyList<KeywordSearchResult> ftsResults = await SearchFtsAsync(
@@ -34,20 +35,21 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
                     documentIds,
                     limit,
                     cancellationToken);
-                return new KeywordSearchResponse(ftsResults, "SQLite FTS5");
+                return new KeywordSearchResponse(ftsResults, usesFts5 ? "SQLite FTS5" : "SQLite FTS indexed fallback");
             }
             catch (SqliteException)
             {
+                IReadOnlyList<KeywordSearchResult> fallbackResults = await SearchFtsWithoutRankAsync(
+                    connection,
+                    query,
+                    documentIds,
+                    limit,
+                    cancellationToken);
+                return new KeywordSearchResponse(fallbackResults, "SQLite FTS indexed fallback");
             }
         }
 
-        IReadOnlyList<KeywordSearchResult> likeResults = await SearchLikeAsync(
-            connection,
-            query,
-            documentIds,
-            limit,
-            cancellationToken);
-        return new KeywordSearchResponse(likeResults, "SQLite LIKE fallback");
+        return new KeywordSearchResponse([], "SQLite keyword search unavailable");
     }
 
     private static async Task<IReadOnlyList<KeywordSearchResult>> SearchFtsAsync(
@@ -79,44 +81,45 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         return await ReadRankedResultsAsync(command, limit, cancellationToken);
     }
 
-    private static async Task<IReadOnlyList<KeywordSearchResult>> SearchLikeAsync(
+    private static async Task<IReadOnlyList<KeywordSearchResult>> SearchFtsWithoutRankAsync(
         SqliteConnection connection,
         string query,
         IReadOnlyCollection<long> documentIds,
         int limit,
         CancellationToken cancellationToken)
     {
-        string[] terms = ExtractTerms(query).ToArray();
-        if (terms.Length == 0)
-        {
-            return [];
-        }
-
         await using SqliteCommand command = connection.CreateCommand();
         string documentParameters = AddInParameters(command, "$doc", documentIds.Distinct().ToArray());
-        string[] clauses = new string[terms.Length];
-        string[] scores = new string[terms.Length];
-        for (int index = 0; index < terms.Length; index++)
-        {
-            string parameter = $"$term{index}";
-            clauses[index] = $"LOWER(c.content) LIKE {parameter} ESCAPE '\\'";
-            scores[index] = $"CASE WHEN LOWER(c.content) LIKE {parameter} ESCAPE '\\' THEN 1 ELSE 0 END";
-            command.AddParameter(parameter, $"%{EscapeLike(terms[index].ToLowerInvariant())}%");
-        }
-
         command.CommandText =
             $$"""
-            SELECT c.id, c.document_id, c.chunk_index, ({{string.Join(" + ", scores)}}) AS match_score
-            FROM chunks AS c
+            SELECT c.id, c.document_id, c.chunk_index
+            FROM (
+                SELECT chunk_id
+                FROM chunks_fts
+                WHERE chunks_fts MATCH $query
+            ) AS fts
+            INNER JOIN chunks AS c ON c.id = fts.chunk_id
             WHERE c.document_id IN ({{documentParameters}})
               AND LENGTH(TRIM(c.content)) > 0
-              AND ({{string.Join(" OR ", clauses)}})
-            ORDER BY match_score DESC, c.id ASC
+            ORDER BY c.id ASC
             LIMIT $limit;
             """;
+        command.AddParameter("$query", BuildFtsQuery(query));
         command.AddParameter("$limit", Math.Max(1, limit));
 
-        return await ReadRankedResultsAsync(command, limit, cancellationToken);
+        List<KeywordSearchResult> results = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            double score = Math.Max(1, limit - results.Count);
+            results.Add(new KeywordSearchResult(
+                reader.GetInt64(0),
+                reader.GetInt64(1),
+                reader.GetInt32(2),
+                score));
+        }
+
+        return results;
     }
 
     private static async Task<IReadOnlyList<KeywordSearchResult>> ReadRankedResultsAsync(
@@ -151,6 +154,20 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         return value is not null;
     }
 
+    private static async Task<bool> TableSqlContainsAsync(
+        SqliteConnection connection,
+        string tableName,
+        string expectedText,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+        command.AddParameter("$name", tableName);
+        object? value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is string sql
+            && sql.Contains(expectedText, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string BuildFtsQuery(string query)
     {
         string[] terms = ExtractTerms(query).ToArray();
@@ -167,14 +184,6 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             .Where(term => term.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(12);
-    }
-
-    private static string EscapeLike(string value)
-    {
-        return value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("%", "\\%", StringComparison.Ordinal)
-            .Replace("_", "\\_", StringComparison.Ordinal);
     }
 
     private static string AddInParameters(

@@ -48,7 +48,12 @@ public partial class App : Application
         {
             backend = await InProcessBackend.StartAsync();
             backend.StoppedToken.Register(OnBackendStopped);
-            return new BackendWebSettings(true, backend.BaseUri.ToString(), null);
+            return new BackendWebSettings(
+                true,
+                backend.BaseUri.ToString(),
+                backend.SessionToken,
+                OnlyRag.Core.OnlyRagApiHeaders.SessionTokenHeaderName,
+                null);
         }
         catch (Exception ex)
         {

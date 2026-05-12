@@ -29,6 +29,8 @@ $supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $appProject = Join-Path $repoRoot "src\OnlyRag.App\OnlyRag.App.csproj"
 $appIcon = Join-Path $repoRoot "src\OnlyRag.App\Assets\OnlyRag.ico"
+$wizardImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-image-164x314.bmp"
+$wizardSmallImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp"
 $webRoot = Join-Path $repoRoot "src\OnlyRag.Web"
 $innoScript = Join-Path $repoRoot "packaging\OnlyRag.iss"
 
@@ -43,6 +45,12 @@ $installerDir = Join-Path $outputRootPath "installer"
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $outputRootPath
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $publishDir
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $installerDir
+
+foreach ($requiredInstallerAsset in @($appIcon, $wizardImage, $wizardSmallImage)) {
+    if (-not (Test-Path -LiteralPath $requiredInstallerAsset -PathType Leaf)) {
+        throw "Required installer asset was not found: $requiredInstallerAsset"
+    }
+}
 
 foreach ($directory in @($publishDir, $installerDir)) {
     if (Test-Path -LiteralPath $directory) {
@@ -90,6 +98,8 @@ Invoke-OnlyRagNative -FilePath $iscc -WorkingDirectory $repoRoot -Arguments @(
     "/DPublishDir=$publishDir",
     "/DOutputDir=$installerDir",
     "/DAppIcon=$appIcon",
+    "/DWizardImage=$wizardImage",
+    "/DWizardSmallImage=$wizardSmallImage",
     $innoScript
 )
 

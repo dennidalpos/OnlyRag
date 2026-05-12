@@ -479,8 +479,13 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
 
     public async Task<IReadOnlyList<DocumentPageInfo>> GetPagesAsync(
         long documentId,
+        int pageStart,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageStart);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
@@ -488,9 +493,13 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
             SELECT page_number, text_content, ocr_status, ocr_engine, ocr_confidence, ocr_error
             FROM document_pages
             WHERE document_id = $documentId
-            ORDER BY page_number ASC;
+              AND page_number >= $pageStart
+            ORDER BY page_number ASC
+            LIMIT $pageSize;
             """;
         command.AddParameter("$documentId", documentId);
+        command.AddParameter("$pageStart", pageStart);
+        command.AddParameter("$pageSize", pageSize);
 
         List<DocumentPageInfo> pages = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);

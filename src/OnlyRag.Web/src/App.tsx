@@ -3,7 +3,7 @@ import {
   apiRequest,
   markBackendOffline,
   markBackendOnline,
-  resolveBackendBaseUrlDirect,
+  resolveBackendErrorMessage,
   type DependencyActionResponse,
   type OllamaInstallStatus,
   type OllamaModel,
@@ -73,20 +73,8 @@ export default function App() {
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   async function refreshBackendStatus() {
-    const baseUrl = resolveBackendBaseUrlDirect();
-    if (!baseUrl) {
-      setBackendStatus(offlineStatus);
-      setStatusChecked(true);
-      return;
-    }
-
     try {
-      const response = await fetch(new URL("/api/app/status", baseUrl));
-      if (!response.ok) {
-        throw new Error();
-      }
-
-      const status = (await response.json()) as AppStatusResponse;
+      const status = await apiRequest<AppStatusResponse>("/api/app/status");
       markBackendOnline();
       setBackendStatus((current) => ({
         ...current,
@@ -157,7 +145,8 @@ export default function App() {
     setIsRecheckingOllama(true);
     try {
       await apiRequest<DependencyActionResponse>("/api/dependencies/ollama/install", {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
       });
       await refreshOllamaData();
     } finally {
@@ -219,7 +208,8 @@ export default function App() {
         <section className={`workspace-content workspace-content--${activeSection}`} aria-label={sectionLabels[activeSection]}>
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
-              Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l&apos;applicazione.
+              {resolveBackendErrorMessage() ??
+                "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."}
             </div>
           )}
           {activeSection === "chat" && (

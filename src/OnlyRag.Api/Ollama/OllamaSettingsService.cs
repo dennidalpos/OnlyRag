@@ -20,6 +20,7 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
     private const string EmbeddingNumCtxKey = "ollama.embeddingNumCtx";
     private const string ChatNumCtxKey = "ollama.chatNumCtx";
     private const string TranslationNumCtxKey = "ollama.translationNumCtx";
+    private const string TrustNonLocalEndpointKey = "ollama.trustNonLocalEndpoint";
     private const int MinNumCtx = 64;
     private const int MaxNumCtx = 131072;
 
@@ -45,6 +46,7 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         string? embeddingNumCtxValue = await settingsRepository.GetValueAsync(EmbeddingNumCtxKey, cancellationToken);
         string? chatNumCtxValue = await settingsRepository.GetValueAsync(ChatNumCtxKey, cancellationToken);
         string? translationNumCtxValue = await settingsRepository.GetValueAsync(TranslationNumCtxKey, cancellationToken);
+        string? trustNonLocalEndpointValue = await settingsRepository.GetValueAsync(TrustNonLocalEndpointKey, cancellationToken);
 
         return new OllamaSettings(
             baseUrl,
@@ -55,12 +57,13 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             ParseEmbeddingBatchSize(embeddingBatchSizeValue),
             ParseNumCtx(embeddingNumCtxValue),
             ParseNumCtx(chatNumCtxValue),
-            ParseNumCtx(translationNumCtxValue));
+            ParseNumCtx(translationNumCtxValue),
+            ParseBoolean(trustNonLocalEndpointValue));
     }
 
     public async Task<OllamaSettings> UpdateAsync(OllamaSettings settings, CancellationToken cancellationToken = default)
     {
-        string normalizedBaseUrl = NormalizeAndValidateBaseUrl(settings.OllamaBaseUrl);
+        string normalizedBaseUrl = NormalizeAndValidateBaseUrl(settings.OllamaBaseUrl, settings.TrustNonLocalEndpoint);
         int normalizedTimeout = ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds);
         string? defaultChatModel = NormalizeOptionalValue(settings.DefaultChatModel);
         string? defaultEmbeddingModel = NormalizeOptionalValue(settings.DefaultEmbeddingModel);
@@ -79,6 +82,10 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         await settingsRepository.UpsertAsync(EmbeddingNumCtxKey, embeddingNumCtx?.ToString() ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(ChatNumCtxKey, chatNumCtx?.ToString() ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(TranslationNumCtxKey, translationNumCtx?.ToString() ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(
+            TrustNonLocalEndpointKey,
+            settings.TrustNonLocalEndpoint ? bool.TrueString : bool.FalseString,
+            cancellationToken);
 
         return new OllamaSettings(
             normalizedBaseUrl,
@@ -89,7 +96,8 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             embeddingBatchSize,
             embeddingNumCtx,
             chatNumCtx,
-            translationNumCtx);
+            translationNumCtx,
+            settings.TrustNonLocalEndpoint);
     }
 
     public async Task ClearMissingDefaultModelAsync(string modelName, CancellationToken cancellationToken = default)
@@ -122,6 +130,11 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
 
     internal static string NormalizeAndValidateBaseUrl(string? baseUrl)
     {
+        return NormalizeAndValidateBaseUrl(baseUrl, trustNonLocalEndpoint: false);
+    }
+
+    internal static string NormalizeAndValidateBaseUrl(string? baseUrl, bool trustNonLocalEndpoint)
+    {
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
             throw new OllamaApiException(
@@ -149,6 +162,20 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidUrl,
                 "L'URL di Ollama deve includere un host valido.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(uri.Query) || !string.IsNullOrWhiteSpace(uri.Fragment))
+        {
+            throw new OllamaApiException(
+                OllamaErrorKind.InvalidUrl,
+                "L'URL di Ollama non deve includere query string o frammenti.");
+        }
+
+        if (!uri.IsLoopback && !trustNonLocalEndpoint)
+        {
+            throw new OllamaApiException(
+                OllamaErrorKind.InvalidUrl,
+                "Gli endpoint Ollama non locali richiedono conferma esplicita perche chat, embedding e traduzione inviano testo al servizio configurato.");
         }
 
         UriBuilder builder = new(uri)
@@ -242,6 +269,11 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             && parsed <= MaxNumCtx
             ? parsed
             : null;
+    }
+
+    private static bool ParseBoolean(string? value)
+    {
+        return bool.TryParse(value, out bool parsed) && parsed;
     }
 
     private static string? NormalizeOptionalValue(string? value)

@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -19,10 +22,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: src/OnlyRag.Web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: src/OnlyRag.Web
-
-      - name: Run repository gate
+      - name: Run repository gate and security audits
         shell: pwsh
         run: .\scripts\Invoke-Gate.ps1 -Configuration Release

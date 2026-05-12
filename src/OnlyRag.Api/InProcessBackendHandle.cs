@@ -9,16 +9,20 @@ public sealed class InProcessBackendHandle : IAsyncDisposable
     internal InProcessBackendHandle(
         WebApplication application,
         Uri baseUri,
-        InProcessBackendDescriptor descriptor)
+        InProcessBackendDescriptor descriptor,
+        string sessionToken)
     {
         this.application = application;
         BaseUri = baseUri;
         Descriptor = descriptor;
+        SessionToken = sessionToken;
     }
 
     public Uri BaseUri { get; }
 
     public InProcessBackendDescriptor Descriptor { get; }
+
+    public string SessionToken { get; }
 
     public CancellationToken StoppedToken => application.Lifetime.ApplicationStopped;
 

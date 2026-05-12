@@ -19,8 +19,11 @@ public sealed class LocalSqliteStorageTests
         Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.TargetSchemaVersion);
         Assert.Equal("Current", status.MigrationStatus);
-        Assert.Equal(status.Fts5Available, await tempStorage.TableExistsAsync("chunks_fts"));
         Assert.True(status.Fts5Available || status.TechnicalNote is not null);
+        if (status.Fts5Available || status.TechnicalNote?.Contains("FTS4", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            Assert.True(await tempStorage.TableExistsAsync("chunks_fts"));
+        }
 
         foreach (string directory in tempStorage.Paths.EnumerateRequiredDirectories())
         {
@@ -63,6 +66,66 @@ public sealed class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_MigratesVersion8SchemaAndCreatesBackup()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateVersion8SchemaAsync(tempStorage);
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.InitializeAsync();
+
+        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal("Current", status.MigrationStatus);
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
+        Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("embeddings", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
+        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
+        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
+
+        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
+        await using (SqliteConnection backupConnection = new($"Data Source={backupPath};Mode=ReadOnly;Pooling=False"))
+        {
+            await backupConnection.OpenAsync();
+            await using SqliteCommand backupCommand = backupConnection.CreateCommand();
+            backupCommand.CommandText = "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
+            Assert.Equal(8, Convert.ToInt32(await backupCommand.ExecuteScalarAsync()));
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_CreatesBackupBeforeFailedSupportedMigration()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TABLE schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at_utc TEXT NOT NULL
+                );
+
+                INSERT INTO schema_migrations(version, name, applied_at_utc)
+                VALUES (8, '008_incomplete_fixture', '2026-05-12T00:00:00.000Z');
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        await Assert.ThrowsAsync<SqliteException>(() => storage.InitializeAsync());
+
+        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
+        Assert.True(File.Exists(backupPath));
+        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 8));
     }
 
     [Fact]
@@ -247,6 +310,8 @@ public sealed class LocalSqliteStorageTests
 
         public LocalSqliteStoreDescriptor Descriptor { get; }
 
+        public string BackupDirectory => Path.Combine(Paths.DataDirectory, "backups");
+
         public static TempStorage Create()
         {
             string root = Path.Combine(Path.GetTempPath(), "OnlyRag.Tests", Guid.NewGuid().ToString("N"));
@@ -313,5 +378,100 @@ public sealed class LocalSqliteStorageTests
         command.Parameters.AddWithValue("$documentId", value);
         command.Parameters.AddWithValue("$value", value);
         return Convert.ToInt64(await command.ExecuteScalarAsync());
+    }
+
+    private static async Task CreateVersion8SchemaAsync(TempStorage tempStorage)
+    {
+        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_uid TEXT NOT NULL UNIQUE,
+                original_file_name TEXT NOT NULL,
+                original_path TEXT NOT NULL,
+                sha256 TEXT NULL,
+                mime_type TEXT NULL,
+                file_size_bytes INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'Imported',
+                page_count INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER NOT NULL,
+                document_page_id INTEGER NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                token_count INTEGER NULL,
+                page_start INTEGER NULL,
+                page_end INTEGER NULL,
+                metadata_json TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                UNIQUE (document_id, chunk_index)
+            );
+
+            CREATE TABLE embeddings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chunk_id INTEGER NOT NULL,
+                model TEXT NOT NULL,
+                dimensions INTEGER NOT NULL,
+                distance_metric TEXT NOT NULL DEFAULT 'cosine',
+                vector_blob BLOB NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                UNIQUE (chunk_id, model)
+            );
+
+            CREATE TABLE jobs (
+                id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                priority INTEGER NOT NULL DEFAULT 0,
+                progress_percent INTEGER NOT NULL DEFAULT 0,
+                current_step TEXT NOT NULL DEFAULT '',
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                max_retries INTEGER NOT NULL DEFAULT 3,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE translation_units (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                translation_id INTEGER NOT NULL,
+                document_page_id INTEGER NULL,
+                unit_index INTEGER NOT NULL,
+                unit_kind TEXT NOT NULL DEFAULT 'paragraph',
+                page_number INTEGER NULL,
+                source_text TEXT NOT NULL,
+                source_hash TEXT NOT NULL DEFAULT '',
+                translated_text TEXT NULL,
+                manually_edited INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'Pending',
+                validation_warnings TEXT NULL,
+                error TEXT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                completed_at_utc TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                UNIQUE (translation_id, unit_index)
+            );
+
+            INSERT INTO schema_migrations(version, name, applied_at_utc)
+            VALUES (8, '008_previous_local_storage', '2026-05-12T00:00:00.000Z');
+            """;
+        await command.ExecuteNonQueryAsync();
     }
 }

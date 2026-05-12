@@ -460,14 +460,15 @@ public sealed class TranslationExportService
         IReadOnlyList<StoredTranslationUnit> units,
         CancellationToken cancellationToken)
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), $"onlyrag_pdf_{Guid.NewGuid():N}");
+        string tempDir = Path.Combine(descriptor.StoragePaths.TempDirectory, "translation-export", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
+        OfficeConversionResult? conversion = null;
         try
         {
             string tempDocx = Path.Combine(tempDir, "export.docx");
             WriteDocx(tempDocx, translation, units);
 
-            OfficeConversionResult result = await officeConverter.ConvertToPdfAsync(
+            conversion = await officeConverter.ConvertToPdfAsync(
                 new OfficeConversionRequest(
                     translation.Id,
                     tempDocx,
@@ -475,7 +476,7 @@ public sealed class TranslationExportService
                     "docx"),
                 cancellationToken);
 
-            File.Move(result.PdfPath, outputPath, overwrite: false);
+            File.Move(conversion.PdfPath, outputPath, overwrite: false);
         }
         catch (OfficeConversionUnavailableException ex)
         {
@@ -491,7 +492,27 @@ public sealed class TranslationExportService
         }
         finally
         {
-            try { Directory.Delete(tempDir, recursive: true); } catch { /* best effort */ }
+            if (conversion is not null)
+            {
+                TryDeleteDirectory(conversion.TemporaryDirectory);
+            }
+
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    private static void TryDeleteDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup; export has already failed or completed.
         }
     }
 

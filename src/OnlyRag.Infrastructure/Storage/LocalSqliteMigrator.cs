@@ -5,9 +5,16 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteMigrator
 {
-    public const int TargetSchemaVersion = 9;
-    private const string InitialSchemaName = "009_fresh_local_storage";
-    private const string Fts5UnavailableNote = "TODO: FTS5 is not available in the active SQLite provider; add a supported SQLite bundle or a fallback full-text index before enabling search.";
+    public const int TargetSchemaVersion = 10;
+    private const string InitialSchemaName = "010_fresh_local_storage";
+    private const string BackupDirectoryName = "backups";
+    private const string FtsUnavailableNote = "No SQLite FTS module is available in the active SQLite provider; keyword search is disabled until FTS5 or FTS4 is available.";
+
+    private static readonly IReadOnlyList<SqliteSchemaMigration> Migrations =
+    [
+        new(9, "009_add_document_jobs_hashes_and_translation_layout", ApplySchemaVersion9Async),
+        new(10, "010_add_fts4_keyword_search_fallback", ApplySchemaVersion10Async)
+    ];
 
     private readonly LocalSqliteStoreDescriptor descriptor;
     private readonly ISqliteConnectionFactory connectionFactory;
@@ -23,28 +30,34 @@ public sealed class LocalSqliteMigrator
     public async Task<StorageStatusResponse> MigrateAsync(CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        await EnsureMigrationTableAsync(connection, cancellationToken);
+        SqliteTextSearchBackend textSearchBackend = await DetectTextSearchBackendAsync(connection, cancellationToken);
+        bool migrationTableExists = await TableExistsAsync(connection, "schema_migrations", cancellationToken);
+        if (!migrationTableExists && await UserSchemaExistsAsync(connection, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                "Database SQLite esistente senza schema OnlyRag supportato. OnlyRag e trattata come nuova app e non esegue migrazioni dati.");
+        }
 
-        bool fts5Available = await DetectFts5Async(connection, cancellationToken);
+        await EnsureMigrationTableAsync(connection, cancellationToken);
         int currentVersion = await GetCurrentSchemaVersionAsync(connection, cancellationToken);
         if (currentVersion == 0)
         {
-            if (await UserSchemaExistsAsync(connection, cancellationToken))
-            {
-                throw new InvalidOperationException(
-                    "Database SQLite esistente senza schema OnlyRag supportato. OnlyRag e trattata come nuova app e non esegue migrazioni dati.");
-            }
-
-            await ApplyFreshSchemaAsync(connection, fts5Available, cancellationToken);
+            await ApplyFreshSchemaAsync(connection, textSearchBackend, cancellationToken);
             currentVersion = TargetSchemaVersion;
         }
-        else if (currentVersion != TargetSchemaVersion)
+        else if (currentVersion < TargetSchemaVersion)
+        {
+            await BackupDatabaseAsync(connection, currentVersion, TargetSchemaVersion, cancellationToken);
+            await ApplyPendingMigrationsAsync(connection, currentVersion, textSearchBackend, cancellationToken);
+            currentVersion = await GetCurrentSchemaVersionAsync(connection, cancellationToken);
+        }
+        else if (currentVersion > TargetSchemaVersion)
         {
             throw new InvalidOperationException(
-                $"Schema SQLite OnlyRag non supportato: versione {currentVersion}, attesa {TargetSchemaVersion}. Le migrazioni dati esistenti non sono supportate.");
+                $"Schema SQLite OnlyRag non supportato: versione {currentVersion}, attesa {TargetSchemaVersion}. Avviare una versione di OnlyRag compatibile o ripristinare un backup.");
         }
 
-        return BuildStatus(currentVersion, fts5Available);
+        return BuildStatus(currentVersion, textSearchBackend);
     }
 
     public async Task<StorageStatusResponse> GetStatusAsync(CancellationToken cancellationToken = default)
@@ -67,26 +80,34 @@ public sealed class LocalSqliteMigrator
         int currentVersion = migrationTableExists
             ? await GetCurrentSchemaVersionAsync(connection, cancellationToken)
             : 0;
-        bool fts5Available = await DetectFts5Async(connection, cancellationToken);
+        SqliteTextSearchBackend textSearchBackend = await DetectTextSearchBackendAsync(connection, cancellationToken);
 
-        return BuildStatus(currentVersion, fts5Available);
+        return BuildStatus(currentVersion, textSearchBackend);
     }
 
-    private StorageStatusResponse BuildStatus(int currentVersion, bool fts5Available)
+    private StorageStatusResponse BuildStatus(int currentVersion, SqliteTextSearchBackend textSearchBackend)
     {
         string migrationStatus = currentVersion switch
         {
             0 => "NotInitialized",
             TargetSchemaVersion => "Current",
+            < TargetSchemaVersion => "MigrationRequired",
             _ => "Unsupported"
         };
 
-        string? technicalNote = fts5Available
-            ? null
-            : Fts5UnavailableNote;
+        string? technicalNote = textSearchBackend switch
+        {
+            SqliteTextSearchBackend.Fts5 => null,
+            SqliteTextSearchBackend.Fts4 => "SQLite FTS5 is unavailable; keyword search uses the indexed SQLite FTS4 fallback.",
+            _ => FtsUnavailableNote
+        };
         if (migrationStatus == "Unsupported")
         {
-            technicalNote = "La versione schema locale non e supportata: il progetto e trattato come nuova app e non esegue migrazioni dati.";
+            technicalNote = "La versione schema locale e piu recente di questa applicazione. Avviare una versione compatibile o ripristinare un backup.";
+        }
+        else if (migrationStatus == "MigrationRequired")
+        {
+            technicalNote = "La versione schema locale richiede migrazione. OnlyRag crea un backup prima di applicare aggiornamenti schema supportati.";
         }
 
         return new StorageStatusResponse(
@@ -96,7 +117,7 @@ public sealed class LocalSqliteMigrator
             currentVersion,
             TargetSchemaVersion,
             migrationStatus,
-            fts5Available,
+            textSearchBackend == SqliteTextSearchBackend.Fts5,
             technicalNote);
     }
 
@@ -154,7 +175,7 @@ public sealed class LocalSqliteMigrator
         return value is not null;
     }
 
-    private static async Task<bool> DetectFts5Async(
+    private static async Task<SqliteTextSearchBackend> DetectTextSearchBackendAsync(
         SqliteConnection connection,
         CancellationToken cancellationToken)
     {
@@ -166,30 +187,231 @@ public sealed class LocalSqliteMigrator
             await connection.ExecuteNonQueryAsync(
                 "DROP TABLE temp.__onlyrag_fts5_probe;",
                 cancellationToken);
-            return true;
+            return SqliteTextSearchBackend.Fts5;
         }
         catch (SqliteException)
         {
-            return false;
+        }
+
+        try
+        {
+            await connection.ExecuteNonQueryAsync(
+                "CREATE VIRTUAL TABLE temp.__onlyrag_fts4_probe USING fts4(content);",
+                cancellationToken);
+            await connection.ExecuteNonQueryAsync(
+                "DROP TABLE temp.__onlyrag_fts4_probe;",
+                cancellationToken);
+            return SqliteTextSearchBackend.Fts4;
+        }
+        catch (SqliteException)
+        {
+            return SqliteTextSearchBackend.None;
         }
     }
 
     private static async Task ApplyFreshSchemaAsync(
         SqliteConnection connection,
-        bool fts5Available,
+        SqliteTextSearchBackend textSearchBackend,
         CancellationToken cancellationToken)
     {
         await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = BuildFreshSchemaSql(fts5Available);
+        command.CommandText = BuildFreshSchemaSql(textSearchBackend);
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private static string BuildFreshSchemaSql(bool fts5Available)
+    private async Task BackupDatabaseAsync(
+        SqliteConnection connection,
+        int fromVersion,
+        int toVersion,
+        CancellationToken cancellationToken)
     {
-        string ftsSql = BuildChunkFtsTriggerSql(fts5Available);
+        string databasePath = descriptor.Paths.DatabasePath;
+        if (!File.Exists(databasePath))
+        {
+            throw new InvalidOperationException("Database SQLite locale non trovato prima della migrazione.");
+        }
+
+        string backupDirectory = Path.Combine(descriptor.Paths.DataDirectory, BackupDirectoryName);
+        Directory.CreateDirectory(backupDirectory);
+
+        string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        string databaseName = Path.GetFileNameWithoutExtension(databasePath);
+        string backupPath = Path.Combine(
+            backupDirectory,
+            $"{databaseName}.v{fromVersion}-to-v{toVersion}.{timestamp}.db");
+
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "VACUUM main INTO $backupPath;";
+        command.AddParameter("$backupPath", backupPath);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task ApplyPendingMigrationsAsync(
+        SqliteConnection connection,
+        int currentVersion,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        int version = currentVersion;
+        foreach (SqliteSchemaMigration migration in Migrations.Where(migration => migration.Version > currentVersion))
+        {
+            if (migration.Version != version + 1)
+            {
+                throw new InvalidOperationException(
+                    $"Migrazione SQLite OnlyRag mancante da versione {version} a {migration.Version}.");
+            }
+
+            await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await migration.ApplyAsync(connection, transaction, textSearchBackend, cancellationToken);
+                await InsertMigrationRecordAsync(connection, transaction, migration, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                version = migration.Version;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
+
+        if (version != TargetSchemaVersion)
+        {
+            throw new InvalidOperationException(
+                $"Schema SQLite OnlyRag non supportato: versione {currentVersion}, attesa {TargetSchemaVersion}. Nessun percorso di migrazione completo disponibile.");
+        }
+    }
+
+    private static async Task InsertMigrationRecordAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteSchemaMigration migration,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO schema_migrations(version, name, applied_at_utc)
+            VALUES ($version, $name, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            """;
+        command.AddParameter("$version", migration.Version);
+        command.AddParameter("$name", migration.Name);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task ApplySchemaVersion9Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await AddColumnIfMissingAsync(connection, transaction, "documents", "file_extension", "TEXT NULL", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "documents", "current_job_id", "TEXT NULL", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "chunks", "content_hash", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "embeddings", "content_hash", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "jobs", "checkpoint_json", "TEXT NOT NULL DEFAULT '{}'", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "translation_units", "layout_metadata_json", "TEXT NOT NULL DEFAULT '{}'", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "translation_units", "machine_translated_text", "TEXT NULL", cancellationToken);
+
+        await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);", cancellationToken);
+        await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_embeddings_content_hash ON embeddings(content_hash);", cancellationToken);
+        await EnsureChunkFtsObjectsAsync(connection, transaction, textSearchBackend, cancellationToken);
+    }
+
+    private static Task ApplySchemaVersion10Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        return EnsureChunkFtsObjectsAsync(connection, transaction, textSearchBackend, cancellationToken);
+    }
+
+    private static async Task AddColumnIfMissingAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName,
+        string columnName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        if (await ColumnExistsAsync(connection, transaction, tableName, columnName, cancellationToken))
+        {
+            return;
+        }
+
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};",
+            cancellationToken);
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task EnsureChunkFtsObjectsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        if (textSearchBackend == SqliteTextSearchBackend.None
+            || await TableExistsAsync(connection, "chunks_fts", cancellationToken))
+        {
+            return;
+        }
+
+        await ExecuteInTransactionAsync(connection, transaction, BuildChunkFtsTriggerSql(textSearchBackend), cancellationToken);
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            """
+            INSERT INTO chunks_fts(rowid, chunk_id, content)
+            SELECT id, id, content FROM chunks;
+            """,
+            cancellationToken);
+    }
+
+    private static async Task ExecuteInTransactionAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string commandText,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string BuildFreshSchemaSql(SqliteTextSearchBackend textSearchBackend)
+    {
+        string ftsSql = BuildChunkFtsTriggerSql(textSearchBackend);
 
         return $$"""
             CREATE TABLE documents (
@@ -379,20 +601,38 @@ public sealed class LocalSqliteMigrator
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (9, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (10, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 
-    private static string BuildChunkFtsTriggerSql(bool fts5Available)
+    private static string BuildChunkFtsTriggerSql(SqliteTextSearchBackend textSearchBackend)
     {
-        return fts5Available
-            ? """
-
+        string createTableSql = textSearchBackend switch
+        {
+            SqliteTextSearchBackend.Fts5 => """
             CREATE VIRTUAL TABLE chunks_fts USING fts5(
                 chunk_id UNINDEXED,
-                content,
-                tokenize = 'unicode61'
+                content
             );
+            """,
+            SqliteTextSearchBackend.Fts4 => """
+            CREATE VIRTUAL TABLE chunks_fts USING fts4(
+                chunk_id,
+                content,
+                notindexed=chunk_id
+            );
+            """,
+            _ => string.Empty
+        };
+
+        return string.IsNullOrWhiteSpace(createTableSql)
+            ? """
+
+            -- No SQLite FTS module is available in the active provider.
+            """
+            : $$"""
+
+            {{createTableSql}}
 
             CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
                 INSERT INTO chunks_fts(rowid, chunk_id, content)
@@ -408,11 +648,18 @@ public sealed class LocalSqliteMigrator
                 INSERT INTO chunks_fts(rowid, chunk_id, content)
                 VALUES (new.id, new.id, new.content);
             END;
-            """
-            : """
-
-            -- TODO: FTS5 is not available in the active SQLite provider.
-            -- Add a supported SQLite bundle or a fallback full-text index before enabling search.
             """;
+    }
+
+    private sealed record SqliteSchemaMigration(
+        int Version,
+        string Name,
+        Func<SqliteConnection, SqliteTransaction, SqliteTextSearchBackend, CancellationToken, Task> ApplyAsync);
+
+    private enum SqliteTextSearchBackend
+    {
+        None,
+        Fts4,
+        Fts5
     }
 }

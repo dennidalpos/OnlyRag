@@ -8,6 +8,49 @@ namespace OnlyRag.Api.Tests;
 
 public sealed class OllamaClientTests
 {
+    [Theory]
+    [InlineData("http://localhost:11434")]
+    [InlineData("http://127.0.0.1:11434")]
+    [InlineData("http://[::1]:11434")]
+    public void NormalizeAndValidateBaseUrl_AllowsLoopbackByDefault(string baseUrl)
+    {
+        string normalized = OllamaSettingsService.NormalizeAndValidateBaseUrl(baseUrl);
+
+        Assert.StartsWith("http://", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormalizeAndValidateBaseUrl_RejectsNonLoopbackWithoutTrust()
+    {
+        OllamaApiException exception = Assert.Throws<OllamaApiException>(
+            () => OllamaSettingsService.NormalizeAndValidateBaseUrl("http://192.168.1.40:11434"));
+
+        Assert.Equal(OllamaErrorKind.InvalidUrl, exception.Kind);
+        Assert.Contains("conferma esplicita", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormalizeAndValidateBaseUrl_AllowsNonLoopbackWithTrust()
+    {
+        string normalized = OllamaSettingsService.NormalizeAndValidateBaseUrl(
+            "http://192.168.1.40:11434",
+            trustNonLocalEndpoint: true);
+
+        Assert.Equal("http://192.168.1.40:11434", normalized);
+    }
+
+    [Theory]
+    [InlineData("ftp://localhost:11434")]
+    [InlineData("http://")]
+    [InlineData("http://localhost:11434?token=abc")]
+    public void NormalizeAndValidateBaseUrl_RejectsUnsupportedOrAmbiguousUrls(string baseUrl)
+    {
+        OllamaApiException exception = Assert.Throws<OllamaApiException>(
+            () => OllamaSettingsService.NormalizeAndValidateBaseUrl(baseUrl, trustNonLocalEndpoint: true));
+
+        Assert.Equal(OllamaErrorKind.InvalidUrl, exception.Kind);
+    }
+
     [Fact]
     public async Task ListModelsAsync_ReturnsInstalledModels()
     {

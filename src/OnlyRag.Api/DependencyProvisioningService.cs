@@ -12,6 +12,7 @@ public sealed class DependencyProvisioningService
         "Per usare un endpoint Ollama da altri PC della LAN, configura OLLAMA_HOST nelle impostazioni/variabili ambiente di Ollama e riavvia Ollama.";
 
     private const string LibreOfficeDownloadUrl = "https://www.libreoffice.org/download/download-libreoffice/";
+    private readonly ILocalProcessLauncher processLauncher;
     private readonly object syncRoot = new();
     private OcrProvisionStatus lastOcrProvisionStatus = new(
         false,
@@ -19,6 +20,11 @@ public sealed class DependencyProvisioningService
         "OCR non configurato. Usa Configura OCR per preparare automaticamente le dipendenze locali.",
         null);
     private Task? ocrProvisionTask;
+
+    public DependencyProvisioningService(ILocalProcessLauncher processLauncher)
+    {
+        this.processLauncher = processLauncher;
+    }
 
     public OllamaInstallStatus CreateOllamaStatus(bool apiReachable)
     {
@@ -51,10 +57,9 @@ public sealed class DependencyProvisioningService
         startInfo.ArgumentList.Add("-Command");
         startInfo.ArgumentList.Add(OllamaInstallCommand);
 
-        using Process process = new() { StartInfo = startInfo };
-        if (!process.Start())
+        if (!processLauncher.TryStart(startInfo, out string? errorMessage))
         {
-            throw new InvalidOperationException("PowerShell non ha accettato la richiesta di installazione Ollama.");
+            throw new InvalidOperationException(errorMessage ?? "PowerShell non ha accettato la richiesta di installazione Ollama.");
         }
 
         return new DependencyActionResponse(true, $"Installazione Ollama avviata con: {OllamaInstallCommand}");
@@ -68,10 +73,9 @@ public sealed class DependencyProvisioningService
             UseShellExecute = true
         };
 
-        using Process process = new() { StartInfo = startInfo };
-        if (!process.Start())
+        if (!processLauncher.TryStart(startInfo, out string? errorMessage))
         {
-            throw new InvalidOperationException("Impossibile aprire la pagina di download LibreOffice.");
+            throw new InvalidOperationException(errorMessage ?? "Impossibile aprire la pagina di download LibreOffice.");
         }
 
         return new DependencyActionResponse(true, "Pagina download LibreOffice aperta.");
@@ -204,55 +208,22 @@ public sealed class DependencyProvisioningService
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "scripts", "ocr"));
     }
 
-    private static async Task<string> RunProcessAsync(
+    private async Task<string> RunProcessAsync(
         string fileName,
         IReadOnlyList<string> arguments,
         string? workingDirectory,
         CancellationToken cancellationToken)
     {
-        ProcessStartInfo startInfo = new()
+        LocalProcessResult result = await processLauncher.RunAsync(fileName, arguments, workingDirectory, cancellationToken);
+        if (result.ExitCode != 0)
         {
-            FileName = fileName,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        if (!string.IsNullOrWhiteSpace(workingDirectory))
-        {
-            startInfo.WorkingDirectory = workingDirectory;
-        }
-
-        foreach (string argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using Process process = new() { StartInfo = startInfo };
-        try
-        {
-            if (!process.Start())
-            {
-                throw new InvalidOperationException($"Impossibile avviare {fileName}.");
-            }
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            throw new InvalidOperationException($"Impossibile avviare {fileName}: {ex.Message}", ex);
-        }
-
-        string stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        string stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
-        {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            string detail = string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput : result.StandardError;
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
-                ? $"{fileName} terminato con exit code {process.ExitCode}."
+                ? $"{fileName} terminato con exit code {result.ExitCode}."
                 : detail.Trim());
         }
 
-        return string.IsNullOrWhiteSpace(stdout) ? stderr : stdout;
+        return string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
     }
 
     private static Version? ParseVersion(string text)

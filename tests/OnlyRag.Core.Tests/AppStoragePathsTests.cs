@@ -17,5 +17,7 @@ public sealed class AppStoragePathsTests
         Assert.EndsWith(Path.Combine("documents", "ocr-cache"), paths.DocumentOcrCacheDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith(Path.Combine("documents", "exports"), paths.DocumentExportsDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("logs", paths.LogsDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("temp", paths.TempDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(paths.TempDirectory, paths.EnumerateRequiredDirectories());
     }
 }

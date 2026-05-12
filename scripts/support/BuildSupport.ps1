@@ -220,7 +220,10 @@ function Test-OnlyRagPublishPayload {
         "OnlyRag.App.exe",
         "OnlyRag.App.dll",
         "OnlyRag.App.runtimeconfig.json",
-        "wwwroot\index.html"
+        "wwwroot\index.html",
+        "vec0.dll",
+        "scripts\ocr\paddle_ocr_bridge.py",
+        "scripts\ocr\requirements.txt"
     )
 
     foreach ($requiredFile in $requiredFiles) {

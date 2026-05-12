@@ -9,6 +9,9 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
+    private const int DefaultDocumentPreviewPageSize = 1;
+    private const int MaxDocumentPreviewPageSize = 10;
+
     private static void MapDocumentEndpoints(WebApplication app)
     {
         app.MapGet("/api/documents", async (IDocumentLibraryService documents, CancellationToken cancellationToken) =>
@@ -26,6 +29,7 @@ public static partial class InProcessBackend
         app.MapPost("/api/documents/import", async (
             HttpRequest request,
             IDocumentLibraryService documents,
+            LocalDocumentStorageGuard storageGuard,
             CancellationToken cancellationToken) =>
         {
             if (!request.HasFormContentType)
@@ -36,13 +40,49 @@ public static partial class InProcessBackend
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            IFormCollection form = await request.ReadFormAsync(cancellationToken);
+            if (request.ContentLength > storageGuard.Limits.MaxRequestBodySizeBytes)
+            {
+                return Results.Problem(
+                    title: "Import troppo grande",
+                    detail: $"La richiesta supera il limite di {FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
+                    statusCode: StatusCodes.Status413PayloadTooLarge);
+            }
+
+            IFormCollection form;
+            try
+            {
+                form = await request.ReadFormAsync(cancellationToken);
+            }
+            catch (BadHttpRequestException)
+            {
+                return Results.Problem(
+                    title: "Import troppo grande",
+                    detail: "La richiesta multipart supera i limiti configurati.",
+                    statusCode: StatusCodes.Status413PayloadTooLarge);
+            }
+            catch (InvalidDataException)
+            {
+                return Results.Problem(
+                    title: "Import troppo grande",
+                    detail: "La richiesta multipart supera i limiti configurati.",
+                    statusCode: StatusCodes.Status413PayloadTooLarge);
+            }
+
             if (form.Files.Count == 0)
             {
                 return Results.Problem(
                     title: "Nessun file selezionato",
                     detail: "Seleziona almeno un file da importare.",
                     statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            try
+            {
+                ValidateImportBatch(form.Files, storageGuard);
+            }
+            catch (DocumentStorageLimitException ex)
+            {
+                return MapDocumentStorageLimitException(ex);
             }
 
             bool forceOcr = string.Equals(
@@ -73,6 +113,10 @@ public static partial class InProcessBackend
                         title: "Import non valido",
                         detail: ex.Message,
                         statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (DocumentStorageLimitException ex)
+                {
+                    return MapDocumentStorageLimitException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -439,6 +483,8 @@ public static partial class InProcessBackend
 
         app.MapGet("/api/documents/{id:long}/preview", async (
             long id,
+            int? page,
+            int? pageSize,
             IDocumentLibraryService documents,
             IDocumentRepository documentRepository,
             CancellationToken cancellationToken) =>
@@ -449,7 +495,21 @@ public static partial class InProcessBackend
                 return Results.NotFound();
             }
 
-            IReadOnlyList<DocumentPageInfo> pages = await documentRepository.GetPagesAsync(id, cancellationToken);
+            int requestedPage = Math.Max(1, page ?? 1);
+            if (document.PageCount > 0)
+            {
+                requestedPage = Math.Min(requestedPage, document.PageCount);
+            }
+
+            int requestedPageSize = Math.Clamp(
+                pageSize ?? DefaultDocumentPreviewPageSize,
+                1,
+                MaxDocumentPreviewPageSize);
+            IReadOnlyList<DocumentPageInfo> pages = await documentRepository.GetPagesAsync(
+                id,
+                requestedPage,
+                requestedPageSize,
+                cancellationToken);
             return Results.Ok(new DocumentPreviewResponse(
                 document.Id,
                 document.OriginalFileName,
@@ -459,7 +519,41 @@ public static partial class InProcessBackend
                 document.PageCount,
                 document.ChunkCount,
                 document.Status.ToString(),
+                requestedPage,
+                requestedPageSize,
+                pages.Count,
                 pages));
         });
+    }
+
+    private static void ValidateImportBatch(IFormFileCollection files, LocalDocumentStorageGuard storageGuard)
+    {
+        long totalBytes = 0;
+        foreach (IFormFile file in files)
+        {
+            storageGuard.EnsureFileWithinLimits(file.FileName, file.Length);
+            totalBytes = checked(totalBytes + file.Length);
+        }
+
+        storageGuard.EnsureBatchWithinLimits(files.Count, totalBytes);
+        storageGuard.EnsureStorageAvailableForBytes(totalBytes);
+    }
+
+    private static IResult MapDocumentStorageLimitException(DocumentStorageLimitException exception)
+    {
+        int statusCode = exception.Kind == DocumentStorageLimitKind.TooManyFiles
+            ? StatusCodes.Status400BadRequest
+            : StatusCodes.Status413PayloadTooLarge;
+        return Results.Problem(
+            title: exception.Title,
+            detail: exception.Message,
+            statusCode: statusCode);
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        return bytes >= LocalDocumentLibraryLimits.GiB
+            ? $"{bytes / (double)LocalDocumentLibraryLimits.GiB:0.#} GB"
+            : $"{bytes / (double)LocalDocumentLibraryLimits.MiB:0.#} MB";
     }
 }

@@ -1,6 +1,8 @@
 export type BackendBridge = {
   isRunning: boolean;
   baseUrl: string | null;
+  apiToken: string | null;
+  apiTokenHeaderName: string;
   errorMessage: string | null;
 };
 
@@ -14,6 +16,7 @@ export type OllamaSettings = {
   embeddingNumCtx: number | null;
   chatNumCtx: number | null;
   translationNumCtx: number | null;
+  trustNonLocalEndpoint: boolean;
 };
 
 export type OllamaModelDetails = {
@@ -390,6 +393,9 @@ export type DocumentPreviewResponse = {
   pageCount: number;
   chunkCount: number;
   status: string;
+  pageStart: number;
+  pageSize: number;
+  returnedPageCount: number;
   pages: DocumentPageInfo[];
 };
 
@@ -406,6 +412,23 @@ export function resolveBackendBaseUrl(): string | null {
 
 export function resolveBackendBaseUrlDirect(): string | null {
   return window.__ONLYRAG_BACKEND__?.baseUrl ?? null;
+}
+
+export function resolveBackendErrorMessage(): string | null {
+  const message = window.__ONLYRAG_BACKEND__?.errorMessage;
+  return message && message.trim().length > 0 ? message : null;
+}
+
+export function resolveBackendSessionToken(): { headerName: string; token: string } | null {
+  const bridge = window.__ONLYRAG_BACKEND__;
+  if (!bridge?.apiToken || !bridge.apiTokenHeaderName) {
+    return null;
+  }
+
+  return {
+    headerName: bridge.apiTokenHeaderName,
+    token: bridge.apiToken
+  };
 }
 
 export function markBackendOnline(): void {
@@ -425,13 +448,20 @@ export function markBackendOffline(): void {
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const baseUrl = resolveBackendBaseUrl();
   if (!baseUrl) {
-    throw new Error("Il backend locale non è disponibile. Riavviare l'applicazione.");
+    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile. Riavviare l'applicazione.");
   }
 
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+
+  const sessionToken = resolveBackendSessionToken();
+  if (!sessionToken) {
+    throw new Error("Il token di sessione del backend locale non è disponibile. Riavviare l'applicazione.");
+  }
+
+  headers.set(sessionToken.headerName, sessionToken.token);
 
   let response: Response;
   try {

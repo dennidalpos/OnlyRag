@@ -102,70 +102,94 @@ public static partial class InProcessBackend
                 ocrAvailability.EngineName));
         });
 
-        app.MapPost("/api/diagnostics/open-logs-folder", (InProcessBackendDescriptor descriptor) =>
+        app.MapPost("/api/diagnostics/open-logs-folder", (
+            HttpContext httpContext,
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor,
+            ILocalProcessLauncher processLauncher) =>
         {
+            if (!request.Confirmed)
+            {
+                return Results.Problem(
+                    title: "Conferma richiesta",
+                    detail: "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             try
             {
                 Directory.CreateDirectory(descriptor.StoragePaths.LogsDirectory);
-                using Process process = new()
+                ProcessStartInfo startInfo = CreateExplorerStartInfo(descriptor.StoragePaths.LogsDirectory);
+                if (!processLauncher.TryStart(startInfo, out string? errorMessage))
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "explorer.exe",
-                        UseShellExecute = false
-                    }
-                };
-                process.StartInfo.ArgumentList.Add(descriptor.StoragePaths.LogsDirectory);
-                if (!process.Start())
-                {
-                    return Results.Problem(
-                        title: "Cartella log non aperta",
-                        detail: "Windows Explorer non ha accettato la richiesta.",
-                        statusCode: StatusCodes.Status500InternalServerError);
+                    BackendLog.Write(
+                        descriptor.StoragePaths,
+                        $"Open logs folder failed [{httpContext.TraceIdentifier}]: {errorMessage ?? "Windows Explorer did not accept the request."}");
+                    return CreateUnexpectedErrorProblem("Cartella log non aperta", httpContext.TraceIdentifier);
                 }
 
                 return Results.Ok(new OperationMessageResponse("Cartella log aperta."));
             }
             catch (Exception ex)
             {
-                return Results.Problem(
-                    title: "Cartella log non aperta",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status500InternalServerError);
+                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open logs folder failed.", ex);
+                return CreateUnexpectedErrorProblem("Cartella log non aperta", httpContext.TraceIdentifier);
             }
         });
 
-        app.MapPost("/api/documents/exports/open-folder", (InProcessBackendDescriptor descriptor) =>
+        app.MapPost("/api/documents/exports/open-folder", (
+            HttpContext httpContext,
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor,
+            ILocalProcessLauncher processLauncher) =>
         {
+            if (!request.Confirmed)
+            {
+                return Results.Problem(
+                    title: "Conferma richiesta",
+                    detail: "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             try
             {
                 Directory.CreateDirectory(descriptor.StoragePaths.DocumentExportsDirectory);
-                using Process process = new()
+                ProcessStartInfo startInfo = CreateExplorerStartInfo(descriptor.StoragePaths.DocumentExportsDirectory);
+                if (!processLauncher.TryStart(startInfo, out string? errorMessage))
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "explorer.exe",
-                        UseShellExecute = false
-                    }
-                };
-                process.StartInfo.ArgumentList.Add(descriptor.StoragePaths.DocumentExportsDirectory);
-                if (!process.Start())
-                {
-                    return Results.Problem(
-                        title: "Cartella export non aperta",
-                        detail: "Windows Explorer non ha accettato la richiesta.",
-                        statusCode: StatusCodes.Status500InternalServerError);
+                    BackendLog.Write(
+                        descriptor.StoragePaths,
+                        $"Open exports folder failed [{httpContext.TraceIdentifier}]: {errorMessage ?? "Windows Explorer did not accept the request."}");
+                    return CreateUnexpectedErrorProblem("Cartella export non aperta", httpContext.TraceIdentifier);
                 }
 
                 return Results.Ok(new OperationMessageResponse("Cartella export aperta."));
             }
             catch (Exception ex)
             {
-                return Results.Problem(
-                    title: "Cartella export non aperta",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status500InternalServerError);
+                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open exports folder failed.", ex);
+                return CreateUnexpectedErrorProblem("Cartella export non aperta", httpContext.TraceIdentifier);
             }
         });
+    }
+
+    private static ProcessStartInfo CreateExplorerStartInfo(string folderPath)
+    {
+        string fullPath = Path.GetFullPath(folderPath);
+        string explorerPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "explorer.exe");
+        if (!File.Exists(explorerPath))
+        {
+            explorerPath = "explorer.exe";
+        }
+
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = explorerPath,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add(fullPath);
+        return startInfo;
     }
 }
