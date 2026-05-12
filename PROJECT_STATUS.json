@@ -1,16 +1,15 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "final-readiness-complete",
-  "last_updated": "2026-05-12T17:18:10+02:00",
+  "current_phase": "release-readiness-blocked",
+  "last_updated": "2026-05-12T18:06:00+02:00",
   "production_target": true,
-  "summary": "Windows-first local RAG desktop app: WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
-  "active_objective": "Final cross-cutting maintenance and readiness pass completed: repository setup, gate, docs/assets, CI, packaging, and quality state were verified; one small gate packaging bug was fixed.",
+  "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
+  "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, run interactive runtime checks, verify optional OCR, and make the final release decision.",
   "assumptions": [
-    "Existing uncommitted source and documentation changes predate this final pass and were preserved.",
     "Generated outputs under bin, obj, dist, node_modules, and artifacts are build artifacts, not source state.",
-    "OCR runtime preparation and live Ollama model workflows are optional feature paths; the final bootstrap run intentionally skipped OCR installation and Ollama probing to avoid heavy optional setup work.",
-    "Interactive desktop launch and installer lifecycle operations require user-facing Windows UI changes, so they were not executed during this non-invasive readiness pass."
+    "OCR runtime preparation and live Ollama model workflows are optional feature paths unless included in the intended release scope.",
+    "Interactive desktop launch and installer lifecycle checks require a Windows desktop session or clean Windows verification machine."
   ],
   "decisions": [
     {
@@ -22,95 +21,147 @@
     {
       "id": "npm-lockfile-package-manager",
       "date": "2026-05-12T10:43:16+02:00",
-      "decision": "Use npm as the frontend package manager because src/OnlyRag.Web/package-lock.json is present and package.json scripts are npm-based.",
+      "decision": "Use npm as the frontend package manager because src\\OnlyRag.Web\\package-lock.json is present and package.json scripts are npm-based.",
       "impact": "Do not introduce pnpm, yarn, or alternate frontend package manager conventions."
     },
     {
-      "id": "release-signing-blocked",
+      "id": "release-signing-required",
       "date": "2026-05-12T10:43:16+02:00",
       "decision": "Do not promote installer artifacts as release artifacts until a trusted code-signing certificate, signtool, Inno Setup, and signed lifecycle verification are available.",
       "impact": "Packaging can be verified separately from release; signed release tasks remain blocked."
-    },
-    {
-      "id": "scoped-csharp-refactor-low-risk-active-paths",
-      "date": "2026-05-12T16:34:44+02:00",
-      "decision": "Limit this pass to three behavior-preserving C# refactors in active persistence, document import, API, and WPF shutdown paths.",
-      "impact": "Shared SQL IN parameter creation, document size formatting, and WPF JSON read options are consolidated without moving public endpoints, changing SQLite schema, changing settings keys, or touching pre-existing React UI edits."
-    },
-    {
-      "id": "scoped-risk-reduction-three-fixes",
-      "date": "2026-05-12T16:51:04+02:00",
-      "decision": "Limit this pass to three directly inferable risks: local API token egress guard in the web client, bounded/sanitized Ollama external error bodies, and concurrent stdout/stderr reads for local setup processes.",
-      "impact": "No package versions or lockfiles changed; verification used existing npm, NuGet, lint, format, typecheck, build, and xUnit gates."
-    },
-    {
-      "id": "installer-prerequisite-text-wrapper",
-      "date": "2026-05-12T15:37:19+02:00",
-      "decision": "Use an Inno Setup Pascal Script wrapper for prerequisite dialog lines instead of pixel-specific page fixes.",
-      "impact": "Unsupported-Windows and missing-WebView2 dialogs share one wrapping behavior, preserving the existing installer technology while reducing clipping risk for long product names, paths, URLs, and localized wording."
-    },
-    {
-      "id": "brand-assets-existing-identity",
-      "date": "2026-05-12T15:46:16+02:00",
-      "decision": "Preserve the existing OnlyRag Windows-first identity and extend the generated asset inventory instead of introducing a rebrand.",
-      "impact": "The source app icon, favicon/PWA assets, GitHub README logo, social card images, and Inno Setup wizard artwork remain generated by scripts\\Generate-BrandAssets.ps1 from the existing editable SVG and WPF drawing pipeline."
-    },
-    {
-      "id": "final-readiness-scope",
-      "date": "2026-05-12T17:18:10+02:00",
-      "decision": "Close this pass as verification and small localized maintenance only; do not reopen broad refactors, redesign, packaging changes, or security hardening initiatives.",
-      "impact": "Only scripts\\Invoke-Gate.ps1 was changed in this pass; remaining release work stays limited to concrete external verification items."
     }
   ],
-  "current_tasks": [],
-  "next_tasks": [
-    "Provision a trusted Windows code-signing certificate outside Git, then run scripts\\Sign-Release.ps1 with the certificate password supplied through ONLYRAG_CERT_PASSWORD or a secure prompt.",
-    "Run scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle on a clean Windows verification machine after signing.",
-    "Run pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 without -SkipOcr on a machine intended to use OCR, then audit scripts\\ocr\\requirements.txt with pip-audit or safety when one is available.",
-    "Run the interactive desktop app and browser UI against real imported documents, active jobs, and translation records before public release sign-off."
+  "current_tasks": [
+    {
+      "order": 2,
+      "priority": "P0",
+      "task": "Provision trusted Windows code-signing material outside Git and sign the installer.",
+      "addresses": [
+        "signed-release-blocked",
+        "unsigned-installer"
+      ],
+      "prerequisites": [
+        "Trusted code-signing certificate/private key",
+        "Secure password delivery through ONLYRAG_CERT_PASSWORD or an interactive secure prompt",
+        "Available Windows SDK signtool.exe and Inno Setup"
+      ],
+      "execution": [
+        "Place signing material in the approved external location, not in source control.",
+        "Run scripts\\Sign-Release.ps1 with the trusted certificate and versioned installer artifact.",
+        "Confirm the installer Authenticode signature is valid and timestamped."
+      ],
+      "completion_criteria": "artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is signed by the trusted publisher and signature verification passes.",
+      "status": "pending"
+    },
+    {
+      "order": 3,
+      "priority": "P0",
+      "task": "Run signed installer lifecycle verification on a clean Windows machine.",
+      "addresses": [
+        "clean-machine-installer-lifecycle-not-run",
+        "installer-lifecycle-not-verified"
+      ],
+      "prerequisites": [
+        "Signed installer from task 2",
+        "Clean Windows verification machine or equivalent disposable VM"
+      ],
+      "execution": [
+        "Run scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle.",
+        "Verify install, first launch, upgrade path if applicable, rollback behavior, uninstall, and SmartScreen/signature behavior.",
+        "Record any installer findings as blockers before release sign-off."
+      ],
+      "completion_criteria": "Signed installer lifecycle checks pass on a clean Windows environment with no unresolved release-blocking findings.",
+      "status": "pending"
+    },
+    {
+      "order": 4,
+      "priority": "P1",
+      "task": "Run interactive desktop and populated browser UI verification.",
+      "addresses": [
+        "interactive-runtime-not-run"
+      ],
+      "prerequisites": [
+        "Windows desktop session",
+        "WebView2 Runtime",
+        "Representative imported documents",
+        "Ollama endpoint when model-backed workflows are tested"
+      ],
+      "execution": [
+        "Launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug or the installed app.",
+        "Verify document import, populated document views, active jobs, retrieval/chat, translation records, settings persistence, and shutdown behavior.",
+        "Capture defects with exact workflow, input, expected result, and observed result."
+      ],
+      "completion_criteria": "Core desktop and UI workflows pass with representative local data, or all defects are classified and resolved or accepted before public release.",
+      "status": "pending"
+    },
+    {
+      "order": 5,
+      "priority": "P1",
+      "task": "Verify optional OCR setup and Python OCR dependency security posture.",
+      "addresses": [
+        "optional-ocr-bootstrap-not-run",
+        "python-ocr-dependency-audit-tool-unavailable"
+      ],
+      "prerequisites": [
+        "Machine intended to support OCR",
+        "Python 3.10+",
+        "pip-audit or safety available without compromising dependency policy"
+      ],
+      "execution": [
+        "Run pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 without -SkipOcr.",
+        "Audit scripts\\ocr\\requirements.txt with pip-audit or safety when one is available.",
+        "Verify OCR processing on representative scanned documents."
+      ],
+      "completion_criteria": "OCR bootstrap succeeds, OCR dependency audit has no unresolved high-severity findings, and representative OCR processing works.",
+      "status": "pending"
+    },
+    {
+      "order": 6,
+      "priority": "P2",
+      "task": "Finalize release readiness decision.",
+      "addresses": [
+        "signed-release-blocked",
+        "clean-machine-installer-lifecycle-not-run",
+        "interactive-runtime-not-run",
+        "optional-ocr-bootstrap-not-run"
+      ],
+      "execution": [
+        "Re-run the canonical gate after any fixes made during residual verification.",
+        "Update PROJECT_STATUS.json quality gates, blockers, risks, and handoff notes to reflect the verified final state.",
+        "Promote the artifact only if P0 items are complete and no accepted P1 risk blocks the intended release scope."
+      ],
+      "completion_criteria": "PROJECT_STATUS.json shows no release-blocking blockers, quality gates reflect actual results, and the release decision is explicit.",
+      "status": "pending"
+    }
   ],
+  "next_tasks": [],
   "blockers": [
     {
       "id": "signed-release-blocked",
-      "reason": "No code-signing certificate/private key is present under certificates\\app; the generated installer is unsigned. Inno Setup 6.7.1 and Windows SDK signtool.exe are available locally.",
+      "reason": "No code-signing certificate/private key is present under certificates\\app; the generated installer is unsigned.",
       "blocked_release": true
     },
     {
       "id": "clean-machine-installer-lifecycle-not-run",
-      "reason": "Install, launch, upgrade, rollback, uninstall, SmartScreen, and signed enforcement checks were intentionally not run on this development machine.",
+      "reason": "Install, launch, upgrade, rollback, uninstall, SmartScreen, and signed enforcement checks were not run on a clean Windows verification machine.",
       "blocked_release": true
     }
   ],
   "risks": [
     {
-      "id": "dirty-working-tree",
-      "severity": "medium",
-      "description": "The repository remains on main with uncommitted source, script, documentation, and PROJECT_STATUS.json changes; review and commit intentionally before release work."
-    },
-    {
       "id": "unsigned-installer",
       "severity": "high",
-      "description": "The installer built by the gate is valid as an unsigned package artifact only; it is not a signed release candidate."
-    },
-    {
-      "id": "installer-lifecycle-not-verified",
-      "severity": "high",
-      "description": "Installer lifecycle and SmartScreen behavior were not executed; only non-invasive installer evidence was generated."
-    },
-    {
-      "id": "optional-ocr-bootstrap-not-run",
-      "severity": "medium",
-      "description": "Final bootstrap verification used -SkipOcr; OCR runtime setup remains a concrete optional-feature verification item for OCR release support."
+      "description": "The installer is valid only as an unsigned package artifact, not as a signed release candidate."
     },
     {
       "id": "interactive-runtime-not-run",
       "severity": "medium",
-      "description": "The WPF desktop app and populated live UI workflows were not launched during this pass to avoid invasive interactive state changes."
+      "description": "The WPF desktop app and populated live UI workflows still need interactive verification."
     },
     {
-      "id": "python-ocr-dependency-audit-tool-unavailable",
+      "id": "optional-ocr-bootstrap-not-run",
       "severity": "medium",
-      "description": "No pip-audit or safety command was available locally, so Python OCR package vulnerability status was not verified."
+      "description": "OCR runtime setup and Python OCR dependency audit remain unverified for OCR release support."
     }
   ],
   "dependencies": {
@@ -128,9 +179,7 @@
       "PowerShell 7",
       ".NET 10 SDK",
       "Node.js ^20.19.0 || >=22.12.0 with npm",
-      "npm lockfile at src\\OnlyRag.Web\\package-lock.json",
-      "ESLint, Prettier, TypeScript, and Vite from src\\OnlyRag.Web",
-      "Inno Setup 6 for installer packaging",
+      "Inno Setup 6",
       "Windows SDK signtool.exe for signed release candidates"
     ],
     "external_services": [
@@ -150,136 +199,16 @@
   },
   "commands": {
     "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "preflight_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev; dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
-    "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
-    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
     "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
+    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
     "build": "Set-Location .\\src\\OnlyRag.Web; npm run build; Set-Location ..\\..; dotnet build .\\OnlyRag.sln --configuration Release --no-restore",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "release": "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath .\\certificates\\app\\OnlyRag-CodeSigning.pfx -Version \"0.1.0\"",
-    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "serve": "Set-Location .\\src\\OnlyRag.Web; npm run preview"
+    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
   },
-  "command_matrix": [
-    {
-      "category": "environment diagnostic",
-      "command": "dotnet --info; node --version; npm --version",
-      "prerequisites": "Installed .NET SDK, Node.js, and npm",
-      "purpose": "Confirm local toolchain used for readiness verification.",
-      "result": "passed; .NET SDK 10.0.203, .NET host 10.0.7, Node v24.15.0, npm 11.12.1 on Windows 10.0.26200 win-x64"
-    },
-    {
-      "category": "install/setup",
-      "command": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 -NonInteractive -SkipOcr -SkipOllamaCheck",
-      "prerequisites": "Windows, PowerShell 7, .NET 10 SDK/runtimes, WebView2, Node/npm; optional LibreOffice",
-      "purpose": "Verify required fresh-install setup path without installing optional OCR runtime or probing Ollama.",
-      "result": "passed; verified Windows, PowerShell 7.6.1, .NET 10 SDK/runtimes, WebView2 148.0.3967.54, Node v24.15.0, npm 11.12.1, LibreOffice, local data directories, dotnet restore, and npm ci"
-    },
-    {
-      "category": "preflight/gate/package",
-      "command": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
-      "prerequisites": "Windows, PowerShell 7, .NET 10 SDK, Node/npm, package sources, Inno Setup 6",
-      "purpose": "Run canonical gate plus installer packaging.",
-      "result": "passed after fixing IncludeInstaller named argument splatting; npm ci, dotnet restore, npm audit, NuGet vulnerability audit, typecheck, lint, format check, 165 xUnit tests, installer prerequisite self-test, web build, .NET build, self-contained publish, and Inno Setup installer compile all passed"
-    },
-    {
-      "category": "package/release evidence",
-      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
-      "prerequisites": "Built installer artifact",
-      "purpose": "Generate non-invasive installer evidence without installing.",
-      "result": "passed with warning; primary installer found, optional OCR Python/LibreOffice/Ollama detected, install lifecycle skipped by design, signature status NotSigned"
-    },
-    {
-      "category": "documentation and asset integrity",
-      "command": "Node local documentation/html/manifest link and asset resolver",
-      "prerequisites": "Node.js and repository files",
-      "purpose": "Verify local Markdown links, HTML href/src assets, Open Graph/Twitter images, and manifest icons resolve.",
-      "result": "passed; checked 18 documentation/html/manifest files and all local links/assets resolved"
-    },
-    {
-      "category": "repository hygiene",
-      "command": "git ls-files \"**/bin/**\" \"**/obj/**\" \"src/OnlyRag.Web/dist/**\" \"src/OnlyRag.Web/node_modules/**\" \"artifacts/**\"",
-      "prerequisites": "Git repository",
-      "purpose": "Verify generated outputs are not tracked as source.",
-      "result": "passed; no tracked generated output paths returned"
-    },
-    {
-      "category": "security scan",
-      "command": "PowerShell high-confidence secret scan excluding .git, node_modules, bin, obj, dist, and artifacts",
-      "prerequisites": "PowerShell and repository files",
-      "purpose": "Check for high-confidence private key/token patterns without printing values.",
-      "result": "passed; 0 findings"
-    },
-    {
-      "category": "signed release",
-      "command": "Get-AuthenticodeSignature .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe; inspect certificates\\app and local signing tools",
-      "prerequisites": "Built installer artifact and local signing toolchain",
-      "purpose": "Confirm release signing state.",
-      "result": "blocked; installer is NotSigned, certificates\\app contains no PFX/private key, Inno Setup 6.7.1 and Windows SDK signtool.exe are available locally"
-    },
-    {
-      "category": "dev/run",
-      "command": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-      "prerequisites": ".NET 10 SDK, WebView2 Runtime, built web dist or Vite dev server",
-      "purpose": "Run WPF shell and in-process backend locally.",
-      "result": "not_run; starts an interactive desktop app and was outside the non-invasive final readiness pass"
-    },
-    {
-      "category": "optional OCR audit",
-      "command": "Get-Command pip-audit; Get-Command safety",
-      "prerequisites": "Optional Python vulnerability audit tools",
-      "purpose": "Determine whether scripts\\ocr\\requirements.txt can be audited with already available Python tooling.",
-      "result": "not_available; neither tool was available locally and no new tool was installed during this scoped pass"
-    }
-  ],
-  "test_inventory": {
-    "frameworks": [
-      "xUnit via Microsoft.NET.Test.Sdk in tests\\OnlyRag.Core.Tests, tests\\OnlyRag.Infrastructure.Tests, and tests\\OnlyRag.Api.Tests",
-      "Frontend has TypeScript, ESLint, Prettier, and Vite build checks; no real browser e2e test framework is configured."
-    ],
-    "fixtures_and_mocks": [
-      "In-memory and temp SQLite fixtures under Path.GetTempPath() for unit/integration-style tests.",
-      "Stub and fake services cover Ollama, Office conversion, process launch, job workers, OCR, and HTTP message handling."
-    ],
-    "last_result": "passed; Invoke-Gate.ps1 -Configuration Release -IncludeInstaller ran 165 xUnit tests successfully"
-  },
-  "ui_a11y_coverage": {
-    "last_result": "not_run in this final pass; populated UI verification remains a release-signoff task.",
-    "limits": [
-      "No live desktop/browser UI session was launched during this final non-invasive readiness pass.",
-      "Populated documents, active jobs, preview data, and translation records still require interactive verification before public release sign-off."
-    ]
-  },
-  "configuration_sources": [
-    "Persistent UI/backend settings are stored in SQLite settings rows: Ollama, performance, OCR, OCR processing, ingestion, and Office conversion.",
-    "Application defaults live in code: AppStoragePaths, OllamaEndpointOptions, OcrSettings, OcrPipelineOptions, IngestionSettingsStore, OfficeConversionSettingsStore, PerformanceSettingsService, and backend options.",
-    "Environment variables are optional overrides for development/runtime helpers: ONLYRAG_WEB_DEV_SERVER, ONLYRAG_LIBREOFFICE_PATH, ONLYRAG_OCR_PYTHON, ONLYRAG_OCR_BRIDGE, and ONLYRAG_CERT_PASSWORD.",
-    "CLI/script arguments are used by PowerShell bootstrap, gate, build, installer, signing, and verification scripts.",
-    "Frontend package manifest and web manifest are package.json and src\\OnlyRag.Web\\public\\site.webmanifest; installer manifest is packaging\\OnlyRag.iss."
-  ],
-  "runtime_paths": [
-    "%LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db",
-    "%LOCALAPPDATA%\\OnlyRag\\data\\jobs.db",
-    "%LOCALAPPDATA%\\OnlyRag\\data\\backups",
-    "%LOCALAPPDATA%\\OnlyRag\\documents\\originals",
-    "%LOCALAPPDATA%\\OnlyRag\\documents\\renders",
-    "%LOCALAPPDATA%\\OnlyRag\\documents\\ocr-cache",
-    "%LOCALAPPDATA%\\OnlyRag\\documents\\exports",
-    "%LOCALAPPDATA%\\OnlyRag\\logs",
-    "%LOCALAPPDATA%\\OnlyRag\\temp",
-    "%LOCALAPPDATA%\\OnlyRag\\ocr-python",
-    "%LOCALAPPDATA%\\Programs\\OnlyRag"
-  ],
   "environment": {
     "os_target": "Windows",
     "shell": "PowerShell",
-    "observed_os": "Windows 10.0.26200 win-x64",
-    "observed_dotnet_sdk": "10.0.203",
-    "observed_dotnet_host": "10.0.7",
-    "observed_node": "v24.15.0",
-    "observed_npm": "11.12.1",
     "required_env_vars": [],
     "env_files": [],
     "optional_env_vars": [
@@ -290,16 +219,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "outputs": [
-    "src\\OnlyRag.Web\\dist",
-    "src\\**\\bin",
-    "src\\**\\obj",
-    "tests\\**\\bin",
-    "tests\\**\\obj",
-    "artifacts",
-    "%LOCALAPPDATA%\\OnlyRag"
-  ],
-  "last_completed_work": "Fixed scripts\\Invoke-Gate.ps1 -IncludeInstaller argument passing, verified bootstrap, full gate with installer packaging, non-invasive installer evidence, docs/assets/manifest links, generated-output hygiene, and high-confidence secret scan.",
+  "last_completed_work": "Stabilized repository state for release readiness: reviewed the working tree, confirmed only PROJECT_STATUS.json changed, and recorded the remaining release blockers explicitly.",
   "open_questions": [],
-  "handoff_notes": "Final readiness pass is complete. Main gates passed and an unsigned installer was generated at artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe. Do not call this a signed production release until certificate provisioning, signing, clean-machine installer lifecycle verification, and interactive runtime checks are completed."
+  "handoff_notes": "Repository state has been stabilized for the current release-readiness pass. Do not call this a signed production release until the remaining P0 tasks are complete: installer signed and clean-machine signed installer lifecycle verification passed."
 }
