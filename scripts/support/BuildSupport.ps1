@@ -47,22 +47,6 @@ function Test-OnlyRagNpmModulesUpToDate {
     return (Get-Item -LiteralPath $internalLock).LastWriteTimeUtc -ge (Get-Item -LiteralPath $lockFile).LastWriteTimeUtc
 }
 
-function Test-OnlyRagNuGetRestoreUpToDate {
-    param([Parameter(Mandatory)][string]$SolutionRoot)
-
-    $projects = Get-ChildItem -Path $SolutionRoot -Recurse -Filter "*.csproj" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notlike "*\node_modules\*" }
-    if ($projects.Count -eq 0) { return $false }
-
-    foreach ($project in $projects) {
-        $assets = Join-Path $project.DirectoryName "obj\project.assets.json"
-        if (-not (Test-Path -LiteralPath $assets -PathType Leaf)) { return $false }
-        if ($project.LastWriteTimeUtc -gt (Get-Item -LiteralPath $assets).LastWriteTimeUtc) { return $false }
-    }
-
-    return $true
-}
-
 function Invoke-OnlyRagWebBuild {
     param(
         [Parameter(Mandatory)]
@@ -250,33 +234,5 @@ function Test-OnlyRagPublishPayload {
     if ($forbiddenMatches) {
         $items = ($forbiddenMatches | Select-Object -First 20 -ExpandProperty FullName) -join [Environment]::NewLine
         throw "Publish output contains files or directories that must not be packaged:$([Environment]::NewLine)$items"
-    }
-}
-
-function Remove-OnlyRagDirectoryRobust {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Path,
-        [Parameter()]
-        [scriptblock]$BeforeRetry,
-        [int]$MaxRetries = 3,
-        [int]$RetryDelayMs = 1000
-    )
-
-    for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-        try {
-            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
-            return
-        }
-        catch {
-            if ($attempt -ge $MaxRetries) {
-                throw
-            }
-
-            if ($BeforeRetry) {
-                & $BeforeRetry
-            }
-            Start-Sleep -Milliseconds $RetryDelayMs
-        }
     }
 }

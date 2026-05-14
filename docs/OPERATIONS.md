@@ -108,7 +108,7 @@ settings actions above.
 | Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. Use `-SkipInstallWhenUpToDate` only after a completed npm restore in the same workspace. |
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
 | Web lint | `npm run lint` from `src\OnlyRag.Web` | Runs ESLint over the React/Vite workspace. |
-| Web format check | `npm run format:check` from `src\OnlyRag.Web` | Runs Prettier in check mode without rewriting files. |
+| Web format check | `npm run format:check` from `src\OnlyRag.Web` | Runs Prettier plus the frontend text-format checker in check mode without rewriting files. |
 | Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, npm production dependency audit, NuGet transitive vulnerability audit, web typecheck, web lint, web format check, .NET tests, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
 | Installer prerequisite self-test | `pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest` | Simulates present and missing blocking prerequisites and verifies the expected message content. |
 | Package installer | `pwsh .\scripts\Build-Installer.ps1` | Builds web, publishes WPF, validates publish output, and compiles Inno Setup installer when `ISCC.exe` is installed. Pass `-SigningCertificateThumbprint` for signed release candidates. |

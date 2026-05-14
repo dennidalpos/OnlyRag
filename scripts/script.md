@@ -28,7 +28,7 @@ Run repository scripts from the repository root in PowerShell 7 unless a script 
 | `build` | `src\OnlyRag.Web\package.json` | Esegue `tsc -b` e `vite build`. | Build asset web statici. | `Build-Web.ps1`, `Build-Installer.ps1`. | Node/npm e dipendenze installate. | Output in `src\OnlyRag.Web\dist`. |
 | `typecheck` | `src\OnlyRag.Web\package.json` | Esegue TypeScript senza emit. | Verifica frontend. | `Invoke-Gate.ps1`, documentazione operativa. | Node/npm e dipendenze installate. | Separato da lint e format check. |
 | `lint` | `src\OnlyRag.Web\package.json` | Esegue ESLint sul workspace React/Vite. | Verifica statica frontend. | `Invoke-Gate.ps1`, documentazione operativa. | Node/npm e dipendenze installate. | Non riscrive file. |
-| `format:check` | `src\OnlyRag.Web\package.json` | Esegue Prettier in check mode sui manifest/config e `scripts\check-format.mjs` sui testi sorgente supportati. | Verifica non invasiva della formattazione. | `Invoke-Gate.ps1`, documentazione operativa. | Node/npm e dipendenze installate. | Non applica formattazione automatica. |
+| `format:check` | `src\OnlyRag.Web\package.json` | Esegue Prettier in check mode sui manifest/config/script frontend e `scripts\check-format.mjs` sui testi sorgente supportati. | Verifica non invasiva della formattazione. | `Invoke-Gate.ps1`, documentazione operativa. | Node/npm e dipendenze installate. | Non applica formattazione automatica. |
 | `preview` | `src\OnlyRag.Web\package.json` | Avvia preview Vite su `127.0.0.1`. | Preview manuale degli asset buildati. | Uso manuale. | Build web già prodotta. | Non usato da CI o packaging. |
 
 ## Migrazioni

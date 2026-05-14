@@ -206,6 +206,7 @@ begin
     RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) or
     RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) or
     DirExists(ExpandConstant('{commonpf}') + '\Microsoft\EdgeWebView\Application') or
+    DirExists(ExpandConstant('{commonpf32}') + '\Microsoft\EdgeWebView\Application') or
     DirExists(ExpandConstant('{localappdata}') + '\Microsoft\EdgeWebView\Application');
 end;
 

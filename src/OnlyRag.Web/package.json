@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check eslint.config.js .prettierrc.json package.json && node scripts/check-format.mjs",
+    "format:check": "prettier --check eslint.config.js .prettierrc.json package.json scripts/check-format.mjs && node scripts/check-format.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

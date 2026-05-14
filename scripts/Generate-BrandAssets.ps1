@@ -1,9 +1,21 @@
+#requires -Version 7.0
+[CmdletBinding()]
+param()
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BrandRoot = Join-Path $RepoRoot "assets\brand"
 $SourceIconPath = Join-Path $RepoRoot "src\OnlyRag.App\Assets\OnlyRag.svg"
+
+if (-not $IsWindows) {
+    throw "Generate-BrandAssets.ps1 requires Windows because it uses WPF imaging assemblies."
+}
+
+if (-not (Test-Path -LiteralPath $SourceIconPath -PathType Leaf)) {
+    throw "Source icon not found: $SourceIconPath"
+}
 
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase

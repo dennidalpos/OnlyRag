@@ -2,7 +2,7 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-12T19:50:00+02:00",
+  "last_updated": "2026-05-14T13:51:00+02:00",
   "production_target": true,
   "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
   "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, verify installer wizard visual layout, run interactive runtime checks, and make the final release decision.",
@@ -234,7 +234,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "last_completed_work": "Added enterprise self-signed signing support scripts and documentation: public .cer export from installer signer, target-machine trust verification for LocalMachine Root/TrustedPublisher, and signing documentation updates.",
+  "last_completed_work": "Completed repository script audit: removed unused build helper functions, tightened brand asset generation preflight, aligned installer WebView2 fallback detection, expanded frontend format checking, updated script documentation, reran the canonical gate successfully, built the unsigned installer, and generated non-invasive installer release evidence.",
   "open_questions": [],
-  "handoff_notes": "Optional OCR verification is complete for this machine. The enterprise self-signed path now has scripts and documentation, but trust verification still fails on this machine until the public .cer is deployed through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not call this a production enterprise release until trust verification and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
+  "handoff_notes": "Script audit found no remaining script blockers after the 2026-05-14 gate, unsigned installer build, and non-invasive installer release verification. Optional OCR verification is complete for this machine. The enterprise self-signed path now has scripts and documentation, but trust verification still fails on this machine until the public .cer is deployed through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not call this a production enterprise release until trust verification and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
 }
