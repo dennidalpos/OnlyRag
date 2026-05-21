@@ -2,15 +2,16 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-14T13:51:00+02:00",
+  "last_updated": "2026-05-15T10:38:52+02:00",
   "production_target": true,
   "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
-  "active_objective": "Complete the remaining release-readiness tasks: sign the installer, verify the signed installer lifecycle, verify installer wizard visual layout, run interactive runtime checks, and make the final release decision.",
+  "active_objective": "Resolve the release signing blocker before continuing dependent installer lifecycle, installer visual layout, interactive runtime, and final release decision tasks.",
   "assumptions": [
     "Generated outputs under bin, obj, dist, node_modules, and artifacts are build artifacts, not source state.",
     "OCR runtime preparation and live Ollama model workflows are optional feature paths unless included in the intended release scope.",
     "Interactive desktop launch and installer lifecycle checks require a Windows desktop session or clean Windows verification machine.",
-    "Installer wizard visual layout checks require a visible Windows session at representative DPI scaling and accessibility font settings; they are not covered by non-invasive installer evidence."
+    "Installer wizard visual layout checks require a visible Windows session at representative DPI scaling and accessibility font settings; they are not covered by non-invasive installer evidence.",
+    "Importing the enterprise self-signed code-signing certificate into LocalMachine trusted stores is a security boundary and requires explicit operator approval or managed GPO deployment."
   ],
   "decisions": [
     {
@@ -59,7 +60,9 @@
         "Confirm the installer Authenticode signature is valid and timestamped on a machine where the enterprise trust policy has applied."
       ],
       "completion_criteria": "artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is signed and signature verification passes on target machines after enterprise certificate trust deployment.",
-      "status": "pending"
+      "status": "blocked",
+      "last_checked": "2026-05-15T10:38:52+02:00",
+      "latest_result": "Blocked: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe currently reports Authenticode status NotSigned; the expected enterprise certificate thumbprint is absent from LocalMachine\\Root and LocalMachine\\TrustedPublisher. Windows SDK signtool.exe and Inno Setup ISCC.exe are installed in standard locations but not on PATH."
     },
     {
       "order": 3,
@@ -146,7 +149,7 @@
   "blockers": [
     {
       "id": "signed-release-blocked",
-      "reason": "The installer has an Authenticode signature and RFC 3161 timestamp, but the signer certificate is self-signed/untrusted until deployed to target machines through an enterprise trust mechanism such as Group Policy.",
+      "reason": "The current installer artifact is not signed. A matching enterprise self-signed public certificate exists locally, but it is absent from LocalMachine\\Root and LocalMachine\\TrustedPublisher; signing and trusted verification remain blocked until a CA-trusted certificate is used or enterprise trust is deployed with explicit approval.",
       "blocked_release": true
     },
     {
@@ -159,7 +162,7 @@
     {
       "id": "unsigned-installer",
       "severity": "high",
-      "description": "The installer is signed with a local self-signed certificate, but Windows does not trust the certificate chain until the enterprise root/trust policy is deployed and verified on target machines."
+      "description": "The current installer artifact is not signed. The available local certificate is self-signed and cannot satisfy release trust until the public certificate is deployed to trusted enterprise stores and verified on target machines, or a CA-trusted code-signing certificate is used."
     },
     {
       "id": "interactive-runtime-not-run",
@@ -208,7 +211,7 @@
     "typecheck": "passed",
     "tests": "passed",
     "build": "passed",
-    "security_review": "passed"
+    "security_review": "failed"
   },
   "commands": {
     "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -234,7 +237,7 @@
       "ONLYRAG_CERT_PASSWORD"
     ]
   },
-  "last_completed_work": "Completed repository script audit: removed unused build helper functions, tightened brand asset generation preflight, aligned installer WebView2 fallback detection, expanded frontend format checking, updated script documentation, reran the canonical gate successfully, built the unsigned installer, and generated non-invasive installer release evidence.",
+  "last_completed_work": "Verified release signing state: the installer artifact is currently NotSigned; the expected enterprise certificate is not trusted in LocalMachine stores; signtool.exe and Inno Setup ISCC.exe are installed in standard locations but not on PATH.",
   "open_questions": [],
-  "handoff_notes": "Script audit found no remaining script blockers after the 2026-05-14 gate, unsigned installer build, and non-invasive installer release verification. Optional OCR verification is complete for this machine. The enterprise self-signed path now has scripts and documentation, but trust verification still fails on this machine until the public .cer is deployed through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not call this a production enterprise release until trust verification and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
+  "handoff_notes": "Script audit found no remaining script blockers after the 2026-05-14 gate, unsigned installer build, and non-invasive installer release verification. Optional OCR verification is complete for this machine. On 2026-05-15, release signing verification found artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is NotSigned and the enterprise self-signed certificate thumbprint 1E4A238A06A117710F11816DAB0C1833AC775712 is missing from LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not import that certificate into trusted machine stores without explicit approval or managed GPO policy. Do not call this a production enterprise release until signing, trust verification, and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
 }
