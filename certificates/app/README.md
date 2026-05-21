@@ -1,16 +1,10 @@
-# App Certificates
+# App Certificate Notes
 
-Put local app code-signing certificates here when you want to sign a release build.
+Do not put private code-signing material in this repository directory.
 
-Supported file type:
+Private `.pfx` files, passwords, recovery keys, and vendor portal exports must stay outside the
+repository workspace. Use `scripts\Sign-Release.ps1 -CertificatePath` with an external PFX path, or
+use `-CertificateThumbprint` for a certificate already installed in a Windows certificate store.
 
-- `*.pfx`
-
-Do not commit private certificates or passwords. The repository `.gitignore` keeps certificate files in this directory out of version control while preserving this README and `.gitkeep`.
-
-Recommended local name:
-
-```text
-OnlyRag-CodeSigning.pfx
-```
-
+This directory may hold non-secret documentation placeholders and optional exported public `.cer`
+files for enterprise trust distribution. Generated certificate files remain ignored by Git.

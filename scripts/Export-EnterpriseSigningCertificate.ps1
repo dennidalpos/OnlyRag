@@ -33,16 +33,7 @@ if (-not [string]::IsNullOrWhiteSpace($InstallerPath) -and
 if ([string]::IsNullOrWhiteSpace($InstallerPath) -and
     [string]::IsNullOrWhiteSpace($CertificatePath) -and
     [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
-    $certificates = @(Get-ChildItem -LiteralPath $certificateRoot -Filter "*.pfx" -File | Sort-Object Name)
-    if ($certificates.Count -eq 0) {
-        throw "No .pfx certificate found in '$certificateRoot'. Pass -InstallerPath, -CertificatePath, or -CertificateThumbprint."
-    }
-    if ($certificates.Count -gt 1) {
-        $names = ($certificates | Select-Object -ExpandProperty Name) -join ", "
-        throw "Multiple .pfx certificates found in '$certificateRoot': $names. Pass -CertificatePath explicitly."
-    }
-
-    $CertificatePath = $certificates[0].FullName
+    throw "Pass one source: -InstallerPath, -CertificatePath for an external .pfx, or -CertificateThumbprint. Private signing material must not be stored under the repository."
 }
 
 if (-not [string]::IsNullOrWhiteSpace($CertificatePath) -and -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
@@ -69,10 +60,10 @@ elseif (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
     }
 
     $resolvedCertificatePath = (Resolve-Path -LiteralPath $CertificatePath).Path
-    $certificateRootFullPath = [System.IO.Path]::GetFullPath($certificateRoot).TrimEnd('\') + '\'
+    $repositoryPrefix = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\') + '\'
     $certificateFullPath = [System.IO.Path]::GetFullPath($resolvedCertificatePath)
-    if (-not $certificateFullPath.StartsWith($certificateRootFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Certificate path must be under '$certificateRoot'."
+    if ($certificateFullPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to read a private signing certificate from inside the repository: $resolvedCertificatePath. Move the PFX outside the repository and pass that path."
     }
 
     $certificate = Get-PfxCertificate -FilePath $resolvedCertificatePath

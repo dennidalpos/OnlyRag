@@ -159,7 +159,7 @@ residual work is tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
 - [Documentation index](docs/README.md)
 - [Operations](docs/OPERATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Scripts](scripts/script.md)
+- [Scripts](scripts/README.md)
 - [Brand assets](docs/BRAND_ASSETS.md)
 - [RAG pipeline](docs/RAG_PIPELINE.md)
 - [OCR pipeline](docs/OCR_PIPELINE.md)

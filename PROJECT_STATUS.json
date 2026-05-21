@@ -1,243 +1,284 @@
 {
-  "project_name": "OnlyRag",
-  "status": "active",
-  "current_phase": "release-readiness-blocked",
-  "last_updated": "2026-05-15T10:38:52+02:00",
-  "production_target": true,
-  "summary": "Windows-first local RAG desktop app with WPF/WebView2 shell, in-process ASP.NET Minimal API backend, React/Vite web UI, SQLite plus sqlite-vec local storage, Ollama integration, OCR and Office ingestion support, and Inno Setup packaging.",
-  "active_objective": "Resolve the release signing blocker before continuing dependent installer lifecycle, installer visual layout, interactive runtime, and final release decision tasks.",
-  "assumptions": [
-    "Generated outputs under bin, obj, dist, node_modules, and artifacts are build artifacts, not source state.",
-    "OCR runtime preparation and live Ollama model workflows are optional feature paths unless included in the intended release scope.",
-    "Interactive desktop launch and installer lifecycle checks require a Windows desktop session or clean Windows verification machine.",
-    "Installer wizard visual layout checks require a visible Windows session at representative DPI scaling and accessibility font settings; they are not covered by non-invasive installer evidence.",
-    "Importing the enterprise self-signed code-signing certificate into LocalMachine trusted stores is a security boundary and requires explicit operator approval or managed GPO deployment."
-  ],
-  "decisions": [
+  "tasks": [
     {
-      "id": "windows-local-first-desktop-target",
-      "date": "2026-05-12T10:43:16+02:00",
-      "decision": "Treat Windows plus PowerShell 7 as the primary development and release environment.",
-      "impact": "Repository commands, path checks, installer verification, and release tasks are evaluated against Windows tooling first."
-    },
-    {
-      "id": "npm-lockfile-package-manager",
-      "date": "2026-05-12T10:43:16+02:00",
-      "decision": "Use npm as the frontend package manager because src\\OnlyRag.Web\\package-lock.json is present and package.json scripts are npm-based.",
-      "impact": "Do not introduce pnpm, yarn, or alternate frontend package manager conventions."
-    },
-    {
-      "id": "release-signing-required",
-      "date": "2026-05-12T10:43:16+02:00",
-      "decision": "Do not promote installer artifacts as release artifacts until a trusted code-signing certificate, signtool, Inno Setup, and signed lifecycle verification are available.",
-      "impact": "Packaging can be verified separately from release; signed release tasks remain blocked."
-    },
-    {
-      "id": "enterprise-self-signed-gpo-distribution",
-      "date": "2026-05-12T19:32:00+02:00",
-      "decision": "Treat self-signed certificate trust as an enterprise-managed deployment option only when the certificate is distributed to target machines through Group Policy.",
-      "impact": "Self-signed installer artifacts can be considered only for controlled domain environments after GPO trust deployment and clean-machine lifecycle verification; public release still requires a CA-trusted code-signing certificate."
-    }
-  ],
-  "current_tasks": [
-    {
-      "order": 2,
+      "id": "TASK-001",
       "priority": "P0",
-      "task": "Provision trusted Windows code-signing material outside Git and sign the installer.",
-      "addresses": [
-        "signed-release-blocked",
-        "unsigned-installer"
+      "status": "todo",
+      "title": "Fix job pause/resume lifecycle race",
+      "source": "AUD-001",
+      "effort": "medium",
+      "actions": [
+        "Introduce a Pausing state or lease-owner guard for running jobs.",
+        "Block resume while the job is still registered as running.",
+        "Separate cooperative pause from final cancellation."
       ],
-      "prerequisites": [
-        "Trusted code-signing certificate/private key",
-        "Secure password delivery through ONLYRAG_CERT_PASSWORD or an interactive secure prompt",
-        "Available Windows SDK signtool.exe and Inno Setup"
-      ],
-      "execution": [
-        "Place signing material in the approved external location, not in source control.",
-        "For enterprise self-signed deployment, export only the public .cer with scripts\\Export-EnterpriseSigningCertificate.ps1 and distribute it through GPO to LocalMachine\\Root and LocalMachine\\TrustedPublisher.",
-        "Run scripts\\Sign-Release.ps1 with the trusted certificate and versioned installer artifact.",
-        "Confirm the installer Authenticode signature is valid and timestamped on a machine where the enterprise trust policy has applied."
-      ],
-      "completion_criteria": "artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is signed and signature verification passes on target machines after enterprise certificate trust deployment.",
-      "status": "blocked",
-      "last_checked": "2026-05-15T10:38:52+02:00",
-      "latest_result": "Blocked: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe currently reports Authenticode status NotSigned; the expected enterprise certificate thumbprint is absent from LocalMachine\\Root and LocalMachine\\TrustedPublisher. Windows SDK signtool.exe and Inno Setup ISCC.exe are installed in standard locations but not on PATH."
+      "verify": [
+        "Pause a slow running job.",
+        "Resume immediately after pause.",
+        "Resume only after cancellation has fully completed.",
+        "Repeat with maxParallelJobs greater than 1."
+      ]
     },
     {
-      "order": 3,
+      "id": "TASK-002",
       "priority": "P0",
-      "task": "Run signed installer lifecycle verification on a clean Windows machine.",
-      "addresses": [
-        "clean-machine-installer-lifecycle-not-run",
-        "installer-lifecycle-not-verified"
+      "status": "todo",
+      "title": "Make document import deduplication atomic",
+      "source": "AUD-002",
+      "effort": "medium-high",
+      "actions": [
+        "Audit existing duplicate document rows.",
+        "Add a unique database constraint or equivalent transactional guard for non-null sha256 values.",
+        "Handle duplicate import conflicts without creating shared-file delete hazards."
       ],
-      "prerequisites": [
-        "Signed installer from task 2",
-        "Clean Windows verification machine or equivalent disposable VM"
-      ],
-      "execution": [
-        "Run scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle.",
-        "Verify install, first launch, upgrade path if applicable, rollback behavior, uninstall, and SmartScreen/signature behavior.",
-        "Record any installer findings as blockers before release sign-off."
-      ],
-      "completion_criteria": "Signed installer lifecycle checks pass on a clean Windows environment with no unresolved release-blocking findings.",
-      "status": "pending"
+      "verify": [
+        "Import the same file concurrently.",
+        "Import a batch containing duplicates.",
+        "Delete one duplicate candidate.",
+        "Reindex after deletion."
+      ]
     },
     {
-      "order": 4,
+      "id": "TASK-003",
+      "priority": "P0",
+      "status": "todo",
+      "title": "Fix OCR bridge process I/O, timeout, and cancellation behavior",
+      "source": "AUD-003",
+      "effort": "medium",
+      "actions": [
+        "Read stdout and stderr concurrently.",
+        "Add explicit timeouts to OCR check, prepare, and recognize operations.",
+        "Terminate the process tree on cancellation or timeout."
+      ],
+      "verify": [
+        "Bridge writes large stderr output.",
+        "Bridge hangs.",
+        "Bridge returns invalid stdout.",
+        "Application closes during OCR."
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "priority": "P0",
+      "status": "todo",
+      "title": "Move signing material out of the repository workspace",
+      "source": "AUD-004",
+      "effort": "low",
+      "actions": [
+        "Remove local PFX and password files from the repository tree.",
+        "Require an explicit external certificate path or secure prompt/environment variable.",
+        "Keep only non-secret certificate documentation in the repo."
+      ],
+      "verify": [
+        "Run git status --ignored.",
+        "Run signing with an external certificate path.",
+        "Confirm no signing secret remains under the repository root."
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "priority": "P0",
+      "status": "todo",
+      "title": "Replace or harden Ollama remote installer execution",
+      "source": "AUD-005",
+      "effort": "low-medium",
+      "actions": [
+        "Remove or gate the irm | iex PowerShell path.",
+        "Prefer manual installation guidance or a pinned, verified installer flow.",
+        "Show clear offline and enterprise-policy errors in the UI."
+      ],
+      "verify": [
+        "Attempt install without confirmation.",
+        "Attempt install offline.",
+        "Verify no unpinned remote script is executed automatically."
+      ]
+    },
+    {
+      "id": "TASK-006",
       "priority": "P1",
-      "task": "Run installer wizard visual layout verification across display scaling and font settings.",
-      "addresses": [
-        "installer-wizard-visual-layout-not-run"
+      "status": "todo",
+      "title": "Reduce unauthenticated health metadata exposure",
+      "source": "AUD-006",
+      "effort": "low",
+      "actions": [
+        "Keep only a minimal unauthenticated liveness endpoint.",
+        "Move vector backend and embedding counters behind authenticated diagnostics."
       ],
-      "prerequisites": [
-        "Signed installer from task 2",
-        "Clean Windows verification machine or equivalent disposable VM",
-        "Visible interactive desktop session with configurable display scaling"
-      ],
-      "execution": [
-        "Run the signed installer visibly and verify prerequisite dialogs, destination, additional tasks, ready, installing, and finished pages do not clip or overlap.",
-        "Repeat visible wizard passes at Windows display scaling 100%, 125%, 150%, and 200%.",
-        "Repeat at least one visible pass with a non-default Windows UI font or accessibility text setting when available.",
-        "Record screenshots or exact observations for any clipped text, overlapping controls, or wizard artwork collisions."
-      ],
-      "completion_criteria": "Installer wizard pages and prerequisite dialogs render without clipping or overlap across the documented display scaling and font scenarios.",
-      "status": "pending"
+      "verify": [
+        "Call health endpoints without a token.",
+        "Call diagnostics with and without a token."
+      ]
     },
     {
-      "order": 5,
+      "id": "TASK-007",
       "priority": "P1",
-      "task": "Run interactive desktop and populated browser UI verification.",
-      "addresses": [
-        "interactive-runtime-not-run"
+      "status": "todo",
+      "title": "Add frontend unit, component, and e2e coverage",
+      "source": "AUD-008",
+      "effort": "medium-high",
+      "actions": [
+        "Add tests for Chat, Documents, Settings, error states, and persisted WebView storage.",
+        "Add an e2e smoke path for import, job state, backend offline, and preview modal."
       ],
-      "prerequisites": [
-        "Windows desktop session",
-        "WebView2 Runtime",
-        "Representative imported documents",
-        "Ollama endpoint when model-backed workflows are tested"
-      ],
-      "execution": [
-        "Launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug or the installed app.",
-        "Verify document import, populated document views, active jobs, retrieval/chat, translation records, settings persistence, and shutdown behavior.",
-        "Capture defects with exact workflow, input, expected result, and observed result."
-      ],
-      "completion_criteria": "Core desktop and UI workflows pass with representative local data, or all defects are classified and resolved or accepted before public release.",
-      "status": "pending"
+      "verify": [
+        "Run new frontend test script.",
+        "Run typecheck, lint, format check, and build."
+      ]
     },
     {
-      "order": 6,
+      "id": "TASK-008",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Split oversized mixed-responsibility files",
+      "source": "AUD-007",
+      "effort": "high",
+      "actions": [
+        "Split SettingsSection into focused settings panels.",
+        "Split DocumentIngestionService by document strategy.",
+        "Split InProcessBackend DI, middleware, endpoint, and helper responsibilities."
+      ],
+      "verify": [
+        "Run stale reference search.",
+        "Run canonical gate after each split batch."
+      ]
+    },
+    {
+      "id": "TASK-009",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Normalize API contracts and error responses",
+      "source": "AUD-014",
+      "effort": "medium",
+      "actions": [
+        "Add OpenAPI or contract tests for critical backend/frontend DTOs.",
+        "Standardize error response shape and status codes.",
+        "Avoid surfacing raw external exception details to the UI."
+      ],
+      "verify": [
+        "Run backend contract tests.",
+        "Run frontend typecheck against generated or tested contracts."
+      ]
+    },
+    {
+      "id": "TASK-010",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Improve polling, stale-state, and shutdown UX",
+      "source": "AUD-009",
+      "effort": "medium",
+      "actions": [
+        "Surface repeated polling failures in the UI.",
+        "Track last successful refresh time.",
+        "Do not treat active-job API failure as zero active jobs during app exit."
+      ],
+      "verify": [
+        "Backend offline during polling.",
+        "Corrupted browser storage.",
+        "Exit while active jobs endpoint fails."
+      ]
+    },
+    {
+      "id": "TASK-011",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Add database status constraints and migration checks",
+      "source": "AUD-015",
+      "effort": "medium",
+      "actions": [
+        "Add CHECK constraints or equivalent validation for job and translation statuses.",
+        "Create migration checks for existing invalid statuses.",
+        "Align code enum-like transitions with database constraints."
+      ],
+      "verify": [
+        "Migrate an existing database.",
+        "Attempt invalid status writes.",
+        "Run job and translation lifecycle tests."
+      ]
+    },
+    {
+      "id": "TASK-012",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Run signed installer lifecycle verification on a clean Windows machine",
+      "source": "release-gate",
+      "effort": "medium",
+      "actions": [
+        "Sign the installer with trusted signing material outside Git.",
+        "Run installer install, first launch, upgrade if applicable, rollback, uninstall, and SmartScreen/signature checks on a clean machine."
+      ],
+      "verify": [
+        "Run scripts\\Test-InstallerRelease.ps1 with -RequireSigned and -RunInstallLifecycle.",
+        "Confirm Authenticode signature and timestamp validation."
+      ]
+    },
+    {
+      "id": "TASK-013",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Run visible installer wizard layout verification",
+      "source": "release-gate",
+      "effort": "medium",
+      "actions": [
+        "Verify installer wizard pages in a visible desktop session.",
+        "Repeat at 100%, 125%, 150%, and 200% display scaling.",
+        "Repeat at least once with non-default accessibility text settings."
+      ],
+      "verify": [
+        "Record screenshots or exact observations for every wizard page.",
+        "Confirm no clipping, overlap, or unreadable controls."
+      ]
+    },
+    {
+      "id": "TASK-014",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Run interactive desktop and populated UI verification",
+      "source": "release-gate",
+      "effort": "medium",
+      "actions": [
+        "Launch the WPF/WebView app in a Windows desktop session.",
+        "Verify document import, active jobs, retrieval/chat, translation records, settings persistence, and shutdown behavior with representative data."
+      ],
+      "verify": [
+        "Run with representative imported documents.",
+        "Run with Ollama-backed workflows when in release scope.",
+        "Capture exact defects and reproduction steps."
+      ]
+    },
+    {
+      "id": "TASK-015",
       "priority": "P2",
-      "task": "Finalize release readiness decision.",
-      "addresses": [
-        "signed-release-blocked",
-        "clean-machine-installer-lifecycle-not-run",
-        "installer-wizard-visual-layout-not-run",
-        "interactive-runtime-not-run"
+      "status": "todo",
+      "title": "Finalize release readiness decision after fixes",
+      "source": "release-gate",
+      "effort": "low-medium",
+      "actions": [
+        "Re-run the canonical gate.",
+        "Re-run relevant targeted tests for every fixed audit finding.",
+        "Promote the artifact only if P0 tasks are complete and P1 residual risk is explicitly accepted."
       ],
-      "execution": [
-        "Re-run the canonical gate after any fixes made during residual verification.",
-        "Update PROJECT_STATUS.json quality gates, blockers, risks, and handoff notes to reflect the verified final state.",
-        "Promote the artifact only if P0 items are complete and no accepted P1 risk blocks the intended release scope."
-      ],
-      "completion_criteria": "PROJECT_STATUS.json shows no release-blocking blockers, quality gates reflect actual results, and the release decision is explicit.",
-      "status": "pending"
+      "verify": [
+        "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
+        "Confirm no unresolved P0 audit finding remains."
+      ]
     }
   ],
-  "next_tasks": [],
-  "blockers": [
-    {
-      "id": "signed-release-blocked",
-      "reason": "The current installer artifact is not signed. A matching enterprise self-signed public certificate exists locally, but it is absent from LocalMachine\\Root and LocalMachine\\TrustedPublisher; signing and trusted verification remain blocked until a CA-trusted certificate is used or enterprise trust is deployed with explicit approval.",
-      "blocked_release": true
+  "script_automation_status": {
+    "last_updated": "2026-05-22T00:07:16+02:00",
+    "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "commands": {
+      "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
+      "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+      "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release; pwsh .\\scripts\\Build-Web.ps1",
+      "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
+      "sign": "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath <external-pfx-path> -Version \"0.1.0\"",
+      "clean": "pwsh .\\scripts\\Clean.ps1 -WhatIf"
     },
-    {
-      "id": "clean-machine-installer-lifecycle-not-run",
-      "reason": "Install, launch, upgrade, rollback, uninstall, SmartScreen, and signed enforcement checks were not run on a clean Windows verification machine.",
-      "blocked_release": true
-    }
-  ],
-  "risks": [
-    {
-      "id": "unsigned-installer",
-      "severity": "high",
-      "description": "The current installer artifact is not signed. The available local certificate is self-signed and cannot satisfy release trust until the public certificate is deployed to trusted enterprise stores and verified on target machines, or a CA-trusted code-signing certificate is used."
-    },
-    {
-      "id": "interactive-runtime-not-run",
-      "severity": "medium",
-      "description": "The WPF desktop app and populated live UI workflows still need interactive verification."
-    },
-    {
-      "id": "installer-wizard-visual-layout-not-run",
-      "severity": "medium",
-      "description": "The installer pre-release checklist requires visible wizard layout checks at 100%, 125%, 150%, and 200% display scaling plus at least one non-default UI font or accessibility text setting; current scripts do not automate this visual verification."
-    },
-    {
-      "id": "local-signing-secret-file-present",
-      "severity": "medium",
-      "description": "A local signing password file is present under the ignored certificate directory. Do not commit it; prefer ONLYRAG_CERT_PASSWORD or an interactive secure prompt, and remove or rotate local secret material after signing."
-    }
-  ],
-  "dependencies": {
-    "runtime": [
-      "Windows 10 1809 or newer / Windows 11",
-      "Microsoft Edge WebView2 Runtime",
-      "Self-contained .NET 10 runtime components in packaged app",
-      "SQLite local database under %LOCALAPPDATA%\\OnlyRag\\data",
-      "sqlite-vec native extension",
-      "Ollama for chat, embeddings, and translation model features",
-      "Optional LibreOffice for legacy Office conversion and PDF export",
-      "Optional Python 3.10+ PaddleOCR runtime for OCR"
+    "residual_scripts": [
+      "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
+      "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored.",
+      "certificates\\app\\code_signing.ps1 is an ignored local helper that creates private PFX/password files under the repository; do not use it as a supported automation path."
     ],
-    "development": [
-      "PowerShell 7",
-      ".NET 10 SDK",
-      "Node.js ^20.19.0 || >=22.12.0 with npm",
-      "Inno Setup 6",
-      "Windows SDK signtool.exe for signed release candidates"
-    ],
-    "external_services": [
-      "NuGet package source",
-      "npm registry",
-      "Ollama endpoint, local or explicitly trusted non-loopback",
-      "RFC 3161 timestamp server for release signing"
-    ]
-  },
-  "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
-    "tests": "passed",
-    "build": "passed",
-    "security_review": "failed"
-  },
-  "commands": {
-    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev; dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
-    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "build": "Set-Location .\\src\\OnlyRag.Web; npm run build; Set-Location ..\\..; dotnet build .\\OnlyRag.sln --configuration Release --no-restore",
-    "export_enterprise_signing_certificate": "pwsh .\\scripts\\Export-EnterpriseSigningCertificate.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -OutputPath .\\certificates\\app\\OnlyRag-Enterprise-CodeSigning.cer",
-    "verify_enterprise_signing_trust": "pwsh .\\scripts\\Test-EnterpriseSigningTrust.ps1 -CertificateThumbprint 1E4A238A06A117710F11816DAB0C1833AC775712 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
-    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
-  },
-  "environment": {
-    "os_target": "Windows",
-    "shell": "PowerShell",
-    "required_env_vars": [],
-    "env_files": [],
-    "optional_env_vars": [
-      "ONLYRAG_WEB_DEV_SERVER",
-      "ONLYRAG_LIBREOFFICE_PATH",
-      "ONLYRAG_OCR_PYTHON",
-      "ONLYRAG_OCR_BRIDGE",
-      "ONLYRAG_CERT_PASSWORD"
-    ]
-  },
-  "last_completed_work": "Verified release signing state: the installer artifact is currently NotSigned; the expected enterprise certificate is not trusted in LocalMachine stores; signtool.exe and Inno Setup ISCC.exe are installed in standard locations but not on PATH.",
-  "open_questions": [],
-  "handoff_notes": "Script audit found no remaining script blockers after the 2026-05-14 gate, unsigned installer build, and non-invasive installer release verification. Optional OCR verification is complete for this machine. On 2026-05-15, release signing verification found artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe is NotSigned and the enterprise self-signed certificate thumbprint 1E4A238A06A117710F11816DAB0C1833AC775712 is missing from LocalMachine\\Root and LocalMachine\\TrustedPublisher. Do not import that certificate into trusted machine stores without explicit approval or managed GPO policy. Do not call this a production enterprise release until signing, trust verification, and clean-machine signed installer lifecycle verification pass. Public release still requires a CA-trusted certificate."
+    "last_completed_work": "Consolidated the canonical script inventory in scripts\\README.md, kept scripts\\script.md as a compatibility stub, updated script documentation links, and changed signing scripts to require private PFX material outside the repository or an installed certificate thumbprint."
+  }
 }

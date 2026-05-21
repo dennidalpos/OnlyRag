@@ -11,32 +11,25 @@ This document is the step-by-step release signing flow for OnlyRag on Windows.
 - Windows SDK with `signtool.exe`.
 - A trusted code-signing certificate with private key, exported as `.pfx`, or already installed in `Cert:\CurrentUser\My` / `Cert:\LocalMachine\My`.
 
-## Certificate Folder
+## Private Certificate Storage
 
-Put local app signing certificates in:
+Keep private signing material outside the repository workspace. Do not place `.pfx` files,
+passwords, recovery keys, or vendor portal exports under `certificates\app` or any other
+repository path.
 
-```powershell
-.\certificates\app\
-```
+`certificates\app` is reserved for non-secret documentation placeholders and optional exported
+public `.cer` files used for enterprise trust distribution.
 
-Recommended file name:
+## Option A: Sign From an External PFX
 
-```text
-OnlyRag-CodeSigning.pfx
-```
-
-Certificate files are ignored by Git. Do not commit `.pfx`, `.cer`, passwords, recovery keys, or vendor portal exports.
-
-## Option A: Sign From a PFX in the Repository Certificate Folder
-
-1. Copy the PFX to `.\certificates\app\OnlyRag-CodeSigning.pfx`.
+1. Store the PFX outside the repository, for example under a secured operator-controlled folder.
 
 2. Start PowerShell 7 from the repository root.
 
-3. Run the signing pipeline:
+3. Run the signing pipeline with the external path:
 
 ```powershell
-pwsh .\scripts\Sign-Release.ps1 -CertificatePath .\certificates\app\OnlyRag-CodeSigning.pfx -Version "0.1.0"
+pwsh .\scripts\Sign-Release.ps1 -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" -Version "0.1.0"
 ```
 
 4. Enter the PFX password when prompted.
@@ -110,7 +103,7 @@ For local automation, set the PFX password in the current PowerShell session bef
 
 ```powershell
 $env:ONLYRAG_CERT_PASSWORD = "<pfx password>"
-pwsh .\scripts\Sign-Release.ps1 -CertificatePath .\certificates\app\OnlyRag-CodeSigning.pfx -Version "0.1.0"
+pwsh .\scripts\Sign-Release.ps1 -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" -Version "0.1.0"
 Remove-Item Env:\ONLYRAG_CERT_PASSWORD
 ```
 
@@ -144,6 +137,7 @@ This verifies the signature, install, launch, shortcuts, optional component stat
 
 - `signtool.exe was not found`: install the Windows SDK or pass `-SignToolPath`.
 - `Inno Setup compiler was not found`: install Inno Setup 6 or pass `-InnoSetupCompiler`.
-- `No .pfx certificate found`: put a single `.pfx` in `.\certificates\app\` or pass `-CertificatePath`.
+- `Pass -CertificatePath for an external .pfx file or -CertificateThumbprint`: provide an installed certificate thumbprint or a PFX path outside the repository.
+- `Refusing to import a private signing certificate from inside the repository`: move the PFX outside the repository and pass that path.
 - `Signature status is NotSigned`: rerun through `scripts\Sign-Release.ps1` and verify the certificate has a private key.
 - `UnknownError` or timestamp failure: retry with network access or pass another RFC 3161 timestamp server through `-TimestampServer`.

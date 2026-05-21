@@ -40,35 +40,23 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 
 $outputRootPath = [System.IO.Path]::GetFullPath($OutputRoot)
-$certificateRoot = Join-Path $repoRoot "certificates\app"
 $importedThumbprint = $null
 $signingThumbprint = $CertificateThumbprint
 
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $outputRootPath
 
-function Get-OnlyRagDefaultCertificatePath {
+function Test-OnlyRagPathInRepository {
     param([Parameter(Mandatory)][string]$Path)
 
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-        throw "Certificate directory not found: $Path"
-    }
-
-    $certificates = @(Get-ChildItem -LiteralPath $Path -Filter "*.pfx" -File | Sort-Object Name)
-    if ($certificates.Count -eq 0) {
-        throw "No .pfx certificate found in '$Path'. Pass -CertificatePath or -CertificateThumbprint."
-    }
-    if ($certificates.Count -gt 1) {
-        $names = ($certificates | Select-Object -ExpandProperty Name) -join ", "
-        throw "Multiple .pfx certificates found in '$Path': $names. Pass -CertificatePath explicitly."
-    }
-
-    return $certificates[0].FullName
+    $repositoryPrefix = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\') + '\'
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    return $fullPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 try {
     if ([string]::IsNullOrWhiteSpace($signingThumbprint)) {
         if ([string]::IsNullOrWhiteSpace($CertificatePath)) {
-            $CertificatePath = Get-OnlyRagDefaultCertificatePath -Path $certificateRoot
+            throw "Pass -CertificatePath for an external .pfx file or -CertificateThumbprint for an installed certificate. Private signing material must not be stored under the repository."
         }
 
         if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
@@ -76,10 +64,8 @@ try {
         }
 
         $resolvedCertificatePath = (Resolve-Path -LiteralPath $CertificatePath).Path
-        $certificateRootFullPath = [System.IO.Path]::GetFullPath($certificateRoot).TrimEnd('\') + '\'
-        $certificateFullPath = [System.IO.Path]::GetFullPath($resolvedCertificatePath)
-        if (-not $certificateFullPath.StartsWith($certificateRootFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Certificate path must be under '$certificateRoot'."
+        if (Test-OnlyRagPathInRepository -Path $resolvedCertificatePath) {
+            throw "Refusing to import a private signing certificate from inside the repository: $resolvedCertificatePath. Move the PFX outside the repository and pass that path."
         }
 
         if (-not $CertificatePassword) {

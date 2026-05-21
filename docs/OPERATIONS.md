@@ -129,7 +129,7 @@ Set-Location ..\..
 dotnet list .\OnlyRag.sln package --vulnerable --include-transitive --format json
 ```
 
-The full script inventory is documented in [scripts/script.md](../scripts/script.md). Top-level
+The full script inventory is documented in [scripts/README.md](../scripts/README.md). Top-level
 scripts are reserved for supported setup, build, test, package, signing, installer verification,
 brand asset generation, and the repository gate. Shared helpers live under `scripts\support`.
 
