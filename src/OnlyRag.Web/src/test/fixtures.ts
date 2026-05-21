@@ -1,0 +1,202 @@
+import type {
+  DiagnosticsResponse,
+  DocumentEmbeddingStatus,
+  DocumentOcrStatus,
+  DocumentPipelineStatus,
+  ImportedDocument,
+  LocalJob,
+  OcrLanguage,
+  OllamaInstallStatus,
+  OllamaModel,
+  OllamaSettings,
+  OllamaStatusResponse,
+  PerformanceSettings,
+  VectorBackendHealth
+} from "../api";
+
+export function createDocument(overrides: Partial<ImportedDocument> = {}): ImportedDocument {
+  return {
+    id: 1,
+    documentUid: "doc-1",
+    originalFileName: "manuale.pdf",
+    originalPath: "C:\\Docs\\manuale.pdf",
+    sha256: "abc123",
+    mimeType: "application/pdf",
+    fileExtension: ".pdf",
+    fileSizeBytes: 2048,
+    status: "Indexed",
+    pageCount: 2,
+    chunkCount: 4,
+    currentJobId: null,
+    lastError: null,
+    createdAtUtc: "2026-05-21T12:00:00Z",
+    updatedAtUtc: "2026-05-21T12:05:00Z",
+    ...overrides
+  };
+}
+
+export function createModel(overrides: Partial<OllamaModel> = {}): OllamaModel {
+  return {
+    name: "llama3.2:3b",
+    model: "llama3.2:3b",
+    modifiedAt: "2026-05-21T12:00:00Z",
+    size: 2_000_000_000,
+    digest: "digest",
+    family: "llama",
+    parameterSize: "3B",
+    quantizationLevel: "Q4",
+    ...overrides
+  };
+}
+
+export function createOllamaSettings(overrides: Partial<OllamaSettings> = {}): OllamaSettings {
+  return {
+    ollamaBaseUrl: "http://localhost:11434",
+    defaultChatModel: "llama3.2:3b",
+    defaultEmbeddingModel: "nomic-embed-text",
+    defaultTranslationModel: "llama3.2:3b",
+    requestTimeoutSeconds: 120,
+    embeddingBatchSize: 1,
+    embeddingNumCtx: null,
+    chatNumCtx: null,
+    translationNumCtx: null,
+    trustNonLocalEndpoint: false,
+    ...overrides
+  };
+}
+
+export function createOllamaStatus(overrides: Partial<OllamaStatusResponse> = {}): OllamaStatusResponse {
+  return {
+    state: "Ready",
+    isReachable: true,
+    baseUrl: "http://localhost:11434",
+    installedModelCount: 1,
+    message: "Ollama raggiungibile.",
+    suggestion: null,
+    ...overrides
+  };
+}
+
+export function createVectorHealth(overrides: Partial<VectorBackendHealth> = {}): VectorBackendHealth {
+  return {
+    backendName: "sqlite-vec",
+    storagePersistent: true,
+    vectorLimit: 100000,
+    totalVectors: 4,
+    nearLimit: false,
+    warning: null,
+    ...overrides
+  };
+}
+
+export function createOcrLanguage(overrides: Partial<OcrLanguage> = {}): OcrLanguage {
+  return {
+    code: "it",
+    label: "Italiano",
+    scriptGroup: "Principali",
+    isDefault: true,
+    ...overrides
+  };
+}
+
+export function createJob(overrides: Partial<LocalJob> = {}): LocalJob {
+  return {
+    id: "job-1",
+    type: "document-ingestion",
+    status: "Running",
+    priority: 0,
+    progressPercent: 45,
+    currentStep: "Importazione in corso",
+    error: null,
+    updatedAt: "2026-05-21T12:10:00Z",
+    ...overrides
+  };
+}
+
+export function createEmbeddingStatus(overrides: Partial<DocumentEmbeddingStatus> = {}): DocumentEmbeddingStatus {
+  return {
+    documentId: 1,
+    state: "Completed",
+    model: "nomic-embed-text",
+    chunkCount: 4,
+    embeddedChunkCount: 4,
+    progressPercent: 100,
+    currentJobId: null,
+    currentStep: null,
+    vectorSearchBackend: "sqlite-vec",
+    lastEmbeddedAtUtc: "2026-05-21T12:05:00Z",
+    ...overrides
+  };
+}
+
+export function createOcrStatus(overrides: Partial<DocumentOcrStatus> = {}): DocumentOcrStatus {
+  return {
+    documentId: 1,
+    state: "Completed",
+    pageCount: 2,
+    ocrPageCount: 2,
+    currentPage: 2,
+    totalPages: 2,
+    averageConfidence: 0.92,
+    currentJobId: null,
+    currentStep: null,
+    engineName: "PaddleOCR",
+    lastError: null,
+    ...overrides
+  };
+}
+
+export function createPipelineStatus(overrides: Partial<DocumentPipelineStatus> = {}): DocumentPipelineStatus {
+  const completed = { state: "Completed" as const, error: null, completedAtUtc: "2026-05-21T12:05:00Z" };
+  return {
+    documentId: 1,
+    ocrPolicy: "Auto",
+    import: completed,
+    analysis: completed,
+    ocr: completed,
+    textExtraction: completed,
+    chunking: completed,
+    embedding: completed,
+    overallState: "Completed",
+    activeJobId: null,
+    activeJobType: null,
+    ...overrides
+  };
+}
+
+export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}): DiagnosticsResponse {
+  return {
+    appVersion: "0.1.0",
+    databasePath: "C:\\OnlyRag\\onlyrag.db",
+    logsDirectory: "C:\\OnlyRag\\logs",
+    ollamaStatus: "Ready",
+    ollamaIsReachable: true,
+    ocrStatus: "Configured",
+    ocrIsConfigured: true,
+    ocrEngineName: "PaddleOCR",
+    ...overrides
+  };
+}
+
+export function createPerformanceSettings(overrides: Partial<PerformanceSettings> = {}): PerformanceSettings {
+  return {
+    maxParallelJobs: 1,
+    maxOcrParallelPages: 1,
+    embeddingBatchSize: 1,
+    translationBatchSize: 1,
+    maxContextChunks: 8,
+    requestTimeoutSeconds: 120,
+    enableLowResourceMode: false,
+    ...overrides
+  };
+}
+
+export function createOllamaInstallStatus(overrides: Partial<OllamaInstallStatus> = {}): OllamaInstallStatus {
+  return {
+    cliInstalled: true,
+    apiReachable: true,
+    installCommand: "https://ollama.com/download",
+    networkAccessHint: "Download manuale disponibile.",
+    ...overrides
+  };
+}

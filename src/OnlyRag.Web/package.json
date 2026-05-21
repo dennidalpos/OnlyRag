@@ -11,7 +11,10 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check eslint.config.js .prettierrc.json package.json scripts/check-format.mjs && node scripts/check-format.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "format:check": "prettier --check eslint.config.js .prettierrc.json package.json playwright.config.ts scripts/check-format.mjs && node scripts/check-format.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
@@ -20,14 +23,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.9.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "axe-core": "^4.10.0",
     "eslint": "^10.3.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.3",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.59.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^4.1.7"
   }
 }

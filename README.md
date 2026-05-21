@@ -109,10 +109,11 @@ pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 
 The gate includes npm production dependency audit and NuGet transitive vulnerability audit.
 
-Run web lint and formatter checks directly:
+Run web tests, lint, and formatter checks directly:
 
 ```powershell
 Set-Location .\src\OnlyRag.Web
+npm run test
 npm run typecheck
 npm run lint
 npm run format:check

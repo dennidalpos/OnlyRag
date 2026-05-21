@@ -170,7 +170,7 @@
     {
       "id": "TASK-007",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Add frontend unit, component, and e2e coverage",
       "source": "AUD-008",
       "effort": "medium-high",
@@ -181,12 +181,22 @@
       "verify": [
         "Run new frontend test script.",
         "Run typecheck, lint, format check, and build."
+      ],
+      "completed_at": "2026-05-22T01:16:20+02:00",
+      "result": "Added Vitest/jsdom unit and component coverage for API client behavior, WebView exit lifecycle storage, Chat, Documents, Settings, settings helper normalization, error states, and persisted chat draft/session data. Added a Playwright smoke test with a mocked local backend covering document import, active job state, backend offline handling, and preview modal rendering. Integrated the frontend test script into the canonical repository gate and documented the new commands.",
+      "checks": [
+        "npm run test",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check",
+        "npm run build",
+        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
       ]
     },
     {
       "id": "TASK-008",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Split oversized mixed-responsibility files",
       "source": "AUD-007",
       "effort": "high",
@@ -198,7 +208,19 @@
       "verify": [
         "Run stale reference search.",
         "Run canonical gate after each split batch."
-      ]
+      ],
+      "result": "Split SettingsSection rendering into focused settings panel components behind a thin container/context, split DocumentIngestionService into partial strategy files for text, PDF/OCR, Office, and progress helpers, and split InProcessBackend startup, DI, auth, endpoint helpers, document import validation, translation helpers, and error mapping into focused partial files.",
+      "checks": [
+        "dotnet build .\\OnlyRag.sln --no-restore",
+        "dotnet test .\\OnlyRag.sln --no-restore",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check",
+        "npm run test",
+        "npm run build",
+        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
+      ],
+      "completed_at": "2026-05-22T01:33:06+02:00"
     },
     {
       "id": "TASK-009",
@@ -322,13 +344,12 @@
     }
   ],
   "oversized_files": [
-    "src\\OnlyRag.Api\\InProcessBackend.cs is oversized; TASK-008 tracks splitting DI, middleware, endpoint, and helper responsibilities.",
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.tsx is oversized; TASK-008 tracks splitting it into focused settings panels.",
+    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts remains oversized as a state-only settings coordinator after TASK-008 panel extraction; schedule a focused hook split if strict hook line thresholds are required.",
     "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs is oversized but remains a single migration aggregate; defer split to focused storage refactor.",
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
   "script_automation_status": {
-    "last_updated": "2026-05-22T01:00:57+02:00",
+    "last_updated": "2026-05-22T01:35:05+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -342,6 +363,6 @@
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Completed TASK-006 by reducing unauthenticated health output to minimal liveness and moving vector health metadata behind authenticated diagnostics."
+    "last_completed_work": "Completed TASK-008 by splitting oversized mixed-responsibility Settings, ingestion, and in-process backend files into focused modules and verifying build, tests, lint, typecheck, format, and web build."
   }
 }

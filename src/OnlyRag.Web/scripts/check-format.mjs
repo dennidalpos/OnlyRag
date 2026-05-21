@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const roots = ["src", "vite.config.ts", "tsconfig.json", "index.html"];
+const roots = ["src", "e2e", "vite.config.ts", "playwright.config.ts", "tsconfig.json", "index.html"];
 const checkedExtensions = new Set([".ts", ".tsx", ".css", ".json", ".html"]);
 const ignoredDirectories = new Set(["dist", "node_modules"]);
 const failures = [];

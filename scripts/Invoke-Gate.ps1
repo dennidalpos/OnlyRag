@@ -214,6 +214,16 @@ Invoke-GateStep "web format check" {
     }
 }
 
+Invoke-GateStep "web tests" {
+    Push-Location $webRoot
+    try {
+        npm run test
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 Invoke-GateStep ".NET tests" {
     dotnet test $solution --configuration $Configuration --no-restore --logger "console;verbosity=minimal"
 }
