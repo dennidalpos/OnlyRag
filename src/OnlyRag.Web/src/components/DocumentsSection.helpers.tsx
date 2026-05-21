@@ -292,7 +292,7 @@ export function DocumentDetailCard({
   onPreview: (doc: ImportedDocument) => void;
 }) {
   const isOcrDoc = isOcrCandidate(document);
-  const isJobActive = activeJob?.status === "Running" || activeJob?.status === "Pending" || activeJob?.status === "Paused";
+  const isJobActive = activeJob?.status === "Running" || activeJob?.status === "Pausing" || activeJob?.status === "Pending" || activeJob?.status === "Paused";
 
   return (
     <div className="settings-card document-detail-card">

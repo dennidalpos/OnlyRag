@@ -41,6 +41,31 @@ public sealed class SqliteLocalJobQueueTests
     }
 
     [Fact]
+    public async Task PauseAsync_RunningJobUsesPausingUntilWorkerFinalizesPause()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        SqliteLocalJobQueue queue = await tempStorage.CreateInitializedQueueAsync();
+        LocalJob job = await queue.CreateAsync(new CreateLocalJobRequest("embedding", "{}"));
+        LocalJob? leased = await queue.TryLeaseNextAsync();
+
+        LocalJob? pausing = await queue.PauseAsync(job.Id);
+        LocalJob? immediateResume = await queue.ResumeAsync(job.Id);
+        LocalJob? paused = await queue.CompletePauseAsync(job.Id);
+        LocalJob? resumed = await queue.ResumeAsync(job.Id);
+
+        Assert.NotNull(leased);
+        Assert.Equal(JobStatus.Running, leased.Status);
+        Assert.NotNull(pausing);
+        Assert.Equal(JobStatus.Pausing, pausing.Status);
+        Assert.NotNull(immediateResume);
+        Assert.Equal(JobStatus.Pausing, immediateResume.Status);
+        Assert.NotNull(paused);
+        Assert.Equal(JobStatus.Paused, paused.Status);
+        Assert.NotNull(resumed);
+        Assert.Equal(JobStatus.Pending, resumed.Status);
+    }
+
+    [Fact]
     public async Task SaveCheckpointAsync_PersistsProgressAndCheckpoint()
     {
         using TempStorage tempStorage = TempStorage.Create();
@@ -75,6 +100,25 @@ public sealed class SqliteLocalJobQueueTests
         Assert.Equal(1, recovered);
         Assert.NotNull(recoveredJob);
         Assert.Equal(JobStatus.Pending, recoveredJob.Status);
+    }
+
+    [Fact]
+    public async Task RecoverInterruptedJobsAsync_ReturnsPausingJobsToPausedAfterRestart()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        SqliteLocalJobQueue firstQueue = await tempStorage.CreateInitializedQueueAsync();
+        LocalJob job = await firstQueue.CreateAsync(new CreateLocalJobRequest("ingestion", "{}"));
+        LocalJob? leased = await firstQueue.TryLeaseNextAsync();
+        Assert.NotNull(leased);
+        await firstQueue.PauseAsync(job.Id);
+
+        SqliteLocalJobQueue restartedQueue = tempStorage.CreateQueue();
+        int recovered = await restartedQueue.RecoverInterruptedJobsAsync();
+        LocalJob? recoveredJob = await restartedQueue.GetAsync(job.Id);
+
+        Assert.Equal(1, recovered);
+        Assert.NotNull(recoveredJob);
+        Assert.Equal(JobStatus.Paused, recoveredJob.Status);
     }
 
     private sealed class TempStorage : IDisposable

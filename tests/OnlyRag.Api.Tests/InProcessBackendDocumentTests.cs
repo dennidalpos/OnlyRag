@@ -43,6 +43,36 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsImport_DeduplicatesDuplicateFilesInSameBatch()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("batch-dedup-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        byte[] bytes = Encoding.UTF8.GetBytes("same-batch-content");
+        using MultipartFormDataContent content = new();
+        content.Add(new ByteArrayContent(bytes), "files", "One.txt");
+        content.Add(new ByteArrayContent(bytes), "files", "Two.txt");
+
+        using HttpResponseMessage importResponse = await httpClient.PostAsync("/api/documents/import", content);
+        DocumentImportResponse? importPayload = await importResponse.Content.ReadFromJsonAsync<DocumentImportResponse>(JsonOptions);
+        ImportedDocument[]? documents = await httpClient.GetFromJsonAsync<ImportedDocument[]>("/api/documents", JsonOptions);
+        SqliteLocalJobQueue queue = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store), queueDescriptor);
+        IReadOnlyList<LocalJob> jobs = await queue.ListAsync();
+
+        Assert.Equal(HttpStatusCode.OK, importResponse.StatusCode);
+        Assert.NotNull(importPayload);
+        Assert.Equal(2, importPayload.Documents.Count);
+        Assert.False(importPayload.Documents[0].Deduplicated);
+        Assert.True(importPayload.Documents[1].Deduplicated);
+        Assert.Equal(importPayload.Documents[0].Document.Id, importPayload.Documents[1].Document.Id);
+        Assert.NotNull(documents);
+        Assert.Single(documents);
+        Assert.Single(ListOriginalFiles(tempDescriptor));
+        Assert.Single(jobs);
+    }
+
+    [Fact]
     public async Task DocumentsImport_RejectsFileLargerThanConfiguredLimitAndLeavesNoOriginals()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("upload-file-limit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

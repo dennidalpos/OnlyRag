@@ -94,6 +94,17 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
         return await reader.ReadAsync(cancellationToken) ? ReadDocument(reader) : null;
     }
 
+    public async Task<int> CountByOriginalPathAsync(string originalPath, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(originalPath);
+
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM documents WHERE original_path = $originalPath;";
+        command.AddParameter("$originalPath", originalPath);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
     public async Task<ImportedDocument> CreateAsync(
         CreateDocumentRecordRequest request,
         CancellationToken cancellationToken = default)

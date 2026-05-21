@@ -308,7 +308,7 @@ export type TranslationExport = {
   status: string;
 };
 
-export type JobStatus = "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Paused";
+export type JobStatus = "Pending" | "Running" | "Pausing" | "Completed" | "Failed" | "Cancelled" | "Paused";
 
 export type LocalJob = {
   id: string;

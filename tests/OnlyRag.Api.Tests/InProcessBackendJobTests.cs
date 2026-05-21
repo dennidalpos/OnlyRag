@@ -30,6 +30,30 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task JobsResume_ReturnsConflictWhileRunningJobIsPausing()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("resume-pausing-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SqliteLocalJobQueue queue = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store), queueDescriptor);
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest("running-test", "{}"));
+        LocalJob? running = await queue.TryLeaseNextAsync();
+        LocalJob? pausing = await queue.PauseAsync(created.Id);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsync($"/api/jobs/{created.Id}/resume", content: null);
+        LocalJob? stored = await queue.GetAsync(created.Id);
+
+        Assert.NotNull(running);
+        Assert.Equal(JobStatus.Running, running.Status);
+        Assert.NotNull(pausing);
+        Assert.Equal(JobStatus.Pausing, pausing.Status);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.NotNull(stored);
+        Assert.Equal(JobStatus.Pausing, stored.Status);
+    }
+
+    [Fact]
     public async Task PrepareShutdown_WithNoActiveJobs_ReturnsCompleteResponse()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("shutdown-empty-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

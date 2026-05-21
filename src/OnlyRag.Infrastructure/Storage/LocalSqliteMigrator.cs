@@ -5,15 +5,16 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteMigrator
 {
-    public const int TargetSchemaVersion = 10;
-    private const string InitialSchemaName = "010_fresh_local_storage";
+    public const int TargetSchemaVersion = 11;
+    private const string InitialSchemaName = "011_fresh_local_storage";
     private const string BackupDirectoryName = "backups";
     private const string FtsUnavailableNote = "No SQLite FTS module is available in the active SQLite provider; keyword search is disabled until FTS5 or FTS4 is available.";
 
     private static readonly IReadOnlyList<SqliteSchemaMigration> Migrations =
     [
         new(9, "009_add_document_jobs_hashes_and_translation_layout", ApplySchemaVersion9Async),
-        new(10, "010_add_fts4_keyword_search_fallback", ApplySchemaVersion10Async)
+        new(10, "010_add_fts4_keyword_search_fallback", ApplySchemaVersion10Async),
+        new(11, "011_enforce_unique_document_hashes", ApplySchemaVersion11Async)
     ];
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -332,6 +333,60 @@ public sealed class LocalSqliteMigrator
         return EnsureChunkFtsObjectsAsync(connection, transaction, textSearchBackend, cancellationToken);
     }
 
+    private static async Task ApplySchemaVersion11Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await EnsureNoDuplicateDocumentHashesAsync(connection, transaction, cancellationToken);
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_sha256_not_null
+            ON documents(sha256)
+            WHERE sha256 IS NOT NULL;
+            """,
+            cancellationToken);
+    }
+
+    private static async Task EnsureNoDuplicateDocumentHashesAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT sha256, COUNT(*) AS duplicate_count, GROUP_CONCAT(id, ',') AS ids
+            FROM documents
+            WHERE sha256 IS NOT NULL
+            GROUP BY sha256
+            HAVING COUNT(*) > 1
+            ORDER BY duplicate_count DESC, sha256 ASC
+            LIMIT 5;
+            """;
+
+        List<string> duplicates = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            string sha256 = reader.GetString(0);
+            long duplicateCount = reader.GetInt64(1);
+            string ids = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+            duplicates.Add($"{sha256} ({duplicateCount} rows: {ids})");
+        }
+
+        if (duplicates.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Database SQLite contiene documenti duplicati con lo stesso sha256. Risolvere i duplicati prima della migrazione. Hash duplicati: "
+                + string.Join("; ", duplicates));
+        }
+    }
+
     private static async Task AddColumnIfMissingAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -578,7 +633,7 @@ public sealed class LocalSqliteMigrator
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE INDEX idx_documents_sha256 ON documents(sha256);
+            CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
             CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
             CREATE INDEX idx_document_pages_document ON document_pages(document_id);
             CREATE INDEX idx_document_pages_ocr ON document_pages(document_id, ocr_status, page_number);
@@ -601,7 +656,7 @@ public sealed class LocalSqliteMigrator
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (10, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (11, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 

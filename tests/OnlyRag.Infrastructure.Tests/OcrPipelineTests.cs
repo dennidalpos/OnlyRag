@@ -382,15 +382,14 @@ public sealed class OcrPipelineTests
     public async Task IngestAsync_Image_UsesOcrCacheOnSecondRun()
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();
-        ImportedDocument firstDocument = await storage.CreateBinaryDocumentAsync("scan-a.jpg", Encoding.UTF8.GetBytes("fake-image"));
-        ImportedDocument secondDocument = await storage.CreateBinaryDocumentAsync("scan-b.jpg", Encoding.UTF8.GetBytes("fake-image"));
+        ImportedDocument document = await storage.CreateBinaryDocumentAsync("scan.jpg", Encoding.UTF8.GetBytes("fake-image"));
         FakeOcrEngine engine = new("cached text", 0.94d);
         DocumentIngestionService service = storage.CreateIngestionService(engine);
 
-        await service.IngestAsync(firstDocument, checkpoint: null, (_, _) => Task.CompletedTask);
-        await service.IngestAsync(secondDocument, checkpoint: null, (_, _) => Task.CompletedTask);
+        await service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask);
+        await service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask);
 
-        IReadOnlyList<string> pages = await storage.ReadPageTextsAsync(secondDocument.Id);
+        IReadOnlyList<string> pages = await storage.ReadPageTextsAsync(document.Id);
         Assert.Equal("cached text", pages[0]);
         Assert.Equal(1, engine.RecognizeCount);
         Assert.Equal(2, engine.PrepareCount);
@@ -459,15 +458,14 @@ public sealed class OcrPipelineTests
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();
         OcrSettingsStore settingsStore = new(storage.Settings);
-        ImportedDocument firstDocument = await storage.CreateBinaryDocumentAsync("settings-a.jpg", Encoding.UTF8.GetBytes("fake-image"));
-        ImportedDocument secondDocument = await storage.CreateBinaryDocumentAsync("settings-b.jpg", Encoding.UTF8.GetBytes("fake-image"));
+        ImportedDocument document = await storage.CreateBinaryDocumentAsync("settings.jpg", Encoding.UTF8.GetBytes("fake-image"));
         FakeOcrEngine engine = new("settings text", 0.94d);
         DocumentIngestionService service = storage.CreateIngestionService(engine);
 
         await settingsStore.UpdateAsync(OcrSettings.Default with { Profile = "balanced", PdfDpi = 200 });
-        await service.IngestAsync(firstDocument, checkpoint: null, (_, _) => Task.CompletedTask);
+        await service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask);
         await settingsStore.UpdateAsync(OcrSettings.Default with { Profile = "accurate", PdfDpi = 300 });
-        await service.IngestAsync(secondDocument, checkpoint: null, (_, _) => Task.CompletedTask);
+        await service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask);
 
         Assert.Equal(2, engine.RecognizeCount);
         Assert.Equal("accurate", engine.LastSettings?.Profile);

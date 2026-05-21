@@ -8,15 +8,37 @@ public sealed class PaddleOcrEngine : IOcrEngine
 {
     private const string PythonEnvVar = "ONLYRAG_OCR_PYTHON";
     private const string BridgeEnvVar = "ONLYRAG_OCR_BRIDGE";
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan PrepareTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan RecognizeTimeout = TimeSpan.FromMinutes(3);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly string pythonPath;
     private readonly string bridgePath;
+    private readonly TimeSpan checkTimeout;
+    private readonly TimeSpan prepareTimeout;
+    private readonly TimeSpan recognizeTimeout;
 
     public PaddleOcrEngine()
+        : this(ResolvePythonPath(), ResolveBridgePath(), CheckTimeout, PrepareTimeout, RecognizeTimeout)
     {
-        pythonPath = ResolvePythonPath();
-        bridgePath = ResolveBridgePath();
+    }
+
+    internal PaddleOcrEngine(
+        string pythonPath,
+        string bridgePath,
+        TimeSpan checkTimeout,
+        TimeSpan prepareTimeout,
+        TimeSpan recognizeTimeout)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pythonPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bridgePath);
+
+        this.pythonPath = pythonPath;
+        this.bridgePath = bridgePath;
+        this.checkTimeout = ValidateTimeout(checkTimeout, nameof(checkTimeout));
+        this.prepareTimeout = ValidateTimeout(prepareTimeout, nameof(prepareTimeout));
+        this.recognizeTimeout = ValidateTimeout(recognizeTimeout, nameof(recognizeTimeout));
     }
 
     public string EngineName => "PaddleOCR";
@@ -40,6 +62,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
         {
             BridgeCheckResponse response = await RunBridgeAsync<BridgeCheckResponse>(
                 ["--mode", "check"],
+                checkTimeout,
                 cancellationToken);
             return new OcrEngineAvailability(
                 response.Available,
@@ -70,6 +93,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
                 "--preprocess-version", request.PreprocessVersion,
                 "--dpi", request.Settings.PdfDpi.ToString(CultureInfo.InvariantCulture)
             ],
+            prepareTimeout,
             cancellationToken);
 
         return new OcrPagePreparation(
@@ -87,6 +111,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
 
         BridgeOcrResponse response = await RunBridgeAsync<BridgeOcrResponse>(
             BuildRecognizeArguments(request),
+            recognizeTimeout,
             cancellationToken);
 
         IReadOnlyList<OcrTextBox> boxes = response.Boxes
@@ -131,6 +156,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
 
     private async Task<T> RunBridgeAsync<T>(
         IReadOnlyList<string> arguments,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         ProcessStartInfo startInfo = new()
@@ -166,23 +192,29 @@ public sealed class PaddleOcrEngine : IOcrEngine
                 ex);
         }
 
-        string stdout;
-        string stderr;
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutSource.Token);
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync(timeoutSource.Token);
         try
         {
-            stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExitAsync(timeoutSource.Token);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            KillProcessTree(process);
+            throw new OcrEngineUnavailableException(
+                $"Timeout bridge PaddleOCR dopo {timeout.TotalSeconds:0} secondi.");
         }
         catch (OperationCanceledException)
         {
-            if (!process.HasExited)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { }
-            }
+            KillProcessTree(process);
             throw;
         }
 
+        string stdout = await stdoutTask;
+        string stderr = await stderrTask;
         if (process.ExitCode != 0)
         {
             string detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
@@ -192,8 +224,48 @@ public sealed class PaddleOcrEngine : IOcrEngine
                     : detail.Trim());
         }
 
-        T? result = JsonSerializer.Deserialize<T>(stdout, JsonOptions);
+        T? result;
+        try
+        {
+            result = JsonSerializer.Deserialize<T>(stdout, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            string detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(detail)
+                    ? "Risposta JSON OCR non valida."
+                    : $"Risposta JSON OCR non valida: {detail.Trim()}",
+                ex);
+        }
+
         return result ?? throw new InvalidOperationException("Risposta JSON OCR non valida.");
+    }
+
+    private static void KillProcessTree(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+        }
+    }
+
+    private static TimeSpan ValidateTimeout(TimeSpan timeout, string parameterName)
+    {
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Il timeout OCR deve essere positivo.");
+        }
+
+        return timeout;
     }
 
     private static string ResolvePythonPath()

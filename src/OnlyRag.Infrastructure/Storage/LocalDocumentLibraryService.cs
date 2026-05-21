@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
 using OnlyRag.Worker;
 
@@ -94,22 +95,40 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
 
         string documentUid = Guid.NewGuid().ToString("N");
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        ImportedDocument created = await documents.CreateAsync(
-            new CreateDocumentRecordRequest(
-                documentUid,
-                safeFileName,
-                finalPath,
-                sha256,
-                mimeType,
-                fileExtension,
-                fileSizeBytes,
-                DocumentStatus.Imported,
-                PageCount: 0,
-                CurrentJobId: null,
-                LastError: null,
-                now,
-                now),
-            cancellationToken);
+        ImportedDocument created;
+        try
+        {
+            created = await documents.CreateAsync(
+                new CreateDocumentRecordRequest(
+                    documentUid,
+                    safeFileName,
+                    finalPath,
+                    sha256,
+                    mimeType,
+                    fileExtension,
+                    fileSizeBytes,
+                    DocumentStatus.Imported,
+                    PageCount: 0,
+                    CurrentJobId: null,
+                    LastError: null,
+                    now,
+                    now),
+                cancellationToken);
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
+        {
+            ImportedDocument? duplicate = await documents.FindBySha256Async(sha256, cancellationToken);
+            if (duplicate is null)
+            {
+                throw;
+            }
+
+            await DeleteOriginalIfUnreferencedAsync(finalPath, cancellationToken);
+            return new DocumentImportResult(
+                duplicate,
+                Deduplicated: true,
+                "Documento gia presente. Import annullato senza copiare un duplicato.");
+        }
 
         try
         {
@@ -119,10 +138,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
         catch
         {
             await documents.DeleteAsync(created.Id, cancellationToken);
-            if (File.Exists(finalPath))
-            {
-                File.Delete(finalPath);
-            }
+            await DeleteOriginalIfUnreferencedAsync(finalPath, cancellationToken);
 
             throw;
         }
@@ -154,24 +170,38 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
             return null;
         }
 
-        if (File.Exists(document.OriginalPath))
-        {
-            try
-            {
-                File.Delete(document.OriginalPath);
-            }
-            catch (IOException)
-            {
-                // File locked by a running ingestion job; the record is already removed from SQLite.
-                // The orphaned file will remain on disk and can be cleaned up manually.
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // No delete permission; leave the file on disk.
-            }
-        }
+        await DeleteOriginalIfUnreferencedAsync(document.OriginalPath, cancellationToken);
 
         return document;
+    }
+
+    private async Task DeleteOriginalIfUnreferencedAsync(
+        string originalPath,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(originalPath))
+        {
+            return;
+        }
+
+        if (await documents.CountByOriginalPathAsync(originalPath, cancellationToken) > 0)
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(originalPath);
+        }
+        catch (IOException)
+        {
+            // File locked by a running ingestion job; the record is already removed from SQLite.
+            // The orphaned file will remain on disk and can be cleaned up manually.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // No delete permission; leave the file on disk.
+        }
     }
 
     private async Task<ImportedDocument?> QueueDocumentByIdAsync(
@@ -237,7 +267,14 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
             return;
         }
 
-        File.Move(temporaryPath, finalPath);
+        try
+        {
+            File.Move(temporaryPath, finalPath);
+        }
+        catch (IOException) when (File.Exists(finalPath))
+        {
+            File.Delete(temporaryPath);
+        }
     }
 
     private static async Task<(string Sha256, long FileSizeBytes)> CopyToTemporaryFileAndHashAsync(

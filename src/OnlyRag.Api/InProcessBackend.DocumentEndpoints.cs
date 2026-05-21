@@ -432,7 +432,7 @@ public static partial class InProcessBackend
             {
                 embeddingPhase = new(PhaseState.Completed, null, embeddingStatus.LastEmbeddedAtUtc);
             }
-            else if (embState is "Running" or "Pending" or "Paused")
+            else if (embState is "Running" or "Pausing" or "Pending" or "Paused")
             {
                 embeddingPhase = new(PhaseState.InProgress, null, null);
             }

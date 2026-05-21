@@ -49,8 +49,23 @@ public static partial class InProcessBackend
             return Results.Ok(job);
         });
 
-        app.MapPost("/api/jobs/{id}/resume", async (string id, ILocalJobQueue jobs, CancellationToken cancellationToken) =>
+        app.MapPost("/api/jobs/{id}/resume", async (
+            string id,
+            ILocalJobQueue jobs,
+            RunningJobCancellationRegistry cancellationRegistry,
+            CancellationToken cancellationToken) =>
         {
+            LocalJob? current = await jobs.GetAsync(id, cancellationToken);
+            if (current is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (current.Status is JobStatus.Pausing || cancellationRegistry.IsRunning(id))
+            {
+                return Results.Conflict("Il job sta ancora completando la pausa. Riprovare tra poco.");
+            }
+
             LocalJob? job = await jobs.ResumeAsync(id, cancellationToken);
             return job is null ? Results.NotFound() : Results.Ok(job);
         });
@@ -63,7 +78,7 @@ public static partial class InProcessBackend
                 return Results.NotFound();
             }
 
-            if (job.Status is JobStatus.Running or JobStatus.Pending)
+            if (job.Status is JobStatus.Running or JobStatus.Pausing or JobStatus.Pending)
             {
                 return Results.Conflict("Impossibile eliminare un job in esecuzione o in attesa.");
             }

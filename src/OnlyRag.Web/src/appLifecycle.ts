@@ -85,7 +85,7 @@ async function getActiveJobCount(): Promise<number> {
   try {
     const jobs = await apiRequest<LocalJob[]>("/api/jobs?limit=200");
     return jobs.filter((job) =>
-      job.status === "Pending" || job.status === "Running" || job.status === "Paused"
+      job.status === "Pending" || job.status === "Running" || job.status === "Pausing" || job.status === "Paused"
     ).length;
   } catch {
     return 0;

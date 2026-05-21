@@ -75,6 +75,71 @@ public sealed class LocalJobWorkerServiceTests
         Assert.Equal(JobStatus.Cancelled, stored.Status);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_PausedRunningJobBlocksImmediateResumeUntilHandlerStops()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest("slow", "{}"));
+        SlowHandler handler = new();
+        RunningJobCancellationRegistry registry = new();
+        InProcessBackendDescriptor backendDescriptor = new(
+            tempStorage.Paths,
+            tempStorage.Descriptor,
+            LocalJobQueueDescriptor.Default,
+            new OllamaEndpointOptions());
+        LocalJobWorkerService service = new(
+            queue,
+            LocalJobQueueDescriptor.Default,
+            [handler],
+            registry,
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 1, 1, 8, 60, false)),
+            backendDescriptor);
+
+        await service.StartAsync(CancellationToken.None);
+        Task started = await Task.WhenAny(handler.OneRunning.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(handler.OneRunning.Task, started);
+
+        LocalJob? pausing = await queue.PauseAsync(created.Id);
+        LocalJob? immediateResume = await queue.ResumeAsync(created.Id);
+        registry.Cancel(created.Id);
+        Task cancelled = await Task.WhenAny(handler.Cancelled.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        LocalJob? paused = await WaitForStatusAsync(queue, created.Id, JobStatus.Paused);
+        await service.StopAsync(CancellationToken.None);
+        LocalJob? resumed = await queue.ResumeAsync(created.Id);
+
+        Assert.NotNull(pausing);
+        Assert.Equal(JobStatus.Pausing, pausing.Status);
+        Assert.NotNull(immediateResume);
+        Assert.Equal(JobStatus.Pausing, immediateResume.Status);
+        Assert.Same(handler.Cancelled.Task, cancelled);
+        Assert.NotNull(paused);
+        Assert.Equal(JobStatus.Paused, paused.Status);
+        Assert.NotNull(resumed);
+        Assert.Equal(JobStatus.Pending, resumed.Status);
+    }
+
+    private static async Task<LocalJob?> WaitForStatusAsync(
+        ILocalJobQueue queue,
+        string jobId,
+        JobStatus expectedStatus)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            LocalJob? job = await queue.GetAsync(jobId);
+            if (job?.Status == expectedStatus)
+            {
+                return job;
+            }
+
+            await Task.Delay(50);
+        }
+
+        return await queue.GetAsync(jobId);
+    }
+
     private sealed class SlowHandler : ILocalJobHandler
     {
         private int running;

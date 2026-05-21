@@ -260,7 +260,7 @@ export function DocumentsSection() {
     if (busyDocumentId === document.id) return;
     if (document.currentJobId) {
       const job = await apiRequest<LocalJob>(`/api/jobs/${document.currentJobId}`).catch(() => null);
-      if (job?.status === "Running" || job?.status === "Pending") {
+      if (job?.status === "Running" || job?.status === "Pausing" || job?.status === "Pending") {
         setFeedback({ tone: "info", message: `Un job è già in corso per ${document.originalFileName}. Attendi il completamento.` });
         return;
       }
@@ -308,7 +308,7 @@ export function DocumentsSection() {
     if (busyDocumentId === document.id) return;
     if (document.currentJobId) {
       const job = await apiRequest<LocalJob>(`/api/jobs/${document.currentJobId}`).catch(() => null);
-      if (job?.status === "Running" || job?.status === "Pending") {
+      if (job?.status === "Running" || job?.status === "Pausing" || job?.status === "Pending") {
         setFeedback({ tone: "info", message: `Un job è già in corso per ${document.originalFileName}.` });
         return;
       }

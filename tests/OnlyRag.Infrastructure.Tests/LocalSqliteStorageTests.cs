@@ -66,6 +66,7 @@ public sealed class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
+        Assert.True(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
     }
 
     [Fact]
@@ -126,6 +127,22 @@ public sealed class LocalSqliteStorageTests
         string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
         Assert.True(File.Exists(backupPath));
         Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 8));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_RejectsExistingDuplicateDocumentHashesBeforeUniqueIndex()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateVersion10SchemaWithDuplicateDocumentHashesAsync(tempStorage);
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.InitializeAsync());
+
+        Assert.Contains("documenti duplicati", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("duplicate-sha", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
+        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 10));
     }
 
     [Fact]
@@ -357,6 +374,16 @@ public sealed class LocalSqliteStorageTests
             return false;
         }
 
+        public async Task<bool> IndexExistsAsync(string indexName)
+        {
+            await using SqliteConnection connection = await CreateConnectionFactory().OpenConnectionAsync();
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = $name LIMIT 1;";
+            command.Parameters.AddWithValue("$name", indexName);
+            object? value = await command.ExecuteScalarAsync();
+            return value is not null;
+        }
+
         public void Dispose()
         {
             if (Directory.Exists(Root))
@@ -471,6 +498,58 @@ public sealed class LocalSqliteStorageTests
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
             VALUES (8, '008_previous_local_storage', '2026-05-12T00:00:00.000Z');
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task CreateVersion10SchemaWithDuplicateDocumentHashesAsync(TempStorage tempStorage)
+    {
+        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_uid TEXT NOT NULL UNIQUE,
+                original_file_name TEXT NOT NULL,
+                original_path TEXT NOT NULL,
+                sha256 TEXT NULL,
+                mime_type TEXT NULL,
+                file_extension TEXT NULL,
+                file_size_bytes INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'Imported',
+                page_count INTEGER NOT NULL DEFAULT 0,
+                current_job_id TEXT NULL,
+                last_error TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            );
+
+            INSERT INTO documents (
+                document_uid,
+                original_file_name,
+                original_path,
+                sha256,
+                mime_type,
+                file_extension,
+                file_size_bytes,
+                status,
+                page_count,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES
+                ('doc-a', 'a.txt', 'a.txt', 'duplicate-sha', 'text/plain', '.txt', 1, 'Imported', 0, '2026-05-22T00:00:00.000Z', '2026-05-22T00:00:00.000Z'),
+                ('doc-b', 'b.txt', 'b.txt', 'duplicate-sha', 'text/plain', '.txt', 1, 'Imported', 0, '2026-05-22T00:00:01.000Z', '2026-05-22T00:00:01.000Z');
+
+            INSERT INTO schema_migrations(version, name, applied_at_utc)
+            VALUES (10, '010_add_fts4_keyword_search_fallback', '2026-05-12T00:00:00.000Z');
             """;
         await command.ExecuteNonQueryAsync();
     }

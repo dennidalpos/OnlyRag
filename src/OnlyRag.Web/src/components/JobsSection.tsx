@@ -5,6 +5,7 @@ import { ProgressBar } from "./ProgressBar";
 const statusLabels: Record<JobStatus, string> = {
   Pending: "In attesa",
   Running: "In esecuzione",
+  Pausing: "Pausa in corso",
   Completed: "Completato",
   Failed: "Errore",
   Cancelled: "Annullato",
@@ -132,7 +133,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                   {statusLabels[job.status]}
                 </span>
               </div>
-              {(job.status === "Running" || job.status === "Pending" || job.status === "Paused") && (
+              {(job.status === "Running" || job.status === "Pausing" || job.status === "Pending" || job.status === "Paused") && (
                 <ProgressBar label={`Avanzamento ${job.progressPercent}%`} value={job.progressPercent} />
               )}
               <div className="job-row__meta">
@@ -156,6 +157,15 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                       Annulla
                     </button>
                   </>
+                )}
+                {job.status === "Pausing" && (
+                  <button
+                    type="button"
+                    className="button-danger"
+                    onClick={() => void transitionJob(job.id, "cancel")}
+                  >
+                    Annulla
+                  </button>
                 )}
                 {(job.status === "Paused" || job.status === "Failed") && (
                   <button

@@ -3,7 +3,7 @@
     {
       "id": "TASK-001",
       "priority": "P0",
-      "status": "todo",
+      "status": "completed",
       "title": "Fix job pause/resume lifecycle race",
       "source": "AUD-001",
       "effort": "medium",
@@ -17,12 +17,22 @@
         "Resume immediately after pause.",
         "Resume only after cancellation has fully completed.",
         "Repeat with maxParallelJobs greater than 1."
+      ],
+      "completed_at": "2026-05-22T00:26:00+02:00",
+      "result": "Added a Pausing job state, finalized cooperative pauses in the worker before allowing resume, blocked API resume while pause cancellation is still registered or in progress, and covered queue, worker, endpoint, and maxParallelJobs behavior with tests.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~SqliteLocalJobQueueTests\"",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~LocalJobWorkerServiceTests|FullyQualifiedName~InProcessBackendTests.JobsResume\"",
+        "dotnet test OnlyRag.sln",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check"
       ]
     },
     {
       "id": "TASK-002",
       "priority": "P0",
-      "status": "todo",
+      "status": "completed",
       "title": "Make document import deduplication atomic",
       "source": "AUD-002",
       "effort": "medium-high",
@@ -36,12 +46,22 @@
         "Import a batch containing duplicates.",
         "Delete one duplicate candidate.",
         "Reindex after deletion."
+      ],
+      "completed_at": "2026-05-22T00:38:26+02:00",
+      "result": "Added schema version 11 with an audited unique partial index for non-null document sha256 values, handled concurrent import insert conflicts as deduplicated imports, and prevented original-file deletion while another document row still references the same path.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~LocalDocumentLibraryServiceTests|FullyQualifiedName~LocalSqliteStorageTests\"",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~InProcessBackendTests.DocumentsImport\"",
+        "dotnet test OnlyRag.sln",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check"
       ]
     },
     {
       "id": "TASK-003",
       "priority": "P0",
-      "status": "todo",
+      "status": "completed",
       "title": "Fix OCR bridge process I/O, timeout, and cancellation behavior",
       "source": "AUD-003",
       "effort": "medium",
@@ -55,6 +75,16 @@
         "Bridge hangs.",
         "Bridge returns invalid stdout.",
         "Application closes during OCR."
+      ],
+      "completed_at": "2026-05-22T00:45:22+02:00",
+      "result": "Updated PaddleOcrEngine to read stdout and stderr concurrently, apply explicit per-operation bridge timeouts, kill the process tree on timeout or cancellation, and surface invalid JSON diagnostics. Added process-backed tests for large stderr output, hung bridge timeout, cancellation kill, and invalid stdout.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~OcrPipelineTests\"",
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~OcrPipelineTests|FullyQualifiedName~PaddleOcrEngineProcessTests\"",
+        "dotnet test OnlyRag.sln",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check"
       ]
     },
     {
@@ -263,6 +293,10 @@
       ]
     }
   ],
+  "oversized_files": [
+    "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs is oversized but remains a single migration aggregate; defer split to focused storage refactor.",
+    "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
+  ],
   "script_automation_status": {
     "last_updated": "2026-05-22T00:07:16+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
@@ -279,6 +313,6 @@
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored.",
       "certificates\\app\\code_signing.ps1 is an ignored local helper that creates private PFX/password files under the repository; do not use it as a supported automation path."
     ],
-    "last_completed_work": "Consolidated the canonical script inventory in scripts\\README.md, kept scripts\\script.md as a compatibility stub, updated script documentation links, and changed signing scripts to require private PFX material outside the repository or an installed certificate thumbprint."
+    "last_completed_work": "Completed TASK-003 by hardening PaddleOcrEngine process I/O, timeout, cancellation, process-tree termination, invalid JSON handling, and process-backed OCR bridge tests."
   }
 }

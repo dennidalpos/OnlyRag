@@ -299,7 +299,7 @@ public static partial class InProcessBackend
         }
 
         LocalJob? currentJob = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
-        return currentJob?.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Paused
+        return currentJob?.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused
             ? currentJob
             : null;
     }
@@ -600,7 +600,7 @@ public static partial class InProcessBackend
         }
 
         LocalJob? currentJob = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
-        if (currentJob?.Status is not (JobStatus.Pending or JobStatus.Running or JobStatus.Paused))
+        if (currentJob?.Status is not (JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused))
         {
             return;
         }

@@ -87,12 +87,13 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
             ORDER BY
                 CASE status
                     WHEN 'Running' THEN 0
-                    WHEN 'Pending' THEN 1
-                    WHEN 'Paused' THEN 2
-                    WHEN 'Failed' THEN 3
-                    WHEN 'Completed' THEN 4
-                    WHEN 'Cancelled' THEN 5
-                    ELSE 6
+                    WHEN 'Pausing' THEN 1
+                    WHEN 'Pending' THEN 2
+                    WHEN 'Paused' THEN 3
+                    WHEN 'Failed' THEN 4
+                    WHEN 'Completed' THEN 5
+                    WHEN 'Cancelled' THEN 6
+                    ELSE 7
                 END,
                 priority DESC,
                 created_at_utc ASC
@@ -121,17 +122,22 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         return TransitionAsync(
             id,
             JobStatus.Cancelled,
-            [JobStatus.Pending, JobStatus.Running, JobStatus.Paused, JobStatus.Failed],
+            [JobStatus.Pending, JobStatus.Running, JobStatus.Pausing, JobStatus.Paused, JobStatus.Failed],
             error: null,
             cancellationToken);
     }
 
     public Task<LocalJob?> PauseAsync(string id, CancellationToken cancellationToken = default)
     {
+        return RequestPauseAsync(id, cancellationToken);
+    }
+
+    public Task<LocalJob?> CompletePauseAsync(string id, CancellationToken cancellationToken = default)
+    {
         return TransitionAsync(
             id,
             JobStatus.Paused,
-            [JobStatus.Pending, JobStatus.Running],
+            [JobStatus.Pausing],
             error: null,
             cancellationToken);
     }
@@ -165,7 +171,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
                 checkpoint_json = $checkpointJson,
                 updated_at_utc = $now
             WHERE id = $id
-              AND status IN ('Pending', 'Running', 'Paused');
+              AND status IN ('Pending', 'Running', 'Pausing', 'Paused');
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$progressPercent", progressPercent);
@@ -186,10 +192,14 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         command.CommandText =
             """
             UPDATE jobs
-            SET status = 'Pending',
-                current_step = CASE WHEN current_step = '' THEN 'Ripresa dopo interruzione' ELSE current_step END,
+            SET status = CASE WHEN status = 'Pausing' THEN 'Paused' ELSE 'Pending' END,
+                current_step = CASE
+                    WHEN status = 'Pausing' THEN 'Paused'
+                    WHEN current_step = '' THEN 'Ripresa dopo interruzione'
+                    ELSE current_step
+                END,
                 updated_at_utc = $now
-            WHERE status = 'Running';
+            WHERE status IN ('Running', 'Pausing');
             """;
         command.AddParameter("$now", now);
         return await command.ExecuteNonQueryAsync(cancellationToken);
@@ -306,6 +316,36 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         return await GetAsync(connection, id, cancellationToken);
     }
 
+    private async Task<LocalJob?> RequestPauseAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        string now = DateTimeOffset.UtcNow.ToString("O");
+
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE jobs
+            SET status = CASE
+                    WHEN status = 'Running' THEN 'Pausing'
+                    ELSE 'Paused'
+                END,
+                current_step = CASE
+                    WHEN status = 'Running' THEN 'Pausa in corso'
+                    ELSE 'Paused'
+                END,
+                updated_at_utc = $now
+            WHERE id = $id
+              AND status IN ('Pending', 'Running');
+            """;
+        command.AddParameter("$id", id);
+        command.AddParameter("$now", now);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return await GetAsync(connection, id, cancellationToken);
+    }
+
     private async Task<LocalJob?> TransitionAsync(
         string id,
         JobStatus targetStatus,
@@ -361,7 +401,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
     {
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM jobs WHERE id = $id AND status NOT IN ('Running', 'Pending');";
+        command.CommandText = "DELETE FROM jobs WHERE id = $id AND status NOT IN ('Running', 'Pausing', 'Pending');";
         command.AddParameter("$id", id);
         int affected = await command.ExecuteNonQueryAsync(cancellationToken);
         return affected > 0;

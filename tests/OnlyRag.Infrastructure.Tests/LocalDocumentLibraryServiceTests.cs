@@ -69,6 +69,83 @@ public sealed class LocalDocumentLibraryServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_DeduplicatesConcurrentImportsByHash()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        LocalDocumentLibraryService library = await tempStorage.CreateLibraryAsync();
+        byte[] bytes = Encoding.UTF8.GetBytes("concurrent-duplicate-content");
+
+        DocumentImportResult[] results = await Task.WhenAll(
+            Enumerable.Range(0, 4)
+                .Select(index => ImportDuplicateAsync(index)));
+
+        IReadOnlyList<ImportedDocument> documents = await library.ListAsync();
+        IReadOnlyList<LocalJob> jobs = await tempStorage.CreateQueue().ListAsync();
+        string[] storedFiles = Directory.GetFiles(tempStorage.Paths.DocumentOriginalsDirectory);
+
+        Assert.Single(documents);
+        Assert.Single(results.Select(result => result.Document.Id).Distinct());
+        Assert.Equal(1, results.Count(result => !result.Deduplicated));
+        Assert.Equal(3, results.Count(result => result.Deduplicated));
+        Assert.Single(storedFiles);
+        Assert.Single(jobs);
+
+        async Task<DocumentImportResult> ImportDuplicateAsync(int index)
+        {
+            await using MemoryStream stream = new(bytes, writable: false);
+            return await library.ImportAsync(stream, $"Concurrent-{index}.pdf");
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DoesNotDeleteOriginalStillReferencedByAnotherDocument()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        LocalDocumentLibraryService library = await tempStorage.CreateLibraryAsync();
+        SqliteDocumentRepository documents = tempStorage.CreateDocumentRepository();
+        string sharedPath = Path.Combine(tempStorage.Paths.DocumentOriginalsDirectory, "shared.txt");
+        Directory.CreateDirectory(tempStorage.Paths.DocumentOriginalsDirectory);
+        await File.WriteAllTextAsync(sharedPath, "shared content");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        ImportedDocument first = await documents.CreateAsync(new CreateDocumentRecordRequest(
+            Guid.NewGuid().ToString("N"),
+            "first.txt",
+            sharedPath,
+            "shared-sha-a",
+            "text/plain",
+            ".txt",
+            14,
+            DocumentStatus.Indexed,
+            PageCount: 0,
+            CurrentJobId: null,
+            LastError: null,
+            now,
+            now));
+        ImportedDocument second = await documents.CreateAsync(new CreateDocumentRecordRequest(
+            Guid.NewGuid().ToString("N"),
+            "second.txt",
+            sharedPath,
+            "shared-sha-b",
+            "text/plain",
+            ".txt",
+            14,
+            DocumentStatus.Indexed,
+            PageCount: 0,
+            CurrentJobId: null,
+            LastError: null,
+            now,
+            now));
+
+        ImportedDocument? deleted = await library.DeleteAsync(first.Id);
+        ImportedDocument? queued = await library.QueueForIndexingAsync(second.Id);
+
+        Assert.NotNull(deleted);
+        Assert.True(File.Exists(sharedPath));
+        Assert.NotNull(queued);
+        Assert.Equal(DocumentStatus.Queued, queued.Status);
+    }
+
+    [Fact]
     public async Task ImportAsync_RejectsUnsupportedExtension()
     {
         using TempStorage tempStorage = TempStorage.Create();
@@ -143,6 +220,11 @@ public sealed class LocalDocumentLibraryServiceTests
                 new SqliteDocumentRepository(connectionFactory),
                 CreateQueue(),
                 new LocalDocumentStorageGuard(Descriptor, LocalDocumentLibraryLimits.Default));
+        }
+
+        public SqliteDocumentRepository CreateDocumentRepository()
+        {
+            return new SqliteDocumentRepository(CreateConnectionFactory());
         }
 
         public SqliteLocalJobQueue CreateQueue()

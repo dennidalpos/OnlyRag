@@ -26,7 +26,7 @@ public static partial class InProcessBackend
         {
             IReadOnlyList<LocalJob> jobList = await jobs.ListAsync(cancellationToken: cancellationToken);
             int activeJobs = jobList.Count(job =>
-                job.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Paused);
+                job.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused);
             OllamaSettings settings = await ollamaSettings.GetAsync(cancellationToken);
             PerformanceSettings performance = await performanceSettings.GetAsync(cancellationToken);
 

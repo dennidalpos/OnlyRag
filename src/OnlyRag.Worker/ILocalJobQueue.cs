@@ -12,6 +12,8 @@ public interface ILocalJobQueue
 
     Task<LocalJob?> PauseAsync(string id, CancellationToken cancellationToken = default);
 
+    Task<LocalJob?> CompletePauseAsync(string id, CancellationToken cancellationToken = default);
+
     Task<LocalJob?> ResumeAsync(string id, CancellationToken cancellationToken = default);
 
     Task<LocalJob?> SaveCheckpointAsync(

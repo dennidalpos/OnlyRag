@@ -10,6 +10,8 @@ public interface IDocumentRepository
 
     Task<ImportedDocument?> FindBySha256Async(string sha256, CancellationToken cancellationToken = default);
 
+    Task<int> CountByOriginalPathAsync(string originalPath, CancellationToken cancellationToken = default);
+
     Task<ImportedDocument> CreateAsync(CreateDocumentRecordRequest request, CancellationToken cancellationToken = default);
 
     Task<ImportedDocument?> UpdateStatusAsync(

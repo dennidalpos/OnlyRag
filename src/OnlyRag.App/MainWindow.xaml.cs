@@ -357,7 +357,7 @@ public partial class MainWindow : Window
                 "/api/jobs?limit=500",
                 ExitStateJsonOptions);
 
-            return jobs?.Count(job => job.Status is "Pending" or "Running" or "Paused") ?? 0;
+            return jobs?.Count(job => job.Status is "Pending" or "Running" or "Pausing" or "Paused") ?? 0;
         }
         catch
         {
