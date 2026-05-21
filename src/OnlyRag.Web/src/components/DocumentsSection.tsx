@@ -87,7 +87,7 @@ export function DocumentsSection() {
   }, [busyDocumentId, isUploading]);
 
   useEffect(() => {
-    apiRequest<VectorBackendHealth>("/api/health")
+    apiRequest<VectorBackendHealth>("/api/diagnostics/vector-health")
       .then((health) => setVectorHealth(health))
       .catch(() => {});
     apiRequest<OcrLanguage[]>("/api/ocr/languages")

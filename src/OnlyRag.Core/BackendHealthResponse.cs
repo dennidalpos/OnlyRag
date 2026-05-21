@@ -1,3 +1,3 @@
 namespace OnlyRag.Core;
 
-public sealed record BackendHealthResponse(string Status, DateTimeOffset StartedAtUtc);
+public sealed record BackendHealthResponse(string Status);

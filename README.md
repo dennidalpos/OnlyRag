@@ -81,8 +81,8 @@ pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 
 End users configure optional dependencies from **Settings** in the app:
 
-- **Ollama**: if missing, the UI can start the official PowerShell install command
-  `irm https://ollama.com/install.ps1 | iex`.
+- **Ollama**: if missing, the UI opens the official download page for manual installation.
+  OnlyRag does not execute remote PowerShell installer scripts.
 - **LibreOffice**: if missing, the UI opens the LibreOffice download page.
 - **OCR**: the **Configura OCR** button prepares the per-user PaddleOCR environment under
   `%LOCALAPPDATA%\OnlyRag\ocr-python`.

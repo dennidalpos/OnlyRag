@@ -50,4 +50,4 @@ Working directory: `src\OnlyRag.Web`. npm e il package manager supportato perche
 - `scripts\internal\BuildSupport.ps1` non esiste piu: l'helper e `scripts\support\BuildSupport.ps1`.
 - `assets\brand\Generate-BrandAssets.ps1` non esiste piu: usare `scripts\Generate-BrandAssets.ps1`.
 - `scripts\script.md` e mantenuto come stub di compatibilita; l'inventario canonico e questo file.
-- `certificates\app\code_signing.ps1` e un file locale ignorato da Git sotto area certificati. Non e documentato come script supportato perche crea PFX e password nel repository; preferire materiale di signing esterno o certificati installati nello store Windows.
+- `certificates\app\code_signing.ps1` non e supportato ed e stato rimosso perche generava PFX e password nel repository; usare `scripts\Sign-Release.ps1` con materiale di signing esterno o certificati installati nello store Windows.

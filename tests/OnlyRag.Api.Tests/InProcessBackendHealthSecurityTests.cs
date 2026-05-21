@@ -49,6 +49,71 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task Health_DoesNotExposeRuntimeMetadataWithoutSessionToken()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/health");
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Healthy", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("startedAt", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("backendName", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("totalVectors", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ApiHealth_RequiresSessionToken()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/api/health");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task VectorHealth_RequiresSessionToken()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = new()
+        {
+            BaseAddress = backend.BaseUri
+        };
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/api/diagnostics/vector-health");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task VectorHealth_ReturnsDiagnosticsWithSessionToken()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/api/diagnostics/vector-health");
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("backendName", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("totalVectors", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ApiRequest_RejectsMissingSessionToken()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

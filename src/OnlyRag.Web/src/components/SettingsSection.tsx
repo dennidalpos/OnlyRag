@@ -890,7 +890,7 @@ export function SettingsSection({
               </button>
               {ollamaInstallStatus && !ollamaInstallStatus.cliInstalled && (
                 <button type="button" className="button-secondary" onClick={installOllama} disabled={isBusy}>
-                  Installa Ollama
+                  Apri download Ollama
                 </button>
               )}
             </div>
@@ -898,7 +898,7 @@ export function SettingsSection({
               <p>{status?.message ?? loadError ?? "Configura l'indirizzo Ollama e testa la connessione."}</p>
               {status?.suggestion && <p>{status.suggestion}</p>}
               {ollamaInstallStatus && !ollamaInstallStatus.cliInstalled && (
-                <p>Ollama non risulta installato. Il pulsante usa: <code>{ollamaInstallStatus.installCommand}</code></p>
+                <p>Ollama non risulta installato. Il pulsante apre la pagina ufficiale: <code>{ollamaInstallStatus.installCommand}</code></p>
               )}
               {ollamaInstallStatus && (
                 <p>{ollamaInstallStatus.networkAccessHint}</p>

@@ -13,8 +13,8 @@ public static partial class InProcessBackend
 {
     private static void MapAppEndpoints(WebApplication app)
     {
-        app.MapGet("/health", (BackendRuntimeState runtime) =>
-            Results.Ok(new BackendHealthResponse("Healthy", runtime.StartedAtUtc)));
+        app.MapGet("/health", () =>
+            Results.Ok(new BackendHealthResponse("Healthy")));
 
         app.MapGet("/api/app/status", async (
             InProcessBackendDescriptor descriptor,
@@ -47,7 +47,10 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await shutdown.PrepareAsync(cancellationToken)));
 
-        app.MapGet("/api/health", async (
+        app.MapGet("/api/health", () =>
+            Results.Ok(new BackendHealthResponse("Healthy")));
+
+        app.MapGet("/api/diagnostics/vector-health", async (
             IVectorSearchService vectorSearch,
             IEmbeddingRepository embeddings,
             CancellationToken cancellationToken) =>

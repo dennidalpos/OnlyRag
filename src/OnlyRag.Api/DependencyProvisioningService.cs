@@ -7,9 +7,10 @@ namespace OnlyRag.Api;
 
 public sealed class DependencyProvisioningService
 {
-    public const string OllamaInstallCommand = "irm https://ollama.com/install.ps1 | iex";
+    public const string OllamaDownloadUrl = "https://ollama.com/download";
+    public const string OllamaInstallCommand = OllamaDownloadUrl;
     public const string OllamaNetworkAccessHint =
-        "Per usare un endpoint Ollama da altri PC della LAN, configura OLLAMA_HOST nelle impostazioni/variabili ambiente di Ollama e riavvia Ollama.";
+        "Installa Ollama manualmente dalla pagina ufficiale. Se sei offline o una policy aziendale blocca download o browser esterni, scarica il programma da una rete approvata o chiedi al reparto IT. Per usare un endpoint Ollama da altri PC della LAN, configura OLLAMA_HOST nelle impostazioni/variabili ambiente di Ollama e riavvia Ollama.";
 
     private const string LibreOfficeDownloadUrl = "https://www.libreoffice.org/download/download-libreoffice/";
     private readonly ILocalProcessLauncher processLauncher;
@@ -37,32 +38,22 @@ public sealed class DependencyProvisioningService
 
     public DependencyActionResponse StartOllamaInstall()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new InvalidOperationException("Installazione automatica Ollama disponibile solo su Windows.");
-        }
-
-        string shell = ResolveExecutable("pwsh")
-            ?? ResolveExecutable("powershell")
-            ?? throw new InvalidOperationException("PowerShell non trovato. Installa PowerShell 7+ oppure esegui manualmente: " + OllamaInstallCommand);
-
         ProcessStartInfo startInfo = new()
         {
-            FileName = shell,
+            FileName = OllamaDownloadUrl,
             UseShellExecute = true
         };
-        startInfo.ArgumentList.Add("-NoExit");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(OllamaInstallCommand);
 
-        if (!processLauncher.TryStart(startInfo, out string? errorMessage))
+        if (!processLauncher.TryStart(startInfo, out _))
         {
-            throw new InvalidOperationException(errorMessage ?? "PowerShell non ha accettato la richiesta di installazione Ollama.");
+            throw new InvalidOperationException(
+                "Download Ollama non aperto. Apri manualmente https://ollama.com/download. " +
+                "Se sei offline o una policy aziendale blocca browser o download esterni, usa una rete approvata o chiedi al reparto IT.");
         }
 
-        return new DependencyActionResponse(true, $"Installazione Ollama avviata con: {OllamaInstallCommand}");
+        return new DependencyActionResponse(
+            true,
+            "Pagina download Ollama aperta. Installa manualmente Ollama, avvialo, poi torna in OnlyRag e usa Verifica ora.");
     }
 
     public DependencyActionResponse OpenLibreOfficeDownload()

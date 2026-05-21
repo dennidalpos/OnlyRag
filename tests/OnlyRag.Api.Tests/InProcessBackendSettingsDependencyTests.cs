@@ -241,8 +241,11 @@ public sealed partial class InProcessBackendTests
         OllamaInstallStatus? status = await httpClient.GetFromJsonAsync<OllamaInstallStatus>("/api/dependencies/ollama");
 
         Assert.NotNull(status);
-        Assert.Equal("irm https://ollama.com/install.ps1 | iex", status.InstallCommand);
+        Assert.Equal("https://ollama.com/download", status.InstallCommand);
+        Assert.DoesNotContain("irm", status.InstallCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("iex", status.InstallCommand, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("OLLAMA_HOST", status.NetworkAccessHint);
+        Assert.Contains("policy aziendale", status.NetworkAccessHint);
     }
 
     [Fact]
@@ -320,13 +323,27 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task DependencyOllamaInstall_UsesExpectedPowerShellDispatch()
+    public async Task DependencyOllamaInstall_RequiresExplicitConfirmation()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        FakeProcessLauncher processLauncher = new();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ProcessLauncher = processLauncher });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            "/api/dependencies/ollama/install",
+            new ProcessLaunchRequest(false),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(processLauncher.StartedProcesses);
+    }
+
+    [Fact]
+    public async Task DependencyOllamaInstall_OpensManualDownloadPageWithoutRemoteScriptExecution()
+    {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
         FakeProcessLauncher processLauncher = new();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
@@ -341,11 +358,34 @@ public sealed partial class InProcessBackendTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         ProcessStartInfo startInfo = Assert.Single(processLauncher.StartedProcesses);
-        Assert.Matches(@"(pwsh|powershell)(\.exe)?$", Path.GetFileName(startInfo.FileName));
+        Assert.Equal("https://ollama.com/download", startInfo.FileName);
         Assert.True(startInfo.UseShellExecute);
-        Assert.Equal(
-            ["-NoExit", "-ExecutionPolicy", "Bypass", "-Command", "irm https://ollama.com/install.ps1 | iex"],
-            startInfo.ArgumentList.ToArray());
+        Assert.Empty(startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public async Task DependencyOllamaInstall_ProcessLaunchFailureReturnsManualOfflinePolicyGuidance()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        FakeProcessLauncher processLauncher = new()
+        {
+            TryStartErrorMessage = "blocked by enterprise policy: internal details"
+        };
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ProcessLauncher = processLauncher });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            "/api/dependencies/ollama/install",
+            new ProcessLaunchRequest(true),
+            JsonOptions);
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("offline", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("policy aziendale", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("internal details", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

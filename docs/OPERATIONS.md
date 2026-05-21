@@ -40,8 +40,9 @@ Optional:
 
 Optional dependencies are configured from **Settings** in the desktop app:
 
-- **Ollama**: when the CLI is missing, the app shows the command
-  `irm https://ollama.com/install.ps1 | iex` and can start it in PowerShell.
+- **Ollama**: when the CLI is missing, the app opens the official Ollama download page
+  for manual installation. OnlyRag does not execute remote PowerShell installer scripts.
+  In offline or enterprise-managed environments, use an approved software distribution path.
 - **LibreOffice**: when missing, the app opens the official LibreOffice download page.
 - **OCR**: **Configura OCR** creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`
   and installs the pinned PaddleOCR requirements shipped with the app.

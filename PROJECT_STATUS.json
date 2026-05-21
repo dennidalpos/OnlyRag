@@ -90,7 +90,7 @@
     {
       "id": "TASK-004",
       "priority": "P0",
-      "status": "todo",
+      "status": "completed",
       "title": "Move signing material out of the repository workspace",
       "source": "AUD-004",
       "effort": "low",
@@ -103,12 +103,21 @@
         "Run git status --ignored.",
         "Run signing with an external certificate path.",
         "Confirm no signing secret remains under the repository root."
+      ],
+      "completed_at": "2026-05-22T00:49:16+02:00",
+      "result": "Removed ignored local PFX, password, public certificate export, and local code-signing helper files from certificates\\app, leaving only the tracked non-secret README and .gitkeep. Confirmed the signing script requires an explicit external PFX path or installed certificate thumbprint, rejects repository-local certificate paths, and reaches certificate import only for an explicit external PFX path. Full trusted signing remains covered by release-gate TASK-012.",
+      "checks": [
+        "git status --ignored --short",
+        "pwsh .\\scripts\\Sign-Release.ps1",
+        "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath .\\certificates\\app\\.gitkeep -SkipReleaseVerification",
+        "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath $env:TEMP\\OnlyRag-external-test.pfx -SkipReleaseVerification with ONLYRAG_CERT_PASSWORD set to a non-secret dummy value",
+        "Get-ChildItem -Recurse -Force .\\certificates"
       ]
     },
     {
       "id": "TASK-005",
       "priority": "P0",
-      "status": "todo",
+      "status": "completed",
       "title": "Replace or harden Ollama remote installer execution",
       "source": "AUD-005",
       "effort": "low-medium",
@@ -121,12 +130,22 @@
         "Attempt install without confirmation.",
         "Attempt install offline.",
         "Verify no unpinned remote script is executed automatically."
+      ],
+      "completed_at": "2026-05-22T00:57:35+02:00",
+      "result": "Replaced the Ollama installer action with a manual download-page launch. The backend no longer starts PowerShell, no longer passes ExecutionPolicy Bypass, and no longer executes irm/iex remote installer content. UI and docs now describe manual installation and include offline/enterprise-policy guidance.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~DependencyOllama\"",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check",
+        "rg -n \"irm https://ollama\\.com/install\\.ps1|\\| iex|ExecutionPolicy\\s+Bypass\" -S src tests README.md docs packaging scripts"
       ]
     },
     {
       "id": "TASK-006",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Reduce unauthenticated health metadata exposure",
       "source": "AUD-006",
       "effort": "low",
@@ -137,6 +156,15 @@
       "verify": [
         "Call health endpoints without a token.",
         "Call diagnostics with and without a token."
+      ],
+      "completed_at": "2026-05-22T01:00:57+02:00",
+      "result": "Kept /health as the only unauthenticated liveness endpoint and reduced it to a minimal healthy status. Removed /api/health from the authentication bypass and moved vector backend metadata, persistence, limits, and embedding counts to the authenticated /api/diagnostics/vector-health endpoint. Updated the Documents UI and architecture docs to use the authenticated diagnostics path.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~Health|FullyQualifiedName~Diagnostics\"",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check"
       ]
     },
     {
@@ -294,11 +322,13 @@
     }
   ],
   "oversized_files": [
+    "src\\OnlyRag.Api\\InProcessBackend.cs is oversized; TASK-008 tracks splitting DI, middleware, endpoint, and helper responsibilities.",
+    "src\\OnlyRag.Web\\src\\components\\SettingsSection.tsx is oversized; TASK-008 tracks splitting it into focused settings panels.",
     "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs is oversized but remains a single migration aggregate; defer split to focused storage refactor.",
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
   "script_automation_status": {
-    "last_updated": "2026-05-22T00:07:16+02:00",
+    "last_updated": "2026-05-22T01:00:57+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -310,9 +340,8 @@
     },
     "residual_scripts": [
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
-      "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored.",
-      "certificates\\app\\code_signing.ps1 is an ignored local helper that creates private PFX/password files under the repository; do not use it as a supported automation path."
+      "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Completed TASK-003 by hardening PaddleOcrEngine process I/O, timeout, cancellation, process-tree termination, invalid JSON handling, and process-backed OCR bridge tests."
+    "last_completed_work": "Completed TASK-006 by reducing unauthenticated health output to minimal liveness and moving vector health metadata behind authenticated diagnostics."
   }
 }

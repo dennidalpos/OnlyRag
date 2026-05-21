@@ -30,7 +30,7 @@ function detectIssue(
   if (ollamaInstallStatus && !ollamaInstallStatus.cliInstalled) {
     return {
       title: "Ollama non installato",
-      detail: "Installa Ollama per usare chat, embedding e traduzione con modelli locali.",
+      detail: "Installa Ollama manualmente per usare chat, embedding e traduzione con modelli locali.",
       installCommand: ollamaInstallStatus.installCommand,
       networkAccessHint: ollamaInstallStatus.networkAccessHint,
       canInstallOllama: true
@@ -119,14 +119,12 @@ export function OllamaSetupGate({
         <h2 id="setup-gate-title">Configurazione iniziale richiesta</h2>
         <h3>{issue.title}</h3>
         <p>{issue.detail}</p>
-        {issue.installCommand && (
-          <p>Comando usato: <code>{issue.installCommand}</code></p>
-        )}
+        {issue.installCommand && <p>Pagina download: <code>{issue.installCommand}</code></p>}
         {issue.networkAccessHint && <p>{issue.networkAccessHint}</p>}
         <div className="settings-actions">
           {issue.canInstallOllama && (
             <button type="button" onClick={onInstallOllama} disabled={isChecking}>
-              Installa Ollama
+              Apri download Ollama
             </button>
           )}
           <button type="button" onClick={onOpenSettings}>

@@ -248,8 +248,7 @@ public static partial class InProcessBackend
 
     private static bool IsHealthRequest(HttpRequest request)
     {
-        return request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase)
-            || request.Path.Equals("/api/health", StringComparison.OrdinalIgnoreCase);
+        return request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsValidSessionToken(HttpRequest request, string sessionToken)
