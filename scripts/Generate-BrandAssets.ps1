@@ -133,11 +133,11 @@ Save-RasterAsset -Path (Join-Path $SetupDir "onlyrag-setup-wizard-image-164x314.
 }
 Save-RasterAsset -Path (Join-Path $SetupDir "onlyrag-setup-wizard-small-55x55.png") -Width 55 -Height 55 -Draw {
     param($context, $width, $height)
-    Draw-AppIcon -Context $context -X 0 -Y 0 -Size 55
+    Draw-AppIcon -Context $context -X 0 -Y 0 -Size ([Math]::Min($width, $height))
 }
 Save-RasterAsset -Path (Join-Path $SetupDir "onlyrag-setup-wizard-small-55x55.bmp") -Width 55 -Height 55 -Format Bmp -Draw {
     param($context, $width, $height)
-    Draw-AppIcon -Context $context -X 0 -Y 0 -Size 55
+    Draw-AppIcon -Context $context -X 0 -Y 0 -Size ([Math]::Min($width, $height))
 }
 Save-RasterAsset -Path (Join-Path $SetupDir "onlyrag-setup-banner-493x58.png") -Width 493 -Height 58 -Draw {
     param($context, $width, $height)

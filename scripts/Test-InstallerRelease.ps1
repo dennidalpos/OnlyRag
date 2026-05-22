@@ -131,10 +131,15 @@ function Test-PathExpectation {
 }
 
 function Test-InstallerSignature {
-    param([Parameter(Mandatory)][string]$Path)
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [bool]$RequireValidSignature
+    )
 
     $signature = Get-AuthenticodeSignature -FilePath $Path
-    $status = if ($signature.Status -eq "Valid") { "pass" } elseif ($RequireSigned) { "fail" } else { "warn" }
+    $status = if ($signature.Status -eq "Valid") { "pass" } elseif ($RequireValidSignature) { "fail" } else { "warn" }
     Add-Check -Id "signing-status" -Status $status -Message "Signature status: $($signature.Status)." -Data @{
         signer = $signature.SignerCertificate?.Subject
         statusMessage = $signature.StatusMessage
@@ -228,7 +233,7 @@ Add-Check -Id "installer-file" -Status "pass" -Message "Primary installer found.
     path = $resolvedInstaller
     bytes = (Get-Item -LiteralPath $resolvedInstaller).Length
 }
-Test-InstallerSignature -Path $resolvedInstaller
+Test-InstallerSignature -Path $resolvedInstaller -RequireValidSignature:$RequireSigned
 Test-OptionalComponents
 
 if (-not $RunInstallLifecycle) {

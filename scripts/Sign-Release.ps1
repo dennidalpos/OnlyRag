@@ -69,12 +69,7 @@ try {
         }
 
         if (-not $CertificatePassword) {
-            if (-not [string]::IsNullOrWhiteSpace($env:ONLYRAG_CERT_PASSWORD)) {
-                $CertificatePassword = ConvertTo-SecureString -String $env:ONLYRAG_CERT_PASSWORD -AsPlainText -Force
-            }
-            else {
-                $CertificatePassword = Read-Host "PFX password" -AsSecureString
-            }
+            $CertificatePassword = Read-Host "PFX password" -AsSecureString
         }
 
         Write-Host "Importing signing certificate into CurrentUser\\My..." -ForegroundColor Cyan

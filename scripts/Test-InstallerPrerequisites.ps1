@@ -14,10 +14,15 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 function Test-OnlyRagSupportedWindows {
-    if ($SimulateWindows -eq "Supported") {
+    param(
+        [ValidateSet("Supported", "Unsupported")]
+        [string]$Simulation
+    )
+
+    if ($Simulation -eq "Supported") {
         return $true
     }
-    if ($SimulateWindows -eq "Unsupported") {
+    if ($Simulation -eq "Unsupported") {
         return $false
     }
 
@@ -34,10 +39,15 @@ function Test-OnlyRagSupportedWindows {
 }
 
 function Test-OnlyRagWebView2Runtime {
-    if ($SimulateWebView2 -eq "Present") {
+    param(
+        [ValidateSet("Present", "Missing")]
+        [string]$Simulation
+    )
+
+    if ($Simulation -eq "Present") {
         return $true
     }
-    if ($SimulateWebView2 -eq "Missing") {
+    if ($Simulation -eq "Missing") {
         return $false
     }
 
@@ -248,8 +258,8 @@ if ($SelfTest) {
     exit 0
 }
 
-$windowsSupported = Test-OnlyRagSupportedWindows
-$webView2Present = Test-OnlyRagWebView2Runtime
+$windowsSupported = Test-OnlyRagSupportedWindows -Simulation $SimulateWindows
+$webView2Present = Test-OnlyRagWebView2Runtime -Simulation $SimulateWebView2
 $status = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $windowsSupported -WebView2Present $webView2Present
 
 if ($status.CanInstall) {

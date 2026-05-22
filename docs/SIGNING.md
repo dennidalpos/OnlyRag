@@ -99,15 +99,18 @@ pwsh .\scripts\Test-InstallerRelease.ps1 `
 
 ## Non-Interactive Runs
 
-For local automation, set the PFX password in the current PowerShell session before invoking the script:
+For local automation, pass the PFX password as a `SecureString` value created outside repository
+files:
 
 ```powershell
-$env:ONLYRAG_CERT_PASSWORD = "<pfx password>"
-pwsh .\scripts\Sign-Release.ps1 -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" -Version "0.1.0"
-Remove-Item Env:\ONLYRAG_CERT_PASSWORD
+$certificatePassword = Read-Host "PFX password" -AsSecureString
+pwsh .\scripts\Sign-Release.ps1 `
+  -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" `
+  -CertificatePassword $certificatePassword `
+  -Version "0.1.0"
 ```
 
-Do not store this value in repository files.
+Do not store this value in repository files, command history, logs, or environment variables.
 
 ## Output
 

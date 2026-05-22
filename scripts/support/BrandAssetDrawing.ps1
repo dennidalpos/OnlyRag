@@ -215,13 +215,14 @@ function Save-RasterAsset {
         [int]$Width,
         [int]$Height,
         [scriptblock]$Draw,
+        [object[]]$DrawArguments = @(),
         [ValidateSet("Png", "Bmp")]
         [string]$Format = "Png"
     )
 
     $visual = [System.Windows.Media.DrawingVisual]::new()
     $context = $visual.RenderOpen()
-    & $Draw $context $Width $Height
+    & $Draw $context $Width $Height @DrawArguments
     $context.Close()
 
     $bitmap = [System.Windows.Media.Imaging.RenderTargetBitmap]::new(
@@ -258,7 +259,7 @@ function Save-LogoIconPng {
 
     Save-RasterAsset -Path $Path -Width $Size -Height $Size -Draw {
         param($context, $width, $height)
-        Draw-AppIcon -Context $context -X 0 -Y 0 -Size $width
+        Draw-AppIcon -Context $context -X 0 -Y 0 -Size ([Math]::Min($width, $height))
     }
 }
 
@@ -289,18 +290,18 @@ function Save-SocialImage {
     )
 
     Save-RasterAsset -Path $Path -Width $Width -Height $Height -Draw {
-        param($context, $width, $height)
+        param($context, $width, $height, $headline, $subtitle)
         Draw-SocialBackground -Context $context -Width $width -Height $height
         $iconSize = [Math]::Min($width, $height) * 0.13
         Draw-AppIcon -Context $context -X ($width * 0.08) -Y ($height * 0.10) -Size $iconSize
         Draw-Text -Context $context -Text "OnlyRag" -X ($width * 0.08 + $iconSize + 24) -Y ($height * 0.13) -Size ($height * 0.06) -Color "#ffffff" -MaxWidth ($width * 0.44) -Weight "Bold"
-        Draw-Text -Context $context -Text $Headline -X ($width * 0.08) -Y ($height * 0.36) -Size ($height * 0.105) -Color $Colors.Ink -MaxWidth ($width * 0.48) -Weight "Bold" -MaxHeight ($height * 0.32)
-        Draw-Text -Context $context -Text $Subtitle -X ($width * 0.08) -Y ($height * 0.69) -Size ($height * 0.04) -Color $Colors.Muted -MaxWidth ($width * 0.50) -Weight "SemiBold" -MaxHeight ($height * 0.15)
+        Draw-Text -Context $context -Text $headline -X ($width * 0.08) -Y ($height * 0.36) -Size ($height * 0.105) -Color $Colors.Ink -MaxWidth ($width * 0.48) -Weight "Bold" -MaxHeight ($height * 0.32)
+        Draw-Text -Context $context -Text $subtitle -X ($width * 0.08) -Y ($height * 0.69) -Size ($height * 0.04) -Color $Colors.Muted -MaxWidth ($width * 0.50) -Weight "SemiBold" -MaxHeight ($height * 0.15)
         $pillWidth = [Math]::Min($width * 0.34, 330)
         $pillHeight = [Math]::Max($height * 0.07, 46)
         $context.DrawRoundedRectangle((New-SolidBrush $Colors.Blue), $null, [System.Windows.Rect]::new($width * 0.08, $height * 0.84, $pillWidth, $pillHeight), 12, 12)
         Draw-Text -Context $context -Text "Windows desktop app" -X ($width * 0.10) -Y ($height * 0.852) -Size ($height * 0.031) -Color "#ffffff" -MaxWidth ($pillWidth - 36) -Weight "Bold"
-    }
+    } -DrawArguments @($Headline, $Subtitle)
 }
 
 function Save-PostImage {
@@ -314,16 +315,16 @@ function Save-PostImage {
     )
 
     Save-RasterAsset -Path $Path -Width $Width -Height $Height -Draw {
-        param($context, $width, $height)
+        param($context, $width, $height, $label, $headline, $subtitle)
         $context.DrawRectangle((New-SolidBrush "#ffffff"), $null, [System.Windows.Rect]::new(0, 0, $width, $height))
         $context.DrawRectangle((New-SolidBrush $Colors.Surface), $null, [System.Windows.Rect]::new(0, $height * 0.67, $width, $height * 0.33))
         $context.DrawRoundedRectangle((New-LinearBrush $Colors.Navy $Colors.NavyDark 135), $null, [System.Windows.Rect]::new($width * 0.08, $height * 0.08, $width * 0.84, $height * 0.33), 28, 28)
         Draw-AppIcon -Context $context -X ($width * 0.12) -Y ($height * 0.13) -Size ([Math]::Min($width, $height) * 0.14)
-        Draw-Text -Context $context -Text $Label -X ($width * 0.29) -Y ($height * 0.16) -Size ($height * 0.035) -Color $Colors.Teal -MaxWidth ($width * 0.55) -Weight "Bold"
+        Draw-Text -Context $context -Text $label -X ($width * 0.29) -Y ($height * 0.16) -Size ($height * 0.035) -Color $Colors.Teal -MaxWidth ($width * 0.55) -Weight "Bold"
         Draw-Text -Context $context -Text "OnlyRag" -X ($width * 0.29) -Y ($height * 0.22) -Size ($height * 0.065) -Color "#ffffff" -MaxWidth ($width * 0.55) -Weight "Bold"
-        Draw-Text -Context $context -Text $Headline -X ($width * 0.10) -Y ($height * 0.49) -Size ($height * 0.062) -Color $Colors.Ink -MaxWidth ($width * 0.80) -Weight "Bold" -MaxHeight ($height * 0.22)
-        Draw-Text -Context $context -Text $Subtitle -X ($width * 0.10) -Y ($height * 0.75) -Size ($height * 0.034) -Color $Colors.Muted -MaxWidth ($width * 0.76) -Weight "SemiBold" -MaxHeight ($height * 0.14)
+        Draw-Text -Context $context -Text $headline -X ($width * 0.10) -Y ($height * 0.49) -Size ($height * 0.062) -Color $Colors.Ink -MaxWidth ($width * 0.80) -Weight "Bold" -MaxHeight ($height * 0.22)
+        Draw-Text -Context $context -Text $subtitle -X ($width * 0.10) -Y ($height * 0.75) -Size ($height * 0.034) -Color $Colors.Muted -MaxWidth ($width * 0.76) -Weight "SemiBold" -MaxHeight ($height * 0.14)
         $context.DrawRoundedRectangle((New-SolidBrush $Colors.Amber), $null, [System.Windows.Rect]::new($width * 0.10, $height * 0.91, $width * 0.28, $height * 0.018), 8, 8)
         $context.DrawRoundedRectangle((New-SolidBrush $Colors.Teal), $null, [System.Windows.Rect]::new($width * 0.40, $height * 0.91, $width * 0.16, $height * 0.018), 8, 8)
-    }
+    } -DrawArguments @($Label, $Headline, $Subtitle)
 }

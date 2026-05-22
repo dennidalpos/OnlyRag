@@ -134,6 +134,7 @@ Write-Host "OnlyRag repository gate" -ForegroundColor Cyan
 Write-Host "Repository: $repoRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Installer: $(if ($IncludeInstaller) { 'included' } else { 'skipped by default' })"
+Write-Host "Inno Setup: $(if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) { 'auto-detect when installer is included' } else { $InnoSetupCompiler })"
 
 Invoke-GateStep "preflight" {
     if (-not $IsWindows) {

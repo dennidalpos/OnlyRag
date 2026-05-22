@@ -49,6 +49,7 @@ function Resolve-OnlyRagRepositoryPath {
 }
 
 function Remove-OnlyRagPathIfExists {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)]
         [string]$Path
@@ -84,6 +85,23 @@ function Test-OnlyRagSkippedTree {
         $relativePath.StartsWith("src\OnlyRag.Web\node_modules\", [System.StringComparison]::OrdinalIgnoreCase) -or
         $relativePath -eq "artifacts" -or
         $relativePath.StartsWith("artifacts\", [System.StringComparison]::OrdinalIgnoreCase)
+    )
+}
+
+function Test-OnlyRagPreservedIgnoredStatusLine {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Line
+    )
+
+    if (-not $Line.StartsWith("!! ", [System.StringComparison]::Ordinal)) {
+        return $false
+    }
+
+    $relativePath = $Line.Substring(3).Trim().TrimEnd('/').Replace('/', '\')
+    return (
+        (-not $cleanArtifacts -and ($relativePath -eq "artifacts" -or $relativePath.StartsWith("artifacts\", [System.StringComparison]::OrdinalIgnoreCase))) -or
+        (-not $cleanDependencies -and ($relativePath -eq "src\OnlyRag.Web\node_modules" -or $relativePath.StartsWith("src\OnlyRag.Web\node_modules\", [System.StringComparison]::OrdinalIgnoreCase)))
     )
 }
 
@@ -162,7 +180,10 @@ if ($gitCommand) {
         throw "git status failed with exit code $LASTEXITCODE."
     }
 
-    $ignoredGeneratedLines = @($statusLines | Where-Object { $_.StartsWith("!! ", [System.StringComparison]::Ordinal) })
+    $ignoredGeneratedLines = @($statusLines | Where-Object {
+        $_.StartsWith("!! ", [System.StringComparison]::Ordinal) -and
+        -not (Test-OnlyRagPreservedIgnoredStatusLine -Line $_)
+    })
     if ($ignoredGeneratedLines.Count -gt 0) {
         Write-Host "Remaining ignored/generated paths:" -ForegroundColor Red
         $ignoredGeneratedLines | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }

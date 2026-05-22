@@ -18,6 +18,8 @@ product-facing and concise; keep operational and implementation details here.
 
 ## Pipeline Notes
 
+- [Application flow diagram](APP_FLOW.drawio): editable draw.io diagram with runtime architecture
+  and main product flows.
 - [RAG pipeline](RAG_PIPELINE.md): ingestion, embeddings, sqlite-vec retrieval, chat behavior, and
   vector-search runtime requirements.
 - [OCR pipeline](OCR_PIPELINE.md): scanned PDF/image OCR flow, cache, bridge, and prerequisites.

@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-05-22T15:16:14+02:00",
+  "last_updated": "2026-05-22T15:33:42+02:00",
   "current_phase": "release-hardening",
   "status": "blocked-on-external-release-verification",
   "summary": "Build, dependency, runtime, installer payload, automated desktop workflow, and repository structure hardening are complete. The generated installer is currently unsigned. Residual release work requires a trusted signing certificate and interactive Windows verification passes.",
@@ -7,7 +7,8 @@
     "Low-risk dependency updates applied and audited with no NuGet/npm vulnerabilities reported.",
     "Release gate, web checks, .NET tests, OCR bridge check, installer build, and non-invasive unsigned installer evidence passed.",
     "Representative populated workflow is covered by automated in-process backend tests.",
-    "Oversized file review completed with focused splits and documented justifications."
+    "Oversized file review completed with focused splits and documented justifications.",
+    "Repository scripts rechecked with parser/static analysis; signing password handling, script analyzer issues, and clean preservation behavior were hardened."
   ],
   "residual_plan": [
     {
@@ -64,6 +65,7 @@
     "web_format": "passed",
     "web_tests": "passed",
     "dependency_audit": "passed",
+    "script_static_analysis": "passed_with_known_style_warnings",
     "installer_payload": "passed_unsigned",
     "signed_installer_lifecycle": "blocked",
     "wizard_layout": "blocked"
