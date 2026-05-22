@@ -81,7 +81,7 @@
     {
       "id": "TASK-015",
       "priority": "P2",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Split oversized source files that exceed repository thresholds",
       "source": "structure-review",
       "effort": "medium-large",
@@ -98,31 +98,33 @@
       "evidence": [
         "Current line-count scan found multiple tracked source/script files above split-required thresholds, including 821-line useSettingsSectionController.ts, 758-line TranslationSection.tsx, 664-line LocalSqliteMigrator.cs, 661-line SqliteTranslationRepository.cs, 573-line DocumentsSection.tsx, 551-line Bootstrap-Prerequisites.ps1, 535-line DocumentsSection.helpers.tsx, 531-line Generate-BrandAssets.ps1, 509-line SqliteDocumentRepository.cs, and 503-line ChatSection.tsx."
       ],
-      "last_updated": "2026-05-22T12:35:45+02:00",
+      "last_updated": "2026-05-22T13:00:33+02:00",
       "completed_actions": [
         "Split storage implementation files into partial classes: LocalSqliteMigrator.SchemaSql.cs, SqliteTranslationRepository.SourceUnits.cs, SqliteTranslationRepository.Mapping.cs, and SqliteDocumentRepository.Queries.cs.",
         "Split oversized PowerShell entrypoints into support helpers: BootstrapPrerequisites.Core.ps1, BootstrapPrerequisites.Ocr.ps1, and BrandAssetDrawing.ps1.",
         "Split settings controller defaults and action groups into SettingsSection.defaults.ts, useSettingsSectionController.actions.ts, and useSettingsSectionController.dependencyActions.ts.",
-        "Updated scripts/README.md for the new internal helper scripts."
+        "Updated scripts/README.md for the new internal helper scripts.",
+        "Split remaining oversized frontend components into focused controllers, views, dialogs, field components, formatting helpers, and storage helpers for TranslationSection, DocumentsSection, ChatSection, SettingsSection.helpers, and related support code.",
+        "Split newly surfaced oversized C# source files into partial classes: TranslationExportService.Content.cs, TranslationExportService.Docx.cs, MainWindow.Startup.cs, and MainWindow.Exit.cs.",
+        "Split oversized infrastructure test fixtures into DocumentIngestionServiceTests.Fixtures.cs and OcrPipelineTests.Fixtures.cs."
       ],
-      "remaining_actions": [
-        "Split remaining oversized frontend components: TranslationSection.tsx, DocumentsSection.tsx, DocumentsSection.helpers.tsx, and ChatSection.tsx.",
-        "Review newly surfaced oversized files outside the original evidence list before marking the structure gate complete: DocumentIngestionServiceTests.cs, OcrPipelineTests.cs, LocalSqliteStorageTests.cs, TranslationExportService.cs, MainWindow.xaml.cs, and SettingsSection.helpers.tsx.",
-        "Run the full repository gate after the remaining split work."
-      ],
+      "remaining_actions": [],
       "latest_evidence": [
-        "Current completed split targets are under split-required threshold: useSettingsSectionController.ts 374 lines, useSettingsSectionController.actions.ts 410, useSettingsSectionController.dependencyActions.ts 252, LocalSqliteMigrator.cs 490, SqliteTranslationRepository.cs 490, SqliteDocumentRepository.cs 450, Bootstrap-Prerequisites.ps1 260, Generate-BrandAssets.ps1 266.",
-        "Current line-count scan still reports oversized files, led by TranslationSection.tsx 827, DocumentsSection.tsx 621, DocumentsSection.helpers.tsx 582, and ChatSection.tsx 562."
+        "Repository line-count scan with rg --files over src, tests, and scripts found no split-required source, test, or script files after the final split pass.",
+        "Original oversized frontend targets are now split below mandatory thresholds: TranslationSection.tsx, DocumentsSection.tsx, DocumentsSection.helpers.tsx, and ChatSection.tsx.",
+        "Newly surfaced oversized files were split or reviewed: DocumentIngestionServiceTests.cs, OcrPipelineTests.cs, TranslationExportService.cs, and MainWindow.xaml.cs no longer exceed split-required thresholds; generated/lock/audit artifacts remain out of split scope."
       ],
       "checks": [
-        "dotnet build OnlyRag.sln --configuration Release --no-restore: passed",
         "npm run typecheck: passed",
         "npm run lint: passed",
         "npm run format:check: passed",
-        "npm run test: passed",
-        "PowerShell parser check for split scripts: passed",
-        "dotnet test OnlyRag.sln --configuration Release --no-build: passed after rerunning one initial file-lock failure in LocalJobWorkerServiceTests"
-      ]
+        "npm run test: passed, including Vitest unit tests and Playwright smoke e2e",
+        "dotnet build OnlyRag.sln --configuration Release --no-restore: passed with 0 warnings and 0 errors",
+        "dotnet test OnlyRag.sln --configuration Release --no-build: passed",
+        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release: passed on rerun; first run hit a transient LocalJobWorkerServiceTests SQLite file-lock cleanup failure before passing unchanged",
+        "Repository structure scan: no split-required source, test, or script files found"
+      ],
+      "completed_at": "2026-05-22T13:00:33+02:00"
     }
   ]
 }

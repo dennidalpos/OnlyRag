@@ -2,12 +2,21 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type K
 import {
   apiRequest,
   type ChatResponse,
-  type ChatSource,
   type ImportedDocument,
   type OllamaModel,
   type OllamaStatusResponse
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
+import {
+  clamp,
+  clearChatSession,
+  getMaxDocumentsPanelWidth,
+  loadChatSession,
+  loadDocumentsPanelWidth,
+  saveChatSession,
+  type ChatMessage
+} from "./ChatSection.helpers";
+import { ChatDocumentsPanel, ChatMainPanel, ChatResizeHandle } from "./ChatSection.views";
 
 type ChatSectionProps = {
   models: OllamaModel[];
@@ -15,43 +24,6 @@ type ChatSectionProps = {
   ollamaStatus: OllamaStatusResponse | null;
   loadError: string | null;
 };
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  sources: ChatSource[];
-};
-
-type PersistedChatSession = {
-  conversationId: string | null;
-  messages: ChatMessage[];
-  selectedDocumentIds: number[];
-};
-
-function loadChatSession(): PersistedChatSession | null {
-  try {
-    const raw = window.sessionStorage.getItem("onlyrag.chat.session");
-    if (!raw) return null;
-    return JSON.parse(raw) as PersistedChatSession;
-  } catch {
-    return null;
-  }
-}
-
-function saveChatSession(session: PersistedChatSession): void {
-  try {
-    window.sessionStorage.setItem("onlyrag.chat.session", JSON.stringify(session));
-  } catch {
-  }
-}
-
-function clearChatSession(): void {
-  try {
-    window.sessionStorage.removeItem("onlyrag.chat.session");
-  } catch {
-  }
-}
 
 export function ChatSection({
   models,
@@ -366,197 +338,41 @@ export function ChatSection({
       ref={chatLayoutRef}
       style={{ "--chat-documents-width": `${documentsPanelWidth}px` } as CSSProperties}
     >
-      <section className="chat-documents-panel" aria-labelledby="chat-documents-title">
-        <div className="settings-card__header">
-          <h2 id="chat-documents-title">Documenti</h2>
-        </div>
+      <ChatDocumentsPanel
+        documentsError={documentsError}
+        isDocsLoading={isDocsLoading}
+        documents={documents}
+        selectedDocumentIds={selectedDocumentIds}
+        onToggleDocument={toggleDocument}
+      />
 
-        {documentsError && <div className="feedback-banner feedback-banner--error" role="alert">{documentsError}</div>}
-
-        <div className="chat-document-list" aria-label="Documenti selezionabili per la chat">
-          {isDocsLoading ? (
-            <div className="empty-state chat-empty-state" role="status" aria-live="polite">
-              <p>Caricamento...</p>
-            </div>
-          ) : documents.length === 0 ? (
-            <div className="empty-state chat-empty-state" role="status">
-              <p>Nessun documento importato.</p>
-            </div>
-          ) : (
-            documents.map((document) => (
-              <label className="chat-document-row" key={document.id}>
-                <input
-                  type="checkbox"
-                  checked={selectedDocumentIds.includes(document.id)}
-                  onChange={(event) => toggleDocument(document.id, event.target.checked)}
-                />
-                <span>
-                  <strong>{document.originalFileName}</strong>
-                  <small>
-                    {document.chunkCount === 0 ? "Non ancora pronto per la ricerca" : "Pronto per la ricerca"}
-                  </small>
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-      </section>
-
-      <div
-        className="chat-resize-handle"
-        role="separator"
-        aria-label="Ridimensiona pannelli chat"
-        aria-orientation="vertical"
-        aria-valuemin={minDocumentsPanelWidth}
-        aria-valuemax={maxDocumentsPanelWidth}
-        aria-valuenow={Math.round(documentsPanelWidth)}
-        tabIndex={0}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          setIsResizingDocumentsPanel(true);
-        }}
+      <ChatResizeHandle
+        minDocumentsPanelWidth={minDocumentsPanelWidth}
+        maxDocumentsPanelWidth={maxDocumentsPanelWidth}
+        documentsPanelWidth={documentsPanelWidth}
+        onPointerDown={() => setIsResizingDocumentsPanel(true)}
         onKeyDown={handleResizeHandleKeyDown}
       />
 
-      <section className="chat-main" aria-label="Chat RAG">
-        <div className="chat-toolbar">
-          <label className="field-group chat-model-field" htmlFor="chat-model">
-            <span>Modello chat</span>
-            <select
-              id="chat-model"
-              value={selectedModel}
-              onChange={(event) => setSelectedModel(event.target.value)}
-              disabled={!ollamaStatus?.isReachable || models.length === 0 || isGenerating}
-            >
-              <option value="">Seleziona un modello disponibile</option>
-              {models.map((model) => (
-                <option key={model.name} value={model.name}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="settings-actions">
-            <button className="button-secondary" type="button" onClick={handleNewChat}>
-              Nuova chat
-            </button>
-          </div>
-        </div>
-
-        <div className="chat-status-stack">
-          {!ollamaStatus?.isReachable && (
-            <div className="feedback-banner feedback-banner--error" role="alert">
-              {loadError ?? "Ollama è offline. Apri Ollama o correggi l'indirizzo in Impostazioni."}
-            </div>
-          )}
-          {ollamaStatus?.isReachable && models.length === 0 && (
-            <div className="feedback-banner feedback-banner--error" role="alert">
-              Nessun modello installato in Ollama. Installa almeno un modello prima di usare la chat.
-            </div>
-          )}
-          {feedback && <div className="feedback-banner feedback-banner--error" role="alert">{feedback}</div>}
-          {notices.length > 0 && (
-            <div className="panel-note panel-note--warning" role="status">
-              {notices.map((notice) => (
-                <p key={notice}>{notice}</p>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="chat-messages" aria-live="polite">
-          {messages.length === 0 ? (
-            <div className="empty-state chat-empty-state" role="status">
-              <p>Inizia una conversazione.</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <article className={`chat-message chat-message--${message.role}`} key={message.id}>
-                <div className="chat-message__bubble">
-                  <p>{message.content}</p>
-                  {message.sources.length > 0 && (
-                    <div className="chat-sources">
-                      <strong>Fonti</strong>
-                      {message.sources.map((source) => (
-                        <details key={source.chunkId} className="chat-source">
-                          <summary>
-                            {source.documentName} - {formatPageRange(source.pageStart, source.pageEnd)}
-                          </summary>
-                          <p>{source.snippet}</p>
-                        </details>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))
-          )}
-          {isGenerating && (
-            <div className="chat-generating" role="status" aria-live="polite">
-              <span>Generazione in corso...</span>
-              <button className="button-secondary" type="button" onClick={handleCancel}>
-                Annulla
-              </button>
-            </div>
-          )}
-        </div>
-
-        <form className="chat-input-row" onSubmit={handleSubmit}>
-          <textarea
-            aria-label="Messaggio"
-            value={input}
-            rows={3}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder={selectedDocumentIds.length > 0 ? "Fai una domanda sui documenti selezionati" : "Scrivi un messaggio"}
-            disabled={isGenerating}
-          />
-          <button type="submit" disabled={!canSend || !input.trim()}>
-            Invia
-          </button>
-        </form>
-      </section>
+      <ChatMainPanel
+        models={models}
+        selectedModel={selectedModel}
+        ollamaStatus={ollamaStatus}
+        loadError={loadError}
+        isGenerating={isGenerating}
+        feedback={feedback}
+        notices={notices}
+        messages={messages}
+        input={input}
+        selectedDocumentIds={selectedDocumentIds}
+        canSend={canSend}
+        onSelectedModelChange={setSelectedModel}
+        onNewChat={handleNewChat}
+        onCancel={handleCancel}
+        onInputChange={setInput}
+        onInputKeyDown={handleInputKeyDown}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function loadDocumentsPanelWidth(storageKey: string, min: number, max: number): number {
-  try {
-    const saved = Number(window.localStorage.getItem(storageKey));
-    return Number.isFinite(saved) ? clamp(saved, min, max) : 220;
-  } catch {
-    return 220;
-  }
-}
-
-function getMaxDocumentsPanelWidth(
-  layout: HTMLDivElement | null,
-  minDocumentsPanelWidth: number,
-  maxDocumentsPanelWidth: number,
-  minChatPanelWidth: number
-): number {
-  if (!layout) {
-    return maxDocumentsPanelWidth;
-  }
-
-  return Math.max(
-    minDocumentsPanelWidth,
-    Math.min(maxDocumentsPanelWidth, layout.getBoundingClientRect().width - minChatPanelWidth)
-  );
-}
-
-function formatPageRange(pageStart: number | null, pageEnd: number | null): string {
-  if (!pageStart && !pageEnd) {
-    return "Pagina non disponibile";
-  }
-
-  if (!pageEnd || pageStart === pageEnd) {
-    return `Pagina ${pageStart}`;
-  }
-
-  return `Pagine ${pageStart}-${pageEnd}`;
 }
