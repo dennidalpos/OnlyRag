@@ -5,8 +5,8 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteMigrator
 {
-    public const int TargetSchemaVersion = 11;
-    private const string InitialSchemaName = "011_fresh_local_storage";
+    public const int TargetSchemaVersion = 12;
+    private const string InitialSchemaName = "012_fresh_local_storage";
     private const string BackupDirectoryName = "backups";
     private const string FtsUnavailableNote = "No SQLite FTS module is available in the active SQLite provider; keyword search is disabled until FTS5 or FTS4 is available.";
 
@@ -14,7 +14,8 @@ public sealed class LocalSqliteMigrator
     [
         new(9, "009_add_document_jobs_hashes_and_translation_layout", ApplySchemaVersion9Async),
         new(10, "010_add_fts4_keyword_search_fallback", ApplySchemaVersion10Async),
-        new(11, "011_enforce_unique_document_hashes", ApplySchemaVersion11Async)
+        new(11, "011_enforce_unique_document_hashes", ApplySchemaVersion11Async),
+        new(12, "012_add_status_constraints", ApplySchemaVersion12Async)
     ];
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -351,6 +352,16 @@ public sealed class LocalSqliteMigrator
             cancellationToken);
     }
 
+    private static async Task ApplySchemaVersion12Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await SqliteStatusConstraints.ValidateExistingStatusesAsync(connection, transaction, cancellationToken);
+        await SqliteStatusConstraints.CreateValidationTriggersAsync(connection, transaction, cancellationToken);
+    }
+
     private static async Task EnsureNoDuplicateDocumentHashesAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -540,7 +551,7 @@ public sealed class LocalSqliteMigrator
             CREATE TABLE jobs (
                 id TEXT PRIMARY KEY,
                 type TEXT NOT NULL,
-                status TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ({{SqliteStatusConstraints.JobStatusPredicate}})),
                 priority INTEGER NOT NULL DEFAULT 0,
                 progress_percent INTEGER NOT NULL DEFAULT 0,
                 current_step TEXT NOT NULL DEFAULT '',
@@ -577,7 +588,7 @@ public sealed class LocalSqliteMigrator
                 source_language TEXT NOT NULL DEFAULT 'auto',
                 target_language TEXT NOT NULL,
                 model TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ({{SqliteStatusConstraints.TranslationStatusPredicate}})),
                 job_id TEXT NULL,
                 unit_count INTEGER NOT NULL DEFAULT 0,
                 completed_unit_count INTEGER NOT NULL DEFAULT 0,
@@ -600,7 +611,7 @@ public sealed class LocalSqliteMigrator
                 machine_translated_text TEXT NULL,
                 translated_text TEXT NULL,
                 manually_edited INTEGER NOT NULL DEFAULT 0,
-                status TEXT NOT NULL DEFAULT 'Pending',
+                status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ({{SqliteStatusConstraints.TranslationUnitStatusPredicate}})),
                 validation_warnings TEXT NULL,
                 error TEXT NULL,
                 attempt_count INTEGER NOT NULL DEFAULT 0,
@@ -656,7 +667,7 @@ public sealed class LocalSqliteMigrator
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (11, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (12, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 

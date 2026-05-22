@@ -287,7 +287,7 @@
     {
       "id": "TASK-011",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Add database status constraints and migration checks",
       "source": "AUD-015",
       "effort": "medium",
@@ -300,12 +300,26 @@
         "Migrate an existing database.",
         "Attempt invalid status writes.",
         "Run job and translation lifecycle tests."
+      ],
+      "completed_at": "2026-05-22T10:03:55+02:00",
+      "result": "Added schema version 12 with CHECK constraints for fresh job, translation, and translation unit status columns plus migration-time validation and trigger-based equivalent enforcement for existing databases. Translation repository status updates now reject unsupported translation states before writing, and focused storage tests cover invalid existing statuses, migrated trigger enforcement, fresh-schema invalid writes, and repository validation.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~LocalSqliteStorageTests|FullyQualifiedName~SqliteLocalJobQueueTests|FullyQualifiedName~SqliteStatusConstraintTests\"",
+        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~SqliteStatusConstraintTests\"",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~DocumentTranslationJobHandlerTests|FullyQualifiedName~InProcessBackendTranslationTests|FullyQualifiedName~InProcessBackendContractTests\"",
+        "dotnet test OnlyRag.sln",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check",
+        "npm run test",
+        "npm run build",
+        "dotnet format OnlyRag.sln --verify-no-changes --no-restore --include src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs src\\OnlyRag.Infrastructure\\Storage\\SqliteStatusConstraints.cs src\\OnlyRag.Infrastructure\\Storage\\SqliteTranslationRepository.cs tests\\OnlyRag.Infrastructure.Tests\\SqliteStatusConstraintTests.cs"
       ]
     },
     {
       "id": "TASK-012",
       "priority": "P1",
-      "status": "todo",
+      "status": "blocked",
       "title": "Run signed installer lifecycle verification on a clean Windows machine",
       "source": "release-gate",
       "effort": "medium",
@@ -316,6 +330,20 @@
       "verify": [
         "Run scripts\\Test-InstallerRelease.ps1 with -RequireSigned and -RunInstallLifecycle.",
         "Confirm Authenticode signature and timestamp validation."
+      ],
+      "blocked_at": "2026-05-22T10:09:17+02:00",
+      "blockers": [
+        "No trusted code-signing certificate is available in Cert:\\CurrentUser\\My or Cert:\\LocalMachine\\My.",
+        "No external signing certificate path or thumbprint is configured in the environment.",
+        "The available installer artifact is unsigned: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe reports Authenticode status NotSigned.",
+        "The install lifecycle must run on a clean Windows release verification machine; this workspace is an active development checkout with existing build artifacts and uncommitted implementation changes."
+      ],
+      "attempted_result": "TASK-012 cannot be completed in the current environment. Non-invasive release verification with -RequireSigned failed at signing-status and produced evidence at artifacts\\release-verification\\OnlyRag-release-verification-20260522-100906.json. Lifecycle installation was intentionally not run on this development machine.",
+      "checks": [
+        "Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert",
+        "Get-ChildItem Cert:\\LocalMachine\\My -CodeSigningCert",
+        "Get-AuthenticodeSignature artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
+        "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned"
       ]
     },
     {
@@ -378,7 +406,7 @@
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
   "script_automation_status": {
-    "last_updated": "2026-05-22T01:53:01+02:00",
+    "last_updated": "2026-05-22T10:09:17+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -392,6 +420,7 @@
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Completed TASK-010 by surfacing repeated stale polling failures, tracking last successful refresh times, handling corrupted WebView session storage in tests, and preventing shutdown from treating active-job API failures as zero active jobs."
+    "last_completed_work": "Completed TASK-011 by adding schema version 12 status validation for jobs, translations, and translation units, validating existing statuses before migration, enforcing future migrated writes with triggers, and covering fresh/migrated invalid status behavior with tests.",
+    "current_blocker": "TASK-012 is blocked until trusted signing material outside Git and a clean Windows release verification machine are available."
   }
 }

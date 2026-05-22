@@ -483,6 +483,7 @@ public sealed class SqliteTranslationRepository : ITranslationRepository
         string? lastError,
         CancellationToken cancellationToken = default)
     {
+        SqliteStatusConstraints.ValidateTranslationStatus(status);
         string now = DateTimeOffset.UtcNow.ToString("O");
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
@@ -509,6 +510,7 @@ public sealed class SqliteTranslationRepository : ITranslationRepository
         string? lastError,
         CancellationToken cancellationToken = default)
     {
+        SqliteStatusConstraints.ValidateTranslationStatus(status);
         string now = DateTimeOffset.UtcNow.ToString("O");
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
