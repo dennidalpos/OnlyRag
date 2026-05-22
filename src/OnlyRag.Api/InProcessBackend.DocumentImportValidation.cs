@@ -23,9 +23,12 @@ public static partial class InProcessBackend
         int statusCode = exception.Kind == DocumentStorageLimitKind.TooManyFiles
             ? StatusCodes.Status400BadRequest
             : StatusCodes.Status413PayloadTooLarge;
-        return Results.Problem(
-            title: exception.Title,
-            detail: exception.Message,
-            statusCode: statusCode);
+        return CreateProblem(
+            exception.Title,
+            exception.Message,
+            statusCode,
+            exception.Kind == DocumentStorageLimitKind.TooManyFiles
+                ? "document_too_many_files"
+                : "document_storage_limit");
     }
 }

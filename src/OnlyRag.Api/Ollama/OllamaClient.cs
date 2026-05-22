@@ -352,23 +352,19 @@ internal sealed class OllamaClient : IOllamaClient
             {
                 return new OllamaApiException(
                     OllamaErrorKind.ContextLengthExceeded,
-                    errorMessage,
+                    "La richiesta supera la finestra di contesto del modello Ollama.",
                     (int)statusCode);
             }
 
             return new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                string.IsNullOrWhiteSpace(errorMessage)
-                    ? "La richiesta verso Ollama non e valida."
-                    : errorMessage,
+                "La richiesta verso Ollama non e valida.",
                 (int)statusCode);
         }
 
         return new OllamaApiException(
             OllamaErrorKind.UnexpectedResponse,
-            string.IsNullOrWhiteSpace(errorMessage)
-                ? $"Ollama ha restituito lo stato HTTP {(int)statusCode}."
-                : errorMessage,
+            $"Ollama ha restituito lo stato HTTP {(int)statusCode}.",
             (int)statusCode);
     }
 

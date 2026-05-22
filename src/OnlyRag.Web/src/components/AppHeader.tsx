@@ -3,7 +3,7 @@ import type { BackendStatus } from "../App";
 type StatusBadge = {
   label: string;
   value: string;
-  tone: "online" | "offline" | "warning";
+  tone: "online" | "offline" | "warning" | "neutral";
 };
 
 type AppHeaderProps = {
@@ -31,6 +31,12 @@ export function AppHeader({ currentSection, backendStatus }: AppHeaderProps) {
             <strong>{badge.value}</strong>
           </span>
         ))}
+        {backendStatus.refreshStatus.lastSuccessfulRefreshAt && (
+          <span className="status-badge status-badge--neutral">
+            <span>Aggiornato</span>
+            <strong>{new Date(backendStatus.refreshStatus.lastSuccessfulRefreshAt).toLocaleTimeString()}</strong>
+          </span>
+        )}
       </div>
     </header>
   );

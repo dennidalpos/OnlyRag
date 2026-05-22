@@ -20,6 +20,14 @@ import { OllamaSetupGate } from "./components/OllamaSetupGate";
 import { SectionId, Sidebar } from "./components/Sidebar";
 import { SettingsSection } from "./components/SettingsSection";
 import { TranslationSection } from "./components/TranslationSection";
+import {
+  formatLastRefresh,
+  initialRefreshStatus,
+  markRefreshFailure,
+  markRefreshSuccess,
+  shouldSurfaceRefreshFailure,
+  type RefreshStatus
+} from "./pollingStatus";
 
 type AppStatusResponse = {
   backend: string;
@@ -40,6 +48,7 @@ export type BackendStatus = {
   jobsValue: string;
   jobsTone: StatusTone;
   lowResourceMode: boolean;
+  refreshStatus: RefreshStatus;
 };
 
 const sectionLabels: Record<SectionId, string> = {
@@ -57,7 +66,8 @@ const offlineStatus: BackendStatus = {
   ollamaTone: "offline",
   jobsValue: "0",
   jobsTone: "offline",
-  lowResourceMode: false
+  lowResourceMode: false,
+  refreshStatus: initialRefreshStatus
 };
 
 export default function App() {
@@ -82,11 +92,19 @@ export default function App() {
         backendTone: "online",
         jobsValue: status.jobQueue,
         jobsTone: "online",
-        lowResourceMode: status.lowResourceMode
+        lowResourceMode: status.lowResourceMode,
+        refreshStatus: markRefreshSuccess()
       }));
     } catch {
       markBackendOffline();
-      setBackendStatus(offlineStatus);
+      setBackendStatus((current) => ({
+        ...offlineStatus,
+        refreshStatus: markRefreshFailure(
+          current.refreshStatus,
+          resolveBackendErrorMessage() ??
+            "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."
+        )
+      }));
     } finally {
       setStatusChecked(true);
     }
@@ -208,8 +226,10 @@ export default function App() {
         <section className={`workspace-content workspace-content--${activeSection}`} aria-label={sectionLabels[activeSection]}>
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
-              {resolveBackendErrorMessage() ??
-                "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."}
+              {shouldSurfaceRefreshFailure(backendStatus.refreshStatus)
+                ? `${backendStatus.refreshStatus.lastErrorMessage ?? "Il backend locale non è raggiungibile."} Ultimo aggiornamento riuscito: ${formatLastRefresh(backendStatus.refreshStatus.lastSuccessfulRefreshAt)}.`
+                : resolveBackendErrorMessage() ??
+                  "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."}
             </div>
           )}
           {activeSection === "chat" && (

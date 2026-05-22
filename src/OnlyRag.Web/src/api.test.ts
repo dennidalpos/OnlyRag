@@ -26,11 +26,32 @@ describe("apiRequest", () => {
         path: "/api/chat",
         method: "POST",
         status: 503,
-        response: { title: "Backend non disponibile", detail: "Ollama non raggiungibile." }
+        response: {
+          title: "Backend non disponibile",
+          detail: "Ollama non raggiungibile.",
+          status: 503,
+          code: "ollama_unreachable"
+        }
       }
     ]);
 
     await expect(apiRequest("/api/chat", { method: "POST", body: "{}" })).rejects.toThrow("Ollama non raggiungibile.");
+  });
+
+  it("falls back to the problem title for contract-shaped errors without details", async () => {
+    mockApi([
+      {
+        path: "/api/documents/404",
+        status: 404,
+        response: {
+          title: "Documento non trovato",
+          status: 404,
+          code: "not_found"
+        }
+      }
+    ]);
+
+    await expect(apiRequest("/api/documents/404")).rejects.toThrow("Documento non trovato");
   });
 
   it("tracks backend bridge online and offline state", () => {

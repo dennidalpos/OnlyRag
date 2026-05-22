@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DocumentsSection } from "./DocumentsSection";
 import { mockApi } from "../test/apiMock";
 import {
@@ -114,5 +114,47 @@ describe("DocumentsSection", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Import documento non riuscito dal backend.");
     });
+  });
+
+  it("surfaces repeated polling failures while keeping the last successful document state", async () => {
+    vi.useFakeTimers();
+    let documentReads = 0;
+    try {
+      mockApi([
+        { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+        { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+        {
+          path: "/api/documents",
+          handler: async () => {
+            documentReads += 1;
+            if (documentReads > 1) {
+              throw new TypeError("offline");
+            }
+
+            return { body: [createDocument()] };
+          }
+        },
+        { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
+        { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
+        { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
+      ]);
+
+      render(<DocumentsSection />);
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(screen.getAllByRole("alert").some((alert) => alert.textContent?.includes("Stato non aggiornato"))).toBe(true);
+      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

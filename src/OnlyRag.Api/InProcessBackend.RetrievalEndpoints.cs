@@ -17,18 +17,18 @@ public static partial class InProcessBackend
         {
             if (string.IsNullOrWhiteSpace(request.Query))
             {
-                return Results.Problem(
-                    title: "Query non valida",
-                    detail: "Inserisci una query di ricerca.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Query non valida",
+                    "Inserisci una query di ricerca.",
+                    "search_query_required");
             }
 
             if (request.DocumentIds is null || request.DocumentIds.Count == 0)
             {
-                return Results.Problem(
-                    title: "Documenti non selezionati",
-                    detail: "Seleziona almeno un documento prima di cercare.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Documenti non selezionati",
+                    "Seleziona almeno un documento prima di cercare.",
+                    "documents_required");
             }
 
             return Results.Ok(await retrieval.SearchAsync(request, cancellationToken));
@@ -45,10 +45,7 @@ public static partial class InProcessBackend
             }
             catch (ChatValidationException ex)
             {
-                return Results.Problem(
-                    title: ex.Title,
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(ex.Title, ex.Message, "chat_validation_failed");
             }
             catch (OllamaApiException ex)
             {

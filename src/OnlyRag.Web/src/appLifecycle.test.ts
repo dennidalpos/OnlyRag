@@ -25,6 +25,7 @@ describe("appLifecycle bridge", () => {
 
     const state = await window.__ONLYRAG_APP__!.getExitState();
     expect(state.activeJobCount).toBe(1);
+    expect(state.isActiveJobStateUnknown).toBe(false);
     expect(state.reasons).toContain("Chat: modifiche non salvate.");
     expect(state.reasons).toContain("Job locali attivi: 1.");
 
@@ -33,5 +34,25 @@ describe("appLifecycle bridge", () => {
     expect(window.localStorage.getItem("onlyrag.chat.draft")).toBe("bozza salvata");
 
     clearExitContributor("chat");
+  });
+
+  it("keeps exit guarded when active job polling fails", async () => {
+    mockApi([
+      {
+        path: "/api/jobs?limit=200",
+        handler: async () => {
+          throw new TypeError("network offline");
+        }
+      }
+    ]);
+
+    initializeAppLifecycleBridge();
+
+    const state = await window.__ONLYRAG_APP__!.getExitState();
+
+    expect(state.activeJobCount).toBe(0);
+    expect(state.isActiveJobStateUnknown).toBe(true);
+    expect(state.hasActiveWork).toBe(true);
+    expect(state.reasons).toContain("Stato dei job locali non verificabile.");
   });
 });

@@ -225,7 +225,7 @@
     {
       "id": "TASK-009",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Normalize API contracts and error responses",
       "source": "AUD-014",
       "effort": "medium",
@@ -237,12 +237,27 @@
       "verify": [
         "Run backend contract tests.",
         "Run frontend typecheck against generated or tested contracts."
+      ],
+      "completed_at": "2026-05-22T01:43:25+02:00",
+      "result": "Centralized API ProblemDetails creation with stable code extensions, normalized not-found/conflict/validation/auth/unexpected error responses to application/problem+json, stopped surfacing raw Ollama external error bodies to the UI, added backend/frontend contract coverage for critical DTO and error shapes, and split document pipeline/preview endpoints out of the main document endpoint controller.",
+      "checks": [
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~ApiContracts|FullyQualifiedName~OllamaClientTests\"",
+        "npm run test:unit -- api.test.ts",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run format:check",
+        "dotnet test OnlyRag.sln",
+        "npm run test",
+        "npm run build",
+        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~ApiContracts|FullyQualifiedName~DocumentPreview|FullyQualifiedName~Pipeline\"",
+        "dotnet test OnlyRag.sln"
       ]
     },
     {
       "id": "TASK-010",
       "priority": "P1",
-      "status": "todo",
+      "status": "completed",
       "title": "Improve polling, stale-state, and shutdown UX",
       "source": "AUD-009",
       "effort": "medium",
@@ -255,6 +270,18 @@
         "Backend offline during polling.",
         "Corrupted browser storage.",
         "Exit while active jobs endpoint fails."
+      ],
+      "completed_at": "2026-05-22T01:53:01+02:00",
+      "result": "Added shared frontend refresh-state tracking with consecutive failure counts and last successful refresh timestamps, surfaced repeated stale polling failures in backend, documents, and jobs UI while preserving the last known data, hardened WebView exit state so active-job polling failures are treated as unknown active work instead of zero jobs, and updated WPF shutdown confirmation to preserve that unknown-job guard.",
+      "checks": [
+        "npm run test:unit -- appLifecycle.test.ts DocumentsSection.test.tsx ChatSection.test.tsx",
+        "npm run typecheck",
+        "dotnet build .\\OnlyRag.sln --no-restore",
+        "npm run lint",
+        "npm run format:check",
+        "npm run test",
+        "dotnet test .\\OnlyRag.sln --no-restore",
+        "npm run build"
       ]
     },
     {
@@ -345,11 +372,13 @@
   ],
   "oversized_files": [
     "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts remains oversized as a state-only settings coordinator after TASK-008 panel extraction; schedule a focused hook split if strict hook line thresholds are required.",
+    "src\\OnlyRag.Web\\src\\components\\DocumentsSection.tsx remains oversized after TASK-010 polling-state work; schedule a focused split of document polling state and import/dropzone UI into dedicated modules.",
+    "src\\OnlyRag.Web\\src\\api.ts remains oversized as the shared frontend API DTO and request client module; schedule a focused contract/type split if frontend API contracts continue to grow.",
     "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs is oversized but remains a single migration aggregate; defer split to focused storage refactor.",
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
   "script_automation_status": {
-    "last_updated": "2026-05-22T01:35:05+02:00",
+    "last_updated": "2026-05-22T01:53:01+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -363,6 +392,6 @@
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Completed TASK-008 by splitting oversized mixed-responsibility Settings, ingestion, and in-process backend files into focused modules and verifying build, tests, lint, typecheck, format, and web build."
+    "last_completed_work": "Completed TASK-010 by surfacing repeated stale polling failures, tracking last successful refresh times, handling corrupted WebView session storage in tests, and preventing shutdown from treating active-job API failures as zero active jobs."
   }
 }

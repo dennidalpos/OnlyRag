@@ -113,10 +113,10 @@ public static partial class InProcessBackend
         {
             if (!request.Confirmed)
             {
-                return Results.Problem(
-                    title: "Conferma richiesta",
-                    detail: "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
             }
 
             try
@@ -148,10 +148,10 @@ public static partial class InProcessBackend
         {
             if (!request.Confirmed)
             {
-                return Results.Problem(
-                    title: "Conferma richiesta",
-                    detail: "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
             }
 
             try

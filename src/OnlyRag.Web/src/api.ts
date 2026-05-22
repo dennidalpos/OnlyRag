@@ -6,6 +6,14 @@ export type BackendBridge = {
   errorMessage: string | null;
 };
 
+export type ApiProblemDetails = {
+  title?: string;
+  detail?: string;
+  status?: number;
+  code?: string;
+  traceId?: string;
+};
+
 export type OllamaSettings = {
   ollamaBaseUrl: string;
   defaultChatModel: string | null;
@@ -496,10 +504,7 @@ function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
 
 async function readProblemMessage(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as {
-      title?: string;
-      detail?: string;
-    };
+    const payload = (await response.json()) as ApiProblemDetails;
 
     return payload.detail ?? payload.title ?? `Richiesta fallita con stato ${response.status}.`;
   } catch {

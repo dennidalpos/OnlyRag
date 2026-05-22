@@ -34,14 +34,12 @@ public static partial class InProcessBackend
                 return;
             }
 
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            context.Response.ContentType = "application/problem+json";
-            await context.Response.WriteAsJsonAsync(new
-            {
-                title = "Non autorizzato",
-                detail = "Token di sessione API mancante o non valido.",
-                status = StatusCodes.Status401Unauthorized
-            });
+            await WriteProblemAsync(
+                context,
+                "Non autorizzato",
+                "Token di sessione API mancante o non valido.",
+                StatusCodes.Status401Unauthorized,
+                "unauthorized");
         });
     }
 

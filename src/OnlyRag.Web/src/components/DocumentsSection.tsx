@@ -13,6 +13,13 @@ import {
   type VectorBackendHealth
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
+import {
+  formatLastRefresh,
+  initialRefreshStatus,
+  markRefreshFailure,
+  markRefreshSuccess,
+  shouldSurfaceRefreshFailure
+} from "../pollingStatus";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
 import { ProgressBar } from "./ProgressBar";
 import {
@@ -76,6 +83,8 @@ export function DocumentsSection() {
   const [previewDocument, setPreviewDocument] = useState<ImportedDocument | null>(null);
   const [previewData, setPreviewData] = useState<DocumentPreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [documentRefreshStatus, setDocumentRefreshStatus] = useState(initialRefreshStatus);
+  const [detailRefreshStatus, setDetailRefreshStatus] = useState(initialRefreshStatus);
 
   useEffect(() => {
     setExitContributor("documents", {
@@ -103,9 +112,14 @@ export function DocumentsSection() {
         if (cancelled) return;
         setDocuments(docs);
         setSelectedDocument(docs[0] ?? null);
+        setDocumentRefreshStatus(markRefreshSuccess());
       })
       .catch((err) => {
-        if (!cancelled) setFeedback({ tone: "error", message: err instanceof Error ? err.message : "Impossibile leggere i documenti." });
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Impossibile leggere i documenti.";
+          setFeedback({ tone: "error", message });
+          setDocumentRefreshStatus((current) => markRefreshFailure(current, message));
+        }
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
@@ -122,7 +136,12 @@ export function DocumentsSection() {
         setSelectedDocument((current) =>
           current ? (docs.find((d) => d.id === current.id) ?? current) : (docs[0] ?? null)
         );
-      } catch {}
+        setDocumentRefreshStatus(markRefreshSuccess());
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Impossibile aggiornare i documenti.";
+        setDocumentRefreshStatus((current) => markRefreshFailure(current, message));
+      }
     }, 5000);
     return () => { cancelled = true; window.clearInterval(interval); };
   }, []);
@@ -131,10 +150,20 @@ export function DocumentsSection() {
   useEffect(() => {
     let cancelled = false;
     const jobId = selectedDocument?.currentJobId;
-    if (!jobId) { setSelectedJob(null); return; }
+    if (!jobId) { setSelectedJob(null); setDetailRefreshStatus(initialRefreshStatus); return; }
     const fetch = () => apiRequest<LocalJob>(`/api/jobs/${jobId}`)
-      .then((job) => { if (!cancelled) setSelectedJob(job); })
-      .catch(() => { if (!cancelled) setSelectedJob(null); });
+      .then((job) => {
+        if (!cancelled) {
+          setSelectedJob(job);
+          setDetailRefreshStatus(markRefreshSuccess());
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Impossibile aggiornare il job selezionato.";
+          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
+        }
+      });
     void fetch();
     const interval = window.setInterval(fetch, 3000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -146,8 +175,18 @@ export function DocumentsSection() {
     const id = selectedDocument?.id;
     if (!id) { setEmbeddingStatus(null); return; }
     const fetch = () => apiRequest<DocumentEmbeddingStatus>(`/api/documents/${id}/embedding-status`)
-      .then((s) => { if (!cancelled) setEmbeddingStatus(s); })
-      .catch(() => { if (!cancelled) setEmbeddingStatus(null); });
+      .then((s) => {
+        if (!cancelled) {
+          setEmbeddingStatus(s);
+          setDetailRefreshStatus(markRefreshSuccess());
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato embedding.";
+          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
+        }
+      });
     void fetch();
     const interval = window.setInterval(fetch, 3000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -159,8 +198,18 @@ export function DocumentsSection() {
     const id = selectedDocument?.id;
     if (!id) { setOcrStatus(null); return; }
     const fetch = () => apiRequest<DocumentOcrStatus>(`/api/documents/${id}/ocr-status`)
-      .then((s) => { if (!cancelled) setOcrStatus(s); })
-      .catch(() => { if (!cancelled) setOcrStatus(null); });
+      .then((s) => {
+        if (!cancelled) {
+          setOcrStatus(s);
+          setDetailRefreshStatus(markRefreshSuccess());
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato OCR.";
+          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
+        }
+      });
     void fetch();
     const interval = window.setInterval(fetch, 3000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -172,8 +221,18 @@ export function DocumentsSection() {
     const id = selectedDocument?.id;
     if (!id) { setPipelineStatus(null); return; }
     const fetch = () => apiRequest<DocumentPipelineStatus>(`/api/documents/${id}/pipeline-status`)
-      .then((s) => { if (!cancelled) setPipelineStatus(s); })
-      .catch(() => { if (!cancelled) setPipelineStatus(null); });
+      .then((s) => {
+        if (!cancelled) {
+          setPipelineStatus(s);
+          setDetailRefreshStatus(markRefreshSuccess());
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato pipeline.";
+          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
+        }
+      });
     void fetch();
     const interval = window.setInterval(fetch, 4000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -182,12 +241,14 @@ export function DocumentsSection() {
   async function refreshDocuments(preferredId?: number | null) {
     const docs = await apiRequest<ImportedDocument[]>("/api/documents");
     setDocuments(docs);
+    setDocumentRefreshStatus(markRefreshSuccess());
     const nextId = preferredId ?? selectedDocument?.id ?? null;
     if (nextId === null) { setSelectedDocument(docs[0] ?? null); return; }
     const found = docs.find((d) => d.id === nextId);
     if (!found) { setSelectedDocument(docs[0] ?? null); return; }
     const detail = await apiRequest<ImportedDocument>(`/api/documents/${found.id}`);
     setSelectedDocument(detail);
+    setDetailRefreshStatus(markRefreshSuccess());
   }
 
   async function importFiles(files: FileList | File[], policy: OcrPolicy, ocrLanguage: string = DEFAULT_OCR_LANGUAGE) {
@@ -500,7 +561,13 @@ export function DocumentsSection() {
           <div className="documents-toolbar">
             <strong>Documenti importati</strong>
             <span>{documents.length}</span>
+            <small>Ultimo aggiornamento: {formatLastRefresh(documentRefreshStatus.lastSuccessfulRefreshAt)}</small>
           </div>
+          {shouldSurfaceRefreshFailure(documentRefreshStatus) && (
+            <div className="feedback-banner feedback-banner--error" role="alert">
+              {documentRefreshStatus.lastErrorMessage} Stato non aggiornato da {formatLastRefresh(documentRefreshStatus.lastSuccessfulRefreshAt)}.
+            </div>
+          )}
           {isLoading ? (
             <div className="empty-state"><p>Caricamento documenti...</p></div>
           ) : documents.length === 0 ? (
@@ -522,20 +589,27 @@ export function DocumentsSection() {
 
         {/* Document detail panel */}
         {selectedDocument && (
-          <DocumentDetailCard
-            document={selectedDocument}
-            pipelineStatus={pipelineStatus}
-            embeddingStatus={embeddingStatus}
-            ocrStatus={ocrStatus}
-            activeJob={selectedJob}
-            isBusy={busyDocumentId === selectedDocument.id}
-            canPreview={canPreview}
-            onReindex={handleReindex}
-            onEmbed={handleEmbed}
-            onOcr={handleRunOcr}
-            onDelete={handleDelete}
-            onPreview={handleOpenPreview}
-          />
+          <div className="document-detail-stack">
+            {shouldSurfaceRefreshFailure(detailRefreshStatus) && (
+              <div className="feedback-banner feedback-banner--error" role="alert">
+                {detailRefreshStatus.lastErrorMessage} Dettaglio non aggiornato da {formatLastRefresh(detailRefreshStatus.lastSuccessfulRefreshAt)}.
+              </div>
+            )}
+            <DocumentDetailCard
+              document={selectedDocument}
+              pipelineStatus={pipelineStatus}
+              embeddingStatus={embeddingStatus}
+              ocrStatus={ocrStatus}
+              activeJob={selectedJob}
+              isBusy={busyDocumentId === selectedDocument.id}
+              canPreview={canPreview}
+              onReindex={handleReindex}
+              onEmbed={handleEmbed}
+              onOcr={handleRunOcr}
+              onDelete={handleDelete}
+              onPreview={handleOpenPreview}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -11,6 +11,7 @@ export type AppExitState = {
   hasPendingChanges: boolean;
   hasActiveWork: boolean;
   activeJobCount: number;
+  isActiveJobStateUnknown: boolean;
   reasons: string[];
 };
 
@@ -42,7 +43,7 @@ export function initializeAppLifecycleBridge() {
 
 async function getExitState(): Promise<AppExitState> {
   const tracked = Array.from(contributors.values());
-  const activeJobCount = await getActiveJobCount();
+  const activeJobs = await getActiveJobSnapshot();
   const reasons: string[] = [];
 
   for (const contributor of tracked) {
@@ -55,14 +56,19 @@ async function getExitState(): Promise<AppExitState> {
     }
   }
 
-  if (activeJobCount > 0) {
-    reasons.push(`Job locali attivi: ${activeJobCount}.`);
+  if (activeJobs.count > 0) {
+    reasons.push(`Job locali attivi: ${activeJobs.count}.`);
+  }
+
+  if (activeJobs.isUnknown) {
+    reasons.push("Stato dei job locali non verificabile.");
   }
 
   return {
     hasPendingChanges: tracked.some((contributor) => contributor.hasPendingChanges),
-    hasActiveWork: tracked.some((contributor) => contributor.hasActiveWork),
-    activeJobCount,
+    hasActiveWork: tracked.some((contributor) => contributor.hasActiveWork) || activeJobs.isUnknown,
+    activeJobCount: activeJobs.count,
+    isActiveJobStateUnknown: activeJobs.isUnknown,
     reasons
   };
 }
@@ -81,13 +87,14 @@ async function prepareForExit(): Promise<AppExitState> {
   return getExitState();
 }
 
-async function getActiveJobCount(): Promise<number> {
+async function getActiveJobSnapshot(): Promise<{ count: number; isUnknown: boolean }> {
   try {
     const jobs = await apiRequest<LocalJob[]>("/api/jobs?limit=200");
-    return jobs.filter((job) =>
+    const count = jobs.filter((job) =>
       job.status === "Pending" || job.status === "Running" || job.status === "Pausing" || job.status === "Paused"
     ).length;
+    return { count, isUnknown: false };
   } catch {
-    return 0;
+    return { count: 0, isUnknown: true };
   }
 }

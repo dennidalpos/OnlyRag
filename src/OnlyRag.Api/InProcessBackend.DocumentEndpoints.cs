@@ -23,7 +23,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
-            return document is null ? Results.NotFound() : Results.Ok(document);
+            return document is null ? CreateNotFoundProblem("Documento") : Results.Ok(document);
         });
 
         app.MapPost("/api/documents/import", async (
@@ -34,18 +34,19 @@ public static partial class InProcessBackend
         {
             if (!request.HasFormContentType)
             {
-                return Results.Problem(
-                    title: "Richiesta import non valida",
-                    detail: "Usa multipart/form-data con uno o piu file.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Richiesta import non valida",
+                    "Usa multipart/form-data con uno o piu file.",
+                    "document_import_invalid_content_type");
             }
 
             if (request.ContentLength > storageGuard.Limits.MaxRequestBodySizeBytes)
             {
-                return Results.Problem(
-                    title: "Import troppo grande",
-                    detail: $"La richiesta supera il limite di {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
-                    statusCode: StatusCodes.Status413PayloadTooLarge);
+                return CreateProblem(
+                    "Import troppo grande",
+                    $"La richiesta supera il limite di {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
+                    StatusCodes.Status413PayloadTooLarge,
+                    "document_import_request_too_large");
             }
 
             IFormCollection form;
@@ -55,25 +56,27 @@ public static partial class InProcessBackend
             }
             catch (BadHttpRequestException)
             {
-                return Results.Problem(
-                    title: "Import troppo grande",
-                    detail: "La richiesta multipart supera i limiti configurati.",
-                    statusCode: StatusCodes.Status413PayloadTooLarge);
+                return CreateProblem(
+                    "Import troppo grande",
+                    "La richiesta multipart supera i limiti configurati.",
+                    StatusCodes.Status413PayloadTooLarge,
+                    "document_import_request_too_large");
             }
             catch (InvalidDataException)
             {
-                return Results.Problem(
-                    title: "Import troppo grande",
-                    detail: "La richiesta multipart supera i limiti configurati.",
-                    statusCode: StatusCodes.Status413PayloadTooLarge);
+                return CreateProblem(
+                    "Import troppo grande",
+                    "La richiesta multipart supera i limiti configurati.",
+                    StatusCodes.Status413PayloadTooLarge,
+                    "document_import_request_too_large");
             }
 
             if (form.Files.Count == 0)
             {
-                return Results.Problem(
-                    title: "Nessun file selezionato",
-                    detail: "Seleziona almeno un file da importare.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Nessun file selezionato",
+                    "Seleziona almeno un file da importare.",
+                    "document_import_files_required");
             }
 
             try
@@ -96,10 +99,10 @@ public static partial class InProcessBackend
             {
                 if (file.Length <= 0)
                 {
-                    return Results.Problem(
-                        title: "File vuoto",
-                        detail: $"Il file '{file.FileName}' e vuoto.",
-                        statusCode: StatusCodes.Status400BadRequest);
+                    return CreateBadRequestProblem(
+                        "File vuoto",
+                        $"Il file '{file.FileName}' e vuoto.",
+                        "document_import_empty_file");
                 }
 
                 try
@@ -109,10 +112,10 @@ public static partial class InProcessBackend
                 }
                 catch (ArgumentException ex)
                 {
-                    return Results.Problem(
-                        title: "Import non valido",
-                        detail: ex.Message,
-                        statusCode: StatusCodes.Status400BadRequest);
+                    return CreateBadRequestProblem(
+                        "Import non valido",
+                        ex.Message,
+                        "document_import_invalid");
                 }
                 catch (DocumentStorageLimitException ex)
                 {
@@ -120,10 +123,10 @@ public static partial class InProcessBackend
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return Results.Problem(
-                        title: "Path documento non valido",
-                        detail: ex.Message,
-                        statusCode: StatusCodes.Status400BadRequest);
+                    return CreateBadRequestProblem(
+                        "Path documento non valido",
+                        ex.Message,
+                        "document_import_invalid_path");
                 }
             }
 
@@ -140,12 +143,12 @@ public static partial class InProcessBackend
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
             ImportedDocument? deleted = await documents.DeleteAsync(id, cancellationToken);
-            return deleted is null ? Results.NotFound() : Results.Ok(deleted);
+            return deleted is null ? CreateNotFoundProblem("Documento") : Results.Ok(deleted);
         });
 
         app.MapPost("/api/documents/{id:long}/reindex", async (
@@ -159,12 +162,12 @@ public static partial class InProcessBackend
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
             ImportedDocument? queued = await documents.QueueForIndexingAsync(id, OcrLanguages.NormalizeCode(ocrLanguage), cancellationToken);
-            return queued is null ? Results.NotFound() : Results.Ok(queued);
+            return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
         });
 
         app.MapGet("/api/documents/{id:long}/ocr-status", async (
@@ -177,7 +180,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             LocalJob? currentJob = await GetActiveDocumentJobAsync(document, jobs, cancellationToken);
@@ -200,7 +203,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             await CancelDocumentJobIfNeededAsync(document, jobs, cancellationRegistry, cancellationToken);
@@ -219,7 +222,7 @@ public static partial class InProcessBackend
                     MaxRetries: 0),
                 cancellationToken);
             ImportedDocument? queued = await documents.SetStatusAsync(id, DocumentStatus.Queued, job.Id, lastError: null, cancellationToken);
-            return queued is null ? Results.NotFound() : Results.Ok(queued);
+            return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
         });
 
         app.MapPost("/api/documents/{id:long}/embed", async (
@@ -235,16 +238,16 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             LocalJob? activeJob = await GetActiveDocumentJobAsync(document, jobs, cancellationToken);
             if (activeJob is not null)
             {
-                return Results.Problem(
-                    title: "Documento occupato",
-                    detail: $"Il documento ha gia un job attivo: {activeJob.Type}.",
-                    statusCode: StatusCodes.Status409Conflict);
+                return CreateConflictProblem(
+                    "Documento occupato",
+                    $"Il documento ha gia un job attivo: {activeJob.Type}.",
+                    "document_job_active");
             }
 
             OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
@@ -260,10 +263,10 @@ public static partial class InProcessBackend
 
             if (document.ChunkCount == 0)
             {
-                return Results.Problem(
-                    title: "Documento non indicizzato",
-                    detail: "Esegui prima l'ingestion del documento: gli embedding vengono generati solo sui chunk.",
-                    statusCode: StatusCodes.Status409Conflict);
+                return CreateConflictProblem(
+                    "Documento non indicizzato",
+                    "Esegui prima l'ingestion del documento: gli embedding vengono generati solo sui chunk.",
+                    "document_not_indexed");
             }
 
             try
@@ -274,10 +277,11 @@ public static partial class InProcessBackend
                     || string.Equals(installed.Model, model, StringComparison.OrdinalIgnoreCase));
                 if (!modelInstalled)
                 {
-                    return Results.Problem(
-                        title: "Modello embedding assente",
-                        detail: $"Il modello embedding '{model}' non e installato in Ollama.",
-                        statusCode: StatusCodes.Status404NotFound);
+                    return CreateProblem(
+                        "Modello embedding assente",
+                        $"Il modello embedding '{model}' non e installato in Ollama.",
+                        StatusCodes.Status404NotFound,
+                        "ollama_embedding_model_not_found");
                 }
             }
             catch (OllamaApiException ex)
@@ -318,7 +322,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Documento");
             }
 
             OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
@@ -332,198 +336,7 @@ public static partial class InProcessBackend
                 cancellationToken));
         });
 
-        app.MapGet("/api/documents/{id:long}/pipeline-status", async (
-            long id,
-            IDocumentLibraryService documents,
-            IDocumentRepository documentRepository,
-            IOllamaSettingsService settings,
-            ILocalJobQueue jobs,
-            IEmbeddingRepository embeddings,
-            IVectorSearchService vectorSearch,
-            CancellationToken cancellationToken) =>
-        {
-            ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
-            if (document is null)
-            {
-                return Results.NotFound();
-            }
-
-            OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
-            LocalJob? activeJob = await GetActiveDocumentJobAsync(document, jobs, cancellationToken);
-
-            DocumentOcrStatusResponse ocrStatus = await documentRepository.GetOcrStatusAsync(
-                id,
-                activeJob?.Type == LocalDocumentLibraryService.DocumentIngestionJobType ? activeJob.Id : null,
-                activeJob?.Type == LocalDocumentLibraryService.DocumentIngestionJobType ? activeJob.CurrentStep : null,
-                cancellationToken);
-
-            DocumentEmbeddingStatusResponse embeddingStatus = await BuildEmbeddingStatusResponseAsync(
-                id,
-                currentSettings.DefaultEmbeddingModel,
-                documents,
-                embeddings,
-                jobs,
-                vectorSearch,
-                cancellationToken);
-
-            string ocrPolicy = "Auto";
-            bool isOcrCandidate = IsOcrCandidate(document.FileExtension);
-
-            PipelinePhaseInfo importPhase = new(PhaseState.Completed, null, document.CreatedAtUtc);
-            PipelinePhaseInfo analysisPhase = document.Status == DocumentStatus.Imported
-                ? new(PhaseState.Todo, null, null)
-                : new(PhaseState.Completed, null, document.UpdatedAtUtc);
-
-            PipelinePhaseInfo ocrPhase;
-            if (!isOcrCandidate)
-            {
-                ocrPhase = new(PhaseState.Skipped, null, null);
-            }
-            else if (activeJob?.Type == LocalDocumentLibraryService.DocumentIngestionJobType)
-            {
-                ocrPhase = new(PhaseState.InProgress, null, null);
-            }
-            else if (ocrStatus.State == "Complete")
-            {
-                ocrPhase = new(PhaseState.Completed, null, null);
-            }
-            else if (ocrStatus.State == "Failed")
-            {
-                ocrPhase = new(PhaseState.Failed, ocrStatus.LastError, null);
-            }
-            else if (ocrStatus.OcrPageCount > 0)
-            {
-                ocrPhase = new(PhaseState.Completed, null, null);
-            }
-            else
-            {
-                ocrPhase = new(PhaseState.Todo, null, null);
-            }
-
-            bool isProcessing = document.Status == DocumentStatus.Processing;
-            bool hasPages = document.PageCount > 0;
-
-            PipelinePhaseInfo textExtractionPhase = hasPages
-                ? new(PhaseState.Completed, null, null)
-                : isProcessing
-                    ? new(PhaseState.InProgress, null, null)
-                    : document.Status == DocumentStatus.Failed
-                        ? new(PhaseState.Failed, document.LastError, null)
-                        : new(PhaseState.Todo, null, null);
-
-            bool hasChunks = document.ChunkCount > 0;
-            PipelinePhaseInfo chunkingPhase = hasChunks
-                ? new(PhaseState.Completed, null, null)
-                : isProcessing
-                    ? new(PhaseState.InProgress, null, null)
-                    : document.Status == DocumentStatus.Failed
-                        ? new(PhaseState.Failed, document.LastError, null)
-                        : hasPages
-                            ? new(PhaseState.Todo, null, null)
-                            : new(PhaseState.Todo, null, null);
-
-            PipelinePhaseInfo embeddingPhase;
-            string embState = embeddingStatus.State;
-            if (string.IsNullOrWhiteSpace(currentSettings.DefaultEmbeddingModel))
-            {
-                embeddingPhase = new(PhaseState.Skipped, "Modello embedding non configurato.", null);
-            }
-            else if (embState is "Complete")
-            {
-                embeddingPhase = new(PhaseState.Completed, null, embeddingStatus.LastEmbeddedAtUtc);
-            }
-            else if (embState is "Running" or "Pausing" or "Pending" or "Paused")
-            {
-                embeddingPhase = new(PhaseState.InProgress, null, null);
-            }
-            else if (embState is "Failed")
-            {
-                embeddingPhase = new(PhaseState.Failed, document.LastError, null);
-            }
-            else if (embState is "NotIndexed")
-            {
-                embeddingPhase = new(PhaseState.Todo, null, null);
-            }
-            else if (embState is "Partial")
-            {
-                embeddingPhase = new(PhaseState.Obsolete, "Embedding parziali: rigenera per completare la ricerca semantica.", embeddingStatus.LastEmbeddedAtUtc);
-            }
-            else
-            {
-                embeddingPhase = new(PhaseState.Todo, null, null);
-            }
-
-            bool isReady = document.Status == DocumentStatus.Indexed
-                && hasChunks
-                && embState == "Complete";
-
-            PhaseState overall = document.Status == DocumentStatus.Failed
-                ? PhaseState.Failed
-                : isReady
-                    ? PhaseState.Completed
-                    : activeJob is not null || isProcessing
-                        ? PhaseState.InProgress
-                        : hasChunks
-                            ? PhaseState.InProgress
-                            : PhaseState.Todo;
-
-            return Results.Ok(new DocumentPipelineStatus(
-                id,
-                ocrPolicy,
-                importPhase,
-                analysisPhase,
-                ocrPhase,
-                textExtractionPhase,
-                chunkingPhase,
-                embeddingPhase,
-                overall,
-                activeJob?.Id,
-                activeJob?.Type));
-        });
-
-        app.MapGet("/api/documents/{id:long}/preview", async (
-            long id,
-            int? page,
-            int? pageSize,
-            IDocumentLibraryService documents,
-            IDocumentRepository documentRepository,
-            CancellationToken cancellationToken) =>
-        {
-            ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
-            if (document is null)
-            {
-                return Results.NotFound();
-            }
-
-            int requestedPage = Math.Max(1, page ?? 1);
-            if (document.PageCount > 0)
-            {
-                requestedPage = Math.Min(requestedPage, document.PageCount);
-            }
-
-            int requestedPageSize = Math.Clamp(
-                pageSize ?? DefaultDocumentPreviewPageSize,
-                1,
-                MaxDocumentPreviewPageSize);
-            IReadOnlyList<DocumentPageInfo> pages = await documentRepository.GetPagesAsync(
-                id,
-                requestedPage,
-                requestedPageSize,
-                cancellationToken);
-            return Results.Ok(new DocumentPreviewResponse(
-                document.Id,
-                document.OriginalFileName,
-                document.MimeType,
-                document.FileExtension,
-                document.FileSizeBytes,
-                document.PageCount,
-                document.ChunkCount,
-                document.Status.ToString(),
-                requestedPage,
-                requestedPageSize,
-                pages.Count,
-                pages));
-        });
+        MapDocumentPipelineEndpoints(app);
     }
 
 }

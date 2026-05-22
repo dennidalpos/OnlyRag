@@ -101,4 +101,22 @@ describe("ChatSection", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Backend offline durante la generazione.");
   });
+
+  it("ignores corrupted WebView session storage", async () => {
+    window.sessionStorage.setItem("onlyrag.chat.session", "{not-valid-json");
+    mockApi([{ path: "/api/documents", response: [createDocument()] }]);
+
+    render(
+      <ChatSection
+        models={[createModel()]}
+        defaultModel="llama3.2:3b"
+        ollamaStatus={createOllamaStatus()}
+        loadError={null}
+      />
+    );
+
+    expect(await screen.findByText("manuale.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveValue("");
+    expect(screen.getByText("Inizia una conversazione.")).toBeInTheDocument();
+  });
 });

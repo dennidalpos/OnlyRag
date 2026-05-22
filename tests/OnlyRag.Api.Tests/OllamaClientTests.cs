@@ -135,7 +135,7 @@ public sealed class OllamaClientTests
     }
 
     [Fact]
-    public async Task ListModelsAsync_TruncatesLargeExternalErrorBodies()
+    public async Task ListModelsAsync_DoesNotExposeLargeExternalErrorBodies()
     {
         string tailMarker = "tail-marker-after-limit";
         StubHttpMessageHandler handler = new((request, cancellationToken) =>
@@ -151,7 +151,8 @@ public sealed class OllamaClientTests
         Assert.Equal(OllamaErrorKind.UnexpectedResponse, exception.Kind);
         Assert.DoesNotContain(tailMarker, exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain('\u0000', exception.Message);
-        Assert.Contains("risposta troncata", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("xxxxx", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("Ollama ha restituito lo stato HTTP 500.", exception.Message);
     }
 
     [Fact]

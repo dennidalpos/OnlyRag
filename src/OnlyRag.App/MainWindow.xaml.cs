@@ -227,8 +227,8 @@ public partial class MainWindow : Window
         try
         {
             AppExitState? exitState = await TryGetExitStateAsync();
-            int backendActiveJobCount = await TryGetBackendActiveJobCountAsync();
-            AppExitState combinedExitState = CombineExitState(exitState, backendActiveJobCount);
+            BackendActiveJobSnapshot backendActiveJobs = await TryGetBackendActiveJobSnapshotAsync();
+            AppExitState combinedExitState = CombineExitState(exitState, backendActiveJobs);
             if (!combinedExitState.HasPendingChanges && !combinedExitState.HasActiveWork && combinedExitState.ActiveJobCount == 0)
             {
                 ((App)Application.Current).EnablePeerProcessTerminationOnExit();
@@ -251,8 +251,8 @@ public partial class MainWindow : Window
             }
 
             AppExitState? postSaveState = await TryPrepareForExitAsync();
-            int backendActiveJobCountAfterPrepare = await TryGetBackendActiveJobCountAsync();
-            AppExitState combinedPostSaveState = CombineExitState(postSaveState, backendActiveJobCountAfterPrepare);
+            BackendActiveJobSnapshot backendActiveJobsAfterPrepare = await TryGetBackendActiveJobSnapshotAsync();
+            AppExitState combinedPostSaveState = CombineExitState(postSaveState, backendActiveJobsAfterPrepare);
             if (combinedPostSaveState.HasPendingChanges)
             {
                 MessageBox.Show(
@@ -337,11 +337,11 @@ public partial class MainWindow : Window
             : JsonSerializer.Deserialize<AppExitState>(raw, ExitStateJsonOptions);
     }
 
-    private async Task<int> TryGetBackendActiveJobCountAsync()
+    private async Task<BackendActiveJobSnapshot> TryGetBackendActiveJobSnapshotAsync()
     {
         if (!backendSettings.IsRunning || string.IsNullOrWhiteSpace(backendSettings.BaseUrl))
         {
-            return 0;
+            return BackendActiveJobSnapshot.Known(0);
         }
 
         try
@@ -357,26 +357,48 @@ public partial class MainWindow : Window
                 "/api/jobs?limit=500",
                 ExitStateJsonOptions);
 
-            return jobs?.Count(job => job.Status is "Pending" or "Running" or "Pausing" or "Paused") ?? 0;
+            int count = jobs?.Count(job => job.Status is "Pending" or "Running" or "Pausing" or "Paused") ?? 0;
+            return BackendActiveJobSnapshot.Known(count);
         }
         catch
         {
-            return 0;
+            return BackendActiveJobSnapshot.Unknown();
         }
     }
 
-    private static AppExitState CombineExitState(AppExitState? exitState, int backendActiveJobCount)
+    private static AppExitState CombineExitState(AppExitState? exitState, BackendActiveJobSnapshot backendActiveJobs)
     {
         AppExitState combined = exitState ?? new AppExitState();
-        if (backendActiveJobCount <= combined.ActiveJobCount)
+        if (!backendActiveJobs.IsKnown)
         {
+            combined.IsActiveJobStateUnknown = true;
+            combined.HasActiveWork = true;
+            if (!combined.Reasons.Any(reason => reason.StartsWith("Stato dei job locali", StringComparison.OrdinalIgnoreCase)))
+            {
+                combined.Reasons.Add("Stato dei job locali non verificabile.");
+            }
+
             return combined;
         }
 
-        combined.ActiveJobCount = backendActiveJobCount;
+        combined.IsActiveJobStateUnknown = false;
+        combined.Reasons.RemoveAll(reason => reason.StartsWith("Stato dei job locali", StringComparison.OrdinalIgnoreCase));
+
+        if (backendActiveJobs.Count <= combined.ActiveJobCount)
+        {
+            if (combined.ActiveJobCount == 0 && !combined.Reasons.Any(reason => reason.Contains("operazione in corso", StringComparison.OrdinalIgnoreCase)))
+            {
+                combined.HasActiveWork = false;
+            }
+
+            return combined;
+        }
+
+        combined.ActiveJobCount = backendActiveJobs.Count;
+        combined.HasActiveWork = true;
         if (!combined.Reasons.Any(reason => reason.StartsWith("Job locali attivi:", StringComparison.OrdinalIgnoreCase)))
         {
-            combined.Reasons.Add($"Job locali attivi: {backendActiveJobCount}.");
+            combined.Reasons.Add($"Job locali attivi: {backendActiveJobs.Count}.");
         }
 
         return combined;
@@ -464,12 +486,27 @@ public partial class MainWindow : Window
 
         public int ActiveJobCount { get; set; }
 
+        public bool IsActiveJobStateUnknown { get; set; }
+
         public List<string> Reasons { get; set; } = [];
     }
 
     private sealed class BackendJob
     {
         public string Status { get; init; } = string.Empty;
+    }
+
+    private sealed record BackendActiveJobSnapshot(bool IsKnown, int Count)
+    {
+        public static BackendActiveJobSnapshot Known(int count)
+        {
+            return new BackendActiveJobSnapshot(true, count);
+        }
+
+        public static BackendActiveJobSnapshot Unknown()
+        {
+            return new BackendActiveJobSnapshot(false, 0);
+        }
     }
 
     private sealed record StartupPrerequisiteStatus(

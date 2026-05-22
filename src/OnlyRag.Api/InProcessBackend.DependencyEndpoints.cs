@@ -35,10 +35,10 @@ public static partial class InProcessBackend
         {
             if (!request.Confirmed)
             {
-                return Results.Problem(
-                    title: "Conferma richiesta",
-                    detail: "L'avvio dell'installazione Ollama richiede una conferma esplicita dalla UI.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'avvio dell'installazione Ollama richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
             }
 
             try
@@ -47,10 +47,10 @@ public static partial class InProcessBackend
             }
             catch (InvalidOperationException ex)
             {
-                return Results.Problem(
-                    title: "Installazione Ollama non avviata",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Installazione Ollama non avviata",
+                    ex.Message,
+                    "dependency_install_not_started");
             }
         });
 
@@ -62,10 +62,10 @@ public static partial class InProcessBackend
         {
             if (!request.Confirmed)
             {
-                return Results.Problem(
-                    title: "Conferma richiesta",
-                    detail: "L'apertura del download LibreOffice richiede una conferma esplicita dalla UI.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'apertura del download LibreOffice richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
             }
 
             try
@@ -93,10 +93,10 @@ public static partial class InProcessBackend
         {
             if (!request.Confirmed)
             {
-                return Results.Problem(
-                    title: "Conferma richiesta",
-                    detail: "La configurazione OCR richiede una conferma esplicita dalla UI.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "La configurazione OCR richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
             }
 
             try

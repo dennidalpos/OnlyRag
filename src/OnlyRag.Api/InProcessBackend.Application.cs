@@ -120,14 +120,13 @@ public static partial class InProcessBackend
                     BackendLog.WriteException(appDescriptor.StoragePaths, correlationId, "Unhandled API exception.", exception);
                 }
 
-                context.Response.StatusCode = 500;
-                context.Response.ContentType = "application/problem+json";
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    title = "Errore interno del server.",
-                    detail = CreateUnexpectedErrorDetail(correlationId),
-                    status = 500
-                });
+                await WriteProblemAsync(
+                    context,
+                    "Errore interno del server.",
+                    CreateUnexpectedErrorDetail(correlationId),
+                    StatusCodes.Status500InternalServerError,
+                    "unexpected_error",
+                    correlationId);
             });
         });
         app.UseCors(WebViewCorsPolicy);

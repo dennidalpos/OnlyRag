@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import { apiRequest, type JobStatus, type LocalJob } from "../api";
+import {
+  formatLastRefresh,
+  initialRefreshStatus,
+  markRefreshFailure,
+  markRefreshSuccess,
+  shouldSurfaceRefreshFailure
+} from "../pollingStatus";
 import { ProgressBar } from "./ProgressBar";
 
 const statusLabels: Record<JobStatus, string> = {
@@ -29,14 +36,18 @@ type JobsSectionProps = {
 export function JobsSection({ onJobsChanged }: JobsSectionProps) {
   const [jobs, setJobs] = useState<LocalJob[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshStatus, setRefreshStatus] = useState(initialRefreshStatus);
 
   async function refreshJobs() {
     try {
       const jobList = await apiRequest<LocalJob[]>("/api/jobs?limit=100");
       setJobs(jobList);
       setError(null);
+      setRefreshStatus(markRefreshSuccess());
     } catch {
-      setError("Impossibile leggere la coda job locale.");
+      const message = "Impossibile leggere la coda job locale.";
+      setError(message);
+      setRefreshStatus((current) => markRefreshFailure(current, message));
     }
   }
 
@@ -49,10 +60,13 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
         if (!isCancelled) {
           setJobs(jobList);
           setError(null);
+          setRefreshStatus(markRefreshSuccess());
         }
       } catch {
         if (!isCancelled) {
-          setError("Impossibile leggere la coda job locale.");
+          const message = "Impossibile leggere la coda job locale.";
+          setError(message);
+          setRefreshStatus((current) => markRefreshFailure(current, message));
         }
       }
     }
@@ -108,6 +122,9 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
       <div className="jobs-toolbar">
         <h2>Operazioni</h2>
         <div className="settings-actions">
+          <span className="jobs-refresh-state">
+            Ultimo aggiornamento: {formatLastRefresh(refreshStatus.lastSuccessfulRefreshAt)}
+          </span>
           {hasTerminated && (
             <button type="button" className="button-secondary" onClick={() => void purgeCompleted()}>
               Rimuovi completati
@@ -116,6 +133,11 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
           {error && <span className="jobs-error">{error}</span>}
         </div>
       </div>
+      {shouldSurfaceRefreshFailure(refreshStatus) && (
+        <div className="feedback-banner feedback-banner--error" role="alert">
+          {refreshStatus.lastErrorMessage} Stato non aggiornato da {formatLastRefresh(refreshStatus.lastSuccessfulRefreshAt)}.
+        </div>
+      )}
       {jobs.length === 0 ? (
         <div className="empty-state">
           <p>Nessuna operazione in corso.</p>

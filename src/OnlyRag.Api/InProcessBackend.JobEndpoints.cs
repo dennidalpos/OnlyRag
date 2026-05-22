@@ -14,7 +14,7 @@ public static partial class InProcessBackend
         app.MapGet("/api/jobs/{id}", async (string id, ILocalJobQueue jobs, CancellationToken cancellationToken) =>
         {
             LocalJob? job = await jobs.GetAsync(id, cancellationToken);
-            return job is null ? Results.NotFound() : Results.Ok(job);
+            return job is null ? CreateNotFoundProblem("Job") : Results.Ok(job);
         });
 
         app.MapPost("/api/jobs/{id}/cancel", async (
@@ -26,7 +26,7 @@ public static partial class InProcessBackend
             LocalJob? job = await jobs.CancelAsync(id, cancellationToken);
             if (job is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Job");
             }
 
             cancellationRegistry.Cancel(id);
@@ -42,7 +42,7 @@ public static partial class InProcessBackend
             LocalJob? job = await jobs.PauseAsync(id, cancellationToken);
             if (job is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Job");
             }
 
             cancellationRegistry.Cancel(id);
@@ -58,16 +58,19 @@ public static partial class InProcessBackend
             LocalJob? current = await jobs.GetAsync(id, cancellationToken);
             if (current is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Job");
             }
 
             if (current.Status is JobStatus.Pausing || cancellationRegistry.IsRunning(id))
             {
-                return Results.Conflict("Il job sta ancora completando la pausa. Riprovare tra poco.");
+                return CreateConflictProblem(
+                    "Job in pausa",
+                    "Il job sta ancora completando la pausa. Riprovare tra poco.",
+                    "job_pause_in_progress");
             }
 
             LocalJob? job = await jobs.ResumeAsync(id, cancellationToken);
-            return job is null ? Results.NotFound() : Results.Ok(job);
+            return job is null ? CreateNotFoundProblem("Job") : Results.Ok(job);
         });
 
         app.MapDelete("/api/jobs/{id}", async (string id, ILocalJobQueue jobs, CancellationToken cancellationToken) =>
@@ -75,16 +78,19 @@ public static partial class InProcessBackend
             LocalJob? job = await jobs.GetAsync(id, cancellationToken);
             if (job is null)
             {
-                return Results.NotFound();
+                return CreateNotFoundProblem("Job");
             }
 
             if (job.Status is JobStatus.Running or JobStatus.Pausing or JobStatus.Pending)
             {
-                return Results.Conflict("Impossibile eliminare un job in esecuzione o in attesa.");
+                return CreateConflictProblem(
+                    "Job attivo",
+                    "Impossibile eliminare un job in esecuzione o in attesa.",
+                    "job_active");
             }
 
             bool deleted = await jobs.DeleteAsync(id, cancellationToken);
-            return deleted ? Results.NoContent() : Results.NotFound();
+            return deleted ? Results.NoContent() : CreateNotFoundProblem("Job");
         });
 
         app.MapDelete("/api/jobs", async (ILocalJobQueue jobs, CancellationToken cancellationToken) =>
