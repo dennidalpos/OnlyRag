@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   apiRequest,
-  type DependencyActionResponse,
   type DiagnosticsResponse,
   type IngestionSettings,
   type OfficeConversionSettings,
@@ -15,7 +14,6 @@ import {
   type OllamaModelDetails,
   type OllamaSettings,
   type OllamaStatusResponse,
-  type OperationMessageResponse,
   type PerformanceSettings
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
@@ -28,21 +26,19 @@ import {
   arePerformanceSettingsEqual,
   buildContextChunkRecommendation,
   buildEmbeddingRecommendations,
-  buildIngestionSettingsPayload,
   buildNumCtxRecommendation,
-  buildOcrProcessingSettingsPayload,
-  buildOcrSettingsPayload,
-  buildOfficeSettingsPayload,
-  buildOllamaSettingsPayload,
-  buildPerformanceSettingsPayload,
   isNonLocalUrl,
-  normalizeIngestionSettings,
-  normalizeOfficeSettings,
-  normalizeOcrProcessingSettings,
-  normalizeOcrSettings,
   normalizeOllamaSettings,
-  normalizePerformanceSettings
 } from "./SettingsSection.helpers";
+import {
+  emptyIngestionSettings,
+  emptyOcrProcessingSettings,
+  emptyOcrSettings,
+  emptyOfficeSettings,
+  emptyPerformanceSettings,
+  emptySettings
+} from "./SettingsSection.defaults";
+import { createSettingsSectionActions } from "./useSettingsSectionController.actions";
 
 export type SettingsSectionProps = {
   settings: OllamaSettings | null;
@@ -51,98 +47,6 @@ export type SettingsSectionProps = {
   loadError: string | null;
   onDataChanged: () => Promise<void>;
 };
-
-const emptySettings: OllamaSettings = {
-  ollamaBaseUrl: "http://localhost:11434",
-  defaultChatModel: null,
-  defaultEmbeddingModel: null,
-  defaultTranslationModel: null,
-  requestTimeoutSeconds: 120,
-  embeddingBatchSize: 1,
-  embeddingNumCtx: null,
-  chatNumCtx: null,
-  translationNumCtx: null,
-  trustNonLocalEndpoint: false
-};
-
-const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
-
-const emptyOfficeSettings: OfficeConversionSettings = {
-  libreOfficePath: null,
-  conversionTimeoutSeconds: 120
-};
-
-const emptyPerformanceSettings: PerformanceSettings = {
-  maxParallelJobs: 1,
-  maxOcrParallelPages: 1,
-  embeddingBatchSize: 1,
-  translationBatchSize: 1,
-  maxContextChunks: 8,
-  requestTimeoutSeconds: 120,
-  enableLowResourceMode: false
-};
-
-const emptyIngestionSettings: IngestionSettings = {
-  chunkSizeTokens: 800,
-  overlapTokens: 120
-};
-
-const emptyOcrProcessingSettings: OcrProcessingSettings = {
-  language: "it",
-  maxRetries: 2,
-  pageTimeoutSeconds: 180,
-  lowConfidenceThreshold: 0.55
-};
-
-const emptyOcrSettings: OcrSettings = {
-  profile: "balanced",
-  pdfDpi: 200,
-  modelPreset: "PP-OCRv5",
-  modelVersion: "PP-OCRv5",
-  detectionSideLimit: 960,
-  detectionThreshold: 0.3,
-  detectionBoxThreshold: 0.6,
-  detectionUnclipRatio: 1.5,
-  recognitionScoreThreshold: 0.5,
-  useTextlineOrientation: true,
-  useDocumentOrientationClassification: false,
-  useDocumentUnwarping: false,
-  recognitionBatchSize: 6,
-  cpuThreads: 2,
-  device: "cpu"
-};
-
-const ocrProfilePresets: Record<string, OcrSettings> = {
-  fast: {
-    ...emptyOcrSettings,
-    profile: "fast",
-    pdfDpi: 150,
-    detectionSideLimit: 736,
-    detectionThreshold: 0.35,
-    detectionBoxThreshold: 0.65,
-    detectionUnclipRatio: 1.4,
-    recognitionScoreThreshold: 0.55,
-    recognitionBatchSize: 4,
-    cpuThreads: 1
-  },
-  balanced: emptyOcrSettings,
-  accurate: {
-    ...emptyOcrSettings,
-    profile: "accurate",
-    pdfDpi: 300,
-    detectionSideLimit: 1280,
-    detectionThreshold: 0.25,
-    detectionBoxThreshold: 0.55,
-    detectionUnclipRatio: 1.7,
-    recognitionScoreThreshold: 0.45,
-    useDocumentOrientationClassification: true,
-    useDocumentUnwarping: true,
-    recognitionBatchSize: 8,
-    cpuThreads: 4
-  }
-};
-
-
 
 export function useSettingsSectionController({
   settings,
@@ -200,14 +104,14 @@ export function useSettingsSectionController({
   }, [settings]);
 
   useEffect(() => {
-    void refreshOfficeConverter();
-    void refreshPerformanceSettings();
-    void refreshIngestionSettings();
-    void refreshOcrProcessingSettings();
-    void refreshOcrSettings();
-    void refreshOcrLanguages();
-    void refreshDiagnostics();
-    void refreshDependencyStatus();
+    void actions.refreshOfficeConverter();
+    void actions.refreshPerformanceSettings();
+    void actions.refreshIngestionSettings();
+    void actions.refreshOcrProcessingSettings();
+    void actions.refreshOcrSettings();
+    void actions.refreshOcrLanguages();
+    void actions.refreshDiagnostics();
+    void actions.refreshDependencyStatus();
   }, []);
 
   useEffect(() => {
@@ -316,485 +220,50 @@ export function useSettingsSectionController({
     || hasDirtyOcrProcessingSettings
     || hasDirtyOcrSettings;
 
-  async function saveSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<OllamaSettings>("/api/settings/ollama", {
-        method: "PUT",
-        body: JSON.stringify(buildOllamaSettingsPayload(formState, performanceFormState))
-      });
-
-      const normalizedSaved = normalizeOllamaSettings(saved);
-      setFormState(normalizedSaved);
-      setSavedFormState(normalizedSaved);
-      setInfoMessage("Impostazioni Ollama salvate.");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function testConnection() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<OllamaSettings>("/api/settings/ollama", {
-        method: "PUT",
-        body: JSON.stringify(buildOllamaSettingsPayload(formState, performanceFormState))
-      });
-      const normalizedSaved = normalizeOllamaSettings(saved);
-      setFormState(normalizedSaved);
-      setSavedFormState(normalizedSaved);
-
-      const response = await apiRequest<OllamaStatusResponse>("/api/ollama/status");
-      setInfoMessage(response.message);
-      if (!response.isReachable && response.suggestion) {
-        setErrorMessage(response.suggestion);
-      }
-
-      await refreshDependencyStatus();
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Test connessione non riuscito.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function installModel() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<OperationMessageResponse>("/api/ollama/models/pull", {
-        method: "POST",
-        body: JSON.stringify({ name: modelToInstall })
-      });
-
-      setInfoMessage(response.message);
-      setModelToInstall("");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Installazione modello non riuscita.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function removeModel(name: string) {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<OperationMessageResponse>(
-        `/api/ollama/models/${encodeURIComponent(name)}`,
-        {
-          method: "DELETE"
-        }
-      );
-
-      setInfoMessage(response.message);
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Rimozione modello non riuscita.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  function openOllamaModelLibrary() {
-    window.open(OLLAMA_MODEL_LIBRARY_URL, "_blank", "noopener,noreferrer");
-  }
-
-  async function refreshOfficeConverter() {
-    try {
-      const [officeSettings, converterStatus] = await Promise.all([
-        apiRequest<OfficeConversionSettings>("/api/settings/office-conversion"),
-        apiRequest<OfficeConverterStatusResponse>("/api/office-converter/status")
-      ]);
-      const normalizedOfficeSettings = normalizeOfficeSettings(officeSettings);
-      setOfficeFormState(normalizedOfficeSettings);
-      setSavedOfficeFormState(normalizedOfficeSettings);
-      setOfficeStatus(converterStatus);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere il convertitore Office.");
-    }
-  }
-
-  async function refreshPerformanceSettings() {
-    try {
-      const performance = await apiRequest<PerformanceSettings>("/api/settings/performance");
-      const normalizedPerformance = normalizePerformanceSettings(performance);
-      setPerformanceFormState(normalizedPerformance);
-      setSavedPerformanceFormState(normalizedPerformance);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni prestazioni.");
-    }
-  }
-
-  async function refreshIngestionSettings() {
-    try {
-      const ingestion = await apiRequest<IngestionSettings>("/api/settings/ingestion");
-      const normalizedIngestion = normalizeIngestionSettings(ingestion);
-      setIngestionFormState(normalizedIngestion);
-      setSavedIngestionFormState(normalizedIngestion);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni ingestion.");
-    }
-  }
-
-  async function refreshOcrProcessingSettings() {
-    try {
-      const processing = await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing");
-      const normalizedProcessing = normalizeOcrProcessingSettings(processing);
-      setOcrProcessingFormState(normalizedProcessing);
-      setSavedOcrProcessingFormState(normalizedProcessing);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni OCR runtime.");
-    }
-  }
-
-  async function refreshOcrSettings() {
-    try {
-      const ocr = await apiRequest<OcrSettings>("/api/settings/ocr");
-      const normalizedOcr = normalizeOcrSettings(ocr);
-      setOcrFormState(normalizedOcr);
-      setSavedOcrFormState(normalizedOcr);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni OCR.");
-    }
-  }
-
-  async function refreshOcrLanguages() {
-    try {
-      const languages = await apiRequest<OcrLanguage[]>("/api/ocr/languages");
-      setOcrLanguages(languages);
-    } catch {
-      setOcrLanguages([]);
-    }
-  }
-
-  async function refreshDiagnostics() {
-    try {
-      const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
-      setDiagnostics(data);
-    } catch {
-      // Diagnostics are non-critical; silence the error to avoid overwriting other messages.
-    }
-  }
-
-  async function refreshDependencyStatus() {
-    try {
-      const [ollamaDependency, ocrDependency] = await Promise.all([
-        apiRequest<OllamaInstallStatus>("/api/dependencies/ollama"),
-        apiRequest<OcrProvisionStatus>("/api/dependencies/ocr")
-      ]);
-      setOllamaInstallStatus(ollamaDependency);
-      setOcrProvisionStatus(ocrDependency);
-    } catch {
-      // Dependency helpers are non-critical; the rest of Settings must remain usable.
-    }
-  }
-
-  async function installOllama() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ollama/install", {
-        method: "POST",
-        body: JSON.stringify({ confirmed: true })
-      });
-      setInfoMessage(response.message);
-      await refreshDependencyStatus();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Installazione Ollama non avviata.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function openLibreOfficeDownload() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/libreoffice/open-download", {
-        method: "POST",
-        body: JSON.stringify({ confirmed: true })
-      });
-      setInfoMessage(response.message);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Download LibreOffice non aperto.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function configureOcrRuntime() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/provision", {
-        method: "POST",
-        body: JSON.stringify({ confirmed: true })
-      });
-      setInfoMessage(response.message);
-      await refreshDependencyStatus();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Configurazione OCR non avviata.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function openLogsFolder() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const response = await apiRequest<OperationMessageResponse>("/api/diagnostics/open-logs-folder", {
-        method: "POST",
-        body: JSON.stringify({ confirmed: true })
-      });
-      setInfoMessage(response.message);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile aprire la cartella log.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function savePerformanceSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<PerformanceSettings>("/api/settings/performance", {
-        method: "PUT",
-        body: JSON.stringify(buildPerformanceSettingsPayload(performanceFormState))
-      });
-
-      const normalizedSaved = normalizePerformanceSettings(saved);
-      setPerformanceFormState(normalizedSaved);
-      setSavedPerformanceFormState(normalizedSaved);
-      setFormState((current) => ({
-        ...current,
-        requestTimeoutSeconds: normalizedSaved.requestTimeoutSeconds,
-        embeddingBatchSize: normalizedSaved.embeddingBatchSize
-      }));
-      setSavedFormState((current) => ({
-        ...current,
-        requestTimeoutSeconds: normalizedSaved.requestTimeoutSeconds,
-        embeddingBatchSize: normalizedSaved.embeddingBatchSize
-      }));
-      setInfoMessage("Impostazioni prestazioni salvate.");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le prestazioni.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function saveIngestionSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<IngestionSettings>("/api/settings/ingestion", {
-        method: "PUT",
-        body: JSON.stringify(buildIngestionSettingsPayload(ingestionFormState))
-      });
-
-      const normalizedSaved = normalizeIngestionSettings(saved);
-      setIngestionFormState(normalizedSaved);
-      setSavedIngestionFormState(normalizedSaved);
-      setInfoMessage("Impostazioni ingestion salvate.");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare ingestion.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function saveOcrProcessingSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {
-        method: "PUT",
-        body: JSON.stringify(buildOcrProcessingSettingsPayload(ocrProcessingFormState))
-      });
-
-      const normalizedSaved = normalizeOcrProcessingSettings(saved);
-      setOcrProcessingFormState(normalizedSaved);
-      setSavedOcrProcessingFormState(normalizedSaved);
-      setInfoMessage("Impostazioni OCR runtime salvate.");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare OCR runtime.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function saveOcrSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await apiRequest<OcrSettings>("/api/settings/ocr", {
-        method: "PUT",
-        body: JSON.stringify(buildOcrSettingsPayload(ocrFormState))
-      });
-
-      const normalizedSaved = normalizeOcrSettings(saved);
-      setOcrFormState(normalizedSaved);
-      setSavedOcrFormState(normalizedSaved);
-      setInfoMessage("Impostazioni OCR salvate.");
-      await onDataChanged();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni OCR.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  function applyOcrProfile(profile: string) {
-    const preset = ocrProfilePresets[profile];
-    setOcrFormState((current) => (preset ? { ...preset } : { ...current, profile: "custom" }));
-  }
-
-  function updateOcrSettings(patch: Partial<OcrSettings>) {
-    setOcrFormState((current) => ({ ...current, ...patch, profile: "custom" }));
-  }
-
-  async function saveOfficeSettings() {
-    setIsBusy(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      const saved = await persistOfficeSettings();
-      setOfficeFormState(saved);
-      setSavedOfficeFormState(saved);
-      setInfoMessage("Impostazioni convertitore Office salvate.");
-      await refreshOfficeConverter();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare il convertitore Office.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function persistOfficeSettings(): Promise<OfficeConversionSettings> {
-    const saved = await apiRequest<OfficeConversionSettings>("/api/settings/office-conversion", {
-      method: "PUT",
-      body: JSON.stringify(buildOfficeSettingsPayload(officeFormState))
-    });
-    return normalizeOfficeSettings(saved);
-  }
-
-  async function persistAllDirtyChanges() {
-    if (hasDirtyPerformanceSettings) {
-      const savedPerformance = normalizePerformanceSettings(
-        await apiRequest<PerformanceSettings>("/api/settings/performance", {
-          method: "PUT",
-          body: JSON.stringify(buildPerformanceSettingsPayload(performanceFormState))
-        })
-      );
-      setPerformanceFormState(savedPerformance);
-      setSavedPerformanceFormState(savedPerformance);
-      setFormState((current) => ({
-        ...current,
-        requestTimeoutSeconds: savedPerformance.requestTimeoutSeconds,
-        embeddingBatchSize: savedPerformance.embeddingBatchSize
-      }));
-      setSavedFormState((current) => ({
-        ...current,
-        requestTimeoutSeconds: savedPerformance.requestTimeoutSeconds,
-        embeddingBatchSize: savedPerformance.embeddingBatchSize
-      }));
-    }
-
-    if (hasDirtyOllamaSettings) {
-      const savedSettings = normalizeOllamaSettings(
-        await apiRequest<OllamaSettings>("/api/settings/ollama", {
-          method: "PUT",
-          body: JSON.stringify(buildOllamaSettingsPayload(formState, performanceFormState))
-        })
-      );
-      setFormState(savedSettings);
-      setSavedFormState(savedSettings);
-    }
-
-    if (hasDirtyOfficeSettings) {
-      const savedOffice = await persistOfficeSettings();
-      setOfficeFormState(savedOffice);
-      setSavedOfficeFormState(savedOffice);
-    }
-
-    if (hasDirtyIngestionSettings) {
-      const savedIngestion = normalizeIngestionSettings(
-        await apiRequest<IngestionSettings>("/api/settings/ingestion", {
-          method: "PUT",
-          body: JSON.stringify(buildIngestionSettingsPayload(ingestionFormState))
-        })
-      );
-      setIngestionFormState(savedIngestion);
-      setSavedIngestionFormState(savedIngestion);
-    }
-
-    if (hasDirtyOcrProcessingSettings) {
-      const savedProcessing = normalizeOcrProcessingSettings(
-        await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {
-          method: "PUT",
-          body: JSON.stringify(buildOcrProcessingSettingsPayload(ocrProcessingFormState))
-        })
-      );
-      setOcrProcessingFormState(savedProcessing);
-      setSavedOcrProcessingFormState(savedProcessing);
-    }
-
-    if (hasDirtyOcrSettings) {
-      const savedOcr = normalizeOcrSettings(
-        await apiRequest<OcrSettings>("/api/settings/ocr", {
-          method: "PUT",
-          body: JSON.stringify(buildOcrSettingsPayload(ocrFormState))
-        })
-      );
-      setOcrFormState(savedOcr);
-      setSavedOcrFormState(savedOcr);
-    }
-  }
+  const actions = createSettingsSectionActions({
+    onDataChanged,
+    modelToInstall,
+    formState,
+    officeFormState,
+    performanceFormState,
+    ingestionFormState,
+    ocrProcessingFormState,
+    ocrFormState,
+    hasDirtyPerformanceSettings,
+    hasDirtyOllamaSettings,
+    hasDirtyOfficeSettings,
+    hasDirtyIngestionSettings,
+    hasDirtyOcrProcessingSettings,
+    hasDirtyOcrSettings,
+    setFormState,
+    setSavedFormState,
+    setOfficeFormState,
+    setSavedOfficeFormState,
+    setPerformanceFormState,
+    setSavedPerformanceFormState,
+    setIngestionFormState,
+    setSavedIngestionFormState,
+    setOcrProcessingFormState,
+    setSavedOcrProcessingFormState,
+    setOcrFormState,
+    setSavedOcrFormState,
+    setOcrLanguages,
+    setOfficeStatus,
+    setDiagnostics,
+    setOllamaInstallStatus,
+    setOcrProvisionStatus,
+    setModelToInstall,
+    setInfoMessage,
+    setErrorMessage,
+    setIsBusy
+  });
 
   useEffect(() => {
     setExitContributor("settings", {
       label: "Impostazioni",
       hasPendingChanges,
       hasActiveWork: isBusy,
-      prepareForExit: persistAllDirtyChanges
+      prepareForExit: actions.persistAllDirtyChanges
     });
 
     return () => {
@@ -823,8 +292,8 @@ export function useSettingsSectionController({
     }
 
     const interval = window.setInterval(() => {
-      void refreshDependencyStatus();
-      void refreshDiagnostics();
+      void actions.refreshDependencyStatus();
+      void actions.refreshDiagnostics();
     }, 5000);
 
     return () => window.clearInterval(interval);
@@ -875,32 +344,31 @@ export function useSettingsSectionController({
     infoMessage,
     errorMessage,
     isBusy,
-    saveSettings,
-    testConnection,
-    installModel,
-    removeModel,
-    openOllamaModelLibrary,
-    refreshOfficeConverter,
-    refreshPerformanceSettings,
-    refreshIngestionSettings,
-    refreshOcrProcessingSettings,
-    refreshOcrSettings,
-    refreshOcrLanguages,
-    refreshDiagnostics,
-    refreshDependencyStatus,
-    installOllama,
-    openLibreOfficeDownload,
-    configureOcrRuntime,
-    openLogsFolder,
-    saveOfficeSettings,
-    savePerformanceSettings,
-    saveIngestionSettings,
-    saveOcrProcessingSettings,
-    applyOcrProfile,
-    updateOcrSettings,
-    saveOcrSettings
+    saveSettings: actions.saveSettings,
+    testConnection: actions.testConnection,
+    installModel: actions.installModel,
+    removeModel: actions.removeModel,
+    openOllamaModelLibrary: actions.openOllamaModelLibrary,
+    refreshOfficeConverter: actions.refreshOfficeConverter,
+    refreshPerformanceSettings: actions.refreshPerformanceSettings,
+    refreshIngestionSettings: actions.refreshIngestionSettings,
+    refreshOcrProcessingSettings: actions.refreshOcrProcessingSettings,
+    refreshOcrSettings: actions.refreshOcrSettings,
+    refreshOcrLanguages: actions.refreshOcrLanguages,
+    refreshDiagnostics: actions.refreshDiagnostics,
+    refreshDependencyStatus: actions.refreshDependencyStatus,
+    installOllama: actions.installOllama,
+    openLibreOfficeDownload: actions.openLibreOfficeDownload,
+    configureOcrRuntime: actions.configureOcrRuntime,
+    openLogsFolder: actions.openLogsFolder,
+    saveOfficeSettings: actions.saveOfficeSettings,
+    savePerformanceSettings: actions.savePerformanceSettings,
+    saveIngestionSettings: actions.saveIngestionSettings,
+    saveOcrProcessingSettings: actions.saveOcrProcessingSettings,
+    applyOcrProfile: actions.applyOcrProfile,
+    updateOcrSettings: actions.updateOcrSettings,
+    saveOcrSettings: actions.saveOcrSettings
   } as const;
 }
 
 export type SettingsSectionController = ReturnType<typeof useSettingsSectionController>;
-
