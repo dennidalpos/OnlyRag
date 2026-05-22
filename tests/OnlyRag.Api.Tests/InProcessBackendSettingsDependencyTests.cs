@@ -323,6 +323,15 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public void DependencyOcrProvision_SupportsOnlyPaddleCompatiblePythonVersions()
+    {
+        Assert.False(DependencyProvisioningService.IsSupportedOcrPythonVersion(new Version(3, 9, 0)));
+        Assert.True(DependencyProvisioningService.IsSupportedOcrPythonVersion(new Version(3, 10, 0)));
+        Assert.True(DependencyProvisioningService.IsSupportedOcrPythonVersion(new Version(3, 13, 5)));
+        Assert.False(DependencyProvisioningService.IsSupportedOcrPythonVersion(new Version(3, 14, 0)));
+    }
+
+    [Fact]
     public async Task DependencyOllamaInstall_RequiresExplicitConfirmation()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

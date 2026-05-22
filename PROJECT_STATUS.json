@@ -1,130 +1,147 @@
 {
+  "last_updated": "2026-05-22T14:35:19+02:00",
+  "current_phase": "release-hardening",
+  "audit_summary": "Dependency audit found no NuGet/npm vulnerabilities and confirmed installer payload contains .NET self-contained runtime, WebView2 loader, sqlite-vec native asset, web UI, and OCR provisioning files. Current generated installer is unsigned.",
   "tasks": [
     {
+      "id": "TASK-017",
+      "order": 1,
+      "priority": "P1",
+      "status": "completed",
+      "title": "Apply low-risk dependency updates before final installer verification",
+      "source": "dependency-audit-2026-05-22",
+      "actions": [
+        "Update Microsoft.Web.WebView2 1.0.3912.50 to 1.0.3967.48.",
+        "Update Microsoft.Data.Sqlite 10.0.7 to 10.0.8.",
+        "Update npm patch/minor dependencies within current major lines: react/react-dom 19.2.6, eslint 10.4.0, vite 7.3.3, typescript-eslint 8.59.4, axe-core 4.11.4, @types/react 19.2.15.",
+        "Update OCR pypdfium2 5.7.1 to 5.8.0 and keep scripts\\ocr\\runtime-manifest.json aligned.",
+        "Keep all module, extension, and native runtime manifests aligned with the actual package versions copied into publish output."
+      ],
+      "verify": [
+        "dotnet list OnlyRag.sln package --vulnerable --include-transitive",
+        "npm audit --json and npm audit --omit=dev --json",
+        "py -3.10 -m pip install --dry-run --only-binary=:all: -r scripts\\ocr\\requirements.txt --disable-pip-version-check",
+        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+        "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release -Version 0.1.0",
+        "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe"
+      ],
+      "completed_actions": [
+        "Updated Microsoft.Web.WebView2 to 1.0.3967.48.",
+        "Updated Microsoft.Data.Sqlite to 10.0.8.",
+        "Updated React, React DOM, ESLint, Vite, typescript-eslint, axe-core, and @types/react within current major lines.",
+        "Updated OCR pypdfium2 to 5.8.0 and aligned scripts\\ocr\\runtime-manifest.json.",
+        "Constrained OCR provisioning to Python 3.10 through 3.13 because the pinned PaddlePaddle runtime has no Python 3.14 Windows wheel.",
+        "Rebuilt the Release installer and verified the published payload contains updated WebView2, Microsoft.Data.Sqlite, OCR manifest, vec0.dll, and wwwroot assets without node_modules."
+      ],
+      "checks": [
+        "dotnet list OnlyRag.sln package --vulnerable --include-transitive: passed, no vulnerable packages reported.",
+        "npm audit --json: passed, 0 vulnerabilities.",
+        "npm audit --omit=dev --json: passed, 0 vulnerabilities.",
+        "py -3.10 -m pip install --dry-run --only-binary=:all: -r scripts\\ocr\\requirements.txt --disable-pip-version-check: passed; pypdfium2 5.8.0 resolves.",
+        "npm run typecheck: passed.",
+        "npm run lint: passed.",
+        "npm run format:check: passed.",
+        "npm run test: passed, including Vitest and Playwright smoke test.",
+        "dotnet test OnlyRag.sln --configuration Release: passed.",
+        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release: passed.",
+        "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release -Version 0.1.0: passed; generated artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe.",
+        "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe: passed with expected NotSigned warning and skipped install lifecycle.",
+        "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 -SkipNode -SkipOllamaCheck -NonInteractive: passed; recreated OCR venv with Python 3.10.11 and verified pinned OCR package imports.",
+        "OCR bridge check: passed with {\"available\": true, \"engineVersion\": \"3.5.0\", \"message\": null}."
+      ],
+      "completed_at": "2026-05-22T14:35:19+02:00"
+    },
+    {
+      "id": "TASK-019",
+      "order": 2,
+      "priority": "P1",
+      "status": "todo",
+      "title": "Verify updated modules and runtime extensions end to end",
+      "source": "dependency-audit-2026-05-22",
+      "actions": [
+        "Verify WebView2 managed/native modules load in the WPF shell after package update.",
+        "Verify sqlite-vec native extension loads from the published win-x64 payload and vector search still works.",
+        "Verify Microsoft.Data.Sqlite, e_sqlite3, PdfPig, OpenXML, and OCR Python modules import or initialize through existing app paths.",
+        "Verify Vite/React production bundle builds and is served from packaged wwwroot without missing assets.",
+        "Verify installer payload contains the updated module and extension files and excludes node_modules, local databases, logs, temp data, documents, and model caches."
+      ],
+      "verify": [
+        "dotnet test OnlyRag.sln --configuration Release",
+        "npm run typecheck, npm run lint, npm run format:check, npm run test from src\\OnlyRag.Web",
+        "py -3.10 -m pip install --dry-run --only-binary=:all: -r scripts\\ocr\\requirements.txt --disable-pip-version-check",
+        "Run OCR bridge check with the prepared OCR Python environment when available.",
+        "Run a representative vector retrieval/chat workflow and confirm sqlite-vec-backed retrieval returns expected source snippets.",
+        "Run a representative PDF, DOCX, and scanned-image ingestion workflow after packaging."
+      ]
+    },
+    {
       "id": "TASK-012",
+      "order": 3,
       "priority": "P1",
       "status": "blocked",
       "title": "Run signed installer lifecycle verification on a clean Windows machine",
       "source": "release-gate",
-      "effort": "medium",
-      "actions": [
-        "Sign the installer with trusted signing material outside Git.",
-        "Run installer install, first launch, upgrade if applicable, rollback, uninstall, and SmartScreen/signature checks on a clean machine."
+      "blockers": [
+        "No trusted code-signing certificate or signing thumbprint is configured.",
+        "Current installer artifact is unsigned: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe reports NotSigned.",
+        "Install, upgrade, rollback, uninstall, SmartScreen, and signature validation must run on a clean Windows release verification machine."
       ],
       "verify": [
-        "Run scripts\\Test-InstallerRelease.ps1 with -RequireSigned and -RunInstallLifecycle.",
-        "Confirm Authenticode signature and timestamp validation."
-      ],
-      "blocked_at": "2026-05-22T10:09:17+02:00",
-      "blockers": [
-        "No trusted code-signing certificate is available in Cert:\\CurrentUser\\My or Cert:\\LocalMachine\\My.",
-        "No external signing certificate path or thumbprint is configured in the environment.",
-        "The available installer artifact is unsigned: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe reports Authenticode status NotSigned.",
-        "The signed release lifecycle must run on a clean Windows release verification machine; this workspace is an active development checkout with uncommitted implementation changes."
-      ],
-      "attempted_result": "TASK-012 cannot be completed as a signed clean-machine release verification in the current environment. Non-invasive release verification with -RequireSigned failed at signing-status and produced evidence at artifacts\\release-verification\\OnlyRag-release-verification-20260522-100906.json. An unsigned local lifecycle verification was run after first-launch dependency fixes and passed before generated artifacts were cleaned.",
-      "checks": [
-        "Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert",
-        "Get-ChildItem Cert:\\LocalMachine\\My -CodeSigningCert",
-        "Get-AuthenticodeSignature artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
-        "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned"
+        "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release -Version 0.1.0 -SigningCertificateThumbprint <thumbprint>",
+        "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
       ]
     },
     {
       "id": "TASK-013",
+      "order": 4,
       "priority": "P1",
       "status": "blocked",
-      "title": "Run visible installer wizard layout verification",
+      "title": "Complete installer wizard layout verification",
       "source": "release-gate",
-      "effort": "medium",
-      "actions": [
-        "Verify installer wizard pages in a visible desktop session.",
-        "Repeat at 100%, 125%, 150%, and 200% display scaling.",
-        "Repeat at least once with non-default accessibility text settings."
+      "blockers": [
+        "100%, 125%, and 200% display-scale passes require changing the interactive Windows desktop scale.",
+        "Non-default accessibility text pass requires changing user display/accessibility settings."
       ],
       "verify": [
-        "Record screenshots or exact observations for every wizard page.",
-        "Confirm no clipping, overlap, or unreadable controls."
-      ],
-      "blocked_at": "2026-05-22T10:42:30+02:00",
-      "blockers": [
-        "Only the current Windows display scale is available non-invasively in this session: AppliedDPI 144 / 150%.",
-        "The required 100%, 125%, and 200% display-scaling passes require changing the interactive Windows desktop scale and are not safe to perform automatically in this active user session.",
-        "The required non-default accessibility text pass requires changing user accessibility/display text settings and is not safe to perform automatically in this active user session."
-      ],
-      "attempted_result": "Captured and manually inspected visible installer wizard screenshots at 150% display scaling for Destination, Additional Tasks, Ready to Install, Installing, and Finished pages. No clipping, overlap, or unreadable controls were observed in this 150% pass. The installer was temporarily installed to reach the Finished page, then uninstalled and the remaining install payload was removed from %LOCALAPPDATA%\\Programs\\OnlyRag. TASK-013 remains blocked until the same visible pass is repeated at 100%, 125%, 200%, and once with non-default accessibility text settings.",
-      "checks": [
-        "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1",
-        "Visible wizard pass at 150% display scaling with screenshots under artifacts\\installer-ui-layout-verification\\20260522-104147-clicked",
-        "Manual screenshot inspection of 01-destination.png, 02-additional-tasks.png, 03-ready-to-install.png, 04-installing.png, and 05-finished.png",
-        "Installer cleanup check: %LOCALAPPDATA%\\Programs\\OnlyRag, Start Menu OnlyRag folder, and desktop shortcut were absent after verification",
-        "Get-Process -Name OnlyRag.App"
+        "Capture and inspect every installer wizard page at 100%, 125%, 150%, and 200% display scaling.",
+        "Repeat once with non-default accessibility text settings.",
+        "Record screenshots or exact observations and confirm no clipping, overlap, or unreadable controls."
       ]
     },
     {
       "id": "TASK-014",
+      "order": 5,
       "priority": "P1",
       "status": "todo",
-      "title": "Run interactive desktop and populated UI verification",
+      "title": "Run populated desktop workflow verification",
       "source": "release-gate",
-      "effort": "medium",
       "actions": [
         "Launch the WPF/WebView app in a Windows desktop session.",
-        "Verify document import, active jobs, retrieval/chat, translation records, settings persistence, and shutdown behavior with representative data."
+        "Verify document import, active jobs, retrieval/chat, translation records, settings persistence, OCR provisioning status, and shutdown behavior with representative data.",
+        "Run Ollama-backed workflows when they are in release scope.",
+        "Run complete functionality checks after module and extension updates, including import, indexing, OCR, retrieval, chat, translation, export, settings persistence, job cancellation, and shutdown."
       ],
       "verify": [
-        "Run with representative imported documents.",
-        "Run with Ollama-backed workflows when in release scope.",
-        "Capture exact defects and reproduction steps."
+        "Capture exact defects and reproduction steps.",
+        "Confirm representative documents, generated data, and logs stay under %LOCALAPPDATA%\\OnlyRag and are not packaged into source or installer payload."
       ]
     },
     {
-      "id": "TASK-015",
+      "id": "TASK-018",
+      "order": 6,
       "priority": "P2",
-      "status": "completed",
-      "title": "Split oversized source files that exceed repository thresholds",
-      "source": "structure-review",
-      "effort": "medium-large",
+      "status": "todo",
+      "title": "Evaluate higher-risk dependency migrations separately",
+      "source": "dependency-audit-2026-05-22",
       "actions": [
-        "Split oversized frontend workflow coordinators into focused state, view, and helper modules: src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts, src\\OnlyRag.Web\\src\\components\\TranslationSection.tsx, src\\OnlyRag.Web\\src\\components\\DocumentsSection.tsx, src\\OnlyRag.Web\\src\\components\\DocumentsSection.helpers.tsx, and src\\OnlyRag.Web\\src\\components\\ChatSection.tsx.",
-        "Split oversized backend/storage/script files only where responsibilities can be separated without behavior changes: src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs, src\\OnlyRag.Infrastructure\\Storage\\SqliteTranslationRepository.cs, src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs, scripts\\Bootstrap-Prerequisites.ps1, and scripts\\Generate-BrandAssets.ps1.",
-        "Keep generated files, lockfiles, large fixtures, and broad behavior changes out of scope."
+        "Evaluate xunit 2.9.3 legacy migration to xunit.v3.",
+        "Evaluate Vite 8, @vitejs/plugin-react 6, and TypeScript 6 as a separate frontend toolchain migration.",
+        "Keep sqlite-vec pinned unless a compatible NuGet replacement with win-x64 native vec0.dll is selected and tested."
       ],
       "verify": [
-        "Re-run line-count review against AGENTS.md split thresholds.",
-        "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
-        "Confirm imports, script docs, and PROJECT_STATUS.json stay aligned after any split."
-      ],
-      "evidence": [
-        "Current line-count scan found multiple tracked source/script files above split-required thresholds, including 821-line useSettingsSectionController.ts, 758-line TranslationSection.tsx, 664-line LocalSqliteMigrator.cs, 661-line SqliteTranslationRepository.cs, 573-line DocumentsSection.tsx, 551-line Bootstrap-Prerequisites.ps1, 535-line DocumentsSection.helpers.tsx, 531-line Generate-BrandAssets.ps1, 509-line SqliteDocumentRepository.cs, and 503-line ChatSection.tsx."
-      ],
-      "last_updated": "2026-05-22T13:00:33+02:00",
-      "completed_actions": [
-        "Split storage implementation files into partial classes: LocalSqliteMigrator.SchemaSql.cs, SqliteTranslationRepository.SourceUnits.cs, SqliteTranslationRepository.Mapping.cs, and SqliteDocumentRepository.Queries.cs.",
-        "Split oversized PowerShell entrypoints into support helpers: BootstrapPrerequisites.Core.ps1, BootstrapPrerequisites.Ocr.ps1, and BrandAssetDrawing.ps1.",
-        "Split settings controller defaults and action groups into SettingsSection.defaults.ts, useSettingsSectionController.actions.ts, and useSettingsSectionController.dependencyActions.ts.",
-        "Updated scripts/README.md for the new internal helper scripts.",
-        "Split remaining oversized frontend components into focused controllers, views, dialogs, field components, formatting helpers, and storage helpers for TranslationSection, DocumentsSection, ChatSection, SettingsSection.helpers, and related support code.",
-        "Split newly surfaced oversized C# source files into partial classes: TranslationExportService.Content.cs, TranslationExportService.Docx.cs, MainWindow.Startup.cs, and MainWindow.Exit.cs.",
-        "Split oversized infrastructure test fixtures into DocumentIngestionServiceTests.Fixtures.cs and OcrPipelineTests.Fixtures.cs."
-      ],
-      "remaining_actions": [],
-      "latest_evidence": [
-        "Repository line-count scan with rg --files over src, tests, and scripts found no split-required source, test, or script files after the final split pass.",
-        "Original oversized frontend targets are now split below mandatory thresholds: TranslationSection.tsx, DocumentsSection.tsx, DocumentsSection.helpers.tsx, and ChatSection.tsx.",
-        "Newly surfaced oversized files were split or reviewed: DocumentIngestionServiceTests.cs, OcrPipelineTests.cs, TranslationExportService.cs, and MainWindow.xaml.cs no longer exceed split-required thresholds; generated/lock/audit artifacts remain out of split scope."
-      ],
-      "checks": [
-        "npm run typecheck: passed",
-        "npm run lint: passed",
-        "npm run format:check: passed",
-        "npm run test: passed, including Vitest unit tests and Playwright smoke e2e",
-        "dotnet build OnlyRag.sln --configuration Release --no-restore: passed with 0 warnings and 0 errors",
-        "dotnet test OnlyRag.sln --configuration Release --no-build: passed",
-        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release: passed on rerun; first run hit a transient LocalJobWorkerServiceTests SQLite file-lock cleanup failure before passing unchanged",
-        "Repository structure scan: no split-required source, test, or script files found"
-      ],
-      "completed_at": "2026-05-22T13:00:33+02:00"
+        "Run full repository gate after each migration group.",
+        "Regenerate installer and verify payload dependencies after any runtime-affecting migration."
+      ]
     }
   ]
 }

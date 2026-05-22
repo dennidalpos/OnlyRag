@@ -30,6 +30,102 @@ function Test-OcrDiskSpace {
     }
 }
 
+function Test-OcrSupportedPythonVersion {
+    param([version]$Version)
+
+    return (
+        $Version.Major -eq 3 -and
+        $Version.Minor -ge 10 -and
+        $Version.Minor -le 13
+    )
+}
+
+function Get-OcrPythonVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string]$FilePath,
+        [string[]]$Arguments = @()
+    )
+
+    $versionArguments = @($Arguments) + @("--version")
+    $versionText = (& $FilePath @versionArguments 2>&1 | Out-String).Trim()
+    $version = ConvertTo-VersionOrNull $versionText
+    if (-not $version) {
+        return $null
+    }
+
+    return [pscustomobject]@{
+        FilePath = $FilePath
+        Arguments = @($Arguments)
+        Version = $version
+        VersionText = $versionText
+    }
+}
+
+function Get-OcrPythonCommand {
+    $candidates = [System.Collections.Generic.List[object]]::new()
+
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCommand) {
+        $candidates.Add([pscustomobject]@{
+            FilePath = $pythonCommand.Source
+            Arguments = @()
+            DisplayName = "python"
+        })
+    }
+
+    $pyCommand = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyCommand) {
+        foreach ($minor in @(13, 12, 11, 10)) {
+            $candidates.Add([pscustomobject]@{
+                FilePath = $pyCommand.Source
+                Arguments = @("-3.$minor")
+                DisplayName = "py -3.$minor"
+            })
+        }
+    }
+
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $unsupported = [System.Collections.Generic.List[string]]::new()
+    foreach ($candidate in $candidates) {
+        $key = "$($candidate.FilePath)|$($candidate.Arguments -join ' ')"
+        if (-not $seen.Add($key)) {
+            continue
+        }
+
+        try {
+            $detected = Get-OcrPythonVersion -FilePath $candidate.FilePath -Arguments $candidate.Arguments
+            if (-not $detected) {
+                continue
+            }
+
+            if (Test-OcrSupportedPythonVersion -Version $detected.Version) {
+                return [pscustomobject]@{
+                    FilePath = $detected.FilePath
+                    Arguments = @($detected.Arguments)
+                    Version = $detected.Version
+                    VersionText = $detected.VersionText
+                    DisplayName = $candidate.DisplayName
+                }
+            }
+
+            $unsupported.Add("$($candidate.DisplayName) -> $($detected.VersionText)")
+        }
+        catch {
+            continue
+        }
+    }
+
+    if ($unsupported.Count -gt 0) {
+        Add-Warning "OCR requires Python 3.10 through 3.13 because PaddlePaddle 3.3.1 has no Python 3.14 Windows wheel. Found unsupported interpreter(s): $($unsupported -join '; ')."
+    }
+    else {
+        Add-Warning "Python 3.10 through 3.13 was not found. OCR is optional; install a compatible Python for Windows to enable PaddleOCR."
+    }
+
+    return $null
+}
+
 function Test-OcrPinnedPackageSet {
     param(
         [Parameter(Mandatory)]
@@ -102,22 +198,14 @@ function Ensure-OcrEnvironment {
     $ocrManifest = Get-OcrRuntimeManifest
     Test-OcrDiskSpace -Manifest $ocrManifest
 
-    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    $pythonCommand = Get-OcrPythonCommand
     if (-not $pythonCommand) {
-        Add-Warning "Python was not found. OCR is optional; install Python 3.10+ for Windows to enable PaddleOCR."
-        Add-Manual "After installing Python, rerun pwsh .\scripts\Bootstrap-Prerequisites.ps1 or set ONLYRAG_OCR_PYTHON manually."
+        Add-Manual "Install Python 3.10, 3.11, 3.12, or 3.13 for Windows, then rerun bootstrap without -SkipOcr."
+        Add-Manual "If OCR is already prepared elsewhere, set ONLYRAG_OCR_PYTHON to that environment's python.exe."
         return
     }
 
-    $pythonVersionText = (& $pythonCommand.Source --version 2>&1 | Out-String).Trim()
-    $pythonVersion = ConvertTo-VersionOrNull $pythonVersionText
-    if (-not $pythonVersion -or $pythonVersion.Major -lt 3 -or ($pythonVersion.Major -eq 3 -and $pythonVersion.Minor -lt 10)) {
-        Add-Warning "OCR requires Python 3.10+; found '$pythonVersionText'. OCR preparation skipped."
-        Add-Manual "Install Python 3.10+ for Windows, then rerun bootstrap without -SkipOcr."
-        return
-    }
-
-    Add-Verified "Python available for OCR: $pythonVersionText."
+    Add-Verified "Python available for OCR: $($pythonCommand.VersionText) via $($pythonCommand.DisplayName)."
 
     $ocrInstallRoot = Join-Path $localDataRoot "ocr-python"
     $venvPath = Join-Path $ocrInstallRoot ".venv"
@@ -133,15 +221,15 @@ function Ensure-OcrEnvironment {
         else {
             $venvVersionText = (& $venvPython --version 2>&1 | Out-String).Trim()
             $venvVersion = ConvertTo-VersionOrNull $venvVersionText
-            if (-not $venvVersion) {
-                Add-Warning "OCR venv Python non funzionante (creato con una versione diversa di Python). Ricreo il venv..."
-                Remove-Item -Recurse -Force $venvPath
+            if (-not $venvVersion -or -not (Test-OcrSupportedPythonVersion -Version $venvVersion)) {
+                Add-Warning "OCR venv Python is not compatible with PaddlePaddle 3.3.1 ('$venvVersionText'). Recreating the venv with $($pythonCommand.VersionText)."
+                Remove-Item -LiteralPath $venvPath -Recurse -Force
                 $venvNeedsCreate = $true
             }
         }
 
         if ($venvNeedsCreate) {
-            Invoke-Native -FilePath $pythonCommand.Source -Arguments @("-m", "venv", $venvPath)
+            Invoke-Native -FilePath $pythonCommand.FilePath -Arguments (@($pythonCommand.Arguments) + @("-m", "venv", $venvPath))
             Add-Installed "OCR Python virtual environment created at $venvPath."
         }
         else {

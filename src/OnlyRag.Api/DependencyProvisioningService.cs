@@ -13,6 +13,7 @@ public sealed class DependencyProvisioningService
         "Installa Ollama manualmente dalla pagina ufficiale. Se sei offline o una policy aziendale blocca download o browser esterni, scarica il programma da una rete approvata o chiedi al reparto IT. Per usare un endpoint Ollama da altri PC della LAN, configura OLLAMA_HOST nelle impostazioni/variabili ambiente di Ollama e riavvia Ollama.";
 
     private const string LibreOfficeDownloadUrl = "https://www.libreoffice.org/download/download-libreoffice/";
+    private static readonly int[] SupportedOcrPythonMinors = [13, 12, 11, 10];
     private readonly ILocalProcessLauncher processLauncher;
     private readonly object syncRoot = new();
     private OcrProvisionStatus lastOcrProvisionStatus = new(
@@ -139,15 +140,7 @@ public sealed class DependencyProvisioningService
                 throw new InvalidOperationException("Runtime OCR incompleto: bridge o requirements non trovati.");
             }
 
-            string python = ResolveExecutable("python")
-                ?? throw new InvalidOperationException("Python 3.10+ non trovato. Installa Python per Windows, poi ripeti Configura OCR.");
-
-            string versionText = (await RunProcessAsync(python, ["--version"], null, CancellationToken.None)).Trim();
-            Version? version = ParseVersion(versionText);
-            if (version is null || version.Major < 3 || (version.Major == 3 && version.Minor < 10))
-            {
-                throw new InvalidOperationException($"OCR richiede Python 3.10+; trovato '{versionText}'.");
-            }
+            OcrPythonCommand python = await ResolveOcrPythonCommandAsync(CancellationToken.None);
 
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string installRoot = Path.Combine(localAppData, "OnlyRag", "ocr-python");
@@ -155,9 +148,30 @@ public sealed class DependencyProvisioningService
             string venvPython = Path.Combine(venvPath, "Scripts", "python.exe");
             Directory.CreateDirectory(installRoot);
 
-            if (!File.Exists(venvPython))
+            bool createVenv = !File.Exists(venvPython);
+            if (!createVenv)
             {
-                await RunProcessAsync(python, ["-m", "venv", venvPath], null, CancellationToken.None);
+                LocalProcessResult venvVersionResult = await processLauncher.RunAsync(
+                    venvPython,
+                    ["--version"],
+                    null,
+                    CancellationToken.None);
+                string venvVersionText = GetProcessVersionText(venvVersionResult);
+                Version? venvVersion = ParseVersion(venvVersionText);
+                if (venvVersionResult.ExitCode != 0 || venvVersion is null || !IsSupportedOcrPythonVersion(venvVersion))
+                {
+                    Directory.Delete(venvPath, recursive: true);
+                    createVenv = true;
+                }
+            }
+
+            if (createVenv)
+            {
+                await RunProcessAsync(
+                    python.FileName,
+                    python.WithArguments(["-m", "venv", venvPath]),
+                    null,
+                    CancellationToken.None);
             }
 
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"], null, CancellationToken.None);
@@ -186,6 +200,58 @@ public sealed class DependencyProvisioningService
         {
             lastOcrProvisionStatus = status;
         }
+    }
+
+    private async Task<OcrPythonCommand> ResolveOcrPythonCommandAsync(CancellationToken cancellationToken)
+    {
+        List<OcrPythonCommand> candidates = [];
+        string? python = ResolveExecutable("python");
+        if (python is not null)
+        {
+            candidates.Add(new OcrPythonCommand(python, []));
+        }
+
+        string? py = ResolveExecutable("py");
+        if (py is not null)
+        {
+            candidates.AddRange(SupportedOcrPythonMinors.Select(minor => new OcrPythonCommand(py, [$"-3.{minor}"])));
+        }
+
+        List<string> unsupported = [];
+        foreach (OcrPythonCommand candidate in candidates)
+        {
+            LocalProcessResult result = await processLauncher.RunAsync(
+                candidate.FileName,
+                candidate.WithArguments(["--version"]),
+                null,
+                cancellationToken);
+            if (result.ExitCode != 0)
+            {
+                continue;
+            }
+
+            string versionText = GetProcessVersionText(result);
+            Version? version = ParseVersion(versionText);
+            if (version is null)
+            {
+                continue;
+            }
+
+            if (IsSupportedOcrPythonVersion(version))
+            {
+                return candidate;
+            }
+
+            unsupported.Add(versionText);
+        }
+
+        string detail = unsupported.Count == 0
+            ? "Python compatibile non trovato."
+            : $"Interpreti non compatibili trovati: {string.Join(", ", unsupported)}.";
+        throw new InvalidOperationException(
+            "OCR richiede Python 3.10, 3.11, 3.12 o 3.13. " +
+            "PaddlePaddle 3.3.1 non pubblica wheel Windows per Python 3.14. " +
+            $"{detail} Installa una versione compatibile di Python per Windows, poi ripeti Configura OCR.");
     }
 
     private static string ResolveOcrScriptsRoot()
@@ -225,6 +291,18 @@ public sealed class DependencyProvisioningService
             : null;
     }
 
+    private static string GetProcessVersionText(LocalProcessResult result)
+    {
+        return (string.IsNullOrWhiteSpace(result.StandardOutput)
+            ? result.StandardError
+            : result.StandardOutput).Trim();
+    }
+
+    internal static bool IsSupportedOcrPythonVersion(Version version)
+    {
+        return version.Major == 3 && version.Minor >= 10 && version.Minor <= 13;
+    }
+
     private static string? ResolveExecutable(string executableName)
     {
         string normalizedName = executableName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
@@ -252,5 +330,13 @@ public sealed class DependencyProvisioningService
         }
 
         return null;
+    }
+
+    private sealed record OcrPythonCommand(string FileName, IReadOnlyList<string> PrefixArguments)
+    {
+        public string[] WithArguments(IReadOnlyList<string> arguments)
+        {
+            return [.. PrefixArguments, .. arguments];
+        }
     }
 }

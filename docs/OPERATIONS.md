@@ -326,7 +326,7 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
   Ollama directly.
 - Legacy Office import requires LibreOffice: use **Scarica LibreOffice** in Settings, configure
   `soffice.exe`, or set `ONLYRAG_LIBREOFFICE_PATH`.
-- OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10+ is
+- OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10 through 3.13 is
   available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`.
 - App closes while work is active: confirm the running build includes the WPF shutdown flow and
   inspect `%LOCALAPPDATA%\OnlyRag\logs` for `Shutdown preparation` entries.

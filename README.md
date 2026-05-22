@@ -49,7 +49,7 @@ Model features:
 Optional features:
 
 - LibreOffice for legacy Office conversion and PDF export.
-- Python 3.10+ for the PaddleOCR bridge.
+- Python 3.10 through 3.13 for the PaddleOCR bridge. Python 3.14 is not supported by the pinned PaddlePaddle runtime.
 - Inno Setup 6 for installer generation.
 - Windows SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
 

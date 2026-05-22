@@ -2,6 +2,7 @@
   "strategy": "per-user-online-venv",
   "installRoot": "%LOCALAPPDATA%\\OnlyRag\\ocr-python",
   "pythonMinimumVersion": "3.10.0",
+  "pythonMaximumVersion": "3.13.x",
   "minimumFreeDiskBytes": 5368709120,
   "modelCacheLocations": [
     "%USERPROFILE%\\.paddlex",
@@ -25,7 +26,7 @@
     },
     {
       "name": "pypdfium2",
-      "version": "5.7.1",
+      "version": "5.8.0",
       "importName": "pypdfium2"
     },
     {

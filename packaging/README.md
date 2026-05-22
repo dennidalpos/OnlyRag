@@ -76,7 +76,7 @@ The setup checks Windows version and WebView2 before copying files. If either bl
 | OCR bridge scripts | Optional OCR provisioning and OCR runtime bridge | Included from `scripts\ocr` | `Test-OnlyRagPublishPayload`; Settings > Configura OCR reports missing bridge/requirements |
 | Ollama | Optional chat, embeddings, translation model features | Manual/user-initiated official Ollama install | Settings dependency status and setup gate |
 | LibreOffice | Optional legacy Office conversion and PDF export fallback | Manual install or configured `soffice.exe` path | Settings converter status and document job component status |
-| Python 3.10+ plus PaddleOCR packages | Optional OCR for scanned PDFs/images | User-provisioned per-user venv from Settings/bootstrap | Settings > Configura OCR and OCR availability check |
+| Python 3.10 through 3.13 plus PaddleOCR packages | Optional OCR for scanned PDFs/images | User-provisioned per-user venv from Settings/bootstrap | Settings > Configura OCR and OCR availability check |
 
 External and configurable:
 

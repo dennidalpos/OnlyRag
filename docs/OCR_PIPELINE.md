@@ -36,6 +36,7 @@ Bridge and prerequisites:
 
 - Bridge script: `scripts\ocr\paddle_ocr_bridge.py`.
 - Requirements: `scripts\ocr\requirements.txt`.
+- Supported Python versions: 3.10 through 3.13. The pinned PaddlePaddle runtime does not publish Windows wheels for Python 3.14.
 - End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
 - Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup; use `-SkipOcr` to skip it.
 - Default OCR Python path: `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv\Scripts\python.exe`.
