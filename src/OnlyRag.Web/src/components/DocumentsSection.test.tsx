@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DocumentsSection } from "./DocumentsSection";
+import { ActionButton } from "./DocumentsSection.helpers";
 import { mockApi } from "../test/apiMock";
 import {
   createDocument,
@@ -71,6 +72,7 @@ describe("DocumentsSection", () => {
 
     const { container } = render(<DocumentsSection />);
     expect(await screen.findByText("Nessun documento presente. Importa un file per iniziare.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Nessun documento presente.");
 
     const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
     expect(fileInput).not.toBeNull();
@@ -156,5 +158,21 @@ describe("DocumentsSection", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("connects document action tooltips to the action accessible description", () => {
+    render(
+      <ActionButton
+        label="Ricostruisci indice"
+        tooltip="Ricrea testo, chunk e indice del documento."
+        disabled={false}
+        variant="recovery"
+        onClick={() => {}}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Ricostruisci indice" })).toHaveAccessibleDescription(
+      "Ricrea testo, chunk e indice del documento."
+    );
   });
 });

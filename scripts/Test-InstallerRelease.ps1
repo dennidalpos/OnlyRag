@@ -172,6 +172,12 @@ function Test-OptionalComponents {
 
 function Test-AppLaunch {
     $exe = Join-Path $installDir "OnlyRag.App.exe"
+    $logPath = Join-Path $dataDir "logs\backend.log"
+    $previousLogLength = 0
+    if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+        $previousLogLength = (Get-Item -LiteralPath $logPath).Length
+    }
+
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
         Add-Check -Id "app-launch" -Status "fail" -Message "App executable missing: $exe"
         return
@@ -186,6 +192,31 @@ function Test-AppLaunch {
     else {
         Add-Check -Id "app-launch" -Status "pass" -Message "App process remained alive after launch." -Data @{ processId = $process.Id }
     }
+
+    if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+        $logContent = Get-Content -Raw -LiteralPath $logPath
+        $currentLogLength = (Get-Item -LiteralPath $logPath).Length
+        if ($currentLogLength -gt $previousLogLength -and $logContent.Contains("sqlite-vec native extension verified.")) {
+            Add-Check -Id "first-launch-sqlite-vec-load" -Status "pass" -Message "First launch verified sqlite-vec native extension loading." -Data @{ logPath = $logPath }
+        }
+        else {
+            Add-Check -Id "first-launch-sqlite-vec-load" -Status "fail" -Message "First launch log did not confirm sqlite-vec native extension loading." -Data @{ logPath = $logPath }
+        }
+    }
+    else {
+        Add-Check -Id "first-launch-backend-log" -Status "fail" -Message "First launch did not create backend log." -Data @{ logPath = $logPath }
+    }
+
+    $webViewDataDir = Join-Path $dataDir "webview2"
+    $installWebViewDataDir = Join-Path $installDir "OnlyRag.App.exe.WebView2"
+    Test-PathExpectation -Id "first-launch-webview2-user-data" -Path $webViewDataDir -Kind "directory"
+    if (Test-Path -LiteralPath $installWebViewDataDir) {
+        Add-Check -Id "first-launch-webview2-install-dir-clean" -Status "fail" -Message "WebView2 user data was created under the install directory." -Data @{ path = $installWebViewDataDir }
+    }
+    else {
+        Add-Check -Id "first-launch-webview2-install-dir-clean" -Status "pass" -Message "WebView2 user data was not created under the install directory." -Data @{ path = $installWebViewDataDir }
+    }
+
     Stop-OnlyRagProcesses
 }
 
@@ -210,6 +241,14 @@ else {
     Add-Check -Id "fresh-install-exit" -Status ($(if ($install.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Fresh install exit code $($install.exitCode)." -Data $install
     Test-PathExpectation -Id "install-path" -Path $installDir -Kind "directory"
     Test-PathExpectation -Id "app-executable" -Path (Join-Path $installDir "OnlyRag.App.exe") -Kind "file"
+    Test-PathExpectation -Id "dotnet-coreclr-runtime" -Path (Join-Path $installDir "coreclr.dll") -Kind "file"
+    Test-PathExpectation -Id "dotnet-hostfxr-runtime" -Path (Join-Path $installDir "hostfxr.dll") -Kind "file"
+    Test-PathExpectation -Id "dotnet-hostpolicy-runtime" -Path (Join-Path $installDir "hostpolicy.dll") -Kind "file"
+    Test-PathExpectation -Id "wpf-native-runtime" -Path (Join-Path $installDir "PresentationNative_cor3.dll") -Kind "file"
+    Test-PathExpectation -Id "webview2-core-assembly" -Path (Join-Path $installDir "Microsoft.Web.WebView2.Core.dll") -Kind "file"
+    Test-PathExpectation -Id "webview2-wpf-assembly" -Path (Join-Path $installDir "Microsoft.Web.WebView2.Wpf.dll") -Kind "file"
+    Test-PathExpectation -Id "webview2-loader-native-asset" -Path (Join-Path $installDir "WebView2Loader.dll") -Kind "file"
+    Test-PathExpectation -Id "sqlite-native-provider" -Path (Join-Path $installDir "e_sqlite3.dll") -Kind "file"
     Test-PathExpectation -Id "sqlite-vec-native-asset" -Path (Join-Path $installDir "vec0.dll") -Kind "file"
     Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"

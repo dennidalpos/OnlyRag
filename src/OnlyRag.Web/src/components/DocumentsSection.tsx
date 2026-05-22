@@ -569,9 +569,9 @@ export function DocumentsSection() {
             </div>
           )}
           {isLoading ? (
-            <div className="empty-state"><p>Caricamento documenti...</p></div>
+            <div className="empty-state" role="status" aria-live="polite"><p>Caricamento documenti...</p></div>
           ) : documents.length === 0 ? (
-            <div className="empty-state"><p>Nessun documento presente. Importa un file per iniziare.</p></div>
+            <div className="empty-state" role="status"><p>Nessun documento presente. Importa un file per iniziare.</p></div>
           ) : (
             <div className="documents-list" aria-label="Documenti importati">
               {documents.map((doc) => (

@@ -23,8 +23,8 @@ Direct app startup repeats the Windows and WebView2 checks so manual/portable la
 with the same kind of prerequisite message instead of a generic first-window failure.
 
 The installer is self-contained for OnlyRag's required .NET runtime components and packages the
-required `sqlite-vec` native asset (`vec0.dll`). End users do not need to install .NET 10
-separately for the packaged app.
+WebView2 SDK loader plus the required `sqlite-vec` native asset (`vec0.dll`). End users do not
+need to install .NET 10 separately for the packaged app.
 
 Required for model features:
 
@@ -180,6 +180,7 @@ Runtime data lives under `%LOCALAPPDATA%\OnlyRag`:
 | `documents\exports\` | Translation export files. |
 | `ocr-python\` | PaddleOCR Python environment prepared by **Configura OCR** in Settings or by developer bootstrap. |
 | `logs\` | Application log files. |
+| `webview2\` | WebView2 user data folder for the installed desktop shell, kept outside the install directory. |
 | `temp\` | App-scoped temporary work directories such as Office conversion and PDF export staging. |
 
 Document import is bounded to protect the local machine from storage exhaustion. Default backend
@@ -272,12 +273,12 @@ pwsh .\scripts\Build-Installer.ps1
 ```
 
 The packaging script builds the React UI, publishes the WPF app as a self-contained `win-x64`
-package, validates the publish payload, and compiles an unsigned installer when Inno Setup
-`ISCC.exe` is installed. For a release candidate, pass `-SigningCertificateThumbprint` with a
-trusted code-signing certificate; the build signs with `signtool`, applies a timestamp, and verifies
-the signature before returning the artifact. See [../packaging/README.md](../packaging/README.md)
-for prerequisites, installer contents, OCR runtime packaging strategy, and the pre-release
-checklist.
+package, validates the required .NET/WebView2/sqlite-vec/OCR payload files, and compiles an
+unsigned installer when Inno Setup `ISCC.exe` is installed. For a release candidate, pass
+`-SigningCertificateThumbprint` with a trusted code-signing certificate; the build signs with
+`signtool`, applies a timestamp, and verifies the signature before returning the artifact. See
+[../packaging/README.md](../packaging/README.md) for prerequisites, installer contents, OCR runtime
+packaging strategy, and the pre-release checklist.
 
 Packaging is distinct from release. Run `scripts\Test-InstallerRelease.ps1` to create the evidence
 artifact required for release verification. Use `-RequireSigned` for signed release candidates.

@@ -1,4 +1,5 @@
 import type { BackendStatus } from "../App";
+import { formatTime } from "../pollingStatus";
 
 type StatusBadge = {
   label: string;
@@ -24,7 +25,7 @@ export function AppHeader({ currentSection, backendStatus }: AppHeaderProps) {
   return (
     <header className="app-header">
       <h1>{currentSection}</h1>
-      <div className="status-row" aria-label="Stato applicazione">
+      <div className="status-row" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
         {statusBadges.map((badge) => (
           <span className={`status-badge status-badge--${badge.tone}`} key={badge.label}>
             <span>{badge.label}</span>
@@ -34,7 +35,7 @@ export function AppHeader({ currentSection, backendStatus }: AppHeaderProps) {
         {backendStatus.refreshStatus.lastSuccessfulRefreshAt && (
           <span className="status-badge status-badge--neutral">
             <span>Aggiornato</span>
-            <strong>{new Date(backendStatus.refreshStatus.lastSuccessfulRefreshAt).toLocaleTimeString()}</strong>
+            <strong>{formatTime(backendStatus.refreshStatus.lastSuccessfulRefreshAt)}</strong>
           </span>
         )}
       </div>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiRequest, type JobStatus, type LocalJob } from "../api";
+import { isActiveJobStatus, isTerminalJobStatus } from "../jobStatus";
 import {
+  formatDateTime,
   formatLastRefresh,
   initialRefreshStatus,
   markRefreshFailure,
@@ -25,6 +27,9 @@ const typeLabels: Record<string, string> = {
   "document-translation": "Traduzione documento"
 };
 
+const jobsRefreshErrorMessage = "Impossibile leggere la coda job locale.";
+const jobsRefreshIntervalMs = 3000;
+
 function formatJobType(type: string): string {
   return typeLabels[type] ?? type;
 }
@@ -38,16 +43,23 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState(initialRefreshStatus);
 
+  function applyJobsRefreshSuccess(jobList: LocalJob[]) {
+    setJobs(jobList);
+    setError(null);
+    setRefreshStatus(markRefreshSuccess());
+  }
+
+  function applyJobsRefreshFailure(message: string) {
+    setError(message);
+    setRefreshStatus((current) => markRefreshFailure(current, message));
+  }
+
   async function refreshJobs() {
     try {
       const jobList = await apiRequest<LocalJob[]>("/api/jobs?limit=100");
-      setJobs(jobList);
-      setError(null);
-      setRefreshStatus(markRefreshSuccess());
+      applyJobsRefreshSuccess(jobList);
     } catch {
-      const message = "Impossibile leggere la coda job locale.";
-      setError(message);
-      setRefreshStatus((current) => markRefreshFailure(current, message));
+      applyJobsRefreshFailure(jobsRefreshErrorMessage);
     }
   }
 
@@ -58,21 +70,17 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
       try {
         const jobList = await apiRequest<LocalJob[]>("/api/jobs?limit=100");
         if (!isCancelled) {
-          setJobs(jobList);
-          setError(null);
-          setRefreshStatus(markRefreshSuccess());
+          applyJobsRefreshSuccess(jobList);
         }
       } catch {
         if (!isCancelled) {
-          const message = "Impossibile leggere la coda job locale.";
-          setError(message);
-          setRefreshStatus((current) => markRefreshFailure(current, message));
+          applyJobsRefreshFailure(jobsRefreshErrorMessage);
         }
       }
     }
 
     void poll();
-    const interval = window.setInterval(() => void poll(), 3000);
+    const interval = window.setInterval(() => void poll(), jobsRefreshIntervalMs);
 
     return () => {
       isCancelled = true;
@@ -113,9 +121,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
     }
   }
 
-  const hasTerminated = jobs.some(
-    (j) => j.status === "Completed" || j.status === "Cancelled" || j.status === "Failed"
-  );
+  const hasTerminated = jobs.some((job) => isTerminalJobStatus(job.status));
 
   return (
     <div className="jobs-panel">
@@ -139,7 +145,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
         </div>
       )}
       {jobs.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state" role="status">
           <p>Nessuna operazione in corso.</p>
         </div>
       ) : (
@@ -155,11 +161,11 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                   {statusLabels[job.status]}
                 </span>
               </div>
-              {(job.status === "Running" || job.status === "Pausing" || job.status === "Pending" || job.status === "Paused") && (
+              {isActiveJobStatus(job.status) && (
                 <ProgressBar label={`Avanzamento ${job.progressPercent}%`} value={job.progressPercent} />
               )}
               <div className="job-row__meta">
-                <span>{new Date(job.updatedAt).toLocaleString()}</span>
+                <span>{formatDateTime(job.updatedAt)}</span>
               </div>
               <div className="settings-actions">
                 {(job.status === "Pending" || job.status === "Running") && (
@@ -198,7 +204,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                     Riprendi
                   </button>
                 )}
-                {(job.status === "Completed" || job.status === "Cancelled" || job.status === "Failed") && (
+                {isTerminalJobStatus(job.status) && (
                   <button
                     type="button"
                     className="button-danger"

@@ -1,4 +1,5 @@
 import { apiRequest, type LocalJob } from "./api";
+import { isActiveJobStatus } from "./jobStatus";
 
 type ExitContributor = {
   label: string;
@@ -90,9 +91,7 @@ async function prepareForExit(): Promise<AppExitState> {
 async function getActiveJobSnapshot(): Promise<{ count: number; isUnknown: boolean }> {
   try {
     const jobs = await apiRequest<LocalJob[]>("/api/jobs?limit=200");
-    const count = jobs.filter((job) =>
-      job.status === "Pending" || job.status === "Running" || job.status === "Pausing" || job.status === "Paused"
-    ).length;
+    const count = jobs.filter((job) => isActiveJobStatus(job.status)).length;
     return { count, isUnknown: false };
   } catch {
     return { count: 0, isUnknown: true };

@@ -20,9 +20,9 @@
         "No trusted code-signing certificate is available in Cert:\\CurrentUser\\My or Cert:\\LocalMachine\\My.",
         "No external signing certificate path or thumbprint is configured in the environment.",
         "The available installer artifact is unsigned: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe reports Authenticode status NotSigned.",
-        "The install lifecycle must run on a clean Windows release verification machine; this workspace is an active development checkout with existing build artifacts and uncommitted implementation changes."
+        "The signed release lifecycle must run on a clean Windows release verification machine; this workspace is an active development checkout with uncommitted implementation changes."
       ],
-      "attempted_result": "TASK-012 cannot be completed in the current environment. Non-invasive release verification with -RequireSigned failed at signing-status and produced evidence at artifacts\\release-verification\\OnlyRag-release-verification-20260522-100906.json. Lifecycle installation was intentionally not run on this development machine.",
+      "attempted_result": "TASK-012 cannot be completed as a signed clean-machine release verification in the current environment. Non-invasive release verification with -RequireSigned failed at signing-status and produced evidence at artifacts\\release-verification\\OnlyRag-release-verification-20260522-100906.json. An unsigned local lifecycle verification was run after first-launch dependency fixes and passed before generated artifacts were cleaned.",
       "checks": [
         "Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert",
         "Get-ChildItem Cert:\\LocalMachine\\My -CodeSigningCert",
@@ -99,12 +99,69 @@
   "oversized_files": [
     "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts remains oversized as a state-only settings coordinator after TASK-008 panel extraction; schedule a focused hook split if strict hook line thresholds are required.",
     "src\\OnlyRag.Web\\src\\components\\DocumentsSection.tsx remains oversized after TASK-010 polling-state work; schedule a focused split of document polling state and import/dropzone UI into dedicated modules.",
+    "src\\OnlyRag.Web\\src\\components\\DocumentsSection.helpers.tsx remains oversized as a mixed document dialog/list/detail helper module; schedule a focused split into OCR dialogs, document rows, and detail actions.",
+    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx remains oversized as the chat panel coordinator; schedule a focused split of document selection, resize behavior, and message composer UI.",
+    "src\\OnlyRag.Web\\src\\components\\TranslationSection.tsx remains oversized as the translation workflow coordinator; schedule a focused split of list/detail, export, and compare modal UI.",
     "src\\OnlyRag.Web\\src\\api.ts remains oversized as the shared frontend API DTO and request client module; schedule a focused contract/type split if frontend API contracts continue to grow.",
     "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs is oversized but remains a single migration aggregate; defer split to focused storage refactor.",
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
+  "ui_accessibility_status": {
+    "last_updated": "2026-05-22T11:36:30+02:00",
+    "last_completed_work": "Applied P3 UI accessibility/localization fixes without redesign: Italian locale timestamp formatting, live/status semantics for dynamic UI states, and accessible descriptions for document action buttons.",
+    "quality_gates": {
+      "web_unit_tests": "passed",
+      "web_typecheck": "passed",
+      "web_lint": "passed",
+      "web_format_check": "passed",
+      "web_build": "passed",
+      "web_e2e_smoke": "passed",
+      "manual_browser_check": "passed"
+    },
+    "residuals": [
+      "Split oversized UI workflow components in a focused refactor before expanding their behavior.",
+      "Run populated desktop WebView keyboard and screen-reader verification with real documents and models.",
+      "Consider a shared UI status/empty-state component only if similar live-region markup continues to duplicate."
+    ]
+  },
+  "runtime_config_status": {
+    "last_updated": "2026-05-22T11:16:10+02:00",
+    "config_sources": [
+      "SQLite settings table under %LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db",
+      "ONLYRAG_WEB_DEV_SERVER, ONLYRAG_OCR_PYTHON, ONLYRAG_OCR_BRIDGE, ONLYRAG_LIBREOFFICE_PATH, ONLYRAG_CERT_PASSWORD",
+      "PowerShell script parameters for bootstrap, gate, packaging, signing, installer tests",
+      "Vite, Playwright, npm package manifest, OCR runtime manifest, Inno Setup manifest"
+    ],
+    "runtime_paths": [
+      "%LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db stores documents, jobs, settings, chat history, translations, OCR cache metadata, chunks, and embeddings",
+      "%LOCALAPPDATA%\\OnlyRag\\documents\\originals, renders, ocr-cache, exports",
+      "%LOCALAPPDATA%\\OnlyRag\\logs\\backend.log",
+      "%LOCALAPPDATA%\\OnlyRag\\webview2 for WebView2 user data created at first desktop launch",
+      "%LOCALAPPDATA%\\OnlyRag\\temp for Office conversion and translation export staging",
+      "%LOCALAPPDATA%\\OnlyRag\\ocr-python for optional PaddleOCR runtime"
+    ],
+    "installer_prerequisite_strategy": [
+      "Windows 10 1809/build 17763+ is blocked before install by Inno Setup and repeated at direct app startup.",
+      "Microsoft Edge WebView2 Runtime is blocked before install by Inno Setup and repeated before WebView2 initialization.",
+      ".NET 10 desktop/backend runtime files are included by self-contained win-x64 publish and validated in the publish payload.",
+      "WebView2 SDK loader files, sqlite-vec vec0.dll, static web UI, and OCR bridge scripts are included in the publish payload and validated before installer compilation plus installed-payload lifecycle verification.",
+      "Ollama, LibreOffice, Python, PaddleOCR packages, OCR models, Inno Setup, signtool, and signing certificates remain manual or build-time dependencies only when their feature or release path is used."
+    ],
+    "last_completed_work": "Verified the Inno Setup first-launch lifecycle locally with the requested compiler path before cleanup. Required .NET, WebView2 loader, sqlite native, sqlite-vec, OCR bridge, static UI files, first-launch sqlite-vec loading, and WebView2 user-data location are checked after install. WebView2 user data now lives under %LOCALAPPDATA%\\OnlyRag\\webview2 so uninstall removes the install directory after first launch.",
+    "quality_gates": {
+      "repository_gate": "passed",
+      "dotnet_tests": "passed",
+      "web_tests": "passed",
+      "typecheck": "passed",
+      "lint": "passed",
+      "format": "passed",
+      "build": "passed",
+      "installer_preflight_self_test": "passed",
+      "installer_unsigned_lifecycle": "passed"
+    }
+  },
   "script_automation_status": {
-    "last_updated": "2026-05-22T10:43:53+02:00",
+    "last_updated": "2026-05-22T11:08:00+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -112,13 +169,51 @@
       "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release; pwsh .\\scripts\\Build-Web.ps1",
       "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
       "sign": "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath <external-pfx-path> -Version \"0.1.0\"",
-      "clean": "pwsh .\\scripts\\Clean.ps1 -WhatIf"
+      "clean": "pwsh .\\scripts\\Clean.ps1"
     },
     "residual_scripts": [
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Pruned completed tasks from PROJECT_STATUS.json; active tracker now contains only blocked or todo tasks.",
+    "last_completed_work": "Canonical gate passed after runtime path/config hardening. Installer payload validation was strengthened to require .NET self-contained runtime files, WebView2 SDK loader files, sqlite-vec, static UI, and OCR bridge files before installer compilation. Clean.ps1 now removes generated ignored outputs by default and reports remaining source changes without deleting them.",
     "current_blocker": "TASK-012 is blocked until trusted signing material outside Git and a clean Windows release verification machine are available. TASK-013 has a completed 150% visible wizard pass but remains blocked until 100%, 125%, 200%, and non-default accessibility text passes can be run in an appropriate interactive Windows desktop session."
+  },
+  "brand_asset_status": {
+    "last_updated": "2026-05-22T11:26:05+02:00",
+    "source": "src\\OnlyRag.App\\Assets\\OnlyRag.svg",
+    "generator": "pwsh .\\scripts\\Generate-BrandAssets.ps1",
+    "integrations": [
+      "WPF ApplicationIcon and window icon use src\\OnlyRag.App\\Assets\\OnlyRag.ico.",
+      "Inno Setup uses src\\OnlyRag.App\\Assets\\OnlyRag.ico plus setup BMP artwork under assets\\brand\\setup.",
+      "The web shell uses favicon, Apple touch icon, PWA manifest icons, Open Graph image, and X/Twitter image under src\\OnlyRag.Web\\public.",
+      "The root README uses .github\\assets\\onlyrag-logo-horizontal.png."
+    ],
+    "last_completed_work": "Completed asset integration metadata: app package metadata, private web package metadata, PWA icon purpose metadata, generated manifest refresh, and brand asset documentation.",
+    "quality_gates": {
+      "asset_generation": "passed",
+      "referenced_asset_paths": "passed",
+      "asset_dimensions": "passed",
+      "web_manifest_json": "passed",
+      "dotnet_build": "passed",
+      "web_format_check": "passed"
+    }
+  },
+  "architecture_refactor_status": {
+    "last_updated": "2026-05-22T11:46:08+02:00",
+    "last_completed_work": "Applied small behavior-preserving frontend architecture refactors: split the API request client from DTO contracts, centralized local job status classification, and consolidated JobsSection refresh success/failure handling.",
+    "quality_gates": {
+      "web_unit_tests": "passed",
+      "web_typecheck": "passed",
+      "web_lint": "passed",
+      "web_format_check": "passed",
+      "web_build": "passed",
+      "core_tests": "passed",
+      "structure_review": "passed"
+    },
+    "residuals": [
+      "Split the oversized frontend workflow components already tracked in oversized_files only in focused follow-up tasks.",
+      "Consider a focused API contract split for src\\OnlyRag.Web\\src\\api.ts if DTO contracts continue to grow beyond the current contract-only module.",
+      "Review OCR candidate extension handling between import and document detail actions before changing behavior for BMP/GIF/WEBP documents."
+    ]
   }
 }

@@ -27,6 +27,14 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <ApplicationIcon>Assets\OnlyRag.ico</ApplicationIcon>
+    <Product>OnlyRag</Product>
+    <Company>OnlyRag</Company>
+    <Authors>OnlyRag</Authors>
+    <Description>Local-first document RAG for Windows.</Description>
+    <RepositoryUrl>https://github.com/dennidalpos/OnlyRag</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dennidalpos/OnlyRag</PackageProjectUrl>
+    <Copyright>Copyright (c) 2026 OnlyRag</Copyright>
+    <Version>0.1.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

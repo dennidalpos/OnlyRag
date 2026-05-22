@@ -12,6 +12,7 @@ import {
   type TranslationUnit
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
+import { formatDateTime } from "../pollingStatus";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 import { buildCompareDraftKey, formatTranslationStatus, formatUnitKind, targetLanguages } from "./TranslationSection.helpers";
@@ -595,7 +596,7 @@ export function TranslationSection({
                   )}
                   <div className="job-row__meta">
                     <span>{translation.completedUnitCount}/{translation.unitCount} unità</span>
-                    <span>{new Date(translation.updatedAtUtc).toLocaleString()}</span>
+                    <span>{formatDateTime(translation.updatedAtUtc)}</span>
                   </div>
                   {translation.lastError && <p className="job-error-message">{translation.lastError}</p>}
                   <div className="settings-actions">

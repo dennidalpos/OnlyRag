@@ -19,7 +19,7 @@ public sealed class LocalSqliteStorageService : ILocalStorageService
     {
         foreach (string directory in descriptor.Paths.EnumerateRequiredDirectories())
         {
-            Directory.CreateDirectory(directory);
+            LocalRuntimeDirectoryPreparer.EnsureDirectory(directory);
         }
 
         return await migrator.MigrateAsync(cancellationToken);

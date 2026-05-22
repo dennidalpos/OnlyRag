@@ -2,6 +2,8 @@
   "name": "onlyrag-web",
   "private": true,
   "version": "0.1.0",
+  "description": "Local-first document RAG for the OnlyRag Windows desktop WebView shell.",
+  "homepage": "https://github.com/dennidalpos/OnlyRag",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

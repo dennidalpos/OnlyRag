@@ -51,13 +51,13 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
         </div>
 
         {isLoading && (
-          <div className="preview-modal__loading">
+          <div className="preview-modal__loading" role="status" aria-live="polite">
             <p>Caricamento anteprima in corso...</p>
           </div>
         )}
 
         {!isLoading && !preview && (
-          <div className="preview-modal__error">
+          <div className="preview-modal__error" role="alert">
             <p>Anteprima non disponibile. Il documento potrebbe non essere ancora stato indicizzato.</p>
           </div>
         )}
@@ -102,7 +102,7 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
                 {currentPage ? (
                   <PageContent page={currentPage} />
                 ) : (
-                  <div className="preview-no-pages">
+                  <div className="preview-no-pages" role="status">
                     <p>Nessuna pagina disponibile. Il documento potrebbe non essere ancora completamente indicizzato.</p>
                   </div>
                 )}
@@ -184,7 +184,7 @@ function PageContent({ page }: { page: DocumentPageInfo }) {
           <pre>{page.textContent}</pre>
         </div>
       ) : (
-        <div className="preview-no-text">
+        <div className="preview-no-text" role="status">
           <p>Nessun testo estratto per questa pagina.</p>
           {page.ocrStatus && <p>Stato OCR: {page.ocrStatus}</p>}
         </div>

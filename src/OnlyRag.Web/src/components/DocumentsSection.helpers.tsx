@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import {
   type DocumentEmbeddingStatus,
   type DocumentOcrStatus,
@@ -9,8 +9,10 @@ import {
   type OcrPolicy,
   type PhaseState
 } from "../api";
+import { isActiveJobStatus } from "../jobStatus";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
+import { formatDateTime } from "../pollingStatus";
 
 const DEFAULT_OCR_LANGUAGE = "it";
 
@@ -249,7 +251,7 @@ export function DocumentListRow({
       </div>
       <div className="document-row__meta">
         <span>{formatFileSize(document.fileSizeBytes)}</span>
-        <span>{new Date(document.createdAtUtc).toLocaleString()}</span>
+        <span>{formatDateTime(document.createdAtUtc)}</span>
       </div>
       {(document.chunkCount > 0 || document.pageCount > 0) && (
         <div className="document-row__meta">
@@ -292,7 +294,7 @@ export function DocumentDetailCard({
   onPreview: (doc: ImportedDocument) => void;
 }) {
   const isOcrDoc = isOcrCandidate(document);
-  const isJobActive = activeJob?.status === "Running" || activeJob?.status === "Pausing" || activeJob?.status === "Pending" || activeJob?.status === "Paused";
+  const isJobActive = activeJob ? isActiveJobStatus(activeJob.status) : false;
 
   return (
     <div className="settings-card document-detail-card">
@@ -335,7 +337,7 @@ export function DocumentDetailCard({
           </div>
           <div className="document-details__row">
             <span>Importato il</span>
-            <strong>{new Date(document.createdAtUtc).toLocaleString()}</strong>
+            <strong>{formatDateTime(document.createdAtUtc)}</strong>
           </div>
           <div className="document-details__row">
             <span>{formatIndexedUnitLabel(document)}</span>
@@ -494,6 +496,7 @@ export function ActionButton({
   variant: "primary" | "recovery" | "destructive";
   onClick: () => void;
 }) {
+  const descriptionId = useId();
   const className = variant === "destructive"
     ? "doc-action-btn doc-action-btn--destructive"
     : variant === "primary"
@@ -506,11 +509,12 @@ export function ActionButton({
         className={className}
         type="button"
         disabled={disabled}
+        aria-describedby={descriptionId}
         onClick={onClick}
       >
         {label}
       </button>
-      <span className="doc-action-tooltip">{tooltip}</span>
+      <span className="doc-action-tooltip" id={descriptionId}>{tooltip}</span>
     </div>
   );
 }

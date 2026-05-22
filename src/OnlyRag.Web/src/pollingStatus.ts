@@ -30,10 +30,20 @@ export function shouldSurfaceRefreshFailure(status: RefreshStatus): boolean {
   return status.consecutiveFailureCount >= 2;
 }
 
+const displayLocale = "it-IT";
+
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString(displayLocale);
+}
+
+export function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString(displayLocale);
+}
+
 export function formatLastRefresh(value: string | null): string {
   if (!value) {
     return "Mai aggiornato";
   }
 
-  return new Date(value).toLocaleString();
+  return formatDateTime(value);
 }

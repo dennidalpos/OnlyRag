@@ -69,7 +69,8 @@ The setup checks Windows version and WebView2 before copying files. If either bl
 |---|---|---|---|
 | Windows 10 1809/build 17763+ or Windows 11 | WPF/WebView2 desktop runtime target | Manual OS update before setup | Inno Setup `InitializeSetup`; repeated at direct app startup |
 | Microsoft Edge WebView2 Runtime | WPF shell rendering the bundled React UI | Manual install from official Microsoft WebView2 page | Inno Setup `InitializeSetup`; repeated before `EnsureCoreWebView2Async` |
-| .NET 10 runtime, Windows Desktop runtime, ASP.NET Core runtime | WPF app and in-process backend | Included by self-contained `win-x64` publish | `dotnet publish --self-contained true`; `Test-OnlyRagPublishPayload` checks runtimeconfig/exe/dll payload |
+| .NET 10 runtime, Windows Desktop runtime, ASP.NET Core runtime | WPF app and in-process backend | Included by self-contained `win-x64` publish | `dotnet publish --self-contained true`; `Test-OnlyRagPublishPayload` checks app host, runtimeconfig, `coreclr.dll`, `hostfxr.dll`, `hostpolicy.dll`, and WPF native payload |
+| WebView2 SDK loader | WPF shell loading the installed WebView2 Runtime | Included from the `Microsoft.Web.WebView2` NuGet package | `Test-OnlyRagPublishPayload` checks `Microsoft.Web.WebView2.*.dll` and `WebView2Loader.dll` |
 | `sqlite-vec` `vec0.dll` native extension | SQLite semantic vector retrieval | Included from the `sqlite-vec` NuGet native asset | `Test-OnlyRagPublishPayload`; backend first-start extension load |
 | React/Vite static UI | WebView2-hosted UI | Included under `wwwroot` after web build | `Test-OnlyRagPublishPayload` checks `wwwroot\index.html`; app startup reports missing static UI |
 | OCR bridge scripts | Optional OCR provisioning and OCR runtime bridge | Included from `scripts\ocr` | `Test-OnlyRagPublishPayload`; Settings > Configura OCR reports missing bridge/requirements |
@@ -105,14 +106,14 @@ Build-time prerequisites:
 
 - User data under `%LOCALAPPDATA%\OnlyRag`.
 - SQLite databases or imported document storage.
-- Imported documents, OCR cache, exports, logs, or temp files.
+- Imported documents, OCR cache, exports, logs, WebView2 profile/cache, or temp files.
 - Ollama models or Ollama runtime.
 - PaddleOCR Python environment, OCR packages, or OCR models. PaddleOCR may download models on first OCR use into the user profile cache; keep at least 5 GB free for OCR packages and models.
 - Signing certificate.
 
 ## Verification Status
 
-`scripts\Build-Installer.ps1` verifies React build, self-contained `dotnet publish`, basic publish payload completeness, and absence of known user-data paths in the publish output. Installer generation is verified only when Inno Setup is installed.
+`scripts\Build-Installer.ps1` verifies React build, self-contained `dotnet publish`, required .NET/WebView2/sqlite-vec/OCR payload files, and absence of known user-data paths in the publish output. Installer generation is verified only when Inno Setup is installed.
 
 Installer prerequisite messaging can be checked without installing:
 

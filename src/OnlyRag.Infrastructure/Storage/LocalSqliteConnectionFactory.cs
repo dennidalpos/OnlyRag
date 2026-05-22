@@ -13,7 +13,7 @@ public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
 
     public async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(descriptor.Paths.DataDirectory);
+        LocalRuntimeDirectoryPreparer.EnsureDirectory(descriptor.Paths.DataDirectory);
 
         SqliteConnectionStringBuilder connectionString = new()
         {

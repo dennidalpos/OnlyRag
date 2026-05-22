@@ -9,8 +9,9 @@
 OnlyRag is a Windows desktop app for building a local document library and using it with
 Ollama-backed search, chat, OCR, and translation workflows.
 
-The app is local-first: documents, indexes, jobs, settings, chat history, OCR cache, logs, and
-exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or on a trusted LAN endpoint.
+The app is local-first: documents, indexes, jobs, settings, chat history, OCR cache, logs,
+WebView2 profile data, and exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or
+on a trusted LAN endpoint.
 For RAG answers, OnlyRag sends retrieved snippets to the model, not full source documents.
 
 ## What Works

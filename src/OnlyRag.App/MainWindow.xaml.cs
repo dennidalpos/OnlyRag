@@ -54,7 +54,8 @@ public partial class MainWindow : Window
                 return;
             }
 
-            await MainWebView.EnsureCoreWebView2Async();
+            CoreWebView2Environment webViewEnvironment = await CreateWebViewEnvironmentAsync();
+            await MainWebView.EnsureCoreWebView2Async(webViewEnvironment);
             await MainWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(CreateBackendBridgeScript(backendSettings));
             MainWebView.Source = await ResolveStartupUriAsync();
         }
@@ -89,6 +90,13 @@ public partial class MainWindow : Window
 #endif
 
         return MapStaticWebRoot();
+    }
+
+    private static async Task<CoreWebView2Environment> CreateWebViewEnvironmentAsync()
+    {
+        string userDataFolder = AppStoragePaths.FromLocalAppData().WebView2UserDataDirectory;
+        Directory.CreateDirectory(userDataFolder);
+        return await CoreWebView2Environment.CreateAsync(browserExecutableFolder: null, userDataFolder: userDataFolder);
     }
 
     private static StartupPrerequisiteStatus CheckStartupPrerequisites()

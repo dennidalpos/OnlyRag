@@ -375,11 +375,11 @@ export function ChatSection({
 
         <div className="chat-document-list" aria-label="Documenti selezionabili per la chat">
           {isDocsLoading ? (
-            <div className="empty-state chat-empty-state">
+            <div className="empty-state chat-empty-state" role="status" aria-live="polite">
               <p>Caricamento...</p>
             </div>
           ) : documents.length === 0 ? (
-            <div className="empty-state chat-empty-state">
+            <div className="empty-state chat-empty-state" role="status">
               <p>Nessun documento importato.</p>
             </div>
           ) : (
@@ -466,7 +466,7 @@ export function ChatSection({
 
         <div className="chat-messages" aria-live="polite">
           {messages.length === 0 ? (
-            <div className="empty-state chat-empty-state">
+            <div className="empty-state chat-empty-state" role="status">
               <p>Inizia una conversazione.</p>
             </div>
           ) : (
@@ -492,7 +492,7 @@ export function ChatSection({
             ))
           )}
           {isGenerating && (
-            <div className="chat-generating">
+            <div className="chat-generating" role="status" aria-live="polite">
               <span>Generazione in corso...</span>
               <button className="button-secondary" type="button" onClick={handleCancel}>
                 Annulla

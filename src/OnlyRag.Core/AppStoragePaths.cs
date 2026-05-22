@@ -4,13 +4,13 @@ public sealed record AppStoragePaths(
     string DataRoot,
     string DataDirectory,
     string DatabasePath,
-    string JobQueueDatabasePath,
     string DocumentsRoot,
     string DocumentOriginalsDirectory,
     string DocumentRendersDirectory,
     string DocumentOcrCacheDirectory,
     string DocumentExportsDirectory,
     string LogsDirectory,
+    string WebView2UserDataDirectory,
     string TempDirectory)
 {
     public const string ProductName = "OnlyRag";
@@ -23,21 +23,24 @@ public sealed record AppStoragePaths(
 
     public static AppStoragePaths FromRoot(string dataRoot)
     {
-        string dataDirectory = Path.Combine(dataRoot, "data");
-        string documentsRoot = Path.Combine(dataRoot, "documents");
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+
+        string normalizedRoot = Path.GetFullPath(dataRoot);
+        string dataDirectory = Path.Combine(normalizedRoot, "data");
+        string documentsRoot = Path.Combine(normalizedRoot, "documents");
 
         return new AppStoragePaths(
-            dataRoot,
+            normalizedRoot,
             dataDirectory,
             Path.Combine(dataDirectory, "onlyrag.db"),
-            Path.Combine(dataDirectory, "jobs.db"),
             documentsRoot,
             Path.Combine(documentsRoot, "originals"),
             Path.Combine(documentsRoot, "renders"),
             Path.Combine(documentsRoot, "ocr-cache"),
             Path.Combine(documentsRoot, "exports"),
-            Path.Combine(dataRoot, "logs"),
-            Path.Combine(dataRoot, "temp"));
+            Path.Combine(normalizedRoot, "logs"),
+            Path.Combine(normalizedRoot, "webview2"),
+            Path.Combine(normalizedRoot, "temp"));
     }
 
     public IEnumerable<string> EnumerateRequiredDirectories()
@@ -49,6 +52,7 @@ public sealed record AppStoragePaths(
         yield return DocumentOcrCacheDirectory;
         yield return DocumentExportsDirectory;
         yield return LogsDirectory;
+        yield return WebView2UserDataDirectory;
         yield return TempDirectory;
     }
 }
