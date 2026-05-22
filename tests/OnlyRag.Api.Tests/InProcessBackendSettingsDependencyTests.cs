@@ -162,6 +162,31 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task OcrSettings_RejectsGpuWhenCapabilityCheckFails()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        FakeProcessLauncher processLauncher = new();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ProcessLauncher = processLauncher });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        OcrSettings request = OcrSettings.Default with
+        {
+            Device = "gpu"
+        };
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync(
+            "/api/settings/ocr",
+            request,
+            JsonOptions);
+        string body = await putResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, putResponse.StatusCode);
+        Assert.Contains("ocr_gpu_unavailable", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task IngestionSettings_CanBeSavedAndReadBackNormalized()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

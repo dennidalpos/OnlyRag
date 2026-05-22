@@ -74,6 +74,8 @@ public static partial class InProcessBackend
             IOllamaClient ollamaClient,
             IOllamaSettingsService ollamaSettings,
             IOcrEngine ocrEngine,
+            OcrGpuCapabilityService ocrGpuCapability,
+            SystemTelemetryService systemTelemetry,
             CancellationToken cancellationToken) =>
         {
             string ollamaStatus;
@@ -93,6 +95,8 @@ public static partial class InProcessBackend
             }
 
             OcrEngineAvailability ocrAvailability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+            OcrGpuCapabilityResponse gpuCapability = await ocrGpuCapability.CheckAsync(ocrEngine, cancellationToken);
+            SystemTelemetryResponse telemetry = await systemTelemetry.CaptureAsync(cancellationToken);
 
             return Results.Ok(new DiagnosticsResponse(
                 BackendLog.ResolveAppVersion(),
@@ -102,7 +106,9 @@ public static partial class InProcessBackend
                 ollamaReachable,
                 ocrAvailability.IsConfigured ? "Disponibile" : "Non configurato",
                 ocrAvailability.IsConfigured,
-                ocrAvailability.EngineName));
+                ocrAvailability.EngineName,
+                gpuCapability,
+                telemetry));
         });
 
         app.MapPost("/api/diagnostics/open-logs-folder", (

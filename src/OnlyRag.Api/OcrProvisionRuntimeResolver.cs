@@ -74,7 +74,9 @@ internal sealed class OcrProvisionRuntimeResolver
             return OcrProvisionRuntime.Nvidia(
                 "cuda129",
                 "requirements-nvidia-cu129.txt",
-                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 12.9.");
+                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 12.9.",
+                info.DisplayName,
+                info.DriverVersion?.ToString());
         }
 
         if (info.DriverVersion >= Cuda126MinimumDriver)
@@ -82,7 +84,9 @@ internal sealed class OcrProvisionRuntimeResolver
             return OcrProvisionRuntime.Nvidia(
                 "cuda126",
                 "requirements-nvidia-cu126.txt",
-                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 12.6.");
+                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 12.6.",
+                info.DisplayName,
+                info.DriverVersion?.ToString());
         }
 
         if (info.DriverVersion >= Cuda118MinimumDriver)
@@ -90,7 +94,9 @@ internal sealed class OcrProvisionRuntimeResolver
             return OcrProvisionRuntime.Nvidia(
                 "cuda118",
                 "requirements-nvidia-cu118.txt",
-                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 11.8.");
+                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} compatibile con CUDA 11.8.",
+                info.DisplayName,
+                info.DriverVersion?.ToString());
         }
 
         string message =
@@ -154,7 +160,9 @@ internal sealed record OcrProvisionRuntime(
     string Target,
     string RequirementsFileName,
     string ResolvedRuntime,
-    string Detail)
+    string Detail,
+    string? NvidiaName = null,
+    string? DriverVersion = null)
 {
     public bool IsNvidia => Target == OcrProvisionRuntimeResolver.NvidiaTarget;
 
@@ -167,13 +175,20 @@ internal sealed record OcrProvisionRuntime(
             detail);
     }
 
-    public static OcrProvisionRuntime Nvidia(string runtime, string requirementsFileName, string detail)
+    public static OcrProvisionRuntime Nvidia(
+        string runtime,
+        string requirementsFileName,
+        string detail,
+        string? nvidiaName = null,
+        string? driverVersion = null)
     {
         return new OcrProvisionRuntime(
             OcrProvisionRuntimeResolver.NvidiaTarget,
             requirementsFileName,
             runtime,
-            detail);
+            detail,
+            nvidiaName,
+            driverVersion);
     }
 }
 

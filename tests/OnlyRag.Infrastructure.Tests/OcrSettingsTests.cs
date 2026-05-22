@@ -122,6 +122,26 @@ public sealed partial class OcrPipelineTests
 
         Assert.Equal("accurate", normalized.Profile);
         Assert.Equal("gpu", normalized.Device);
+        Assert.Equal(16, normalized.RecognitionBatchSize);
+    }
+
+    [Theory]
+    [InlineData("fast", 8)]
+    [InlineData("balanced", 12)]
+    [InlineData("accurate", 16)]
+    public void OcrSettings_GpuProfilePresetsUseLargerRecognitionBatches(
+        string profile,
+        int expectedBatchSize)
+    {
+        OcrSettings normalized = OcrSettings.Normalize(OcrSettings.Default with
+        {
+            Profile = profile,
+            Device = "gpu"
+        });
+
+        Assert.Equal(profile, normalized.Profile);
+        Assert.Equal("gpu", normalized.Device);
+        Assert.Equal(expectedBatchSize, normalized.RecognitionBatchSize);
     }
 
     [Fact]

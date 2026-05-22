@@ -75,6 +75,8 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         builder.Services.AddSingleton<DependencyProvisioningService>();
+        builder.Services.AddSingleton<OcrGpuCapabilityService>();
+        builder.Services.AddSingleton<SystemTelemetryService>();
         builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
         builder.Services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         builder.Services.AddSingleton<DocumentTextChunker>();

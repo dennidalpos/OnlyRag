@@ -42,6 +42,13 @@ public sealed partial class OcrPipelineTests
             return Task.FromResult(new OcrEngineAvailability(true, EngineName, EngineVersion, null));
         }
 
+        public Task<OcrEngineAvailability> CheckAvailabilityAsync(
+            string device,
+            CancellationToken cancellationToken = default)
+        {
+            return CheckAvailabilityAsync(cancellationToken);
+        }
+
         public async Task<OcrPagePreparation> PreparePageAsync(
             OcrPagePreparationRequest request,
             CancellationToken cancellationToken = default)

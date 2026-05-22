@@ -30,6 +30,11 @@ public sealed class DiagnosticsTests
         Assert.Equal(temp.Descriptor.StoragePaths.LogsDirectory, diag.LogsDirectory);
         Assert.False(string.IsNullOrWhiteSpace(diag.AppVersion));
         Assert.False(string.IsNullOrWhiteSpace(diag.OcrEngineName));
+        Assert.NotNull(diag.OcrGpuCapability);
+        Assert.NotNull(diag.SystemTelemetry);
+        Assert.True(diag.SystemTelemetry.Cpu.LogicalProcessorCount > 0);
+        Assert.True(diag.SystemTelemetry.Memory.TotalBytes >= 0);
+        Assert.False(string.IsNullOrWhiteSpace(diag.SystemTelemetry.SystemDisk.Name));
     }
 
     [Fact]

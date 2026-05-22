@@ -43,14 +43,30 @@ Bridge and prerequisites:
 - End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
 - GPU setup: **Configura OCR** uses `auto` mode. It chooses NVIDIA only when `nvidia-smi`
   reports a driver compatible with the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 PaddlePaddle GPU wheels;
-  otherwise it installs CPU OCR and reports the fallback reason in Diagnostics.
+  otherwise it installs CPU OCR and reports the fallback reason in Diagnostics. Provisioning removes both
+  `paddlepaddle` and `paddlepaddle-gpu` before installing the selected wheel so CPU and GPU packages cannot mask each other.
 - Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup; use `-SkipOcr` to skip it.
 - Default OCR Python path: `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv\Scripts\python.exe`.
 - Override Python with `ONLYRAG_OCR_PYTHON`.
 - Override bridge path with `ONLYRAG_OCR_BRIDGE`.
-- Select `GPU` in OCR settings only after the OCR runtime reports an NVIDIA runtime such as
-  `cuda129`, `cuda126`, or `cuda118`. If a CPU-only runtime receives `device=gpu`, the bridge returns a clear
-  configuration error instead of silently falling back.
+- Select `GPU` in OCR settings only after Diagnostics reports that `paddle_ocr_bridge.py --mode check --device gpu`
+  is usable with `compiledWithCuda=true`, `cudaDeviceCount > 0`, and `activeDevice=gpu:0`. The backend rejects
+  `PUT /api/settings/ocr` with `device=gpu` until that capability check passes. If a CPU-only runtime receives
+  `device=gpu`, the bridge returns a clear configuration error instead of silently falling back.
+
+PaddleOCR profile presets are device-specific:
+
+| Profile | CPU recognition batch | GPU recognition batch |
+|---|---:|---:|
+| `fast` | 4 | 8 |
+| `balanced` | 6 | 12 |
+| `accurate` | 8 | 16 |
+
+Quality-oriented settings such as DPI, detection thresholds, orientation, and unwarping remain identical between
+CPU and GPU presets.
+
+Settings Diagnostics also shows live local telemetry: CPU usage/logical processors, RAM total/free, system disk
+total/free, NVIDIA GPU name/driver/utilization/VRAM when available, and OCR GPU compatibility state.
 
 Supported OCR inputs:
 

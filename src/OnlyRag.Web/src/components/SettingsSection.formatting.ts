@@ -17,3 +17,23 @@ export function formatModelSize(size: number): string {
 
   return `${size} B`;
 }
+
+export function formatTelemetryBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) {
+    return "n/d";
+  }
+
+  if (bytes >= 1024 ** 3) {
+    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  }
+
+  if (bytes >= 1024 ** 2) {
+    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  }
+
+  return `${Math.round(bytes / 1024).toLocaleString("it-IT")} KB`;
+}
+
+export function formatTelemetryPercent(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "n/d" : `${value.toFixed(1)}%`;
+}

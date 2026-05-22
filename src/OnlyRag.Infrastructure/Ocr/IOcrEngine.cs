@@ -10,6 +10,10 @@ public interface IOcrEngine
 
     Task<OcrEngineAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default);
 
+    Task<OcrEngineAvailability> CheckAvailabilityAsync(
+        string device,
+        CancellationToken cancellationToken = default);
+
     Task<OcrPagePreparation> PreparePageAsync(
         OcrPagePreparationRequest request,
         CancellationToken cancellationToken = default);

@@ -6,7 +6,11 @@ public sealed record OcrEngineAvailability(
     bool IsConfigured,
     string EngineName,
     string EngineVersion,
-    string? Message);
+    string? Message,
+    bool? CompiledWithCuda = null,
+    int? CudaDeviceCount = null,
+    string? ActiveDevice = null,
+    IReadOnlyDictionary<string, string>? PackageVersions = null);
 
 public sealed record OcrPagePreparationRequest(
     string SourcePath,

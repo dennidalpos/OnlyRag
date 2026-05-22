@@ -39,6 +39,11 @@ public sealed record OcrSettings(
 
     public static OcrSettings ForProfile(string profile)
     {
+        return ForProfile(profile, DefaultDevice);
+    }
+
+    public static OcrSettings ForProfile(string profile, string device)
+    {
         return NormalizeProfile(profile) switch
         {
             "fast" => new OcrSettings(
@@ -54,9 +59,9 @@ public sealed record OcrSettings(
                 true,
                 false,
                 false,
-                4,
+                ResolveRecognitionBatchSize("fast", device, 4),
                 1,
-                DefaultDevice),
+                NormalizeDevice(device)),
             "accurate" => new OcrSettings(
                 "accurate",
                 300,
@@ -70,9 +75,9 @@ public sealed record OcrSettings(
                 true,
                 true,
                 true,
-                8,
+                ResolveRecognitionBatchSize("accurate", device, 8),
                 4,
-                DefaultDevice),
+                NormalizeDevice(device)),
             _ => new OcrSettings(
                 DefaultProfile,
                 DefaultPdfDpi,
@@ -86,9 +91,9 @@ public sealed record OcrSettings(
                 DefaultUseTextlineOrientation,
                 DefaultUseDocumentOrientationClassification,
                 DefaultUseDocumentUnwarping,
-                DefaultRecognitionBatchSize,
+                ResolveRecognitionBatchSize(DefaultProfile, device, DefaultRecognitionBatchSize),
                 DefaultCpuThreads,
-                DefaultDevice)
+                NormalizeDevice(device))
         };
     }
 
@@ -99,7 +104,7 @@ public sealed record OcrSettings(
         string profile = NormalizeProfile(settings.Profile);
         if (profile is not "custom")
         {
-            return ForProfile(profile) with { Device = NormalizeDevice(settings.Device) };
+            return ForProfile(profile, settings.Device);
         }
 
         return new OcrSettings(
@@ -155,6 +160,21 @@ public sealed record OcrSettings(
         return normalized is "cpu" or "gpu"
             ? normalized
             : DefaultDevice;
+    }
+
+    private static int ResolveRecognitionBatchSize(string profile, string device, int cpuBatchSize)
+    {
+        if (NormalizeDevice(device) != "gpu")
+        {
+            return cpuBatchSize;
+        }
+
+        return profile switch
+        {
+            "fast" => 8,
+            "accurate" => 16,
+            _ => 12
+        };
     }
 
     private static string NormalizeToken(string value, string defaultValue, int maxLength)

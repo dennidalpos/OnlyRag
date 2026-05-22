@@ -1,0 +1,118 @@
+using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ocr;
+
+namespace OnlyRag.Api;
+
+public sealed class OcrGpuCapabilityService
+{
+    private readonly ILocalProcessLauncher processLauncher;
+
+    public OcrGpuCapabilityService(ILocalProcessLauncher processLauncher)
+    {
+        this.processLauncher = processLauncher;
+    }
+
+    public async Task<OcrGpuCapabilityResponse> CheckAsync(
+        IOcrEngine ocrEngine,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ocrEngine);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            return Blocked("Non disponibile", "OCR GPU e supportato solo su Windows.");
+        }
+
+        OcrProvisionRuntime runtime;
+        try
+        {
+            OcrProvisionRuntimeResolver resolver = new(processLauncher);
+            runtime = await resolver.ResolveAsync(OcrProvisionRuntimeResolver.NvidiaTarget, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            return Blocked("NVIDIA non disponibile", ex.Message);
+        }
+
+        OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync("gpu", cancellationToken);
+        IReadOnlyDictionary<string, string> packageVersions =
+            availability.PackageVersions ?? new Dictionary<string, string>();
+
+        if (!availability.IsConfigured)
+        {
+            return new OcrGpuCapabilityResponse(
+                false,
+                "Runtime CUDA non utilizzabile",
+                availability.Message ?? "Il runtime OCR GPU non e utilizzabile.",
+                runtime.Detail,
+                availability.EngineVersion,
+                runtime.NvidiaName,
+                runtime.DriverVersion,
+                availability.CompiledWithCuda,
+                availability.CudaDeviceCount,
+                availability.ActiveDevice,
+                packageVersions);
+        }
+
+        if (availability.CompiledWithCuda is false)
+        {
+            return new OcrGpuCapabilityResponse(
+                false,
+                "Runtime PaddlePaddle senza CUDA",
+                "PaddlePaddle e installato senza supporto CUDA.",
+                runtime.Detail,
+                availability.EngineVersion,
+                runtime.NvidiaName,
+                runtime.DriverVersion,
+                availability.CompiledWithCuda,
+                availability.CudaDeviceCount,
+                availability.ActiveDevice,
+                packageVersions);
+        }
+
+        if (availability.CudaDeviceCount is int count && count < 1)
+        {
+            return new OcrGpuCapabilityResponse(
+                false,
+                "CUDA non vede GPU",
+                "PaddlePaddle non rileva dispositivi CUDA.",
+                runtime.Detail,
+                availability.EngineVersion,
+                runtime.NvidiaName,
+                runtime.DriverVersion,
+                availability.CompiledWithCuda,
+                availability.CudaDeviceCount,
+                availability.ActiveDevice,
+                packageVersions);
+        }
+
+        return new OcrGpuCapabilityResponse(
+            true,
+            "GPU OCR utilizzabile",
+            null,
+            runtime.Detail,
+            availability.EngineVersion,
+            runtime.NvidiaName,
+            runtime.DriverVersion,
+            availability.CompiledWithCuda,
+            availability.CudaDeviceCount,
+            availability.ActiveDevice,
+            packageVersions);
+    }
+
+    private static OcrGpuCapabilityResponse Blocked(string status, string blockReason)
+    {
+        return new OcrGpuCapabilityResponse(
+            false,
+            status,
+            blockReason,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new Dictionary<string, string>());
+    }
+}

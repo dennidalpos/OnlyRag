@@ -23,7 +23,7 @@ import {
   normalizeOllamaSettings,
   normalizePerformanceSettings
 } from "./SettingsSection.helpers";
-import { ocrProfilePresets } from "./SettingsSection.defaults";
+import { getOcrProfilePreset } from "./SettingsSection.defaults";
 import {
   createSettingsSectionDependencyActions,
   type SettingsSectionDependencyActionParams
@@ -285,9 +285,10 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
   }
 
   function applyOcrProfile(profile: string) {
-    const preset = ocrProfilePresets[profile];
-    setOcrFormState((current: OcrSettings) =>
-      (preset ? { ...preset, device: current.device } : { ...current, profile: "custom" }));
+    setOcrFormState((current: OcrSettings) => {
+      const preset = getOcrProfilePreset(profile, current.device);
+      return preset ?? { ...current, profile: "custom" };
+    });
   }
 
   function updateOcrSettings(patch: Partial<OcrSettings>) {

@@ -17,6 +17,13 @@ public sealed class UnavailableOcrEngine : IOcrEngine
             "PaddleOCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR, oppure imposta ONLYRAG_OCR_PYTHON."));
     }
 
+    public Task<OcrEngineAvailability> CheckAvailabilityAsync(
+        string device,
+        CancellationToken cancellationToken = default)
+    {
+        return CheckAvailabilityAsync(cancellationToken);
+    }
+
     public Task<OcrPagePreparation> PreparePageAsync(
         OcrPagePreparationRequest request,
         CancellationToken cancellationToken = default)

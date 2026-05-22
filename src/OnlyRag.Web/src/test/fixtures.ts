@@ -174,6 +174,35 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
     ocrStatus: "Configured",
     ocrIsConfigured: true,
     ocrEngineName: "PaddleOCR",
+    ocrGpuCapability: {
+      isUsable: false,
+      status: "NVIDIA non disponibile",
+      blockReason: "nvidia-smi non trovato.",
+      runtimeDetail: null,
+      engineVersion: null,
+      nvidiaName: null,
+      driverVersion: null,
+      compiledWithCuda: null,
+      cudaDeviceCount: null,
+      activeDevice: null,
+      packageVersions: {}
+    },
+    systemTelemetry: {
+      cpu: {
+        logicalProcessorCount: 8,
+        usagePercent: 12.5
+      },
+      memory: {
+        totalBytes: 16 * 1024 * 1024 * 1024,
+        availableBytes: 9 * 1024 * 1024 * 1024
+      },
+      systemDisk: {
+        name: "C:\\",
+        totalBytes: 512 * 1024 * 1024 * 1024,
+        availableBytes: 240 * 1024 * 1024 * 1024
+      },
+      gpu: null
+    },
     ...overrides
   };
 }

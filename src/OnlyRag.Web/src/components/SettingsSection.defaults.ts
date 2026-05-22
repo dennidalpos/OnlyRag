@@ -96,3 +96,17 @@ export const ocrProfilePresets: Record<string, OcrSettings> = {
     cpuThreads: 4
   }
 };
+
+export function getOcrProfilePreset(profile: string, device: string): OcrSettings | null {
+  const preset = ocrProfilePresets[profile];
+  if (!preset) {
+    return null;
+  }
+
+  if (device !== "gpu") {
+    return { ...preset, device: "cpu" };
+  }
+
+  const recognitionBatchSize = profile === "fast" ? 8 : profile === "accurate" ? 16 : 12;
+  return { ...preset, device: "gpu", recognitionBatchSize };
+}

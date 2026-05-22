@@ -46,8 +46,10 @@ Optional dependencies are configured from **Settings** in the desktop app:
 - **LibreOffice**: when missing, the app opens the official LibreOffice download page.
 - **OCR**: **Configura OCR** creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`
   and installs the pinned PaddleOCR requirements shipped with the app. The default `auto`
-  provisioning mode selects NVIDIA GPU packages for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi` reports a compatible Windows
-  driver, otherwise it installs the CPU runtime and reports the fallback reason in Diagnostics.
+  provisioning mode selects NVIDIA GPU packages for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi`
+  reports a compatible Windows driver, otherwise it installs the CPU runtime and reports the
+  fallback reason in Diagnostics. GPU selection is blocked until the local PaddleOCR check proves
+  CUDA support with a visible CUDA device.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
@@ -331,7 +333,7 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
 - OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10 through 3.13 is
   available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`. For NVIDIA acceleration, update
   the NVIDIA driver so PaddlePaddle can use the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 GPU wheel, rerun
-  **Configura OCR**, then select GPU in OCR settings.
+  **Configura OCR**, then select GPU in OCR settings after Diagnostics reports OCR GPU as usable.
 - App closes while work is active: confirm the running build includes the WPF shutdown flow and
   inspect `%LOCALAPPDATA%\OnlyRag\logs` for `Shutdown preparation` entries.
 - Installer build stops after publish: install Inno Setup 6 or pass `-InnoSetupCompiler` to

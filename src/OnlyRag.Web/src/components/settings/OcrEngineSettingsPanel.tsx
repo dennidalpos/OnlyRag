@@ -12,12 +12,16 @@ const PADDLE_OCR_MODEL_VERSIONS = ["PP-OCRv5"];
 export function OcrEngineSettingsPanel() {
   const {
     ocrFormState,
+    diagnostics,
     applyOcrProfile,
     updateOcrSettings,
     saveOcrSettings,
     isBusy,
     hasDirtyOcrSettings
   } = useSettingsSectionContext();
+  const gpuCapability = diagnostics?.ocrGpuCapability ?? null;
+  const isGpuUsable = Boolean(gpuCapability?.isUsable);
+  const gpuBlockReason = gpuCapability?.blockReason ?? "Verifica diagnostica OCR GPU non ancora disponibile.";
 
   return (
         <div className="settings-card settings-card--wide">
@@ -54,7 +58,7 @@ export function OcrEngineSettingsPanel() {
                   onChange={(event) => updateOcrSettings({ device: event.target.value })}
                 >
                   <option value="cpu">CPU</option>
-                  <option value="gpu">GPU</option>
+                  <option value="gpu" disabled={!isGpuUsable}>GPU</option>
                 </select>
               </label>
               <OcrRangeField
@@ -201,6 +205,16 @@ export function OcrEngineSettingsPanel() {
               />
               <span>Correzione deformazione documento</span>
             </label>
+            {!isGpuUsable && (
+              <div className="panel-note panel-note--warning" role="status">
+                <p>GPU OCR non selezionabile: {gpuBlockReason}</p>
+              </div>
+            )}
+            {isGpuUsable && (
+              <div className="panel-note" role="status">
+                <p>{gpuCapability?.status}: {gpuCapability?.runtimeDetail}</p>
+              </div>
+            )}
             <div className="settings-actions">
               <button type="button" onClick={saveOcrSettings} disabled={isBusy}>
                 Salva OCR

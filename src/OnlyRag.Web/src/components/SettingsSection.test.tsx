@@ -210,7 +210,24 @@ describe("SettingsSection", () => {
         }
       },
       { path: "/api/ocr/languages", response: [createOcrLanguage()] },
-      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/diagnostics",
+        response: createDiagnostics({
+          ocrGpuCapability: {
+            isUsable: true,
+            status: "GPU OCR utilizzabile",
+            blockReason: null,
+            runtimeDetail: "NVIDIA compatibile.",
+            engineVersion: "3.3.0",
+            nvidiaName: "NVIDIA RTX",
+            driverVersion: "596.49",
+            compiledWithCuda: true,
+            cudaDeviceCount: 1,
+            activeDevice: "gpu:0",
+            packageVersions: {}
+          }
+        })
+      },
       { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
       {
         path: "/api/dependencies/ocr",
@@ -252,7 +269,8 @@ describe("SettingsSection", () => {
     expect(JSON.parse(String(saveCall?.body))).toMatchObject({
       profile: "accurate",
       device: "gpu",
-      detectionSideLimit: 1536
+      detectionSideLimit: 1536,
+      recognitionBatchSize: 16
     });
   });
 });

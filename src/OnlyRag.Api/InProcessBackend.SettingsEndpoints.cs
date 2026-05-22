@@ -57,8 +57,25 @@ public static partial class InProcessBackend
         app.MapPut("/api/settings/ocr", async (
             OcrSettings request,
             OcrSettingsStore settings,
+            IOcrEngine ocrEngine,
+            OcrGpuCapabilityService gpuCapability,
             CancellationToken cancellationToken) =>
-            Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
+        {
+            OcrSettings normalizedRequest = OcrSettings.Normalize(request);
+            if (normalizedRequest.Device == "gpu")
+            {
+                OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+                if (!capability.IsUsable)
+                {
+                    return CreateBadRequestProblem(
+                        "OCR GPU non disponibile",
+                        capability.BlockReason ?? "Il runtime OCR GPU non e utilizzabile.",
+                        "ocr_gpu_unavailable");
+                }
+            }
+
+            return Results.Ok(await settings.UpdateAsync(normalizedRequest, cancellationToken));
+        });
 
         app.MapGet("/api/settings/ingestion", async (
             IngestionSettingsStore settings,

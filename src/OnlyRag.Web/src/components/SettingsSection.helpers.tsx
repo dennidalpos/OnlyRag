@@ -13,7 +13,13 @@ export {
   OcrRangeField,
   SettingsRangeField
 } from "./SettingsSection.fields";
-export { formatModelSize, formatOcrDecimal, formatOcrInteger } from "./SettingsSection.formatting";
+export {
+  formatModelSize,
+  formatOcrDecimal,
+  formatOcrInteger,
+  formatTelemetryBytes,
+  formatTelemetryPercent
+} from "./SettingsSection.formatting";
 
 export function getOcrSelectOptions(currentValue: string, knownValues: string[]): string[] {
   const current = currentValue.trim();

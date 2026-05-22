@@ -37,6 +37,30 @@ def verify_gpu_available():
     if device_count < 1:
         raise RuntimeError("Nessuna GPU CUDA disponibile per PaddlePaddle.")
 
+    set_device = getattr(paddle.device, "set_device", None)
+    if set_device is not None:
+        set_device("gpu:0")
+
+
+def get_paddle_runtime_info():
+    try:
+        import paddle
+    except Exception:
+        return {
+            "compiledWithCuda": False,
+            "cudaDeviceCount": 0,
+            "activeDevice": None
+        }
+
+    cuda_device = getattr(paddle.device, "cuda", None)
+    device_count = getattr(cuda_device, "device_count", lambda: 0)()
+    active_device = getattr(paddle.device, "get_device", lambda: None)()
+    return {
+        "compiledWithCuda": bool(getattr(paddle.device, "is_compiled_with_cuda", lambda: False)()),
+        "cudaDeviceCount": int(device_count or 0),
+        "activeDevice": active_device
+    }
+
 
 def check(args):
     missing = []
@@ -53,10 +77,21 @@ def check(args):
             missing.append(str(exc))
 
     available = len(missing) == 0
+    runtime_info = get_paddle_runtime_info()
     write_json({
         "available": available,
         "engineVersion": package_version("paddleocr"),
-        "message": None if available else "PaddleOCR non configurato: " + "; ".join(missing)
+        "message": None if available else "PaddleOCR non configurato: " + "; ".join(missing),
+        "compiledWithCuda": runtime_info["compiledWithCuda"],
+        "cudaDeviceCount": runtime_info["cudaDeviceCount"],
+        "activeDevice": runtime_info["activeDevice"],
+        "packageVersions": {
+            "paddleocr": package_version("paddleocr"),
+            "paddlepaddle": package_version("paddlepaddle"),
+            "paddlepaddle-gpu": package_version("paddlepaddle-gpu"),
+            "pypdfium2": package_version("pypdfium2"),
+            "Pillow": package_version("Pillow")
+        }
     })
     return 0
 

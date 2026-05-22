@@ -1,4 +1,8 @@
 import { useSettingsSectionContext } from "../SettingsSectionContext";
+import {
+  formatTelemetryBytes,
+  formatTelemetryPercent
+} from "../SettingsSection.helpers";
 
 export function DiagnosticsPanel() {
   const {
@@ -44,6 +48,80 @@ export function DiagnosticsPanel() {
                   >
                     {diagnostics.ocrStatus}
                   </span>
+                </div>
+                <div className="diagnostic-row">
+                  <span className="diagnostic-label">OCR GPU</span>
+                  <span
+                    className={`status-chip status-chip--${diagnostics.ocrGpuCapability.isUsable ? "online" : "offline"}`}
+                  >
+                    {diagnostics.ocrGpuCapability.status}
+                  </span>
+                  {diagnostics.ocrGpuCapability.runtimeDetail && (
+                    <span className="diagnostic-value">{diagnostics.ocrGpuCapability.runtimeDetail}</span>
+                  )}
+                  {diagnostics.ocrGpuCapability.blockReason && (
+                    <span className="diagnostic-value">{diagnostics.ocrGpuCapability.blockReason}</span>
+                  )}
+                </div>
+                <div className="telemetry-grid" aria-label="Telemetria sistema locale">
+                  <div className="telemetry-item">
+                    <span>CPU</span>
+                    <strong>{formatTelemetryPercent(diagnostics.systemTelemetry.cpu.usagePercent)}</strong>
+                    <small>{diagnostics.systemTelemetry.cpu.logicalProcessorCount} thread logici</small>
+                  </div>
+                  <div className="telemetry-item">
+                    <span>RAM</span>
+                    <strong>
+                      {formatTelemetryBytes(diagnostics.systemTelemetry.memory.availableBytes)}
+                    </strong>
+                    <small>
+                      liberi di {formatTelemetryBytes(diagnostics.systemTelemetry.memory.totalBytes)}
+                    </small>
+                  </div>
+                  <div className="telemetry-item">
+                    <span>Disco {diagnostics.systemTelemetry.systemDisk.name}</span>
+                    <strong>
+                      {formatTelemetryBytes(diagnostics.systemTelemetry.systemDisk.availableBytes)}
+                    </strong>
+                    <small>
+                      liberi di {formatTelemetryBytes(diagnostics.systemTelemetry.systemDisk.totalBytes)}
+                    </small>
+                  </div>
+                  <div className="telemetry-item">
+                    <span>GPU</span>
+                    <strong>
+                      {diagnostics.systemTelemetry.gpu
+                        ? formatTelemetryPercent(diagnostics.systemTelemetry.gpu.usagePercent)
+                        : "n/d"}
+                    </strong>
+                    <small>
+                      {diagnostics.systemTelemetry.gpu
+                        ? `${diagnostics.systemTelemetry.gpu.name} ${diagnostics.systemTelemetry.gpu.driverVersion}`
+                        : "NVIDIA non rilevata"}
+                    </small>
+                  </div>
+                  {diagnostics.systemTelemetry.gpu && (
+                    <div className="telemetry-item">
+                      <span>VRAM</span>
+                      <strong>
+                        {formatTelemetryBytes(diagnostics.systemTelemetry.gpu.memoryAvailableBytes)}
+                      </strong>
+                      <small>
+                        liberi di {formatTelemetryBytes(diagnostics.systemTelemetry.gpu.memoryTotalBytes)}
+                      </small>
+                    </div>
+                  )}
+                  <div className="telemetry-item">
+                    <span>CUDA Paddle</span>
+                    <strong>
+                      {diagnostics.ocrGpuCapability.compiledWithCuda === null
+                        ? "n/d"
+                        : diagnostics.ocrGpuCapability.compiledWithCuda ? "Si" : "No"}
+                    </strong>
+                    <small>
+                      {diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, {diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}
+                    </small>
+                  </div>
                 </div>
                 {!diagnostics.ocrIsConfigured && (
                   <div className="panel-note panel-note--warning" role="alert">

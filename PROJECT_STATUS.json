@@ -1,92 +1,57 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-22T20:49:10+02:00",
+  "last_updated": "2026-05-22T21:07:58+02:00",
   "status": "active",
-  "current_phase": "ocr-gpu-telemetry-planned",
+  "current_phase": "ocr-gpu-telemetry-completed",
   "production_target": true,
-  "summary": "Next work is the OCR GPU/preset/telemetry fix. Completed script-gate history was removed from this tracker to keep only current operational state.",
-  "active_objective": "Separate CPU/GPU OCR presets, block GPU selection unless a compatible CUDA OCR runtime is actually usable, prove real GPU use, and show live local system telemetry in Settings.",
+  "summary": "OCR GPU capability blocking, device-specific presets, CUDA bridge diagnostics, provisioning cleanup, local telemetry, tests, docs, and local OCR GPU runtime repair are complete.",
+  "active_objective": "",
   "assumptions": [
-    "GPU presets keep the same quality settings as CPU presets; only runtime-oriented values such as recognition batch size differ.",
-    "Telemetry is local live diagnostics only: no remote reporting, no database history, and no periodic background collection outside Settings.",
-    "If OCR GPU compatibility fails, the app must block GPU selection and report the reason instead of silently falling back to CPU.",
-    "Existing uncommitted changes predate this tracker update and must be preserved."
+    "GPU presets keep the same quality settings as CPU presets; only recognition batch size differs.",
+    "Telemetry is local live diagnostics only: no remote reporting, no database history, and no periodic background collection outside Settings."
   ],
-  "current_tasks": [
+  "current_tasks": [],
+  "next_tasks": [
     {
       "priority": 1,
-      "status": "pending",
-      "task": "Add OCR GPU capability detection shared by settings save, diagnostics, and provisioning.",
-      "done_when": "Backend reports GPU absent, incompatible, CUDA runtime invalid, or usable with a clear block reason."
-    },
-    {
-      "priority": 2,
-      "status": "pending",
-      "task": "Block OCR GPU settings when compatibility fails.",
-      "done_when": "UI disables GPU with a reason, and PUT /api/settings/ocr rejects device=gpu unless the backend GPU check passes."
-    },
-    {
-      "priority": 3,
-      "status": "pending",
-      "task": "Split OCR presets by device while keeping balanced as the default for both CPU and GPU.",
-      "done_when": "CPU keeps current fast/balanced/accurate values; GPU uses the same quality values with higher recognition batch sizes: fast=8, balanced=12, accurate=16."
-    },
-    {
-      "priority": 4,
-      "status": "pending",
-      "task": "Prove real PaddleOCR GPU execution.",
-      "done_when": "paddle_ocr_bridge.py --mode check --device gpu reports compiledWithCuda=true, cudaDeviceCount > 0, activeDevice=gpu, and useful Paddle package versions."
-    },
-    {
-      "priority": 5,
-      "status": "pending",
-      "task": "Repair OCR GPU provisioning so CPU and GPU Paddle wheels cannot mask each other.",
-      "done_when": "GPU provisioning uninstalls both paddlepaddle and paddlepaddle-gpu, installs the selected GPU wheel, verifies CUDA, and reports CPU fallback reasons in auto mode."
-    },
-    {
-      "priority": 6,
-      "status": "pending",
-      "task": "Add live Settings telemetry card.",
-      "done_when": "Settings shows CPU usage, logical CPU count, RAM total/free, C: disk total/free, GPU name/driver/utilization/memory, and OCR GPU compatibility state."
-    },
-    {
-      "priority": 7,
-      "status": "pending",
-      "task": "Update tests and docs for OCR GPU blocking, device presets, bridge diagnostics, provisioning, and telemetry.",
-      "done_when": "Relevant backend, frontend unit, and build checks pass and docs describe the new GPU behavior."
+      "task": "Review pre-existing draw.io working tree changes before staging or committing."
     }
   ],
   "known_residual": [
     {
       "priority": 1,
-      "item": "Current local OCR venv is not using CUDA.",
-      "evidence": "RTX 2070 is visible through nvidia-smi, but bridge check with --device gpu returns: Runtime PaddlePaddle installato senza supporto CUDA."
-    },
+      "item": "Pre-existing draw.io document drift must be reviewed separately before staging or committing.",
+      "evidence": "git status --short reports modified docs/APP_FLOW.drawio and untracked docs/.$APP_FLOW.drawio.bkp. These files are unrelated to the OCR GPU/telemetry implementation and were not edited as part of that change set.",
+      "recommended_action": "Decide whether to accept, discard, or separately document the draw.io changes before creating a commit or PR."
+    }
+  ],
+  "oversized_files": [
     {
-      "priority": 2,
-      "item": "Both paddlepaddle CPU 3.3.1 and paddlepaddle-gpu 3.3.0 are installed in the OCR venv.",
-      "evidence": "paddle.device.is_compiled_with_cuda() is False and paddle.device.get_device() is cpu."
-    },
-    {
-      "priority": 3,
-      "item": "Working tree is dirty with many pre-existing modified and untracked files.",
-      "evidence": "Do not stage, revert, or overwrite unrelated user work without review."
+      "path": "src/OnlyRag.Web/src/styles.css",
+      "lines": 2141,
+      "reason": "Pre-existing monolithic stylesheet; this task only added a small telemetry block. Split deferred to a dedicated CSS organization task."
     }
   ],
   "quality_gates": {
-    "backend_tests": "not_run",
-    "frontend_unit_tests": "not_run",
-    "frontend_build": "not_run",
-    "manual_gpu_check": "failed",
-    "structure_review": "not_run"
+    "backend_tests": "passed",
+    "frontend_unit_tests": "passed",
+    "frontend_e2e_tests": "passed",
+    "frontend_typecheck": "passed",
+    "frontend_lint": "passed",
+    "frontend_format": "passed",
+    "frontend_build": "passed",
+    "manual_gpu_check": "passed",
+    "repository_gate": "passed",
+    "structure_review": "passed"
   },
   "commands": {
-    "backend_tests": "dotnet test .\\OnlyRag.sln",
+    "backend_tests": "dotnet test .\\OnlyRag.sln --no-restore",
     "frontend_unit_tests": "npm --prefix .\\src\\OnlyRag.Web run test:unit",
     "frontend_build": "npm --prefix .\\src\\OnlyRag.Web run build",
-    "manual_gpu_check": "%LOCALAPPDATA%\\OnlyRag\\ocr-python\\.venv\\Scripts\\python.exe scripts\\ocr\\paddle_ocr_bridge.py --mode check --device gpu"
+    "manual_gpu_check": "%LOCALAPPDATA%\\OnlyRag\\ocr-python\\.venv\\Scripts\\python.exe scripts\\ocr\\paddle_ocr_bridge.py --mode check --device gpu",
+    "repository_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
   },
-  "last_completed_work": "PROJECT_STATUS.json was reduced to the current OCR GPU/preset/telemetry plan and active residual only.",
+  "last_completed_work": "Implemented the OCR GPU/preset/telemetry residual. Local RTX 2070 runtime now reports compiledWithCuda=true, cudaDeviceCount=1, activeDevice=gpu:0, paddlepaddle=not-installed, and paddlepaddle-gpu=3.3.0.",
   "open_questions": [],
-  "handoff_notes": "Implement tasks in priority order. Keep PROJECT_STATUS.json short and update only current task status, new blockers, and gate results."
+  "handoff_notes": "Residual to resolve before commit: review docs/APP_FLOW.drawio and docs/.$APP_FLOW.drawio.bkp separately. Do not stage them with the OCR implementation unless those external draw.io changes are intentionally accepted."
 }

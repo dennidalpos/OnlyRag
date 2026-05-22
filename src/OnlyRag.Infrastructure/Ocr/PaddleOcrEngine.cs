@@ -49,6 +49,13 @@ public sealed class PaddleOcrEngine : IOcrEngine
 
     public async Task<OcrEngineAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
     {
+        return await CheckAvailabilityAsync("cpu", cancellationToken);
+    }
+
+    public async Task<OcrEngineAvailability> CheckAvailabilityAsync(
+        string device,
+        CancellationToken cancellationToken = default)
+    {
         if (!File.Exists(bridgePath))
         {
             return new OcrEngineAvailability(
@@ -61,14 +68,18 @@ public sealed class PaddleOcrEngine : IOcrEngine
         try
         {
             BridgeCheckResponse response = await RunBridgeAsync<BridgeCheckResponse>(
-                ["--mode", "check"],
+                ["--mode", "check", "--device", NormalizeDevice(device)],
                 checkTimeout,
                 cancellationToken);
             return new OcrEngineAvailability(
                 response.Available,
                 EngineName,
                 string.IsNullOrWhiteSpace(response.EngineVersion) ? EngineVersion : response.EngineVersion,
-                response.Message);
+                response.Message,
+                response.CompiledWithCuda,
+                response.CudaDeviceCount,
+                response.ActiveDevice,
+                response.PackageVersions);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
@@ -268,6 +279,11 @@ public sealed class PaddleOcrEngine : IOcrEngine
         return timeout;
     }
 
+    private static string NormalizeDevice(string value)
+    {
+        return string.Equals(value, "gpu", StringComparison.OrdinalIgnoreCase) ? "gpu" : "cpu";
+    }
+
     private static string ResolvePythonPath()
     {
         string? configured = Environment.GetEnvironmentVariable(PythonEnvVar);
@@ -299,7 +315,14 @@ public sealed class PaddleOcrEngine : IOcrEngine
         return repoBridge;
     }
 
-    private sealed record BridgeCheckResponse(bool Available, string EngineVersion, string? Message);
+    private sealed record BridgeCheckResponse(
+        bool Available,
+        string EngineVersion,
+        string? Message,
+        bool? CompiledWithCuda,
+        int? CudaDeviceCount,
+        string? ActiveDevice,
+        IReadOnlyDictionary<string, string>? PackageVersions);
 
     private sealed record BridgePrepareResponse(string PreparedImagePath, string PageHash, int Width, int Height);
 

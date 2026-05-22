@@ -77,6 +77,7 @@ public sealed class DependencyProvisioningService
 
     public async Task<OcrProvisionStatus> GetOcrStatusAsync(
         IOcrEngine ocrEngine,
+        OcrGpuCapabilityService gpuCapability,
         CancellationToken cancellationToken)
     {
         lock (syncRoot)
@@ -88,6 +89,7 @@ public sealed class DependencyProvisioningService
         }
 
         OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+        OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
         if (availability.IsConfigured)
         {
             return new OcrProvisionStatus(
@@ -96,8 +98,10 @@ public sealed class DependencyProvisioningService
                 $"OCR configurato: {availability.EngineName} {availability.EngineVersion}.",
                 null,
                 OcrProvisionRuntimeResolver.AutoTarget,
-                "configured",
-                availability.Message);
+                capability.IsUsable ? "gpu-usable" : "cpu",
+                capability.IsUsable
+                    ? capability.RuntimeDetail
+                    : capability.BlockReason ?? availability.Message);
         }
 
         string message = string.IsNullOrWhiteSpace(availability.Message)
