@@ -1,30 +1,18 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-22T21:07:58+02:00",
+  "last_updated": "2026-05-22T21:18:00+02:00",
   "status": "active",
   "current_phase": "ocr-gpu-telemetry-completed",
   "production_target": true,
-  "summary": "OCR GPU capability blocking, device-specific presets, CUDA bridge diagnostics, provisioning cleanup, local telemetry, tests, docs, and local OCR GPU runtime repair are complete.",
+  "summary": "OCR GPU capability blocking, device-specific presets, CUDA bridge diagnostics, provisioning cleanup, local telemetry, tests, docs, local OCR GPU runtime repair, and residual draw.io backup cleanup are complete.",
   "active_objective": "",
   "assumptions": [
     "GPU presets keep the same quality settings as CPU presets; only recognition batch size differs.",
     "Telemetry is local live diagnostics only: no remote reporting, no database history, and no periodic background collection outside Settings."
   ],
   "current_tasks": [],
-  "next_tasks": [
-    {
-      "priority": 1,
-      "task": "Review pre-existing draw.io working tree changes before staging or committing."
-    }
-  ],
-  "known_residual": [
-    {
-      "priority": 1,
-      "item": "Pre-existing draw.io document drift must be reviewed separately before staging or committing.",
-      "evidence": "git status --short reports modified docs/APP_FLOW.drawio and untracked docs/.$APP_FLOW.drawio.bkp. These files are unrelated to the OCR GPU/telemetry implementation and were not edited as part of that change set.",
-      "recommended_action": "Decide whether to accept, discard, or separately document the draw.io changes before creating a commit or PR."
-    }
-  ],
+  "next_tasks": [],
+  "known_residual": [],
   "oversized_files": [
     {
       "path": "src/OnlyRag.Web/src/styles.css",
@@ -53,5 +41,5 @@
   },
   "last_completed_work": "Implemented the OCR GPU/preset/telemetry residual. Local RTX 2070 runtime now reports compiledWithCuda=true, cudaDeviceCount=1, activeDevice=gpu:0, paddlepaddle=not-installed, and paddlepaddle-gpu=3.3.0.",
   "open_questions": [],
-  "handoff_notes": "Residual to resolve before commit: review docs/APP_FLOW.drawio and docs/.$APP_FLOW.drawio.bkp separately. Do not stage them with the OCR implementation unless those external draw.io changes are intentionally accepted."
+  "handoff_notes": "Residual draw.io check completed: docs/APP_FLOW.drawio is clean against HEAD, the tracked stale draw.io backup file was removed, and future *.drawio.bkp backups are ignored."
 }
