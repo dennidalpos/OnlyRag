@@ -1,322 +1,6 @@
 {
   "tasks": [
     {
-      "id": "TASK-001",
-      "priority": "P0",
-      "status": "completed",
-      "title": "Fix job pause/resume lifecycle race",
-      "source": "AUD-001",
-      "effort": "medium",
-      "actions": [
-        "Introduce a Pausing state or lease-owner guard for running jobs.",
-        "Block resume while the job is still registered as running.",
-        "Separate cooperative pause from final cancellation."
-      ],
-      "verify": [
-        "Pause a slow running job.",
-        "Resume immediately after pause.",
-        "Resume only after cancellation has fully completed.",
-        "Repeat with maxParallelJobs greater than 1."
-      ],
-      "completed_at": "2026-05-22T00:26:00+02:00",
-      "result": "Added a Pausing job state, finalized cooperative pauses in the worker before allowing resume, blocked API resume while pause cancellation is still registered or in progress, and covered queue, worker, endpoint, and maxParallelJobs behavior with tests.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~SqliteLocalJobQueueTests\"",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~LocalJobWorkerServiceTests|FullyQualifiedName~InProcessBackendTests.JobsResume\"",
-        "dotnet test OnlyRag.sln",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check"
-      ]
-    },
-    {
-      "id": "TASK-002",
-      "priority": "P0",
-      "status": "completed",
-      "title": "Make document import deduplication atomic",
-      "source": "AUD-002",
-      "effort": "medium-high",
-      "actions": [
-        "Audit existing duplicate document rows.",
-        "Add a unique database constraint or equivalent transactional guard for non-null sha256 values.",
-        "Handle duplicate import conflicts without creating shared-file delete hazards."
-      ],
-      "verify": [
-        "Import the same file concurrently.",
-        "Import a batch containing duplicates.",
-        "Delete one duplicate candidate.",
-        "Reindex after deletion."
-      ],
-      "completed_at": "2026-05-22T00:38:26+02:00",
-      "result": "Added schema version 11 with an audited unique partial index for non-null document sha256 values, handled concurrent import insert conflicts as deduplicated imports, and prevented original-file deletion while another document row still references the same path.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~LocalDocumentLibraryServiceTests|FullyQualifiedName~LocalSqliteStorageTests\"",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~InProcessBackendTests.DocumentsImport\"",
-        "dotnet test OnlyRag.sln",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check"
-      ]
-    },
-    {
-      "id": "TASK-003",
-      "priority": "P0",
-      "status": "completed",
-      "title": "Fix OCR bridge process I/O, timeout, and cancellation behavior",
-      "source": "AUD-003",
-      "effort": "medium",
-      "actions": [
-        "Read stdout and stderr concurrently.",
-        "Add explicit timeouts to OCR check, prepare, and recognize operations.",
-        "Terminate the process tree on cancellation or timeout."
-      ],
-      "verify": [
-        "Bridge writes large stderr output.",
-        "Bridge hangs.",
-        "Bridge returns invalid stdout.",
-        "Application closes during OCR."
-      ],
-      "completed_at": "2026-05-22T00:45:22+02:00",
-      "result": "Updated PaddleOcrEngine to read stdout and stderr concurrently, apply explicit per-operation bridge timeouts, kill the process tree on timeout or cancellation, and surface invalid JSON diagnostics. Added process-backed tests for large stderr output, hung bridge timeout, cancellation kill, and invalid stdout.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~OcrPipelineTests\"",
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~OcrPipelineTests|FullyQualifiedName~PaddleOcrEngineProcessTests\"",
-        "dotnet test OnlyRag.sln",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check"
-      ]
-    },
-    {
-      "id": "TASK-004",
-      "priority": "P0",
-      "status": "completed",
-      "title": "Move signing material out of the repository workspace",
-      "source": "AUD-004",
-      "effort": "low",
-      "actions": [
-        "Remove local PFX and password files from the repository tree.",
-        "Require an explicit external certificate path or secure prompt/environment variable.",
-        "Keep only non-secret certificate documentation in the repo."
-      ],
-      "verify": [
-        "Run git status --ignored.",
-        "Run signing with an external certificate path.",
-        "Confirm no signing secret remains under the repository root."
-      ],
-      "completed_at": "2026-05-22T00:49:16+02:00",
-      "result": "Removed ignored local PFX, password, public certificate export, and local code-signing helper files from certificates\\app, leaving only the tracked non-secret README and .gitkeep. Confirmed the signing script requires an explicit external PFX path or installed certificate thumbprint, rejects repository-local certificate paths, and reaches certificate import only for an explicit external PFX path. Full trusted signing remains covered by release-gate TASK-012.",
-      "checks": [
-        "git status --ignored --short",
-        "pwsh .\\scripts\\Sign-Release.ps1",
-        "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath .\\certificates\\app\\.gitkeep -SkipReleaseVerification",
-        "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath $env:TEMP\\OnlyRag-external-test.pfx -SkipReleaseVerification with ONLYRAG_CERT_PASSWORD set to a non-secret dummy value",
-        "Get-ChildItem -Recurse -Force .\\certificates"
-      ]
-    },
-    {
-      "id": "TASK-005",
-      "priority": "P0",
-      "status": "completed",
-      "title": "Replace or harden Ollama remote installer execution",
-      "source": "AUD-005",
-      "effort": "low-medium",
-      "actions": [
-        "Remove or gate the irm | iex PowerShell path.",
-        "Prefer manual installation guidance or a pinned, verified installer flow.",
-        "Show clear offline and enterprise-policy errors in the UI."
-      ],
-      "verify": [
-        "Attempt install without confirmation.",
-        "Attempt install offline.",
-        "Verify no unpinned remote script is executed automatically."
-      ],
-      "completed_at": "2026-05-22T00:57:35+02:00",
-      "result": "Replaced the Ollama installer action with a manual download-page launch. The backend no longer starts PowerShell, no longer passes ExecutionPolicy Bypass, and no longer executes irm/iex remote installer content. UI and docs now describe manual installation and include offline/enterprise-policy guidance.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~DependencyOllama\"",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check",
-        "rg -n \"irm https://ollama\\.com/install\\.ps1|\\| iex|ExecutionPolicy\\s+Bypass\" -S src tests README.md docs packaging scripts"
-      ]
-    },
-    {
-      "id": "TASK-006",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Reduce unauthenticated health metadata exposure",
-      "source": "AUD-006",
-      "effort": "low",
-      "actions": [
-        "Keep only a minimal unauthenticated liveness endpoint.",
-        "Move vector backend and embedding counters behind authenticated diagnostics."
-      ],
-      "verify": [
-        "Call health endpoints without a token.",
-        "Call diagnostics with and without a token."
-      ],
-      "completed_at": "2026-05-22T01:00:57+02:00",
-      "result": "Kept /health as the only unauthenticated liveness endpoint and reduced it to a minimal healthy status. Removed /api/health from the authentication bypass and moved vector backend metadata, persistence, limits, and embedding counts to the authenticated /api/diagnostics/vector-health endpoint. Updated the Documents UI and architecture docs to use the authenticated diagnostics path.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~Health|FullyQualifiedName~Diagnostics\"",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check"
-      ]
-    },
-    {
-      "id": "TASK-007",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Add frontend unit, component, and e2e coverage",
-      "source": "AUD-008",
-      "effort": "medium-high",
-      "actions": [
-        "Add tests for Chat, Documents, Settings, error states, and persisted WebView storage.",
-        "Add an e2e smoke path for import, job state, backend offline, and preview modal."
-      ],
-      "verify": [
-        "Run new frontend test script.",
-        "Run typecheck, lint, format check, and build."
-      ],
-      "completed_at": "2026-05-22T01:16:20+02:00",
-      "result": "Added Vitest/jsdom unit and component coverage for API client behavior, WebView exit lifecycle storage, Chat, Documents, Settings, settings helper normalization, error states, and persisted chat draft/session data. Added a Playwright smoke test with a mocked local backend covering document import, active job state, backend offline handling, and preview modal rendering. Integrated the frontend test script into the canonical repository gate and documented the new commands.",
-      "checks": [
-        "npm run test",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check",
-        "npm run build",
-        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
-      ]
-    },
-    {
-      "id": "TASK-008",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Split oversized mixed-responsibility files",
-      "source": "AUD-007",
-      "effort": "high",
-      "actions": [
-        "Split SettingsSection into focused settings panels.",
-        "Split DocumentIngestionService by document strategy.",
-        "Split InProcessBackend DI, middleware, endpoint, and helper responsibilities."
-      ],
-      "verify": [
-        "Run stale reference search.",
-        "Run canonical gate after each split batch."
-      ],
-      "result": "Split SettingsSection rendering into focused settings panel components behind a thin container/context, split DocumentIngestionService into partial strategy files for text, PDF/OCR, Office, and progress helpers, and split InProcessBackend startup, DI, auth, endpoint helpers, document import validation, translation helpers, and error mapping into focused partial files.",
-      "checks": [
-        "dotnet build .\\OnlyRag.sln --no-restore",
-        "dotnet test .\\OnlyRag.sln --no-restore",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check",
-        "npm run test",
-        "npm run build",
-        "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
-      ],
-      "completed_at": "2026-05-22T01:33:06+02:00"
-    },
-    {
-      "id": "TASK-009",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Normalize API contracts and error responses",
-      "source": "AUD-014",
-      "effort": "medium",
-      "actions": [
-        "Add OpenAPI or contract tests for critical backend/frontend DTOs.",
-        "Standardize error response shape and status codes.",
-        "Avoid surfacing raw external exception details to the UI."
-      ],
-      "verify": [
-        "Run backend contract tests.",
-        "Run frontend typecheck against generated or tested contracts."
-      ],
-      "completed_at": "2026-05-22T01:43:25+02:00",
-      "result": "Centralized API ProblemDetails creation with stable code extensions, normalized not-found/conflict/validation/auth/unexpected error responses to application/problem+json, stopped surfacing raw Ollama external error bodies to the UI, added backend/frontend contract coverage for critical DTO and error shapes, and split document pipeline/preview endpoints out of the main document endpoint controller.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~ApiContracts|FullyQualifiedName~OllamaClientTests\"",
-        "npm run test:unit -- api.test.ts",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check",
-        "dotnet test OnlyRag.sln",
-        "npm run test",
-        "npm run build",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~ApiContracts|FullyQualifiedName~DocumentPreview|FullyQualifiedName~Pipeline\"",
-        "dotnet test OnlyRag.sln"
-      ]
-    },
-    {
-      "id": "TASK-010",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Improve polling, stale-state, and shutdown UX",
-      "source": "AUD-009",
-      "effort": "medium",
-      "actions": [
-        "Surface repeated polling failures in the UI.",
-        "Track last successful refresh time.",
-        "Do not treat active-job API failure as zero active jobs during app exit."
-      ],
-      "verify": [
-        "Backend offline during polling.",
-        "Corrupted browser storage.",
-        "Exit while active jobs endpoint fails."
-      ],
-      "completed_at": "2026-05-22T01:53:01+02:00",
-      "result": "Added shared frontend refresh-state tracking with consecutive failure counts and last successful refresh timestamps, surfaced repeated stale polling failures in backend, documents, and jobs UI while preserving the last known data, hardened WebView exit state so active-job polling failures are treated as unknown active work instead of zero jobs, and updated WPF shutdown confirmation to preserve that unknown-job guard.",
-      "checks": [
-        "npm run test:unit -- appLifecycle.test.ts DocumentsSection.test.tsx ChatSection.test.tsx",
-        "npm run typecheck",
-        "dotnet build .\\OnlyRag.sln --no-restore",
-        "npm run lint",
-        "npm run format:check",
-        "npm run test",
-        "dotnet test .\\OnlyRag.sln --no-restore",
-        "npm run build"
-      ]
-    },
-    {
-      "id": "TASK-011",
-      "priority": "P1",
-      "status": "completed",
-      "title": "Add database status constraints and migration checks",
-      "source": "AUD-015",
-      "effort": "medium",
-      "actions": [
-        "Add CHECK constraints or equivalent validation for job and translation statuses.",
-        "Create migration checks for existing invalid statuses.",
-        "Align code enum-like transitions with database constraints."
-      ],
-      "verify": [
-        "Migrate an existing database.",
-        "Attempt invalid status writes.",
-        "Run job and translation lifecycle tests."
-      ],
-      "completed_at": "2026-05-22T10:03:55+02:00",
-      "result": "Added schema version 12 with CHECK constraints for fresh job, translation, and translation unit status columns plus migration-time validation and trigger-based equivalent enforcement for existing databases. Translation repository status updates now reject unsupported translation states before writing, and focused storage tests cover invalid existing statuses, migrated trigger enforcement, fresh-schema invalid writes, and repository validation.",
-      "checks": [
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~LocalSqliteStorageTests|FullyQualifiedName~SqliteLocalJobQueueTests|FullyQualifiedName~SqliteStatusConstraintTests\"",
-        "dotnet test tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --filter \"FullyQualifiedName~SqliteStatusConstraintTests\"",
-        "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --filter \"FullyQualifiedName~DocumentTranslationJobHandlerTests|FullyQualifiedName~InProcessBackendTranslationTests|FullyQualifiedName~InProcessBackendContractTests\"",
-        "dotnet test OnlyRag.sln",
-        "npm run typecheck",
-        "npm run lint",
-        "npm run format:check",
-        "npm run test",
-        "npm run build",
-        "dotnet format OnlyRag.sln --verify-no-changes --no-restore --include src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs src\\OnlyRag.Infrastructure\\Storage\\SqliteStatusConstraints.cs src\\OnlyRag.Infrastructure\\Storage\\SqliteTranslationRepository.cs tests\\OnlyRag.Infrastructure.Tests\\SqliteStatusConstraintTests.cs"
-      ]
-    },
-    {
       "id": "TASK-012",
       "priority": "P1",
       "status": "blocked",
@@ -349,7 +33,7 @@
     {
       "id": "TASK-013",
       "priority": "P1",
-      "status": "todo",
+      "status": "blocked",
       "title": "Run visible installer wizard layout verification",
       "source": "release-gate",
       "effort": "medium",
@@ -361,6 +45,20 @@
       "verify": [
         "Record screenshots or exact observations for every wizard page.",
         "Confirm no clipping, overlap, or unreadable controls."
+      ],
+      "blocked_at": "2026-05-22T10:42:30+02:00",
+      "blockers": [
+        "Only the current Windows display scale is available non-invasively in this session: AppliedDPI 144 / 150%.",
+        "The required 100%, 125%, and 200% display-scaling passes require changing the interactive Windows desktop scale and are not safe to perform automatically in this active user session.",
+        "The required non-default accessibility text pass requires changing user accessibility/display text settings and is not safe to perform automatically in this active user session."
+      ],
+      "attempted_result": "Captured and manually inspected visible installer wizard screenshots at 150% display scaling for Destination, Additional Tasks, Ready to Install, Installing, and Finished pages. No clipping, overlap, or unreadable controls were observed in this 150% pass. The installer was temporarily installed to reach the Finished page, then uninstalled and the remaining install payload was removed from %LOCALAPPDATA%\\Programs\\OnlyRag. TASK-013 remains blocked until the same visible pass is repeated at 100%, 125%, 200%, and once with non-default accessibility text settings.",
+      "checks": [
+        "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1",
+        "Visible wizard pass at 150% display scaling with screenshots under artifacts\\installer-ui-layout-verification\\20260522-104147-clicked",
+        "Manual screenshot inspection of 01-destination.png, 02-additional-tasks.png, 03-ready-to-install.png, 04-installing.png, and 05-finished.png",
+        "Installer cleanup check: %LOCALAPPDATA%\\Programs\\OnlyRag, Start Menu OnlyRag folder, and desktop shortcut were absent after verification",
+        "Get-Process -Name OnlyRag.App"
       ]
     },
     {
@@ -406,7 +104,7 @@
     "src\\OnlyRag.Infrastructure\\Storage\\SqliteDocumentRepository.cs is oversized but remains a single SQLite document adapter; defer split to focused repository refactor."
   ],
   "script_automation_status": {
-    "last_updated": "2026-05-22T10:09:17+02:00",
+    "last_updated": "2026-05-22T10:43:53+02:00",
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "commands": {
       "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -420,7 +118,7 @@
       "scripts\\Bootstrap-Prerequisites.ps1 is oversized and handles prerequisite checks plus dependency installation; keep until a focused split is scheduled.",
       "scripts\\Generate-BrandAssets.ps1 is oversized but single-purpose asset generation; keep until brand tooling is refactored."
     ],
-    "last_completed_work": "Completed TASK-011 by adding schema version 12 status validation for jobs, translations, and translation units, validating existing statuses before migration, enforcing future migrated writes with triggers, and covering fresh/migrated invalid status behavior with tests.",
-    "current_blocker": "TASK-012 is blocked until trusted signing material outside Git and a clean Windows release verification machine are available."
+    "last_completed_work": "Pruned completed tasks from PROJECT_STATUS.json; active tracker now contains only blocked or todo tasks.",
+    "current_blocker": "TASK-012 is blocked until trusted signing material outside Git and a clean Windows release verification machine are available. TASK-013 has a completed 150% visible wizard pass but remains blocked until 100%, 125%, 200%, and non-default accessibility text passes can be run in an appropriate interactive Windows desktop session."
   }
 }
