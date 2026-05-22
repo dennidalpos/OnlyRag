@@ -35,13 +35,22 @@ recommendations shown in Settings are visual only and do not modify saved values
 Bridge and prerequisites:
 
 - Bridge script: `scripts\ocr\paddle_ocr_bridge.py`.
-- Requirements: `scripts\ocr\requirements.txt`.
+- Default CPU requirements: `scripts\ocr\requirements.txt` -> `requirements-cpu.txt`.
+- Shared requirements: `scripts\ocr\requirements-common.txt`.
+- NVIDIA requirements: `requirements-nvidia-cu129.txt`, `requirements-nvidia-cu126.txt`, and
+  `requirements-nvidia-cu118.txt`.
 - Supported Python versions: 3.10 through 3.13. The pinned PaddlePaddle runtime does not publish Windows wheels for Python 3.14.
 - End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
+- GPU setup: **Configura OCR** uses `auto` mode. It chooses NVIDIA only when `nvidia-smi`
+  reports a driver compatible with the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 PaddlePaddle GPU wheels;
+  otherwise it installs CPU OCR and reports the fallback reason in Diagnostics.
 - Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup; use `-SkipOcr` to skip it.
 - Default OCR Python path: `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv\Scripts\python.exe`.
 - Override Python with `ONLYRAG_OCR_PYTHON`.
 - Override bridge path with `ONLYRAG_OCR_BRIDGE`.
+- Select `GPU` in OCR settings only after the OCR runtime reports an NVIDIA runtime such as
+  `cuda129`, `cuda126`, or `cuda118`. If a CPU-only runtime receives `device=gpu`, the bridge returns a clear
+  configuration error instead of silently falling back.
 
 Supported OCR inputs:
 

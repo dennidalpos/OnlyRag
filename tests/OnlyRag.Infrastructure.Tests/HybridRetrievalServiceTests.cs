@@ -105,6 +105,28 @@ public sealed class HybridRetrievalServiceTests
     }
 
     [Fact]
+    public async Task SearchAsync_UsesBm25RankForKeywordOrdering()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
+        ImportedDocument document = await tempStorage.CreateDocumentAsync(
+            "doc-bm25",
+            "bm25.txt",
+            [
+                "alpha alpha alpha alpha riferimento forte.",
+                "alpha riferimento debole."
+            ]);
+
+        DocumentSearchResponse response = await services.Retrieval.SearchAsync(
+            new DocumentSearchRequest("alpha", [document.Id], 5));
+
+        Assert.True(response.Results.Count >= 2);
+        Assert.Contains("forte", response.Results[0].Snippet, StringComparison.OrdinalIgnoreCase);
+        Assert.True(response.Results[0].Score >= response.Results[1].Score);
+    }
+
+    [Fact]
     public async Task SearchAsync_UsesSqliteVecWithoutFallbackVectorLimit()
     {
         using TempStorage tempStorage = TempStorage.Create();

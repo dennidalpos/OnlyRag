@@ -286,7 +286,8 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
 
   function applyOcrProfile(profile: string) {
     const preset = ocrProfilePresets[profile];
-    setOcrFormState((current: OcrSettings) => (preset ? { ...preset } : { ...current, profile: "custom" }));
+    setOcrFormState((current: OcrSettings) =>
+      (preset ? { ...preset, device: current.device } : { ...current, profile: "custom" }));
   }
 
   function updateOcrSettings(patch: Partial<OcrSettings>) {

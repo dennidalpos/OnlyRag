@@ -87,7 +87,7 @@ public static partial class InProcessBackend
 
         app.MapPost("/api/dependencies/ocr/provision", (
             HttpContext httpContext,
-            ProcessLaunchRequest request,
+            OcrProvisionRequest request,
             InProcessBackendDescriptor descriptor,
             DependencyProvisioningService dependencies) =>
         {
@@ -101,7 +101,7 @@ public static partial class InProcessBackend
 
             try
             {
-                return Results.Ok(dependencies.StartOcrProvision());
+                return Results.Ok(dependencies.StartOcrProvision(request.RuntimeTarget));
             }
             catch (InvalidOperationException ex)
             {

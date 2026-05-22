@@ -73,6 +73,36 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsImport_ReturnsPerFileFailuresWithoutHidingSuccessfulImports()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("partial-import-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        using MultipartFormDataContent content = new();
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("valid")), "files", "Valid.txt");
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("invalid")), "files", "Unsupported.json");
+
+        using HttpResponseMessage importResponse = await httpClient.PostAsync("/api/documents/import", content);
+        DocumentImportResponse? importPayload = await importResponse.Content.ReadFromJsonAsync<DocumentImportResponse>(JsonOptions);
+        ImportedDocument[]? documents = await httpClient.GetFromJsonAsync<ImportedDocument[]>("/api/documents", JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, importResponse.StatusCode);
+        Assert.NotNull(importPayload);
+        Assert.True(importPayload.HasFailures);
+        DocumentImportResult imported = Assert.Single(importPayload.Documents);
+        Assert.Equal("Valid.txt", imported.Document.OriginalFileName);
+        Assert.Equal(2, importPayload.Results.Count);
+        Assert.Contains(importPayload.Results, result => result.Succeeded && result.FileName == "Valid.txt");
+        Assert.Contains(importPayload.Results, result =>
+            !result.Succeeded
+            && result.FileName == "Unsupported.json"
+            && result.ErrorCode == "document_import_invalid");
+        Assert.NotNull(documents);
+        Assert.Single(documents);
+    }
+
+    [Fact]
     public async Task DocumentsImport_RejectsFileLargerThanConfiguredLimitAndLeavesNoOriginals()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("upload-file-limit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

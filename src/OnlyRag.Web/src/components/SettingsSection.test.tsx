@@ -39,10 +39,10 @@ describe("SettingsSection", () => {
         path: "/api/settings/ocr",
         response: {
           profile: "balanced",
-          pdfDpi: 200,
+          pdfDpi: 220,
           modelPreset: "PP-OCRv5",
           modelVersion: "PP-OCRv5",
-          detectionSideLimit: 960,
+          detectionSideLimit: 1152,
           detectionThreshold: 0.3,
           detectionBoxThreshold: 0.6,
           detectionUnclipRatio: 1.5,
@@ -60,7 +60,15 @@ describe("SettingsSection", () => {
       { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
       {
         path: "/api/dependencies/ocr",
-        response: { isConfigured: true, isRunning: false, message: "OCR configurato.", lastError: null }
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "configured",
+          runtimeDetail: null
+        }
       },
       {
         path: "/api/settings/ollama",
@@ -114,10 +122,10 @@ describe("SettingsSection", () => {
         path: "/api/settings/ocr",
         response: {
           profile: "balanced",
-          pdfDpi: 200,
+          pdfDpi: 220,
           modelPreset: "PP-OCRv5",
           modelVersion: "PP-OCRv5",
-          detectionSideLimit: 960,
+          detectionSideLimit: 1152,
           detectionThreshold: 0.3,
           detectionBoxThreshold: 0.6,
           detectionUnclipRatio: 1.5,
@@ -135,7 +143,15 @@ describe("SettingsSection", () => {
       { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
       {
         path: "/api/dependencies/ocr",
-        response: { isConfigured: false, isRunning: false, message: "OCR assente.", lastError: null }
+        response: {
+          isConfigured: false,
+          isRunning: false,
+          message: "OCR assente.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: "NVIDIA non rilevata."
+        }
       }
     ]);
 
@@ -151,5 +167,92 @@ describe("SettingsSection", () => {
 
     expect(await screen.findByText("Dati diagnostici non disponibili.")).toBeInTheDocument();
     expect(await screen.findByText("Office non disponibile.")).toBeInTheDocument();
+  });
+
+  it("preserves the selected OCR device when applying a profile preset", async () => {
+    const api = mockApi([
+      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      {
+        path: "/api/office-converter/status",
+        response: {
+          state: "Missing",
+          isAvailable: false,
+          executablePath: null,
+          message: "LibreOffice non installato.",
+          suggestion: null,
+          conversionTimeoutSeconds: 120
+        }
+      },
+      { path: "/api/settings/performance", response: createPerformanceSettings() },
+      { path: "/api/settings/ingestion", response: { chunkSizeTokens: 800, overlapTokens: 120 } },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
+      {
+        path: "/api/settings/ocr",
+        response: {
+          profile: "balanced",
+          pdfDpi: 220,
+          modelPreset: "PP-OCRv5",
+          modelVersion: "PP-OCRv5",
+          detectionSideLimit: 1152,
+          detectionThreshold: 0.3,
+          detectionBoxThreshold: 0.6,
+          detectionUnclipRatio: 1.5,
+          recognitionScoreThreshold: 0.5,
+          useTextlineOrientation: true,
+          useDocumentOrientationClassification: false,
+          useDocumentUnwarping: false,
+          recognitionBatchSize: 6,
+          cpuThreads: 2,
+          device: "gpu"
+        }
+      },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cuda126",
+          runtimeDetail: "NVIDIA compatibile."
+        }
+      },
+      {
+        path: "/api/settings/ocr",
+        method: "PUT",
+        handler: (request) => ({ body: JSON.parse(String(request.body)) })
+      }
+    ]);
+
+    render(
+      <SettingsSection
+        settings={createOllamaSettings()}
+        status={createOllamaStatus()}
+        models={[createModel()]}
+        loadError={null}
+        onDataChanged={async () => {}}
+      />
+    );
+
+    const saveButton = await screen.findByRole("button", { name: "Salva OCR" });
+    const profileSelect = document.querySelector("#ocr-profile") as HTMLSelectElement | null;
+    expect(profileSelect).not.toBeNull();
+
+    await userEvent.selectOptions(profileSelect!, "accurate");
+    await userEvent.click(saveButton);
+
+    const saveCall = api.calls.find((call) => call.path === "/api/settings/ocr" && call.method === "PUT");
+    expect(JSON.parse(String(saveCall?.body))).toMatchObject({
+      profile: "accurate",
+      device: "gpu",
+      detectionSideLimit: 1536
+    });
   });
 });

@@ -38,7 +38,7 @@ Development:
 
 - Windows 10 1809 or newer.
 - PowerShell 7 (`pwsh`).
-- .NET 10 SDK.
+- .NET 10 SDK; `global.json` pins repository SDK selection with .NET 10 feature roll-forward.
 - Node.js `^20.19.0 || >=22.12.0` with npm.
 - Microsoft Edge WebView2 Runtime.
 
@@ -50,6 +50,7 @@ Optional features:
 
 - LibreOffice for legacy Office conversion and PDF export.
 - Python 3.10 through 3.13 for the PaddleOCR bridge. Python 3.14 is not supported by the pinned PaddlePaddle runtime.
+- Optional NVIDIA GPU OCR acceleration through PaddlePaddle GPU wheels when a compatible Windows NVIDIA driver is available. CPU OCR remains the fallback.
 - Inno Setup 6 for installer generation.
 - Windows SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
 
@@ -90,7 +91,8 @@ End users configure optional dependencies from **Settings** in the app:
   OnlyRag does not execute remote PowerShell installer scripts.
 - **LibreOffice**: if missing, the UI opens the LibreOffice download page.
 - **OCR**: the **Configura OCR** button prepares the per-user PaddleOCR environment under
-  `%LOCALAPPDATA%\OnlyRag\ocr-python`.
+  `%LOCALAPPDATA%\OnlyRag\ocr-python`. It auto-selects NVIDIA GPU packages for CUDA 12.9, 12.6,
+  or 11.8 when `nvidia-smi` reports a compatible driver; otherwise it installs the CPU runtime.
 
 ## Commands
 

@@ -15,6 +15,7 @@ public sealed class DependencyProvisioningService
     private const string LibreOfficeDownloadUrl = "https://www.libreoffice.org/download/download-libreoffice/";
     private static readonly int[] SupportedOcrPythonMinors = [13, 12, 11, 10];
     private readonly ILocalProcessLauncher processLauncher;
+    private readonly OcrProvisionRuntimeResolver ocrRuntimeResolver;
     private readonly object syncRoot = new();
     private OcrProvisionStatus lastOcrProvisionStatus = new(
         false,
@@ -26,6 +27,7 @@ public sealed class DependencyProvisioningService
     public DependencyProvisioningService(ILocalProcessLauncher processLauncher)
     {
         this.processLauncher = processLauncher;
+        ocrRuntimeResolver = new OcrProvisionRuntimeResolver(processLauncher);
     }
 
     public OllamaInstallStatus CreateOllamaStatus(bool apiReachable)
@@ -92,7 +94,10 @@ public sealed class DependencyProvisioningService
                 true,
                 false,
                 $"OCR configurato: {availability.EngineName} {availability.EngineVersion}.",
-                null);
+                null,
+                OcrProvisionRuntimeResolver.AutoTarget,
+                "configured",
+                availability.Message);
         }
 
         string message = string.IsNullOrWhiteSpace(availability.Message)
@@ -103,8 +108,9 @@ public sealed class DependencyProvisioningService
         return new OcrProvisionStatus(false, false, message, null);
     }
 
-    public DependencyActionResponse StartOcrProvision()
+    public DependencyActionResponse StartOcrProvision(string? runtimeTarget = null)
     {
+        string normalizedTarget = OcrProvisionRuntimeResolver.NormalizeTarget(runtimeTarget);
         lock (syncRoot)
         {
             if (ocrProvisionTask is { IsCompleted: false })
@@ -116,14 +122,17 @@ public sealed class DependencyProvisioningService
                 false,
                 true,
                 "Configurazione OCR avviata. La preparazione può richiedere diversi minuti.",
+                null,
+                normalizedTarget,
+                "resolving",
                 null);
-            ocrProvisionTask = Task.Run(ProvisionOcrAsync);
+            ocrProvisionTask = Task.Run(() => ProvisionOcrAsync(normalizedTarget));
         }
 
         return new DependencyActionResponse(true, "Configurazione OCR avviata.");
     }
 
-    private async Task ProvisionOcrAsync()
+    private async Task ProvisionOcrAsync(string runtimeTarget)
     {
         try
         {
@@ -134,11 +143,27 @@ public sealed class DependencyProvisioningService
 
             string scriptsRoot = ResolveOcrScriptsRoot();
             string bridgePath = Path.Combine(scriptsRoot, "paddle_ocr_bridge.py");
-            string requirementsPath = Path.Combine(scriptsRoot, "requirements.txt");
-            if (!File.Exists(bridgePath) || !File.Exists(requirementsPath))
+            if (!File.Exists(bridgePath))
             {
-                throw new InvalidOperationException("Runtime OCR incompleto: bridge o requirements non trovati.");
+                throw new InvalidOperationException("Runtime OCR incompleto: bridge non trovato.");
             }
+
+            OcrProvisionRuntime runtime = await ocrRuntimeResolver.ResolveAsync(runtimeTarget, CancellationToken.None);
+            string requirementsPath = Path.Combine(scriptsRoot, runtime.RequirementsFileName);
+            if (!File.Exists(requirementsPath))
+            {
+                throw new InvalidOperationException(
+                    $"Runtime OCR incompleto: {runtime.RequirementsFileName} non trovato.");
+            }
+
+            SetLastOcrStatus(new OcrProvisionStatus(
+                false,
+                true,
+                $"Configurazione OCR runtime {runtime.ResolvedRuntime} in corso.",
+                null,
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                runtime.Detail));
 
             OcrPythonCommand python = await ResolveOcrPythonCommandAsync(CancellationToken.None);
 
@@ -175,14 +200,18 @@ public sealed class DependencyProvisioningService
             }
 
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"], null, CancellationToken.None);
+            await RunProcessAsync(venvPython, ["-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu"], null, CancellationToken.None);
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "-r", requirementsPath, "--disable-pip-version-check"], null, CancellationToken.None);
-            await RunProcessAsync(venvPython, [bridgePath, "--mode", "check"], null, CancellationToken.None);
+            await RunProcessAsync(venvPython, [bridgePath, "--mode", "check", "--device", runtime.IsNvidia ? "gpu" : "cpu"], null, CancellationToken.None);
 
             SetLastOcrStatus(new OcrProvisionStatus(
                 true,
                 false,
-                "OCR configurato correttamente. Puoi usare l'OCR da importazione documenti e azioni documento.",
-                null));
+                $"OCR configurato correttamente con runtime {runtime.ResolvedRuntime}. Puoi usare l'OCR da importazione documenti e azioni documento.",
+                null,
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                runtime.Detail));
         }
         catch (Exception ex)
         {
@@ -190,7 +219,10 @@ public sealed class DependencyProvisioningService
                 false,
                 false,
                 "Configurazione OCR non completata.",
-                ex.Message));
+                ex.Message,
+                runtimeTarget,
+                "unknown",
+                null));
         }
     }
 

@@ -145,7 +145,20 @@ test("smoke: import, job state, backend offline, and preview modal", async ({ pa
 
     if (method === "POST" && path === "/api/documents/import") {
       documents = [document];
-      await fulfillJson(route, { documents: [{ document, deduplicated: false, message: "Importato." }] });
+      await fulfillJson(route, {
+        documents: [{ document, deduplicated: false, message: "Importato." }],
+        results: [
+          {
+            fileName: document.originalFileName,
+            document,
+            deduplicated: false,
+            succeeded: true,
+            message: "Importato.",
+            errorCode: null
+          }
+        ],
+        hasFailures: false
+      });
       return;
     }
 

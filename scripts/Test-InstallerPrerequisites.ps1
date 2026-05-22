@@ -15,7 +15,7 @@ Set-StrictMode -Version Latest
 
 function Test-OnlyRagSupportedWindows {
     param(
-        [ValidateSet("Supported", "Unsupported")]
+        [ValidateSet("", "Supported", "Unsupported")]
         [string]$Simulation
     )
 
@@ -40,7 +40,7 @@ function Test-OnlyRagSupportedWindows {
 
 function Test-OnlyRagWebView2Runtime {
     param(
-        [ValidateSet("Present", "Missing")]
+        [ValidateSet("", "Present", "Missing")]
         [string]$Simulation
     )
 
@@ -190,7 +190,7 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         ""
         New-OnlyRagInstallerParagraph "After installing WebView2, run this $AppName setup again."
         ""
-        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components. Ollama, LibreOffice, and OCR/PaddleOCR Python packages remain optional feature dependencies configured from the app settings."
+        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Ollama, LibreOffice, Python OCR packages, and OCR GPU wheels remain optional feature dependencies configured from the app settings."
     ) -join [Environment]::NewLine
 
     return [pscustomobject]@{
@@ -198,6 +198,33 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         Missing = @("Microsoft Edge WebView2 Runtime")
         Message = $message
     }
+}
+
+function Get-OnlyRagNvidiaGpuOcrMemo {
+    param([bool]$NvidiaToolsPresent)
+
+    if ($NvidiaToolsPresent) {
+        return @(
+            "- NVIDIA OCR: NVIDIA management tools were detected. The installed app includes"
+            "              OCR GPU provisioning manifests. After setup, open Settings >"
+            "              Diagnostics > Configure OCR, then select GPU in OCR settings."
+        ) -join [Environment]::NewLine
+    }
+
+    return @(
+        "- NVIDIA OCR: NVIDIA management tools were not detected. OCR provisioning will"
+        "              use the CPU runtime unless a compatible NVIDIA driver is"
+        "              installed later."
+    ) -join [Environment]::NewLine
+}
+
+function Test-OnlyRagNvidiaManagementTools {
+    $systemCandidate = Join-Path $env:WINDIR "System32\nvidia-smi.exe"
+    if (Test-Path -LiteralPath $systemCandidate -PathType Leaf) {
+        return $true
+    }
+
+    return [bool](Get-Command "nvidia-smi" -ErrorAction SilentlyContinue)
 }
 
 function Assert-InstallerMessageLayout {
@@ -240,6 +267,16 @@ if ($SelfTest) {
         Assert-Condition -Condition ($missing.Message -like "*$expected*") -Message "Expected installer message to contain '$expected'."
     }
     Assert-InstallerMessageLayout -Message $missing.Message -Scenario "missing WebView2"
+    Assert-Condition -Condition ($missing.Message -like "*OCR CPU/NVIDIA*") -Message "Expected WebView2 message to mention OCR NVIDIA."
+    Assert-Condition -Condition ($missing.Message -like "*provisioning manifests*") -Message "Expected WebView2 message to mention provisioning manifests."
+
+    $nvidiaPresentMemo = Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent $true
+    Assert-Condition -Condition ($nvidiaPresentMemo -like "*NVIDIA management tools were detected*") -Message "Expected NVIDIA-present memo."
+    Assert-InstallerMessageLayout -Message $nvidiaPresentMemo -Scenario "NVIDIA present memo"
+
+    $nvidiaMissingMemo = Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent $false
+    Assert-Condition -Condition ($nvidiaMissingMemo -like "*CPU runtime*") -Message "Expected NVIDIA-missing CPU fallback memo."
+    Assert-InstallerMessageLayout -Message $nvidiaMissingMemo -Scenario "NVIDIA missing memo"
 
     $unsupportedWindows = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $false -WebView2Present $true
     Assert-Condition -Condition (-not $unsupportedWindows.CanInstall) -Message "Expected simulated unsupported Windows to block setup."
@@ -264,6 +301,7 @@ $status = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $windowsSuppo
 
 if ($status.CanInstall) {
     Write-Host $status.Message -ForegroundColor Green
+    Write-Host (Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent (Test-OnlyRagNvidiaManagementTools)) -ForegroundColor Cyan
     exit 0
 }
 

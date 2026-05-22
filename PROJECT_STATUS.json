@@ -1,77 +1,92 @@
 {
-  "last_updated": "2026-05-22T15:33:42+02:00",
-  "current_phase": "release-hardening",
-  "status": "blocked-on-external-release-verification",
-  "summary": "Build, dependency, runtime, installer payload, automated desktop workflow, and repository structure hardening are complete. The generated installer is currently unsigned. Residual release work requires a trusted signing certificate and interactive Windows verification passes.",
-  "completed_scope": [
-    "Low-risk dependency updates applied and audited with no NuGet/npm vulnerabilities reported.",
-    "Release gate, web checks, .NET tests, OCR bridge check, installer build, and non-invasive unsigned installer evidence passed.",
-    "Representative populated workflow is covered by automated in-process backend tests.",
-    "Oversized file review completed with focused splits and documented justifications.",
-    "Repository scripts rechecked with parser/static analysis; signing password handling, script analyzer issues, and clean preservation behavior were hardened."
+  "project_name": "OnlyRag",
+  "last_updated": "2026-05-22T20:49:10+02:00",
+  "status": "active",
+  "current_phase": "ocr-gpu-telemetry-planned",
+  "production_target": true,
+  "summary": "Next work is the OCR GPU/preset/telemetry fix. Completed script-gate history was removed from this tracker to keep only current operational state.",
+  "active_objective": "Separate CPU/GPU OCR presets, block GPU selection unless a compatible CUDA OCR runtime is actually usable, prove real GPU use, and show live local system telemetry in Settings.",
+  "assumptions": [
+    "GPU presets keep the same quality settings as CPU presets; only runtime-oriented values such as recognition batch size differ.",
+    "Telemetry is local live diagnostics only: no remote reporting, no database history, and no periodic background collection outside Settings.",
+    "If OCR GPU compatibility fails, the app must block GPU selection and report the reason instead of silently falling back to CPU.",
+    "Existing uncommitted changes predate this tracker update and must be preserved."
   ],
-  "residual_plan": [
+  "current_tasks": [
     {
-      "id": "TASK-012",
-      "order": 1,
-      "priority": "P1",
-      "status": "blocked",
-      "title": "Run signed installer lifecycle verification on a clean Windows machine",
-      "blocked_by": [
-        "Trusted code-signing certificate or signing thumbprint not configured.",
-        "Current installer artifact is unsigned: artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe reports NotSigned.",
-        "Clean Windows release verification machine required for install, upgrade, rollback, uninstall, SmartScreen, and signature validation."
-      ],
-      "execute_when_unblocked": [
-        "Obtain trusted Windows code-signing certificate and thumbprint.",
-        "Build signed installer: pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release -Version 0.1.0 -SigningCertificateThumbprint <thumbprint>.",
-        "Run full installer lifecycle: pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle.",
-        "Record exact machine, Windows version, installer path, signing status, lifecycle result, and any defects."
-      ],
-      "done_when": [
-        "Installer signature validates as trusted.",
-        "Clean-machine install, upgrade or repair, rollback path, uninstall, and SmartScreen checks pass.",
-        "No source, local data, logs, temp files, documents, node_modules, databases, or model caches are packaged accidentally."
-      ]
+      "priority": 1,
+      "status": "pending",
+      "task": "Add OCR GPU capability detection shared by settings save, diagnostics, and provisioning.",
+      "done_when": "Backend reports GPU absent, incompatible, CUDA runtime invalid, or usable with a clear block reason."
     },
     {
-      "id": "TASK-013",
-      "order": 2,
-      "priority": "P1",
-      "status": "blocked",
-      "title": "Complete installer wizard layout verification",
-      "blocked_by": [
-        "Requires interactive Windows display scaling changes at 100%, 125%, 150%, and 200%.",
-        "Requires non-default accessibility text settings."
-      ],
-      "execute_when_unblocked": [
-        "Open every installer wizard page at 100%, 125%, 150%, and 200% display scaling.",
-        "Repeat the wizard pass with non-default accessibility text settings.",
-        "Capture screenshots or exact observations for each page and scale.",
-        "Record every clipping, overlap, truncation, unreadable control, or keyboard/accessibility regression."
-      ],
-      "done_when": [
-        "All wizard pages are readable and usable at required scales.",
-        "No clipping, overlap, truncation, or unreadable controls remain.",
-        "Evidence is recorded with scale, settings, Windows version, and installer artifact."
-      ]
+      "priority": 2,
+      "status": "pending",
+      "task": "Block OCR GPU settings when compatibility fails.",
+      "done_when": "UI disables GPU with a reason, and PUT /api/settings/ocr rejects device=gpu unless the backend GPU check passes."
+    },
+    {
+      "priority": 3,
+      "status": "pending",
+      "task": "Split OCR presets by device while keeping balanced as the default for both CPU and GPU.",
+      "done_when": "CPU keeps current fast/balanced/accurate values; GPU uses the same quality values with higher recognition batch sizes: fast=8, balanced=12, accurate=16."
+    },
+    {
+      "priority": 4,
+      "status": "pending",
+      "task": "Prove real PaddleOCR GPU execution.",
+      "done_when": "paddle_ocr_bridge.py --mode check --device gpu reports compiledWithCuda=true, cudaDeviceCount > 0, activeDevice=gpu, and useful Paddle package versions."
+    },
+    {
+      "priority": 5,
+      "status": "pending",
+      "task": "Repair OCR GPU provisioning so CPU and GPU Paddle wheels cannot mask each other.",
+      "done_when": "GPU provisioning uninstalls both paddlepaddle and paddlepaddle-gpu, installs the selected GPU wheel, verifies CUDA, and reports CPU fallback reasons in auto mode."
+    },
+    {
+      "priority": 6,
+      "status": "pending",
+      "task": "Add live Settings telemetry card.",
+      "done_when": "Settings shows CPU usage, logical CPU count, RAM total/free, C: disk total/free, GPU name/driver/utilization/memory, and OCR GPU compatibility state."
+    },
+    {
+      "priority": 7,
+      "status": "pending",
+      "task": "Update tests and docs for OCR GPU blocking, device presets, bridge diagnostics, provisioning, and telemetry.",
+      "done_when": "Relevant backend, frontend unit, and build checks pass and docs describe the new GPU behavior."
+    }
+  ],
+  "known_residual": [
+    {
+      "priority": 1,
+      "item": "Current local OCR venv is not using CUDA.",
+      "evidence": "RTX 2070 is visible through nvidia-smi, but bridge check with --device gpu returns: Runtime PaddlePaddle installato senza supporto CUDA."
+    },
+    {
+      "priority": 2,
+      "item": "Both paddlepaddle CPU 3.3.1 and paddlepaddle-gpu 3.3.0 are installed in the OCR venv.",
+      "evidence": "paddle.device.is_compiled_with_cuda() is False and paddle.device.get_device() is cpu."
+    },
+    {
+      "priority": 3,
+      "item": "Working tree is dirty with many pre-existing modified and untracked files.",
+      "evidence": "Do not stage, revert, or overwrite unrelated user work without review."
     }
   ],
   "quality_gates": {
-    "last_full_gate": "passed",
-    "dotnet_tests": "passed",
-    "web_typecheck": "passed",
-    "web_lint": "passed",
-    "web_format": "passed",
-    "web_tests": "passed",
-    "dependency_audit": "passed",
-    "script_static_analysis": "passed_with_known_style_warnings",
-    "installer_payload": "passed_unsigned",
-    "signed_installer_lifecycle": "blocked",
-    "wizard_layout": "blocked"
+    "backend_tests": "not_run",
+    "frontend_unit_tests": "not_run",
+    "frontend_build": "not_run",
+    "manual_gpu_check": "failed",
+    "structure_review": "not_run"
   },
-  "remaining_risks": [
-    "Release cannot be considered signed or clean-machine verified until TASK-012 completes.",
-    "Installer UI may still have scale/accessibility layout defects until TASK-013 completes."
-  ]
+  "commands": {
+    "backend_tests": "dotnet test .\\OnlyRag.sln",
+    "frontend_unit_tests": "npm --prefix .\\src\\OnlyRag.Web run test:unit",
+    "frontend_build": "npm --prefix .\\src\\OnlyRag.Web run build",
+    "manual_gpu_check": "%LOCALAPPDATA%\\OnlyRag\\ocr-python\\.venv\\Scripts\\python.exe scripts\\ocr\\paddle_ocr_bridge.py --mode check --device gpu"
+  },
+  "last_completed_work": "PROJECT_STATUS.json was reduced to the current OCR GPU/preset/telemetry plan and active residual only.",
+  "open_questions": [],
+  "handoff_notes": "Implement tasks in priority order. Keep PROJECT_STATUS.json short and update only current task status, new blockers, and gate results."
 }

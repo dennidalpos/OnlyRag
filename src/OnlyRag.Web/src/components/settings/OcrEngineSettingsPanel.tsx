@@ -46,7 +46,7 @@ export function OcrEngineSettingsPanel() {
               <label className="field-group" htmlFor="ocr-device">
                 <OcrFieldLabel
                   text="Dispositivo"
-                  tooltip="CPU e' piu compatibile. GPU richiede un ambiente PaddleOCR configurato per accelerazione hardware."
+                  tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
                 />
                 <select
                   id="ocr-device"

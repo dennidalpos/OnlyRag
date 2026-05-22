@@ -48,12 +48,14 @@ export function DiagnosticsPanel() {
                 {!diagnostics.ocrIsConfigured && (
                   <div className="panel-note panel-note--warning" role="alert">
                     <p>{ocrProvisionStatus?.message ?? "OCR non configurato. Configura le dipendenze locali per abilitare OCR."}</p>
+                    {ocrProvisionStatus?.runtimeDetail && <p>{ocrProvisionStatus.runtimeDetail}</p>}
                     {ocrProvisionStatus?.lastError && <p>{ocrProvisionStatus.lastError}</p>}
                   </div>
                 )}
                 {ocrProvisionStatus?.isRunning && (
                   <div className="panel-note" role="status">
                     <p>{ocrProvisionStatus.message}</p>
+                    {ocrProvisionStatus.runtimeDetail && <p>{ocrProvisionStatus.runtimeDetail}</p>}
                   </div>
                 )}
               </>

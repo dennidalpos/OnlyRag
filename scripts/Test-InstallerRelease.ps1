@@ -155,6 +155,18 @@ function Test-OptionalComponents {
         Add-Check -Id "optional-ocr-python" -Status "warn" -Message "OCR Python environment not found; OCR should report a configurable optional dependency."
     }
 
+    $nvidiaSmi = Get-Command "nvidia-smi" -ErrorAction SilentlyContinue
+    if ($nvidiaSmi) {
+        $nvidiaInfo = (& $nvidiaSmi.Source --query-gpu=driver_version,name --format=csv,noheader 2>$null | Select-Object -First 1)
+        Add-Check -Id "optional-nvidia-gpu" -Status "pass" -Message "NVIDIA management tools found for OCR GPU provisioning." -Data @{
+            nvidiaSmi = $nvidiaSmi.Source
+            gpu = $nvidiaInfo
+        }
+    }
+    else {
+        Add-Check -Id "optional-nvidia-gpu" -Status "warn" -Message "NVIDIA management tools not found; OCR GPU provisioning should fall back to CPU."
+    }
+
     $libreOffice = @(
         (Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"),
         (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program\soffice.exe")
@@ -257,6 +269,11 @@ else {
     Test-PathExpectation -Id "sqlite-vec-native-asset" -Path (Join-Path $installDir "vec0.dll") -Kind "file"
     Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements-common" -Path (Join-Path $installDir "scripts\ocr\requirements-common.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements-cpu" -Path (Join-Path $installDir "scripts\ocr\requirements-cpu.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements-nvidia-cu118" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu118.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements-nvidia-cu126" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu126.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-requirements-nvidia-cu129" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu129.txt") -Kind "file"
     Test-PathExpectation -Id "web-ui-entrypoint" -Path (Join-Path $installDir "wwwroot\index.html") -Kind "file"
     Test-PathExpectation -Id "start-menu-shortcut" -Path $startMenuShortcut -Kind "file"
     Test-PathExpectation -Id "desktop-shortcut" -Path $desktopShortcut -Kind "file"

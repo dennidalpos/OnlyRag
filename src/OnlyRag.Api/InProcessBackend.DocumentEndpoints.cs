@@ -14,6 +14,8 @@ public static partial class InProcessBackend
 
     private static void MapDocumentEndpoints(WebApplication app)
     {
+        MapDocumentImportEndpoints(app);
+
         app.MapGet("/api/documents", async (IDocumentLibraryService documents, CancellationToken cancellationToken) =>
             Results.Ok(await documents.ListAsync(cancellationToken)));
 
@@ -24,120 +26,6 @@ public static partial class InProcessBackend
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             return document is null ? CreateNotFoundProblem("Documento") : Results.Ok(document);
-        });
-
-        app.MapPost("/api/documents/import", async (
-            HttpRequest request,
-            IDocumentLibraryService documents,
-            LocalDocumentStorageGuard storageGuard,
-            CancellationToken cancellationToken) =>
-        {
-            if (!request.HasFormContentType)
-            {
-                return CreateBadRequestProblem(
-                    "Richiesta import non valida",
-                    "Usa multipart/form-data con uno o piu file.",
-                    "document_import_invalid_content_type");
-            }
-
-            if (request.ContentLength > storageGuard.Limits.MaxRequestBodySizeBytes)
-            {
-                return CreateProblem(
-                    "Import troppo grande",
-                    $"La richiesta supera il limite di {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
-                    StatusCodes.Status413PayloadTooLarge,
-                    "document_import_request_too_large");
-            }
-
-            IFormCollection form;
-            try
-            {
-                form = await request.ReadFormAsync(cancellationToken);
-            }
-            catch (BadHttpRequestException)
-            {
-                return CreateProblem(
-                    "Import troppo grande",
-                    "La richiesta multipart supera i limiti configurati.",
-                    StatusCodes.Status413PayloadTooLarge,
-                    "document_import_request_too_large");
-            }
-            catch (InvalidDataException)
-            {
-                return CreateProblem(
-                    "Import troppo grande",
-                    "La richiesta multipart supera i limiti configurati.",
-                    StatusCodes.Status413PayloadTooLarge,
-                    "document_import_request_too_large");
-            }
-
-            if (form.Files.Count == 0)
-            {
-                return CreateBadRequestProblem(
-                    "Nessun file selezionato",
-                    "Seleziona almeno un file da importare.",
-                    "document_import_files_required");
-            }
-
-            try
-            {
-                ValidateImportBatch(form.Files, storageGuard);
-            }
-            catch (ArgumentException ex)
-            {
-                return CreateBadRequestProblem(
-                    "Import non valido",
-                    ex.Message,
-                    "document_import_invalid");
-            }
-            catch (DocumentStorageLimitException ex)
-            {
-                return MapDocumentStorageLimitException(ex);
-            }
-
-            bool forceOcr = string.Equals(
-                form["ocrPolicy"].ToString(),
-                "ForceAll",
-                StringComparison.OrdinalIgnoreCase);
-            string ocrLanguage = OcrLanguages.NormalizeCode(form["ocrLanguage"].ToString());
-
-            List<DocumentImportResult> importedDocuments = [];
-            foreach (IFormFile file in form.Files)
-            {
-                if (file.Length <= 0)
-                {
-                    return CreateBadRequestProblem(
-                        "File vuoto",
-                        $"Il file '{file.FileName}' e vuoto.",
-                        "document_import_empty_file");
-                }
-
-                try
-                {
-                    await using Stream stream = file.OpenReadStream();
-                    importedDocuments.Add(await documents.ImportAsync(stream, file.FileName, forceOcr, ocrLanguage, cancellationToken));
-                }
-                catch (ArgumentException ex)
-                {
-                    return CreateBadRequestProblem(
-                        "Import non valido",
-                        ex.Message,
-                        "document_import_invalid");
-                }
-                catch (DocumentStorageLimitException ex)
-                {
-                    return MapDocumentStorageLimitException(ex);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return CreateBadRequestProblem(
-                        "Path documento non valido",
-                        ex.Message,
-                        "document_import_invalid_path");
-                }
-            }
-
-            return Results.Ok(new DocumentImportResponse(importedDocuments));
         });
 
         app.MapDelete("/api/documents/{id:long}", async (

@@ -9,7 +9,7 @@ Required for development:
 
 - Windows 10 1809 or newer.
 - PowerShell 7 (`pwsh`).
-- .NET 10 SDK.
+- .NET 10 SDK. The repository pins SDK selection with `global.json` and allows roll-forward within the .NET 10 feature line.
 - Node.js matching `^20.19.0 || >=22.12.0` with npm for `src\OnlyRag.Web`.
 - Microsoft Edge WebView2 Runtime.
 
@@ -45,7 +45,9 @@ Optional dependencies are configured from **Settings** in the desktop app:
   In offline or enterprise-managed environments, use an approved software distribution path.
 - **LibreOffice**: when missing, the app opens the official LibreOffice download page.
 - **OCR**: **Configura OCR** creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`
-  and installs the pinned PaddleOCR requirements shipped with the app.
+  and installs the pinned PaddleOCR requirements shipped with the app. The default `auto`
+  provisioning mode selects NVIDIA GPU packages for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi` reports a compatible Windows
+  driver, otherwise it installs the CPU runtime and reports the fallback reason in Diagnostics.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
@@ -327,7 +329,9 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
 - Legacy Office import requires LibreOffice: use **Scarica LibreOffice** in Settings, configure
   `soffice.exe`, or set `ONLYRAG_LIBREOFFICE_PATH`.
 - OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10 through 3.13 is
-  available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`.
+  available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`. For NVIDIA acceleration, update
+  the NVIDIA driver so PaddlePaddle can use the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 GPU wheel, rerun
+  **Configura OCR**, then select GPU in OCR settings.
 - App closes while work is active: confirm the running build includes the WPF shutdown flow and
   inspect `%LOCALAPPDATA%\OnlyRag\logs` for `Shutdown preparation` entries.
 - Installer build stops after publish: install Inno Setup 6 or pass `-InnoSetupCompiler` to

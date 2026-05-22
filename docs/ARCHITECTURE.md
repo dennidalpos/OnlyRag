@@ -27,7 +27,7 @@ dispatch still require explicit UI confirmation at the API boundary. Long-runnin
 without shell invocation, capture stdout/stderr concurrently, and terminate their process tree when
 the caller cancels.
 
-The document library is exposed through `GET /api/documents`, `GET /api/documents/{id}`, `POST /api/documents/import`, `DELETE /api/documents/{id}`, and `POST /api/documents/{id}/reindex`. Import computes SHA-256 while streaming the upload into local storage, deduplicates by hash, persists document metadata in SQLite, and enqueues a persistent `document-ingestion` job. Delete is physical: OnlyRag removes the SQLite record and deletes the copied file from `%LOCALAPPDATA%\OnlyRag\documents\originals`.
+The document library is exposed through `GET /api/documents`, `GET /api/documents/{id}`, `POST /api/documents/import`, `DELETE /api/documents/{id}`, and `POST /api/documents/{id}/reindex`. Import computes SHA-256 while streaming the upload into local storage, deduplicates by hash, persists document metadata in SQLite, and enqueues a persistent `document-ingestion` job. Multipart imports report per-file results: valid files remain imported even when another file in the same batch fails validation after the request-level quota checks. Delete is physical: OnlyRag removes the SQLite record and deletes the copied file from `%LOCALAPPDATA%\OnlyRag\documents\originals`.
 
 Chunk embedding is exposed through `POST /api/documents/{id}/embed` and `GET /api/documents/{id}/embedding-status`. The embedding job uses the configured Ollama embedding model, sends only chunk content to Ollama, checkpoints after each chunk or configured small batch, and upserts vectors by `(chunk_id, model)` plus chunk `content_hash`.
 

@@ -121,11 +121,19 @@ export type DependencyActionResponse = {
   message: string;
 };
 
+export type OcrProvisionRequest = {
+  confirmed: boolean;
+  runtimeTarget?: "auto" | "cpu" | "nvidia";
+};
+
 export type OcrProvisionStatus = {
   isConfigured: boolean;
   isRunning: boolean;
   message: string;
   lastError: string | null;
+  runtimeTarget: string;
+  resolvedRuntime: string;
+  runtimeDetail: string | null;
 };
 
 export type OcrLanguage = {
@@ -330,8 +338,19 @@ export type DocumentImportResult = {
   message: string;
 };
 
+export type DocumentImportFileResult = {
+  fileName: string;
+  document: ImportedDocument | null;
+  deduplicated: boolean;
+  succeeded: boolean;
+  message: string;
+  errorCode: string | null;
+};
+
 export type DocumentImportResponse = {
   documents: DocumentImportResult[];
+  results: DocumentImportFileResult[];
+  hasFailures: boolean;
 };
 
 export type DiagnosticsResponse = {

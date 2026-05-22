@@ -4,6 +4,41 @@
   "pythonMinimumVersion": "3.10.0",
   "pythonMaximumVersion": "3.13.x",
   "minimumFreeDiskBytes": 5368709120,
+  "runtimeTargets": [
+    {
+      "target": "cpu",
+      "requirementsFile": "requirements-cpu.txt",
+      "resolvedRuntime": "cpu",
+      "paddlePackage": "paddlepaddle",
+      "paddleVersion": "3.3.1"
+    },
+    {
+      "target": "nvidia",
+      "requirementsFile": "requirements-nvidia-cu129.txt",
+      "resolvedRuntime": "cuda129",
+      "paddlePackage": "paddlepaddle-gpu",
+      "paddleVersion": "3.3.0",
+      "cudnnPackage": "nvidia-cudnn-cu12",
+      "cudnnVersion": "9.9.0.52",
+      "minimumWindowsDriver": "576.02"
+    },
+    {
+      "target": "nvidia",
+      "requirementsFile": "requirements-nvidia-cu126.txt",
+      "resolvedRuntime": "cuda126",
+      "paddlePackage": "paddlepaddle-gpu",
+      "paddleVersion": "3.3.0",
+      "minimumWindowsDriver": "560.94"
+    },
+    {
+      "target": "nvidia",
+      "requirementsFile": "requirements-nvidia-cu118.txt",
+      "resolvedRuntime": "cuda118",
+      "paddlePackage": "paddlepaddle-gpu",
+      "paddleVersion": "3.3.0",
+      "minimumWindowsDriver": "520.06"
+    }
+  ],
   "modelCacheLocations": [
     "%USERPROFILE%\\.paddlex",
     "%USERPROFILE%\\.paddleocr"

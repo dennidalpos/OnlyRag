@@ -8,6 +8,7 @@ import {
   type OfficeConverterStatusResponse,
   type OcrLanguage,
   type OcrProcessingSettings,
+  type OcrProvisionRequest,
   type OcrProvisionStatus,
   type OcrSettings,
   type OllamaInstallStatus,
@@ -203,9 +204,10 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     setInfoMessage(null);
 
     try {
+      const request: OcrProvisionRequest = { confirmed: true, runtimeTarget: "auto" };
       const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/provision", {
         method: "POST",
-        body: JSON.stringify({ confirmed: true })
+        body: JSON.stringify(request)
       });
       setInfoMessage(response.message);
       await refreshDependencyStatus();

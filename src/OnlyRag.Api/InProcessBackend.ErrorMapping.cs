@@ -31,7 +31,7 @@ public static partial class InProcessBackend
         {
             OllamaErrorKind.InvalidUrl => CreateProblem(
                 "URL Ollama non valido",
-                exception.Message,
+                "L'indirizzo configurato per Ollama non e valido. Correggilo nelle impostazioni.",
                 StatusCodes.Status400BadRequest,
                 "ollama_invalid_url"),
             OllamaErrorKind.InvalidRequest => CreateProblem(
@@ -51,12 +51,12 @@ public static partial class InProcessBackend
                 "ollama_model_not_found"),
             OllamaErrorKind.Timeout => CreateProblem(
                 "Timeout Ollama",
-                exception.Message,
+                "Ollama non ha risposto entro il tempo configurato. Controlla il servizio o aumenta il timeout.",
                 StatusCodes.Status408RequestTimeout,
                 "ollama_timeout"),
             OllamaErrorKind.Unreachable => CreateProblem(
                 "Ollama non raggiungibile",
-                exception.Message,
+                "Ollama non e raggiungibile dall'app. Controlla che il servizio sia attivo e che l'endpoint sia corretto.",
                 StatusCodes.Status503ServiceUnavailable,
                 "ollama_unreachable"),
             _ => CreateProblem(
@@ -67,11 +67,11 @@ public static partial class InProcessBackend
         };
     }
 
-    private static IResult MapOfficeConversionException(OfficeConversionException exception)
+    private static IResult MapOfficeConversionException(OfficeConversionException _)
     {
         return CreateProblem(
             "Configurazione convertitore Office non valida",
-            exception.Message,
+            "La configurazione del convertitore Office non e valida. Controlla il percorso e i permessi nelle impostazioni.",
             StatusCodes.Status400BadRequest,
             "office_conversion_invalid_configuration");
     }

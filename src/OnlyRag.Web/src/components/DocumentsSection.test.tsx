@@ -37,7 +37,18 @@ describe("DocumentsSection", () => {
                   deduplicated: false,
                   message: "Importato."
                 }
-              ]
+              ],
+              results: [
+                {
+                  fileName: "contratto.pdf",
+                  document: documents[0],
+                  deduplicated: false,
+                  succeeded: true,
+                  message: "Importato.",
+                  errorCode: null
+                }
+              ],
+              hasFailures: false
             }
           };
         }
@@ -116,6 +127,62 @@ describe("DocumentsSection", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Import documento non riuscito dal backend.");
     });
+  });
+
+  it("summarizes partial import failures without dropping successful files", async () => {
+    let documents: ReturnType<typeof createDocument>[] = [];
+    mockApi([
+      { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      { path: "/api/documents", handler: () => ({ body: documents }) },
+      { path: "/api/documents/1", handler: () => ({ body: documents[0] }) },
+      { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
+      { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
+      { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() },
+      {
+        path: "/api/documents/import",
+        method: "POST",
+        handler: () => {
+          documents = [createDocument({ originalFileName: "ok.txt", fileExtension: ".txt" })];
+          return {
+            body: {
+              documents: [{ document: documents[0], deduplicated: false, message: "Importato." }],
+              results: [
+                {
+                  fileName: "ok.txt",
+                  document: documents[0],
+                  deduplicated: false,
+                  succeeded: true,
+                  message: "Importato.",
+                  errorCode: null
+                },
+                {
+                  fileName: "bad.json",
+                  document: null,
+                  deduplicated: false,
+                  succeeded: false,
+                  message: "Formato non supportato.",
+                  errorCode: "document_import_invalid"
+                }
+              ],
+              hasFailures: true
+            }
+          };
+        }
+      }
+    ]);
+
+    const { container } = render(<DocumentsSection />);
+    await screen.findByText("Nessun documento presente. Importa un file per iniziare.");
+
+    const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
+    await userEvent.upload(fileInput!, [
+      new File(["ok"], "ok.txt", { type: "text/plain" }),
+      new File(["bad"], "bad.json", { type: "application/json" })
+    ]);
+
+    expect(await screen.findByText(/1 file importati.*1 file non importati: bad\.json/)).toBeInTheDocument();
+    expect((await screen.findAllByText("ok.txt")).length).toBeGreaterThan(0);
   });
 
   it("surfaces repeated polling failures while keeping the last successful document state", async () => {

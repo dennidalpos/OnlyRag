@@ -10,8 +10,15 @@ public sealed record DependencyActionResponse(
     bool Started,
     string Message);
 
+public sealed record OcrProvisionRequest(
+    bool Confirmed,
+    string? RuntimeTarget = null);
+
 public sealed record OcrProvisionStatus(
     bool IsConfigured,
     bool IsRunning,
     string Message,
-    string? LastError);
+    string? LastError,
+    string RuntimeTarget = "auto",
+    string ResolvedRuntime = "unknown",
+    string? RuntimeDetail = null);

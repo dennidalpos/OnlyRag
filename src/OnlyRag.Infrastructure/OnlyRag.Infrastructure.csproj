@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\scripts\ocr\**\*">
+    <None Include="..\..\scripts\ocr\**\*" Exclude="..\..\scripts\ocr\**\__pycache__\**;..\..\scripts\ocr\**\*.pyc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>scripts\ocr\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </None>

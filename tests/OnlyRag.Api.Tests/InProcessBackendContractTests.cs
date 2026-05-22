@@ -101,14 +101,58 @@ public sealed partial class InProcessBackendTests
         string body = await response.Content.ReadAsStringAsync();
         using JsonDocument json = JsonDocument.Parse(body);
         JsonElement result = json.RootElement.GetProperty("documents")[0];
+        JsonElement fileResult = json.RootElement.GetProperty("results")[0];
         JsonElement document = result.GetProperty("document");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(json.RootElement.GetProperty("hasFailures").GetBoolean());
         Assert.False(result.GetProperty("deduplicated").GetBoolean());
+        Assert.Equal("Contract.txt", fileResult.GetProperty("fileName").GetString());
+        Assert.True(fileResult.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, fileResult.GetProperty("errorCode").ValueKind);
         Assert.Equal("Contract.txt", document.GetProperty("originalFileName").GetString());
         Assert.Equal("Queued", document.GetProperty("status").GetString());
         Assert.True(document.TryGetProperty("currentJobId", out _));
         Assert.False(document.TryGetProperty("CurrentJobId", out _));
+    }
+
+    [Fact]
+    public async Task ApiContracts_CoreRuntimeDtosUseCamelCaseShapes()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("contract-core-dto-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        SqliteLocalJobQueue queue = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store), queueDescriptor);
+        await queue.CreateAsync(new CreateLocalJobRequest("contract-job", "{}", Priority: 7));
+
+        using HttpResponseMessage jobsResponse = await httpClient.GetAsync("/api/jobs");
+        using JsonDocument jobsJson = JsonDocument.Parse(await jobsResponse.Content.ReadAsStringAsync());
+        JsonElement job = jobsJson.RootElement[0];
+
+        using HttpResponseMessage settingsResponse = await httpClient.GetAsync("/api/settings/ollama");
+        using JsonDocument settingsJson = JsonDocument.Parse(await settingsResponse.Content.ReadAsStringAsync());
+
+        using HttpResponseMessage chatResponse = await httpClient.PostAsJsonAsync(
+            "/api/chat",
+            new ChatRequest("", "gemma3:4b", UseDocuments: false, SelectedDocumentIds: [], ConversationId: null),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, jobsResponse.StatusCode);
+        Assert.True(job.TryGetProperty("progressPercent", out _));
+        Assert.True(job.TryGetProperty("currentStep", out _));
+        Assert.False(job.TryGetProperty("ProgressPercent", out _));
+
+        Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
+        Assert.True(settingsJson.RootElement.TryGetProperty("ollamaBaseUrl", out _));
+        Assert.True(settingsJson.RootElement.TryGetProperty("trustNonLocalEndpoint", out _));
+        Assert.False(settingsJson.RootElement.TryGetProperty("OllamaBaseUrl", out _));
+
+        await AssertProblemAsync(
+            chatResponse,
+            HttpStatusCode.BadRequest,
+            "Messaggio non valido",
+            "chat_validation_failed");
     }
 
     private static async Task AssertProblemAsync(

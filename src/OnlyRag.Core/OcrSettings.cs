@@ -20,10 +20,10 @@ public sealed record OcrSettings(
     string Device)
 {
     public const string DefaultProfile = "balanced";
-    public const int DefaultPdfDpi = 200;
+    public const int DefaultPdfDpi = 220;
     public const string DefaultModelPreset = "PP-OCRv5";
     public const string DefaultModelVersion = "PP-OCRv5";
-    public const int DefaultDetectionSideLimit = 960;
+    public const int DefaultDetectionSideLimit = 1152;
     public const double DefaultDetectionThreshold = 0.30d;
     public const double DefaultDetectionBoxThreshold = 0.60d;
     public const double DefaultDetectionUnclipRatio = 1.50d;
@@ -43,14 +43,14 @@ public sealed record OcrSettings(
         {
             "fast" => new OcrSettings(
                 "fast",
-                150,
+                160,
                 DefaultModelPreset,
                 DefaultModelVersion,
-                736,
-                0.35d,
-                0.65d,
-                1.40d,
-                0.55d,
+                896,
+                0.38d,
+                0.68d,
+                1.35d,
+                0.58d,
                 true,
                 false,
                 false,
@@ -62,11 +62,11 @@ public sealed record OcrSettings(
                 300,
                 DefaultModelPreset,
                 DefaultModelVersion,
-                1280,
-                0.25d,
-                0.55d,
-                1.70d,
-                0.45d,
+                1536,
+                0.23d,
+                0.52d,
+                1.75d,
+                0.42d,
                 true,
                 true,
                 true,
@@ -99,7 +99,7 @@ public sealed record OcrSettings(
         string profile = NormalizeProfile(settings.Profile);
         if (profile is not "custom")
         {
-            return ForProfile(profile);
+            return ForProfile(profile) with { Device = NormalizeDevice(settings.Device) };
         }
 
         return new OcrSettings(

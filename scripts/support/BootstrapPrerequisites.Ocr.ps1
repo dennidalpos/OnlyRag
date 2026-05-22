@@ -238,12 +238,13 @@ function Ensure-OcrEnvironment {
 
         Invoke-Native -FilePath $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check")
 
-        # Upgrade OCR packages only when requirements.txt has changed; otherwise just install missing.
+        # Upgrade OCR packages only when OCR requirement files changed; otherwise just install missing.
         $requirementsStamp = Join-Path $venvPath ".requirements-stamp"
         $requirementsChanged = $true
+        $requirementFiles = Get-ChildItem -LiteralPath (Split-Path -Parent $ocrRequirementsPath) -Filter "requirements*.txt" -File
         if (Test-Path -LiteralPath $requirementsStamp) {
             $stampMtime = (Get-Item $requirementsStamp).LastWriteTimeUtc
-            $reqMtime   = (Get-Item $ocrRequirementsPath).LastWriteTimeUtc
+            $reqMtime = ($requirementFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
             $requirementsChanged = $reqMtime -gt $stampMtime
         }
 

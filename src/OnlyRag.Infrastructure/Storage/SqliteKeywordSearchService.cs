@@ -131,7 +131,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            double score = Math.Max(1, limit - results.Count);
+            double score = ConvertBm25RankToScore(reader.GetDouble(3), limit, results.Count);
             results.Add(new KeywordSearchResult(
                 reader.GetInt64(0),
                 reader.GetInt64(1),
@@ -140,6 +140,18 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         }
 
         return results;
+    }
+
+    private static double ConvertBm25RankToScore(double rank, int limit, int resultIndex)
+    {
+        if (!double.IsFinite(rank))
+        {
+            return Math.Max(1, limit - resultIndex);
+        }
+
+        return rank < 0d
+            ? -rank
+            : 1d / (1d + rank);
     }
 
     private static async Task<bool> TableExistsAsync(

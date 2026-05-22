@@ -23,13 +23,34 @@ def package_version(name):
         return "not-installed"
 
 
-def check():
+def verify_gpu_available():
+    try:
+        import paddle
+    except Exception as exc:
+        raise RuntimeError(f"Runtime PaddlePaddle non importabile per GPU: {exc}") from exc
+
+    if not getattr(paddle.device, "is_compiled_with_cuda", lambda: False)():
+        raise RuntimeError("Runtime PaddlePaddle installato senza supporto CUDA.")
+
+    cuda_device = getattr(paddle.device, "cuda", None)
+    device_count = getattr(cuda_device, "device_count", lambda: 0)()
+    if device_count < 1:
+        raise RuntimeError("Nessuna GPU CUDA disponibile per PaddlePaddle.")
+
+
+def check(args):
     missing = []
-    for package in ("paddleocr", "PIL", "pypdfium2"):
+    for package in ("paddleocr", "paddle", "PIL", "pypdfium2"):
         try:
             __import__(package)
         except Exception as exc:
             missing.append(f"{package}: {exc}")
+
+    if args.device == "gpu":
+        try:
+            verify_gpu_available()
+        except Exception as exc:
+            missing.append(str(exc))
 
     available = len(missing) == 0
     write_json({
@@ -176,9 +197,10 @@ def build_paddle_kwargs(args):
 
     supported = set(inspect.signature(PaddleOCR).parameters)
     kwargs = {}
+    device = "gpu:0" if args.device == "gpu" else "cpu"
     add_if_supported(kwargs, supported, "lang", args.language)
     add_if_supported(kwargs, supported, "ocr_version", args.model_version)
-    add_if_supported(kwargs, supported, "device", args.device)
+    add_if_supported(kwargs, supported, "device", device)
     add_if_supported(kwargs, supported, "cpu_threads", args.cpu_threads)
     add_if_supported(kwargs, supported, "use_gpu", args.device == "gpu")
 
@@ -215,11 +237,15 @@ def ocr(args):
 
     os.environ["OMP_NUM_THREADS"] = str(args.cpu_threads)
     os.environ["CPU_NUM"] = str(args.cpu_threads)
+    if args.device == "gpu":
+        verify_gpu_available()
 
     # PaddleOCR 3.x removed show_log and renamed use_angle_cls → use_textline_orientation.
     try:
         engine = PaddleOCR(**build_paddle_kwargs(args))
-    except Exception:
+    except Exception as exc:
+        if args.device == "gpu":
+            raise RuntimeError(f"PaddleOCR GPU non inizializzato: {exc}") from exc
         engine = PaddleOCR(lang=args.language)
 
     # PaddleOCR 3.x: use predict(); 2.x: use ocr(). Both formats handled by normalize_paddle_result.
@@ -270,7 +296,7 @@ def main():
     args = parser.parse_args()
 
     if args.mode == "check":
-        return check()
+        return check(args)
     if args.mode == "prepare":
         if not args.input or not args.output_dir:
             raise ValueError("--input e --output-dir sono obbligatori per prepare")

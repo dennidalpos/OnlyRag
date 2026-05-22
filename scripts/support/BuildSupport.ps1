@@ -214,7 +214,12 @@ function Test-OnlyRagPublishPayload {
         "wwwroot\index.html",
         "vec0.dll",
         "scripts\ocr\paddle_ocr_bridge.py",
-        "scripts\ocr\requirements.txt"
+        "scripts\ocr\requirements.txt",
+        "scripts\ocr\requirements-common.txt",
+        "scripts\ocr\requirements-cpu.txt",
+        "scripts\ocr\requirements-nvidia-cu118.txt",
+        "scripts\ocr\requirements-nvidia-cu126.txt",
+        "scripts\ocr\requirements-nvidia-cu129.txt"
     )
 
     foreach ($requiredFile in $requiredFiles) {

@@ -183,7 +183,35 @@ begin
     BulletLine('Install', 'Download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/') + #13#10 +
     BulletLine('Verify', 'Open Settings > Apps and confirm Microsoft Edge WebView2 Runtime is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application') + #13#10 + #13#10 +
     ParagraphLine('After installing WebView2, run this {#AppName} setup again.') + #13#10 + #13#10 +
-    ParagraphLine('The installer includes the required .NET runtime components. Ollama, LibreOffice, and OCR/PaddleOCR Python packages remain optional feature dependencies configured from the app settings.');
+    ParagraphLine('The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Ollama, LibreOffice, Python OCR packages, and OCR GPU wheels remain optional feature dependencies configured from the app settings.');
+end;
+
+function FindNvidiaSmiPath(): String;
+var
+  SystemCandidate: String;
+begin
+  SystemCandidate := ExpandConstant('{sys}') + '\nvidia-smi.exe';
+  if FileExists(SystemCandidate) then
+  begin
+    Result := SystemCandidate;
+    Exit;
+  end;
+
+  Result := FileSearch('nvidia-smi.exe', GetEnv('PATH'));
+end;
+
+function NvidiaGpuOcrMemo(): String;
+begin
+  if FindNvidiaSmiPath() <> '' then
+  begin
+    Result :=
+      BulletLine('NVIDIA OCR', 'NVIDIA management tools were detected. The installed app includes OCR GPU provisioning manifests. After setup, open Settings > Diagnostics > Configure OCR, then select GPU in OCR settings.');
+  end
+  else
+  begin
+    Result :=
+      BulletLine('NVIDIA OCR', 'NVIDIA management tools were not detected. OCR provisioning will use the CPU runtime unless a compatible NVIDIA driver is installed later.');
+  end;
 end;
 
 function IsSupportedWindowsVersion(): Boolean;
@@ -226,4 +254,25 @@ begin
   end
   else
     Result := True;
+end;
+
+function UpdateReadyMemo(
+  Space: String;
+  NewLine: String;
+  MemoUserInfoInfo: String;
+  MemoDirInfo: String;
+  MemoTypeInfo: String;
+  MemoComponentsInfo: String;
+  MemoGroupInfo: String;
+  MemoTasksInfo: String): String;
+begin
+  Result := '';
+  if MemoDirInfo <> '' then
+    Result := Result + MemoDirInfo + NewLine + NewLine;
+  if MemoGroupInfo <> '' then
+    Result := Result + MemoGroupInfo + NewLine + NewLine;
+  if MemoTasksInfo <> '' then
+    Result := Result + MemoTasksInfo + NewLine + NewLine;
+
+  Result := Result + 'Optional feature dependencies:' + NewLine + NvidiaGpuOcrMemo();
 end;

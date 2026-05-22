@@ -3,10 +3,7 @@ import {
   apiRequest,
   type DocumentEmbeddingStatus,
   type DocumentImportResponse,
-  type DocumentOcrStatus,
-  type DocumentPipelineStatus,
   type ImportedDocument,
-  type LocalJob,
   type OcrLanguage,
   type OcrPolicy,
   type VectorBackendHealth
@@ -27,6 +24,7 @@ import {
   type PendingOcrAction
 } from "./DocumentsSection.controllerHelpers";
 import { isOcrCandidate } from "./DocumentsSection.helpers";
+import { useDocumentStatusPolling } from "./useDocumentStatusPolling";
 import { useDocumentPreviewController } from "./useDocumentPreviewController";
 
 export function useDocumentsSectionController() {
@@ -36,10 +34,6 @@ export function useDocumentsSectionController() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<number | null>(null);
-  const [selectedJob, setSelectedJob] = useState<LocalJob | null>(null);
-  const [embeddingStatus, setEmbeddingStatus] = useState<DocumentEmbeddingStatus | null>(null);
-  const [ocrStatus, setOcrStatus] = useState<DocumentOcrStatus | null>(null);
-  const [pipelineStatus, setPipelineStatus] = useState<DocumentPipelineStatus | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [vectorHealth, setVectorHealth] = useState<VectorBackendHealth | null>(null);
@@ -47,7 +41,14 @@ export function useDocumentsSectionController() {
   const [pendingOcrAction, setPendingOcrAction] = useState<PendingOcrAction | null>(null);
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>(fallbackOcrLanguages);
   const [documentRefreshStatus, setDocumentRefreshStatus] = useState(initialRefreshStatus);
-  const [detailRefreshStatus, setDetailRefreshStatus] = useState(initialRefreshStatus);
+  const {
+    detailRefreshStatus,
+    embeddingStatus,
+    ocrStatus,
+    pipelineStatus,
+    selectedJob,
+    setDetailRefreshStatus
+  } = useDocumentStatusPolling(selectedDocument);
   const preview = useDocumentPreviewController();
 
   useEffect(() => {
@@ -115,119 +116,6 @@ export function useDocumentsSectionController() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const jobId = selectedDocument?.currentJobId;
-    if (!jobId) {
-      setSelectedJob(null);
-      setDetailRefreshStatus(initialRefreshStatus);
-      return;
-    }
-    const fetch = () => apiRequest<LocalJob>(`/api/jobs/${jobId}`)
-      .then((job) => {
-        if (!cancelled) {
-          setSelectedJob(job);
-          setDetailRefreshStatus(markRefreshSuccess());
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : "Impossibile aggiornare il job selezionato.";
-          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
-        }
-      });
-    void fetch();
-    const interval = window.setInterval(fetch, 3000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedDocument?.currentJobId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const id = selectedDocument?.id;
-    if (!id) {
-      setEmbeddingStatus(null);
-      return;
-    }
-    const fetch = () => apiRequest<DocumentEmbeddingStatus>(`/api/documents/${id}/embedding-status`)
-      .then((s) => {
-        if (!cancelled) {
-          setEmbeddingStatus(s);
-          setDetailRefreshStatus(markRefreshSuccess());
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato embedding.";
-          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
-        }
-      });
-    void fetch();
-    const interval = window.setInterval(fetch, 3000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedDocument?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const id = selectedDocument?.id;
-    if (!id) {
-      setOcrStatus(null);
-      return;
-    }
-    const fetch = () => apiRequest<DocumentOcrStatus>(`/api/documents/${id}/ocr-status`)
-      .then((s) => {
-        if (!cancelled) {
-          setOcrStatus(s);
-          setDetailRefreshStatus(markRefreshSuccess());
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato OCR.";
-          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
-        }
-      });
-    void fetch();
-    const interval = window.setInterval(fetch, 3000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedDocument?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const id = selectedDocument?.id;
-    if (!id) {
-      setPipelineStatus(null);
-      return;
-    }
-    const fetch = () => apiRequest<DocumentPipelineStatus>(`/api/documents/${id}/pipeline-status`)
-      .then((s) => {
-        if (!cancelled) {
-          setPipelineStatus(s);
-          setDetailRefreshStatus(markRefreshSuccess());
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : "Impossibile aggiornare lo stato pipeline.";
-          setDetailRefreshStatus((current) => markRefreshFailure(current, message));
-        }
-      });
-    void fetch();
-    const interval = window.setInterval(fetch, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedDocument?.id]);
-
   async function refreshDocuments(preferredId?: number | null) {
     const docs = await apiRequest<ImportedDocument[]>("/api/documents");
     setDocuments(docs);
@@ -259,14 +147,25 @@ export function useDocumentsSectionController() {
       const response = await apiRequest<DocumentImportResponse>("/api/documents/import", { method: "POST", body: formData });
       const imported = response.documents;
       const lastId = imported[imported.length - 1]?.document.id ?? null;
-      await refreshDocuments(lastId);
+      if (lastId !== null) {
+        await refreshDocuments(lastId);
+      } else {
+        await refreshDocuments(selectedDocument?.id ?? null);
+      }
       const dedupCount = imported.filter((d) => d.deduplicated).length;
       const importCount = imported.length - dedupCount;
+      const failed = response.results.filter((result) => !result.succeeded);
+      const failedSummary = failed.length > 0
+        ? ` ${failed.length} file non importati: ${failed.map((result) => result.fileName).join(", ")}.`
+        : "";
+      const successSummary = dedupCount > 0
+        ? `${importCount} file importati, ${dedupCount} duplicati riutilizzati.`
+        : `${importCount} file importati. Analisi e indicizzazione in corso.`;
       setFeedback({
-        tone: "info",
-        message: dedupCount > 0
-          ? `${importCount} file importati, ${dedupCount} duplicati riutilizzati.`
-          : `${importCount} file importati. Analisi e indicizzazione in corso.`
+        tone: imported.length > 0 ? "info" : "error",
+        message: imported.length > 0
+          ? `${successSummary}${failedSummary}`
+          : failedSummary.trim() || "Nessun file importato."
       });
     } catch (err) {
       setFeedback({ tone: "error", message: err instanceof Error ? err.message : "Import documento non riuscito." });
