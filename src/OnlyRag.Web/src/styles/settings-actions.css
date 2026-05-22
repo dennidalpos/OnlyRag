@@ -1,0 +1,263 @@
+.settings-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.settings-actions--dirty {
+  padding-top: 2px;
+}
+
+.dirty-hint {
+  color: #6c581c;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.inline-field span {
+  color: #425066;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.inline-field select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #cfd8e2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+}
+
+.inline-field select:focus {
+  outline: 2px solid #2d6f8f;
+  border-color: #2d6f8f;
+}
+
+.settings-actions button,
+.model-row button {
+  flex: 0 1 auto;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #2d6f8f;
+  border-radius: 8px;
+  background: #2d6f8f;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.settings-actions button:disabled,
+.model-row button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.button-secondary {
+  border-color: #cfd8e2;
+  background: #ffffff;
+  color: #172033;
+}
+
+.button-danger {
+  border-color: #b03f3a;
+  background: #b03f3a;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid #d4dce5;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #425066;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+}
+
+.status-chip--online {
+  border-color: #b9d8c5;
+  background: #edf8f1;
+}
+
+.status-chip--offline {
+  border-color: #e7c9c9;
+  background: #fff4f3;
+  color: #8f302e;
+}
+
+.status-chip--muted {
+  border-color: #d4dce5;
+  background: #f8fafc;
+  color: #627084;
+}
+
+.diagnostic-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.diagnostic-row:last-child {
+  border-bottom: 0;
+}
+
+.diagnostic-label {
+  color: #425066;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.diagnostic-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #172033;
+  font-size: 13px;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.telemetry-item {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.telemetry-item span {
+  color: #425066;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.telemetry-item strong {
+  color: #172033;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.telemetry-item small {
+  color: #627084;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.panel-note {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.panel-note p {
+  color: #556277;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.panel-note--warning {
+  border-color: #e4d4a4;
+  background: #fff8df;
+}
+
+.model-list {
+  display: grid;
+  gap: 10px;
+}
+
+.model-row {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.model-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.model-row strong {
+  color: #172033;
+}
+
+.model-row span,
+.model-row--empty p {
+  color: #627084;
+  font-size: 13px;
+}
+
+.feedback-banner {
+  padding: 12px 14px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #425066;
+}
+
+.feedback-banner--info {
+  border-color: #b9d8c5;
+  background: #edf8f1;
+}
+
+.feedback-banner--error {
+  border-color: #e7c9c9;
+  background: #fff4f3;
+  color: #8f302e;
+}
+
+.feedback-banner--spaced {
+  margin-bottom: 24px;
+}
+
+.settings-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.settings-list div:last-child {
+  border-bottom: 0;
+}
+
+.settings-list span {
+  color: #556277;
+}
+
+.settings-list strong {
+  color: #172033;
+  font-weight: 650;
+}
+

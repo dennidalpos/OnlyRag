@@ -169,6 +169,104 @@ describe("SettingsSection", () => {
     expect(await screen.findByText("Office non disponibile.")).toBeInTheDocument();
   });
 
+  it("renders bounded settings sections and saves a performance preset", async () => {
+    const api = mockApi([
+      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      {
+        path: "/api/office-converter/status",
+        response: {
+          state: "Missing",
+          isAvailable: false,
+          executablePath: null,
+          message: "LibreOffice non installato.",
+          suggestion: null,
+          conversionTimeoutSeconds: 120
+        }
+      },
+      {
+        path: "/api/settings/performance",
+        response: createPerformanceSettings({ profile: "auto", effectiveProfile: "balanced" })
+      },
+      { path: "/api/settings/ingestion", response: { chunkSizeTokens: 800, overlapTokens: 120 } },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
+      {
+        path: "/api/settings/ocr",
+        response: {
+          profile: "balanced",
+          pdfDpi: 220,
+          modelPreset: "PP-OCRv5",
+          modelVersion: "PP-OCRv5",
+          detectionSideLimit: 1152,
+          detectionThreshold: 0.3,
+          detectionBoxThreshold: 0.6,
+          detectionUnclipRatio: 1.5,
+          recognitionScoreThreshold: 0.5,
+          useTextlineOrientation: true,
+          useDocumentOrientationClassification: false,
+          useDocumentUnwarping: false,
+          recognitionBatchSize: 6,
+          cpuThreads: 2,
+          device: "cpu"
+        }
+      },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "configured",
+          runtimeDetail: null
+        }
+      },
+      {
+        path: "/api/settings/performance",
+        method: "PUT",
+        handler: (request) => ({ body: JSON.parse(String(request.body)) })
+      }
+    ]);
+
+    render(
+      <SettingsSection
+        settings={createOllamaSettings()}
+        status={createOllamaStatus()}
+        models={[createModel()]}
+        loadError={null}
+        onDataChanged={async () => {}}
+      />
+    );
+
+    expect(await screen.findByRole("heading", { name: "Connessioni" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Prestazioni" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "OCR" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Ingestion" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "Diagnostica" }).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Modalità PC poco performante")).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Profilo prestazioni"), "power");
+    await userEvent.click(screen.getByRole("button", { name: "Salva prestazioni" }));
+
+    const saveCall = api.calls.find((call) => call.path === "/api/settings/performance" && call.method === "PUT");
+    expect(JSON.parse(String(saveCall?.body))).toMatchObject({
+      profile: "power",
+      effectiveProfile: "power",
+      maxParallelJobs: 4,
+      maxOcrParallelPages: 4,
+      embeddingBatchSize: 4,
+      translationBatchSize: 2,
+      maxContextChunks: 12,
+      requestTimeoutSeconds: 120
+    });
+  });
+
   it("preserves the selected OCR device when applying a profile preset", async () => {
     const api = mockApi([
       { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },

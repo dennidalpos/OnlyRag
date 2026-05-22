@@ -36,7 +36,7 @@ public static partial class InProcessBackend
                 descriptor.JobQueue.Persistent ? activeJobs.ToString() : "Disabled",
                 settings.OllamaBaseUrl,
                 runtime.StartedAtUtc,
-                performance.EnableLowResourceMode));
+                performance.EffectiveProfile == PerformanceProfileNames.Eco));
         });
 
         app.MapGet("/api/app/storage-status", async (ILocalStorageService storage, CancellationToken cancellationToken) =>

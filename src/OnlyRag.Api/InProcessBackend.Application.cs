@@ -75,6 +75,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         builder.Services.AddSingleton<DependencyProvisioningService>();
+        builder.Services.AddSingleton<OcrStartupAnalysisService>();
         builder.Services.AddSingleton<OcrGpuCapabilityService>();
         builder.Services.AddSingleton<SystemTelemetryService>();
         builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();

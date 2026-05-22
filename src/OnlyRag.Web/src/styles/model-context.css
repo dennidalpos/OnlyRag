@@ -1,0 +1,53 @@
+/* ── Model context window bar ─────────────────────────────────────── */
+
+.model-context-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  margin-top: 2px;
+}
+
+.model-context-bar__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #425066;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-context-bar__hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #627084;
+}
+
+.model-context-bar__track {
+  position: relative;
+  height: 8px;
+  background: #d9e0e8;
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.model-context-bar__fill {
+  height: 100%;
+  background: #2d6f8f;
+  border-radius: 4px;
+  transition: width 0.25s ease;
+  min-width: 4px;
+}
+
+.model-context-bar__track-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #627084;
+  text-align: right;
+}

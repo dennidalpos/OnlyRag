@@ -1,0 +1,277 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 32, 51, 0.42);
+}
+
+.compare-modal {
+  width: min(1180px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #cfd8e2;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.24);
+}
+
+.compare-modal__header,
+.compare-toolbar,
+.compare-footer,
+.compare-column__header {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compare-modal__header h3 {
+  margin: 0 0 4px;
+  color: #172033;
+  font-size: 18px;
+}
+
+.compare-modal__header span,
+.compare-toolbar span,
+.compare-column__header span {
+  color: #627084;
+  font-size: 13px;
+}
+
+.compare-toolbar {
+  padding: 10px 12px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.compare-toolbar button,
+.compare-modal__header button,
+.compare-footer button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #2d6f8f;
+  border-radius: 8px;
+  background: #2d6f8f;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.compare-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+button.button-secondary {
+  border-color: #cfd8e2;
+  background: #ffffff;
+  color: #172033;
+}
+
+button.button-danger {
+  border-color: #b03f3a;
+  background: #b03f3a;
+  color: #ffffff;
+}
+
+.compare-unit-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.compare-unit-pill {
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid #d4dce5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #425066;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.compare-unit-pill--active {
+  border-color: #2d6f8f;
+  background: #e9f3f8;
+  color: #16324f;
+  font-weight: 700;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+}
+
+.compare-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.compare-column--source {
+  background: #f8fafc;
+}
+
+.compare-column p {
+  flex: 1;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  min-height: 200px;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.compare-column textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #cfd8e2;
+  border-radius: 8px;
+  color: #172033;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.compare-column textarea:focus {
+  outline: 2px solid #2d6f8f;
+  border-color: #2d6f8f;
+}
+
+.document-dropzone__progress {
+  grid-column: 1 / -1;
+}
+
+.machine-translation-note {
+  padding: 10px 12px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.machine-translation-note summary {
+  cursor: pointer;
+  color: #425066;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.machine-translation-note p {
+  margin-top: 8px;
+  color: #556277;
+  font-size: 13px;
+}
+
+.compare-save-state {
+  color: #425066;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.compare-save-state--error {
+  color: #8f302e;
+}
+
+.compare-empty {
+  min-height: 180px;
+}
+
+.compare-footer {
+  padding: 4px 0;
+}
+
+.compare-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.compare-header-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Indeterminate progress bar */
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.progress-track--indeterminate {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-track--indeterminate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 25%;
+  border-radius: inherit;
+  background: #2d6f8f;
+  animation: progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+/* Ollama setup gate overlay */
+.setup-gate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 32, 51, 0.72);
+}
+
+.setup-gate-modal {
+  width: min(520px, 100%);
+  padding: 32px;
+  border: 1px solid #cfd8e2;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 24px 64px rgba(23, 32, 51, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setup-gate-modal h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #172033;
+}
+
+.setup-gate-modal h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #8f302e;
+}
+
+.setup-gate-modal p {
+  margin: 0;
+  color: #425066;
+  line-height: 1.6;
+}
+

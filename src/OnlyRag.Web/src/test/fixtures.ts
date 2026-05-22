@@ -216,6 +216,8 @@ export function createPerformanceSettings(overrides: Partial<PerformanceSettings
     maxContextChunks: 8,
     requestTimeoutSeconds: 120,
     enableLowResourceMode: false,
+    profile: "auto",
+    effectiveProfile: "balanced",
     ...overrides
   };
 }

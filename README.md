@@ -93,6 +93,9 @@ End users configure optional dependencies from **Settings** in the app:
 - **OCR**: the **Configura OCR** button prepares the per-user PaddleOCR environment under
   `%LOCALAPPDATA%\OnlyRag\ocr-python`. It auto-selects NVIDIA GPU packages for CUDA 12.9, 12.6,
   or 11.8 when `nvidia-smi` reports a compatible driver; otherwise it installs the CPU runtime.
+  At startup, OnlyRag analyzes OCR prerequisites and can offer a once-per-session prompt before
+  preparing this per-user runtime; it does not install or repair OCR dependencies without explicit
+  confirmation.
 
 ## Commands
 

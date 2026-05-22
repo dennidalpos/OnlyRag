@@ -22,3 +22,18 @@ public sealed record OcrProvisionStatus(
     string RuntimeTarget = "auto",
     string ResolvedRuntime = "unknown",
     string? RuntimeDetail = null);
+
+public sealed record OcrStartupAnalysisResponse(
+    bool ShouldPrompt,
+    bool IsWindowsSupported,
+    bool HasMinimumDiskSpace,
+    long AvailableDiskBytes,
+    long RequiredDiskBytes,
+    bool HasCompatiblePython,
+    bool IsOcrConfigured,
+    bool IsNvidiaRuntimeAvailable,
+    bool IsGpuUsable,
+    string RecommendedRuntimeTarget,
+    string Title,
+    string Message,
+    IReadOnlyList<string> Findings);

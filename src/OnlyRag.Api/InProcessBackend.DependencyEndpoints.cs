@@ -86,6 +86,13 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await dependencies.GetOcrStatusAsync(ocrEngine, gpuCapability, cancellationToken)));
 
+        app.MapGet("/api/dependencies/ocr/startup-analysis", async (
+            OcrStartupAnalysisService startupAnalysis,
+            IOcrEngine ocrEngine,
+            OcrGpuCapabilityService gpuCapability,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await startupAnalysis.AnalyzeAsync(ocrEngine, gpuCapability, cancellationToken)));
+
         app.MapPost("/api/dependencies/ocr/provision", (
             HttpContext httpContext,
             OcrProvisionRequest request,

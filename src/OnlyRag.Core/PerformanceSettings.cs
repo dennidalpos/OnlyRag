@@ -7,4 +7,6 @@ public sealed record PerformanceSettings(
     int TranslationBatchSize,
     int MaxContextChunks,
     int RequestTimeoutSeconds,
-    bool EnableLowResourceMode);
+    bool EnableLowResourceMode,
+    string Profile = PerformanceProfileNames.Auto,
+    string EffectiveProfile = PerformanceProfileNames.Eco);

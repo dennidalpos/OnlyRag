@@ -5,6 +5,7 @@ import type {
   OcrProcessingSettings,
   OcrSettings,
   OllamaSettings,
+  PerformanceProfile,
   PerformanceSettings
 } from "../api";
 export {
@@ -60,6 +61,8 @@ export function normalizeOfficeSettings(settings: OfficeConversionSettings): Off
 }
 
 export function normalizePerformanceSettings(settings: PerformanceSettings): PerformanceSettings {
+  const profile = normalizePerformanceProfile(settings.profile, settings.enableLowResourceMode);
+  const effectiveProfile = normalizePerformanceProfile(settings.effectiveProfile, false);
   return {
     maxParallelJobs: Number(settings.maxParallelJobs),
     maxOcrParallelPages: Number(settings.maxOcrParallelPages),
@@ -67,8 +70,35 @@ export function normalizePerformanceSettings(settings: PerformanceSettings): Per
     translationBatchSize: Number(settings.translationBatchSize),
     maxContextChunks: Number(settings.maxContextChunks),
     requestTimeoutSeconds: Number(settings.requestTimeoutSeconds),
-    enableLowResourceMode: settings.enableLowResourceMode
+    enableLowResourceMode: profile === "eco" || effectiveProfile === "eco",
+    profile,
+    effectiveProfile
   };
+}
+
+export function normalizePerformanceProfile(
+  value: string | null | undefined,
+  legacyLowResourceMode: boolean
+): PerformanceProfile {
+  if (legacyLowResourceMode && (!value || value === "auto")) {
+    return "eco";
+  }
+
+  switch ((value ?? "auto").trim().toLowerCase()) {
+    case "eco":
+      return "eco";
+    case "bilanciato":
+    case "balanced":
+      return "balanced";
+    case "potente":
+    case "power":
+      return "power";
+    case "personalizzato":
+    case "custom":
+      return "custom";
+    default:
+      return "auto";
+  }
 }
 
 export function normalizeIngestionSettings(settings: IngestionSettings): IngestionSettings {

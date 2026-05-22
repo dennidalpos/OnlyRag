@@ -186,7 +186,7 @@ public sealed class DependencyProvisioningService
                     null,
                     CancellationToken.None);
                 string venvVersionText = GetProcessVersionText(venvVersionResult);
-                Version? venvVersion = ParseVersion(venvVersionText);
+                Version? venvVersion = ParsePythonVersion(venvVersionText);
                 if (venvVersionResult.ExitCode != 0 || venvVersion is null || !IsSupportedOcrPythonVersion(venvVersion))
                 {
                     Directory.Delete(venvPath, recursive: true);
@@ -267,7 +267,7 @@ public sealed class DependencyProvisioningService
             }
 
             string versionText = GetProcessVersionText(result);
-            Version? version = ParseVersion(versionText);
+            Version? version = ParsePythonVersion(versionText);
             if (version is null)
             {
                 continue;
@@ -319,7 +319,7 @@ public sealed class DependencyProvisioningService
         return string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
     }
 
-    private static Version? ParseVersion(string text)
+    internal static Version? ParsePythonVersion(string text)
     {
         Match match = Regex.Match(text, @"(\d+)\.(\d+)\.(\d+)");
         return match.Success
@@ -339,7 +339,7 @@ public sealed class DependencyProvisioningService
         return version.Major == 3 && version.Minor >= 10 && version.Minor <= 13;
     }
 
-    private static string? ResolveExecutable(string executableName)
+    internal static string? ResolveExecutable(string executableName)
     {
         string normalizedName = executableName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? executableName

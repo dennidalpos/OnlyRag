@@ -211,6 +211,7 @@ function Test-OnlyRagPublishPayload {
         "Microsoft.Web.WebView2.Core.dll",
         "Microsoft.Web.WebView2.Wpf.dll",
         "WebView2Loader.dll",
+        "e_sqlite3.dll",
         "wwwroot\index.html",
         "vec0.dll",
         "scripts\ocr\paddle_ocr_bridge.py",
@@ -219,7 +220,8 @@ function Test-OnlyRagPublishPayload {
         "scripts\ocr\requirements-cpu.txt",
         "scripts\ocr\requirements-nvidia-cu118.txt",
         "scripts\ocr\requirements-nvidia-cu126.txt",
-        "scripts\ocr\requirements-nvidia-cu129.txt"
+        "scripts\ocr\requirements-nvidia-cu129.txt",
+        "scripts\ocr\runtime-manifest.json"
     )
 
     foreach ($requiredFile in $requiredFiles) {

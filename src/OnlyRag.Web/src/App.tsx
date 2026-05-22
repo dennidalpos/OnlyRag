@@ -17,9 +17,11 @@ import { ChatSection } from "./components/ChatSection";
 import { DocumentsSection } from "./components/DocumentsSection";
 import { JobsSection } from "./components/JobsSection";
 import { OllamaSetupGate } from "./components/OllamaSetupGate";
+import { OcrStartupPrompt } from "./components/OcrStartupPrompt";
 import { SectionId, Sidebar } from "./components/Sidebar";
 import { SettingsSection } from "./components/SettingsSection";
 import { TranslationSection } from "./components/TranslationSection";
+import { useOcrStartupPrompt } from "./components/useOcrStartupPrompt";
 import {
   formatLastRefresh,
   initialRefreshStatus,
@@ -81,6 +83,7 @@ export default function App() {
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const ocrStartupPrompt = useOcrStartupPrompt();
 
   async function refreshBackendStatus() {
     try {
@@ -186,6 +189,11 @@ export default function App() {
       }
 
       await refreshOllamaData();
+      if (isCancelled) {
+        return;
+      }
+
+      await ocrStartupPrompt.refresh();
       if (!isCancelled) {
         setInitialCheckDone(true);
       }
@@ -212,6 +220,14 @@ export default function App() {
     }
     previousSectionRef.current = activeSection;
   }, [activeSection]);
+
+  const hasBlockingOllamaSetup =
+    Boolean(ollamaInstallStatus && !ollamaInstallStatus.cliInstalled)
+    || !ollamaStatus
+    || !ollamaStatus.isReachable
+    || ollamaModels.length === 0
+    || !ollamaSettings?.defaultChatModel
+    || !ollamaSettings?.defaultEmbeddingModel;
 
   return (
     <div className="desktop-shell">
@@ -276,6 +292,18 @@ export default function App() {
           onOpenSettings={() => setActiveSection("settings")}
           onInstallOllama={() => void handleInstallOllama()}
           onRecheck={() => void handleRecheckOllama()}
+        />
+      )}
+      {initialCheckDone && activeSection !== "settings" && !hasBlockingOllamaSetup && !ocrStartupPrompt.isDismissed && (
+        <OcrStartupPrompt
+          analysis={ocrStartupPrompt.analysis}
+          isConfiguring={ocrStartupPrompt.isConfiguring}
+          onConfirm={() => void ocrStartupPrompt.configure()}
+          onDismiss={ocrStartupPrompt.dismiss}
+          onOpenSettings={() => {
+            ocrStartupPrompt.dismiss();
+            setActiveSection("settings");
+          }}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import type {
   OcrProcessingSettings,
   OcrSettings,
   OllamaSettings,
+  PerformanceProfile,
   PerformanceSettings
 } from "../api";
 
@@ -34,7 +35,46 @@ export const emptyPerformanceSettings: PerformanceSettings = {
   translationBatchSize: 1,
   maxContextChunks: 8,
   requestTimeoutSeconds: 120,
-  enableLowResourceMode: false
+  enableLowResourceMode: false,
+  profile: "auto",
+  effectiveProfile: "eco"
+};
+
+export const performanceProfilePresets: Record<Exclude<PerformanceProfile, "auto" | "custom">, PerformanceSettings> = {
+  eco: {
+    ...emptyPerformanceSettings,
+    profile: "eco",
+    effectiveProfile: "eco",
+    enableLowResourceMode: true,
+    maxParallelJobs: 1,
+    maxOcrParallelPages: 1,
+    embeddingBatchSize: 1,
+    translationBatchSize: 1,
+    maxContextChunks: 6,
+    requestTimeoutSeconds: 180
+  },
+  balanced: {
+    ...emptyPerformanceSettings,
+    profile: "balanced",
+    effectiveProfile: "balanced",
+    maxParallelJobs: 2,
+    maxOcrParallelPages: 2,
+    embeddingBatchSize: 2,
+    translationBatchSize: 1,
+    maxContextChunks: 8,
+    requestTimeoutSeconds: 120
+  },
+  power: {
+    ...emptyPerformanceSettings,
+    profile: "power",
+    effectiveProfile: "power",
+    maxParallelJobs: 4,
+    maxOcrParallelPages: 4,
+    embeddingBatchSize: 4,
+    translationBatchSize: 2,
+    maxContextChunks: 12,
+    requestTimeoutSeconds: 120
+  }
 };
 
 export const emptyIngestionSettings: IngestionSettings = {

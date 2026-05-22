@@ -11,7 +11,6 @@ from pathlib import Path
 # Must be set before paddleocr/paddlex is imported.
 os.environ.setdefault("PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT", "0")
 
-
 def write_json(payload):
     sys.stdout.write(json.dumps(payload, ensure_ascii=False))
 

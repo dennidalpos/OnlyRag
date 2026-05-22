@@ -169,6 +169,27 @@ public sealed partial class InProcessBackendTests
             : null;
     }
 
+    private static void DeleteDirectoryWithRetry(string path)
+    {
+        const int maxAttempts = 5;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                System.Threading.Thread.Sleep(100 * attempt);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                System.Threading.Thread.Sleep(100 * attempt);
+            }
+        }
+    }
+
     private sealed class FakeProcessLauncher : ILocalProcessLauncher
     {
         public List<ProcessStartInfo> StartedProcesses { get; } = [];
@@ -242,7 +263,7 @@ public sealed partial class InProcessBackendTests
         {
             if (Directory.Exists(Root))
             {
-                Directory.Delete(Root, recursive: true);
+                DeleteDirectoryWithRetry(Root);
             }
         }
     }

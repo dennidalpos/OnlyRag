@@ -117,12 +117,54 @@ public sealed partial class InProcessBackendTests
         Assert.NotNull(saved);
         Assert.NotNull(current);
         Assert.True(current.EnableLowResourceMode);
+        Assert.Equal(PerformanceProfileNames.Eco, current.Profile);
+        Assert.Equal(PerformanceProfileNames.Eco, current.EffectiveProfile);
         Assert.Equal(1, current.MaxParallelJobs);
         Assert.Equal(1, current.MaxOcrParallelPages);
         Assert.Equal(1, current.EmbeddingBatchSize);
         Assert.Equal(1, current.TranslationBatchSize);
-        Assert.Equal(8, current.MaxContextChunks);
+        Assert.Equal(6, current.MaxContextChunks);
         Assert.Equal(180, current.RequestTimeoutSeconds);
+    }
+
+    [Fact]
+    public async Task PerformanceSettings_ProfilePresetNormalizesAndPersists()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        PerformanceSettings request = new(
+            MaxParallelJobs: 1,
+            MaxOcrParallelPages: 1,
+            EmbeddingBatchSize: 1,
+            TranslationBatchSize: 1,
+            MaxContextChunks: 6,
+            RequestTimeoutSeconds: 180,
+            EnableLowResourceMode: false,
+            Profile: PerformanceProfileNames.Power);
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync(
+            "/api/settings/performance",
+            request,
+            JsonOptions);
+        PerformanceSettings? saved = await putResponse.Content.ReadFromJsonAsync<PerformanceSettings>(JsonOptions);
+        PerformanceSettings? current = await httpClient.GetFromJsonAsync<PerformanceSettings>(
+            "/api/settings/performance",
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        Assert.NotNull(saved);
+        Assert.NotNull(current);
+        Assert.Equal(PerformanceProfileNames.Power, current.Profile);
+        Assert.Equal(PerformanceProfileNames.Power, current.EffectiveProfile);
+        Assert.False(current.EnableLowResourceMode);
+        Assert.Equal(4, current.MaxParallelJobs);
+        Assert.Equal(4, current.MaxOcrParallelPages);
+        Assert.Equal(4, current.EmbeddingBatchSize);
+        Assert.Equal(2, current.TranslationBatchSize);
+        Assert.Equal(12, current.MaxContextChunks);
+        Assert.Equal(120, current.RequestTimeoutSeconds);
     }
 
     [Fact]
@@ -345,6 +387,29 @@ public sealed partial class InProcessBackendTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(processLauncher.StartedProcesses);
+    }
+
+    [Fact]
+    public async Task DependencyOcrStartupAnalysis_DoesNotStartProvisioning()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        FakeProcessLauncher processLauncher = new();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ProcessLauncher = processLauncher });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        OcrStartupAnalysisResponse? analysis = await httpClient.GetFromJsonAsync<OcrStartupAnalysisResponse>(
+            "/api/dependencies/ocr/startup-analysis",
+            JsonOptions);
+
+        Assert.NotNull(analysis);
+        Assert.Equal(
+            0,
+            processLauncher.StartedProcesses.Count(process =>
+                process.ArgumentList.Any(argument =>
+                    argument.Contains("pip", StringComparison.OrdinalIgnoreCase)
+                    || argument.Contains("venv", StringComparison.OrdinalIgnoreCase))));
     }
 
     [Fact]

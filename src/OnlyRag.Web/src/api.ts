@@ -52,7 +52,11 @@ export type PerformanceSettings = {
   maxContextChunks: number;
   requestTimeoutSeconds: number;
   enableLowResourceMode: boolean;
+  profile: PerformanceProfile;
+  effectiveProfile: PerformanceProfile;
 };
+
+export type PerformanceProfile = "auto" | "eco" | "balanced" | "power" | "custom";
 
 export type OcrSettings = {
   profile: string;
@@ -134,6 +138,22 @@ export type OcrProvisionStatus = {
   runtimeTarget: string;
   resolvedRuntime: string;
   runtimeDetail: string | null;
+};
+
+export type OcrStartupAnalysis = {
+  shouldPrompt: boolean;
+  isWindowsSupported: boolean;
+  hasMinimumDiskSpace: boolean;
+  availableDiskBytes: number;
+  requiredDiskBytes: number;
+  hasCompatiblePython: boolean;
+  isOcrConfigured: boolean;
+  isNvidiaRuntimeAvailable: boolean;
+  isGpuUsable: boolean;
+  recommendedRuntimeTarget: "cpu" | "nvidia";
+  title: string;
+  message: string;
+  findings: string[];
 };
 
 export type OcrLanguage = {

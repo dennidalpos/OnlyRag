@@ -1,7 +1,43 @@
-import {
-  SettingsRangeField
-} from "../SettingsSection.helpers";
+import type { PerformanceProfile, PerformanceSettings } from "../../api";
+import { performanceProfilePresets } from "../SettingsSection.defaults";
+import { SettingsRangeField } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
+
+const profileOptions: Array<{ value: PerformanceProfile; label: string; detail: string }> = [
+  { value: "auto", label: "Auto", detail: "Selezione automatica da RAM e CPU locali." },
+  { value: "eco", label: "Eco", detail: "1 job, batch minimi e timeout piu lungo." },
+  { value: "balanced", label: "Bilanciato", detail: "2 job e batch moderati per uso quotidiano." },
+  { value: "power", label: "Potente", detail: "4 job e batch piu ampi per workstation." },
+  { value: "custom", label: "Personalizzato", detail: "Valori manuali salvati dagli slider." }
+];
+
+function applyPerformanceProfile(
+  current: PerformanceSettings,
+  profile: PerformanceProfile
+): PerformanceSettings {
+  if (profile === "custom") {
+    return {
+      ...current,
+      profile,
+      effectiveProfile: "custom",
+      enableLowResourceMode: false
+    };
+  }
+
+  if (profile === "auto") {
+    return {
+      ...current,
+      profile,
+      enableLowResourceMode: false
+    };
+  }
+
+  return {
+    ...performanceProfilePresets[profile],
+    profile,
+    effectiveProfile: profile
+  };
+}
 
 export function PerformanceSettingsPanel() {
   const {
@@ -14,42 +50,46 @@ export function PerformanceSettingsPanel() {
     isBusy
   } = useSettingsSectionContext();
 
+  const manualControlsEnabled = performanceFormState.profile === "custom";
+  const currentProfile = profileOptions.find((option) => option.value === performanceFormState.profile)
+    ?? profileOptions[0];
+
   return (
-        <div className="settings-card settings-card--wide">
+        <div className="settings-card">
           <div className="settings-card__header">
             <h3>Prestazioni</h3>
-            {performanceFormState.enableLowResourceMode && (
-              <span className="status-chip status-chip--offline">Modalità risparmio risorse</span>
-            )}
+            <span className="status-chip status-chip--muted">
+              Effettivo: {profileOptions.find((option) => option.value === performanceFormState.effectiveProfile)?.label ?? "Auto"}
+            </span>
           </div>
           <div className="settings-form">
-            <label className="toggle-row" htmlFor="low-resource-mode">
-              <input
-                id="low-resource-mode"
-                type="checkbox"
-                checked={performanceFormState.enableLowResourceMode}
+            <label className="field-group" htmlFor="performance-profile">
+              <span>Profilo prestazioni</span>
+              <select
+                id="performance-profile"
+                value={performanceFormState.profile}
                 onChange={(event) =>
-                  setPerformanceFormState((current) => ({
-                    ...current,
-                    enableLowResourceMode: event.target.checked
-                  }))
+                  setPerformanceFormState((current) =>
+                    applyPerformanceProfile(current, event.target.value as PerformanceProfile)
+                  )
                 }
-              />
-              <span>Modalità PC poco performante</span>
+              >
+                {profileOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </label>
-            {performanceFormState.enableLowResourceMode && (
-              <div className="panel-note" style={{ marginTop: 0 }}>
-                <p>Forza job paralleli, batch OCR, embedding e traduzione a 1. Consigliato su macchine con meno di 8 GB di RAM o CPU lenta.</p>
-              </div>
-            )}
+            <div className="panel-note" style={{ marginTop: 0 }}>
+              <p>{currentProfile.detail}</p>
+            </div>
             <div className="settings-grid">
               <SettingsRangeField
                 id="max-parallel-jobs"
                 label="Job paralleli"
                 min={1}
                 max={4}
-                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxParallelJobs}
-                disabled={performanceFormState.enableLowResourceMode}
+                value={performanceFormState.maxParallelJobs}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, maxParallelJobs: value }))
                 }
@@ -59,8 +99,8 @@ export function PerformanceSettingsPanel() {
                 label="Pagine OCR parallele"
                 min={1}
                 max={4}
-                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.maxOcrParallelPages}
-                disabled={performanceFormState.enableLowResourceMode}
+                value={performanceFormState.maxOcrParallelPages}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, maxOcrParallelPages: value }))
                 }
@@ -70,8 +110,8 @@ export function PerformanceSettingsPanel() {
                 label="Batch embedding"
                 min={1}
                 max={8}
-                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.embeddingBatchSize}
-                disabled={performanceFormState.enableLowResourceMode}
+                value={performanceFormState.embeddingBatchSize}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, embeddingBatchSize: value }))
                 }
@@ -81,8 +121,8 @@ export function PerformanceSettingsPanel() {
                 label="Batch traduzione"
                 min={1}
                 max={4}
-                value={performanceFormState.enableLowResourceMode ? 1 : performanceFormState.translationBatchSize}
-                disabled={performanceFormState.enableLowResourceMode}
+                value={performanceFormState.translationBatchSize}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, translationBatchSize: value }))
                 }
@@ -94,6 +134,7 @@ export function PerformanceSettingsPanel() {
                 max={24}
                 value={performanceFormState.maxContextChunks}
                 hint={recommendedMaxContextChunks ? `Suggerito: ${recommendedMaxContextChunks}` : null}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, maxContextChunks: value }))
                 }
@@ -105,6 +146,7 @@ export function PerformanceSettingsPanel() {
                 max={600}
                 value={performanceFormState.requestTimeoutSeconds}
                 formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
+                disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, requestTimeoutSeconds: value }))
                 }

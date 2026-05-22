@@ -1,45 +1,69 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-22T21:18:00+02:00",
+  "last_updated": "2026-05-22T22:19:57+02:00",
   "status": "active",
-  "current_phase": "ocr-gpu-telemetry-completed",
+  "current_phase": "final-readiness-verified",
   "production_target": true,
-  "summary": "OCR GPU capability blocking, device-specific presets, CUDA bridge diagnostics, provisioning cleanup, local telemetry, tests, docs, local OCR GPU runtime repair, and residual draw.io backup cleanup are complete.",
-  "active_objective": "",
-  "assumptions": [
-    "GPU presets keep the same quality settings as CPU presets; only recognition batch size differs.",
-    "Telemetry is local live diagnostics only: no remote reporting, no database history, and no periodic background collection outside Settings."
-  ],
-  "current_tasks": [],
-  "next_tasks": [],
-  "known_residual": [],
-  "oversized_files": [
+  "summary": "Final readiness pass completed. Repository gate, security audits, build, tests, installer prerequisite self-test, unsigned installer packaging, and non-invasive release evidence passed. Release signing and lifecycle verification remain blocked on external prerequisites.",
+  "active_objective": "Complete signed installer verification when a trusted Windows code-signing certificate and clean verification machine are available.",
+  "residuals": [
     {
-      "path": "src/OnlyRag.Web/src/styles.css",
-      "lines": 2141,
-      "reason": "Pre-existing monolithic stylesheet; this task only added a small telemetry block. Split deferred to a dedicated CSS organization task."
+      "priority": 1,
+      "id": "signed-release",
+      "title": "Complete signed installer verification",
+      "reason": "A trusted Windows code-signing certificate and clean-machine installer lifecycle verification are still required before signed release handoff.",
+      "status": "blocked"
     }
   ],
+  "execution_plan": [
+    {
+      "order": 1,
+      "task": "After a signing certificate is available, run signed installer build and clean-machine install, upgrade, rollback, uninstall verification.",
+      "done_when": "Release evidence is generated without unsigned-warning status."
+    }
+  ],
+  "verification_commands": [
+    "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller -InnoSetupCompiler \"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\"",
+    "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe"
+  ],
   "quality_gates": {
-    "backend_tests": "passed",
+    "repository_gate_with_installer": "passed",
+    "npm_production_audit": "passed",
+    "nuget_vulnerability_audit": "passed",
+    "frontend_format": "passed",
+    "frontend_lint": "passed",
+    "frontend_typecheck": "passed",
     "frontend_unit_tests": "passed",
     "frontend_e2e_tests": "passed",
-    "frontend_typecheck": "passed",
-    "frontend_lint": "passed",
-    "frontend_format": "passed",
     "frontend_build": "passed",
-    "manual_gpu_check": "passed",
-    "repository_gate": "passed",
+    "backend_tests": "passed",
+    "dotnet_build": "passed",
+    "installer_prerequisite_self_test": "passed",
+    "unsigned_installer_package": "passed",
+    "release_evidence_non_invasive": "passed_with_unsigned_warning",
+    "signed_installer_verification": "blocked",
+    "install_lifecycle": "not_run",
     "structure_review": "passed"
   },
-  "commands": {
-    "backend_tests": "dotnet test .\\OnlyRag.sln --no-restore",
-    "frontend_unit_tests": "npm --prefix .\\src\\OnlyRag.Web run test:unit",
-    "frontend_build": "npm --prefix .\\src\\OnlyRag.Web run build",
-    "manual_gpu_check": "%LOCALAPPDATA%\\OnlyRag\\ocr-python\\.venv\\Scripts\\python.exe scripts\\ocr\\paddle_ocr_bridge.py --mode check --device gpu",
-    "repository_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
-  },
-  "last_completed_work": "Implemented the OCR GPU/preset/telemetry residual. Local RTX 2070 runtime now reports compiledWithCuda=true, cudaDeviceCount=1, activeDevice=gpu:0, paddlepaddle=not-installed, and paddlepaddle-gpu=3.3.0.",
-  "open_questions": [],
-  "handoff_notes": "Residual draw.io check completed: docs/APP_FLOW.drawio is clean against HEAD, the tracked stale draw.io backup file was removed, and future *.drawio.bkp backups are ignored."
+  "blockers": [
+    "Signed release completion requires a trusted Windows code-signing certificate and signtool.exe.",
+    "Install, upgrade, rollback, and uninstall lifecycle verification must run with -RunInstallLifecycle on a clean Windows verification machine."
+  ],
+  "risks": [
+    "The generated installer is unsigned in this environment; Test-InstallerRelease reports signing-status NotSigned.",
+    "The local dev server must be stopped before running the gate because npm ci replaces node_modules and can be blocked by a running esbuild service."
+  ],
+  "structure_notes": [
+    "No script or CSS file remains above the repository split threshold after the final pass.",
+    "Some pre-existing source and test files remain above review thresholds but below split-required thresholds; no broad structural split was opened during final readiness."
+  ],
+  "last_completed_work": "Final readiness pass: stopped a local Vite/esbuild process that blocked npm ci, split CSS residual was already complete, kept scripts under size threshold, hardened a test cleanup retry for transient SQLite file locks, ran the full Release gate with installer packaging, and generated non-invasive installer evidence.",
+  "next_actions": [
+    "Provide a trusted Windows code-signing certificate and signtool.exe, then run Sign-Release.ps1.",
+    "Run Test-InstallerRelease.ps1 with -RequireSigned -RunInstallLifecycle on a clean Windows verification machine."
+  ],
+  "notes": [
+    "Do not re-add completed task history to this file.",
+    "Update this tracker only when residual scope, priority, blockers, or verification status changes."
+  ]
 }

@@ -3,15 +3,10 @@
 param(
     [Parameter(Mandatory)]
     [string]$InstallerPath,
-
     [string]$UpgradeInstallerPath,
-
     [string]$RollbackInstallerPath,
-
     [string]$OutputRoot,
-
     [switch]$RunInstallLifecycle,
-
     [switch]$RequireSigned
 )
 
@@ -77,7 +72,6 @@ function Resolve-Installer {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "$Label installer not found: $Path"
     }
-
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
@@ -274,6 +268,7 @@ else {
     Test-PathExpectation -Id "ocr-requirements-nvidia-cu118" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu118.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements-nvidia-cu126" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu126.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements-nvidia-cu129" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu129.txt") -Kind "file"
+    Test-PathExpectation -Id "ocr-runtime-manifest" -Path (Join-Path $installDir "scripts\ocr\runtime-manifest.json") -Kind "file"
     Test-PathExpectation -Id "web-ui-entrypoint" -Path (Join-Path $installDir "wwwroot\index.html") -Kind "file"
     Test-PathExpectation -Id "start-menu-shortcut" -Path $startMenuShortcut -Kind "file"
     Test-PathExpectation -Id "desktop-shortcut" -Path $desktopShortcut -Kind "file"
@@ -333,8 +328,6 @@ $warningCount = @($script:Checks | Where-Object { $_.status -eq "warn" }).Count
 $payload = [ordered]@{
     tool = "OnlyRag release verification"
     createdAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
-    machine = [Environment]::MachineName
-    user = [Environment]::UserName
     installerPath = $resolvedInstaller
     upgradeInstallerPath = $resolvedUpgradeInstaller
     rollbackInstallerPath = $resolvedRollbackInstaller
