@@ -74,6 +74,10 @@ installs web dependencies with `npm ci`, and prepares the optional OCR Python en
 Python is available. `Build-Web.ps1` produces the static UI consumed by the WPF app when the Vite
 development server is not running.
 
+In Debug builds the WPF shell can use the Vite dev server on loopback. If `ONLYRAG_WEB_DEV_SERVER`
+is set, it must be an `http` or `https` loopback URL without embedded credentials; other URLs are
+ignored before the backend bridge is injected into WebView2.
+
 To verify a fresh checkout before packaging or handoff:
 
 ```powershell
@@ -108,7 +112,8 @@ Run the canonical repository gate:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
-The gate includes npm production dependency audit and NuGet transitive vulnerability audit.
+The gate includes npm production dependency audit, NuGet transitive vulnerability audit, frontend
+typecheck/lint/format/test, .NET tests, installer prerequisite self-test, web build, and .NET build.
 
 Run web tests, lint, and formatter checks directly:
 

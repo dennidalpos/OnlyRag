@@ -83,6 +83,13 @@ public static partial class InProcessBackend
             {
                 ValidateImportBatch(form.Files, storageGuard);
             }
+            catch (ArgumentException ex)
+            {
+                return CreateBadRequestProblem(
+                    "Import non valido",
+                    ex.Message,
+                    "document_import_invalid");
+            }
             catch (DocumentStorageLimitException ex)
             {
                 return MapDocumentStorageLimitException(ex);

@@ -93,6 +93,29 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsImport_RejectsInvalidFileNameBeforeSizeLimit()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("upload-file-name-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions
+            {
+                DocumentLibraryLimits = CreateTestLimits(maxFileSizeBytes: 5, maxBatchSizeBytes: 100)
+            });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        using MultipartFormDataContent content = new();
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("123456")), "files", "Bad:Name.txt");
+
+        using HttpResponseMessage response = await httpClient.PostAsync("/api/documents/import", content);
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("nome file", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("File troppo grande", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(ListOriginalFiles(tempDescriptor));
+    }
+
+    [Fact]
     public async Task DocumentsImport_RejectsBatchLargerThanConfiguredLimit()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("upload-batch-limit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

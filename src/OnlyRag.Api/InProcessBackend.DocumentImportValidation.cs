@@ -10,7 +10,8 @@ public static partial class InProcessBackend
         long totalBytes = 0;
         foreach (IFormFile file in files)
         {
-            storageGuard.EnsureFileWithinLimits(file.FileName, file.Length);
+            string safeFileName = SafeDocumentPath.NormalizeFileName(file.FileName);
+            storageGuard.EnsureFileWithinLimits(safeFileName, file.Length);
             totalBytes = checked(totalBytes + file.Length);
         }
 

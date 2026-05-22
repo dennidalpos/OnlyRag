@@ -60,8 +60,33 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
 
         Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        string[] output = await Task.WhenAll(stdoutTask, stderrTask);
-        return new LocalProcessResult(process.ExitCode, output[0], output[1]);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+            string[] output = await Task.WhenAll(stdoutTask, stderrTask);
+            return new LocalProcessResult(process.ExitCode, output[0], output[1]);
+        }
+        catch (OperationCanceledException)
+        {
+            KillProcessTree(process);
+            throw;
+        }
+    }
+
+    private static void KillProcessTree(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(3000);
+        }
+        catch
+        {
+        }
     }
 }

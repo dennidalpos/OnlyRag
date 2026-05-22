@@ -58,3 +58,6 @@ Notes:
   model is per-user provisioning from **Configura OCR** in Settings, which prepares and verifies
   `%LOCALAPPDATA%\OnlyRag\ocr-python` when Python is available. PaddleOCR may download models on
   first OCR use into the user profile cache.
+- OCR bridge operations have per-operation timeouts and terminate the Python process tree on timeout
+  or caller cancellation. OCR provisioning records progress/status in Settings, but it still does
+  not expose a user-facing cancel button once provisioning has started.

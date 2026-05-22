@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.ComponentModel;
 using System.Linq;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
@@ -24,7 +23,6 @@ public partial class MainWindow : Window
 
     private static readonly JsonSerializerOptions BackendBridgeJsonOptions = new()
     {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
@@ -143,12 +141,19 @@ public partial class MainWindow : Window
         string? configuredUrl = Environment.GetEnvironmentVariable(DevServerEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(configuredUrl)
             && Uri.TryCreate(configuredUrl, UriKind.Absolute, out Uri? configuredUri)
-            && (configuredUri.Scheme == Uri.UriSchemeHttp || configuredUri.Scheme == Uri.UriSchemeHttps))
+            && IsAllowedDevServerUri(configuredUri))
         {
             return configuredUri;
         }
 
         return new Uri(DefaultViteDevServerUrl);
+    }
+
+    private static bool IsAllowedDevServerUri(Uri uri)
+    {
+        return uri.IsLoopback
+            && string.IsNullOrWhiteSpace(uri.UserInfo)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 
     private static async Task<bool> IsDevServerAvailableAsync(Uri devServerUri)

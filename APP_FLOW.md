@@ -99,11 +99,11 @@ Traduzione:
 - Token sessione random 32 byte hex generato a ogni avvio, salvo override opzioni.
 - Token passato al frontend via `window.__ONLYRAG_BACKEND__`.
 - `apiRequest` aggiunge header `X-OnlyRag-Session-Token`.
-- Middleware rifiuta `/api/*` senza token, eccetto `/api/health`.
+- Middleware rifiuta tutte le rotte `/api/*` senza token.
+- `/health` resta una liveness route minimale non autenticata e non espone metadati runtime.
 - Non ci sono utenti, ruoli o ACL: e un modello single-user local-first.
 
 Punti fragili:
-- `/api/health` e esente da token e rivela conteggi embedding.
 - Un XSS nella UI o una pagina dev server con bridge iniettato avrebbe token completo.
 - Le azioni di provisioning possono avviare processi locali se il token e disponibile.
 
@@ -189,5 +189,5 @@ Ollama:
 - Provisioning OCR/Ollama avvia processi esterni con controllo limitato.
 - La UI puo diventare stale per catch silenziosi nei polling.
 - Non esiste contratto API generato.
-- Non esistono test frontend o E2E.
-- Release gate automatico passa senza installer completo/interattivo.
+- I test frontend unit/component e smoke E2E esistono, ma la verifica popolata WPF/WebView/Ollama/OCR con dati reali resta fuori dal gate automatico.
+- Il gate automatico verifica packaging solo con `-IncludeInstaller`; signing, lifecycle installer e wizard interattivo restano gate release separati.

@@ -110,7 +110,7 @@ settings actions above.
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
 | Web lint | `npm run lint` from `src\OnlyRag.Web` | Runs ESLint over the React/Vite workspace. |
 | Web format check | `npm run format:check` from `src\OnlyRag.Web` | Runs Prettier plus the frontend text-format checker in check mode without rewriting files. |
-| Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, npm production dependency audit, NuGet transitive vulnerability audit, web typecheck, web lint, web format check, .NET tests, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
+| Repository gate | `pwsh .\scripts\Invoke-Gate.ps1` | Runs preflight, web dependency restore, .NET restore, npm production dependency audit, NuGet transitive vulnerability audit, web typecheck, web lint, web format check, web tests, .NET tests, installer prerequisite self-test, web build, and .NET build. Add `-IncludeInstaller` only when Inno Setup verification is required on the current machine. |
 | Installer prerequisite self-test | `pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest` | Simulates present and missing blocking prerequisites and verifies the expected message content. |
 | Package installer | `pwsh .\scripts\Build-Installer.ps1` | Builds web, publishes WPF, validates publish output, and compiles Inno Setup installer when `ISCC.exe` is installed. Pass `-SigningCertificateThumbprint` for signed release candidates. |
 | Verify installer release | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe` | Produces release evidence without installing. Add `-RunInstallLifecycle` on a clean verification machine to test install, shortcuts, launch, upgrade, uninstall, rollback/downgrade, optional components, and signing status. |
@@ -133,6 +133,21 @@ dotnet list .\OnlyRag.sln package --vulnerable --include-transitive --format jso
 The full script inventory is documented in [scripts/README.md](../scripts/README.md). Top-level
 scripts are reserved for supported setup, build, test, package, signing, installer verification,
 brand asset generation, and the repository gate. Shared helpers live under `scripts\support`.
+
+## Handoff Checklist
+
+Before handoff after technical or documentation changes:
+
+- Run `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` unless the change is explicitly
+  documentation-only and the last successful gate still covers the current working tree.
+- Confirm documented scripts and linked paths exist.
+- Keep generated outputs under ignored paths (`bin`, `obj`, `dist`, `node_modules`, `artifacts`)
+  out of source changes unless the artifact is intentionally tracked.
+- Update `PROJECT_STATUS.json` for real residual risks, blocked release work, oversized files, or
+  setup/runtime behavior changes.
+- For release handoff, add installer verification evidence from `scripts\Test-InstallerRelease.ps1`
+  and keep signed-release blockers visible until trusted signing material and a clean verification
+  machine are available.
 
 ## CI
 
@@ -165,7 +180,9 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
 In Debug, the WPF shell uses `http://127.0.0.1:5173/` when reachable. Override with
-`ONLYRAG_WEB_DEV_SERVER` when needed.
+`ONLYRAG_WEB_DEV_SERVER` when needed, but keep it to an `http` or `https` loopback URL without
+embedded credentials. Remote hosts and URLs with user info are ignored before the backend bridge is
+injected into WebView2.
 
 ## Local Data
 
@@ -198,6 +215,11 @@ The WPF shell injects this token into the trusted WebView bridge. Endpoints that
 processes, such as opening Explorer, PowerShell, browser downloads, or OCR provisioning, also
 require an explicit UI confirmation payload.
 
+When the backend cancels a process it started through the shared local process launcher, it attempts
+to terminate the whole process tree and waits briefly for exit before returning cancellation to the
+caller. This protects local setup/provisioning flows from leaving child processes running after a
+cancelled request.
+
 ## App Exit and Jobs
 
 Closing the WPF window with the standard **X** checks both the WebView lifecycle bridge and the
@@ -206,9 +228,9 @@ exiting. Confirmed exit saves available UI state, cancels `Pending`, `Running`, 
 through the local backend, waits briefly for running job handlers to stop cooperatively, and then
 stops the in-process backend.
 
-OnlyRag only targets its own peer processes during exit. It does not directly terminate unrelated
-external processes such as `python.exe`, `soffice.exe`, or Ollama; job handlers receive cancellation
-through the app and are responsible for stopping child work they started.
+OnlyRag only targets its own peer processes during exit. It does not scan for or terminate unrelated
+external processes such as arbitrary `python.exe`, `soffice.exe`, or Ollama instances; job handlers
+receive cancellation through the app and are responsible for stopping child work they started.
 
 If `OnlyRag.App.exe` remains in Task Manager after the window is closed, first confirm whether it is
 an OnlyRag process and whether it still owns child processes:
@@ -296,6 +318,8 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
   `Program Files\Microsoft\EdgeWebView\Application`.
 - Web UI is blank in Debug: run `pwsh .\scripts\Build-Web.ps1`, or start `npm run dev` in
   `src\OnlyRag.Web`.
+- `ONLYRAG_WEB_DEV_SERVER` appears ignored: confirm the value is a loopback `http` or `https` URL,
+  for example `http://127.0.0.1:5173/`, and does not include user info.
 - Ollama is offline: confirm the endpoint in **Settings > Ollama**, start Ollama, and for LAN
   endpoints configure Ollama network access with `OLLAMA_HOST`.
 - Embeddings or chat model missing: install a compatible model from **Settings > Ollama** or with
