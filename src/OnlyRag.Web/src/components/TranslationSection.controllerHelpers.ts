@@ -14,29 +14,3 @@ export function getFirstAvailableCompareUnit(data: TranslationCompare) {
     ?? null;
 }
 
-export function loadCompareDraft(compareDraftKey: string | null): string | null {
-  try {
-    return compareDraftKey ? window.localStorage.getItem(compareDraftKey) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveOrClearCompareDraft(
-  compareDraftKey: string | null,
-  hasUnsavedCompareDraft: boolean,
-  editedTranslationText: string
-): void {
-  if (!compareDraftKey) {
-    return;
-  }
-
-  try {
-    if (!hasUnsavedCompareDraft) {
-      window.localStorage.removeItem(compareDraftKey);
-    } else {
-      window.localStorage.setItem(compareDraftKey, editedTranslationText);
-    }
-  } catch {
-  }
-}

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ChatSection } from "./ChatSection";
+import { chatStorageKeys, loadChatSession } from "./ChatSection.storage";
 import { mockApi } from "../test/apiMock";
 import { createDocument, createModel, createOllamaStatus } from "../test/fixtures";
 
@@ -118,6 +119,37 @@ describe("ChatSection", () => {
     expect(await screen.findByText("manuale.pdf")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveValue("");
     expect(screen.getByText("Inizia una conversazione.")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("onlyrag.chat.session")).not.toBe("{not-valid-json");
+  });
+
+  it("clears invalid or oversized WebView chat storage", () => {
+    window.sessionStorage.setItem(
+      chatStorageKeys.session,
+      JSON.stringify({
+        conversationId: "conversation-1",
+        messages: [{ id: "bad", role: "system", content: "unsafe", sources: [] }],
+        selectedDocumentIds: [1],
+        selectedModel: "llama3.2:3b"
+      })
+    );
+
+    expect(loadChatSession()).toBeNull();
+    expect(window.sessionStorage.getItem(chatStorageKeys.session)).toBeNull();
+
+    window.localStorage.setItem(chatStorageKeys.draft, "x".repeat(16_001));
+    mockApi([{ path: "/api/documents", response: [] }]);
+
+    render(
+      <ChatSection
+        models={[createModel()]}
+        defaultModel="llama3.2:3b"
+        ollamaStatus={createOllamaStatus()}
+        loadError={null}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveValue("");
+    expect(window.localStorage.getItem(chatStorageKeys.draft)).toBeNull();
   });
 
   it("preserves a valid chat-specific model when defaults refresh", async () => {

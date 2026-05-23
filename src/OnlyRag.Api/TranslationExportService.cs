@@ -248,15 +248,21 @@ public sealed partial class TranslationExportService
         }
         catch (OfficeConversionUnavailableException ex)
         {
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "LibreOffice non disponibile.");
             throw new TranslationExportException(
                 "LibreOffice non disponibile",
-                $"L'export PDF richiede LibreOffice. Configura il percorso LibreOffice nelle impostazioni. Dettaglio: {ex.Message}");
+                $"L'export PDF richiede LibreOffice. Configura il percorso LibreOffice nelle impostazioni. Dettaglio: {detail}");
         }
         catch (OfficeConversionException ex)
         {
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Dettagli tecnici disponibili nei log locali.");
             throw new TranslationExportException(
                 "Conversione PDF fallita",
-                $"LibreOffice non ha completato la conversione. Dettaglio: {ex.Message}");
+                $"LibreOffice non ha completato la conversione. Dettaglio: {detail}");
         }
         finally
         {

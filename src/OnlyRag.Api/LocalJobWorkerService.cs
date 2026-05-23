@@ -131,7 +131,10 @@ internal sealed class LocalJobWorkerService : BackgroundService
             }
             else
             {
-                await queue.FailAsync(job.Id, ex.Message, retryable: true, CancellationToken.None);
+                string message = UserFacingErrorText.FromExternalDetail(
+                    ex.Message,
+                    "Job locale non completato. Dettagli tecnici disponibili nei log locali.");
+                await queue.FailAsync(job.Id, message, retryable: true, CancellationToken.None);
                 BackendLog.WriteException(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: fallito.", ex);
             }
         }

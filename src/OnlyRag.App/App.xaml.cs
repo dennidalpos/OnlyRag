@@ -34,7 +34,10 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return "Reset dati locali non completato. Chiudi eventuali istanze di OnlyRag e riprova. Dettaglio: " + ex.Message;
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Dettagli tecnici disponibili nei log locali.");
+            return "Reset dati locali non completato. Chiudi eventuali istanze di OnlyRag e riprova. Dettaglio: " + detail;
         }
     }
 
@@ -75,7 +78,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            return BackendWebSettings.Offline(ex.Message);
+            return BackendWebSettings.Offline(UserFacingErrorText.StartupFailure(ex));
         }
     }
 

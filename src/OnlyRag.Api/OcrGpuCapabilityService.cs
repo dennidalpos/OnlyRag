@@ -31,7 +31,11 @@ public sealed class OcrGpuCapabilityService
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)
         {
-            return Blocked("NVIDIA non disponibile", ex.Message);
+            return Blocked(
+                "NVIDIA non disponibile",
+                UserFacingErrorText.FromExternalDetail(
+                    ex.Message,
+                    "Rilevazione NVIDIA non completata. Dettagli tecnici disponibili nei log locali."));
         }
 
         OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync("gpu", cancellationToken);

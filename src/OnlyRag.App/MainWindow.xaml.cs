@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using OnlyRag.Api;
 using OnlyRag.Core;
 
 namespace OnlyRag.App;
@@ -65,15 +66,21 @@ public partial class MainWindow : Window
         }
         catch (FileNotFoundException ex)
         {
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.FileName,
+                "Asset UI non trovati nel percorso di build previsto.");
             ShowStartupError(
                 "Interfaccia non trovata",
-                $"La build statica della UI non e disponibile. Esegui lo script scripts\\Build-Web.ps1 prima di compilare o distribuire l'app.\n\nPercorso atteso: {ex.FileName}");
+                $"La build statica della UI non e disponibile. Esegui lo script scripts\\Build-Web.ps1 prima di compilare o distribuire l'app.\n\nDettaglio: {detail}");
         }
         catch (Exception ex)
         {
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Dettagli tecnici disponibili nei log locali.");
             ShowStartupError(
                 "OnlyRag non puo avviare la UI",
-                $"Si e verificato un errore durante l'inizializzazione della finestra principale.\n\nDettaglio: {ex.Message}");
+                $"Si e verificato un errore durante l'inizializzazione della finestra principale.\n\nDettaglio: {detail}");
         }
     }
 

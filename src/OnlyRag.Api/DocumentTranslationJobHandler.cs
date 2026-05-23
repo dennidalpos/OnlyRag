@@ -72,11 +72,14 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         }
         catch (InvalidOperationException ex)
         {
-            LocalJob? failed = await queue.FailAsync(job.Id, ex.Message, retryable: true, cancellationToken);
+            string message = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Traduzione non completata. Dettagli tecnici disponibili nei log locali.");
+            LocalJob? failed = await queue.FailAsync(job.Id, message, retryable: true, cancellationToken);
             await translations.RefreshProgressAsync(
                 payload.TranslationId,
                 failed?.Status is JobStatus.Failed ? "Failed" : "Queued",
-                ex.Message,
+                message,
                 cancellationToken);
         }
         catch (TranslationValidationException ex)

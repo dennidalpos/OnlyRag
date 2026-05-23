@@ -9,13 +9,19 @@ import {
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import {
   clamp,
+  getMaxDocumentsPanelWidth
+} from "./ChatSection.helpers";
+import {
+  clearChatDraft,
   clearChatSession,
-  getMaxDocumentsPanelWidth,
+  loadChatDraft,
   loadChatSession,
   loadDocumentsPanelWidth,
   saveChatSession,
+  saveDocumentsPanelWidth,
+  saveOrClearChatDraft,
   type ChatMessage
-} from "./ChatSection.helpers";
+} from "./ChatSection.storage";
 import { ChatDocumentsPanel, ChatMainPanel, ChatResizeHandle } from "./ChatSection.views";
 
 type ChatSectionProps = {
@@ -31,8 +37,6 @@ export function ChatSection({
   ollamaStatus,
   loadError
 }: ChatSectionProps) {
-  const draftStorageKey = "onlyrag.chat.draft";
-  const documentsPanelWidthStorageKey = "onlyrag.chat.documentsPanelWidth";
   const minDocumentsPanelWidth = 180;
   const maxDocumentsPanelWidth = 420;
   const minChatPanelWidth = 360;
@@ -45,7 +49,7 @@ export function ChatSection({
   const [conversationId, setConversationId] = useState<string | null>(() => loadChatSession()?.conversationId ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadChatSession()?.messages ?? []);
   const [input, setInput] = useState("");
-  const [documentsPanelWidth, setDocumentsPanelWidth] = useState(() => loadDocumentsPanelWidth(documentsPanelWidthStorageKey, minDocumentsPanelWidth, maxDocumentsPanelWidth));
+  const [documentsPanelWidth, setDocumentsPanelWidth] = useState(() => loadDocumentsPanelWidth(minDocumentsPanelWidth, maxDocumentsPanelWidth));
   const [isResizingDocumentsPanel, setIsResizingDocumentsPanel] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocsLoading, setIsDocsLoading] = useState(true);
@@ -54,24 +58,11 @@ export function ChatSection({
   const [notices, setNotices] = useState<string[]>([]);
 
   useEffect(() => {
-    try {
-      const savedDraft = window.localStorage.getItem(draftStorageKey);
-      if (savedDraft) {
-        setInput(savedDraft);
-      }
-    } catch {
-    }
+    setInput(loadChatDraft());
   }, []);
 
   useEffect(() => {
-    try {
-      if (input.trim().length === 0) {
-        window.localStorage.removeItem(draftStorageKey);
-      } else {
-        window.localStorage.setItem(draftStorageKey, input);
-      }
-    } catch {
-    }
+    saveOrClearChatDraft(input);
   }, [input]);
 
   useEffect(() => {
@@ -79,10 +70,7 @@ export function ChatSection({
   }, [conversationId, messages, selectedDocumentIds, selectedModel]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(documentsPanelWidthStorageKey, String(documentsPanelWidth));
-    } catch {
-    }
+    saveDocumentsPanelWidth(documentsPanelWidth, minDocumentsPanelWidth, maxDocumentsPanelWidth);
   }, [documentsPanelWidth]);
 
   useEffect(() => {
@@ -182,14 +170,7 @@ export function ChatSection({
       hasActiveWork: isGenerating,
       prepareForExit: async () => {
         abortControllerRef.current?.abort();
-        try {
-          if (input.trim().length === 0) {
-            window.localStorage.removeItem(draftStorageKey);
-          } else {
-            window.localStorage.setItem(draftStorageKey, input);
-          }
-        } catch {
-        }
+        saveOrClearChatDraft(input);
       }
     });
 
@@ -250,10 +231,7 @@ export function ChatSection({
         }
       ]);
       setNotices(response.notices.map((notice) => notice.message));
-      try {
-        window.localStorage.removeItem(draftStorageKey);
-      } catch {
-      }
+      clearChatDraft();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         setFeedback("Generazione annullata.");
@@ -332,10 +310,7 @@ export function ChatSection({
     setFeedback(null);
     setNotices([]);
     clearChatSession();
-    try {
-      window.localStorage.removeItem(draftStorageKey);
-    } catch {
-    }
+    clearChatDraft();
   }
 
   const canSend = Boolean(ollamaStatus?.isReachable && models.length > 0 && selectedModel && !isGenerating);

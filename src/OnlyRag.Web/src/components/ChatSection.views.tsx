@@ -1,6 +1,7 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import type { ImportedDocument, OllamaModel, OllamaStatusResponse } from "../api";
-import { formatPageRange, type ChatMessage } from "./ChatSection.helpers";
+import { formatPageRange } from "./ChatSection.helpers";
+import type { ChatMessage } from "./ChatSection.storage";
 
 export function ChatDocumentsPanel({
   documentsError,

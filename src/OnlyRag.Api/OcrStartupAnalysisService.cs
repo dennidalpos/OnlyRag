@@ -118,7 +118,9 @@ public sealed class OcrStartupAnalysisService
         }
         catch (InvalidOperationException ex)
         {
-            return OcrProvisionRuntime.Cpu(ex.Message);
+            return OcrProvisionRuntime.Cpu(UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Runtime NVIDIA non rilevato. Verrà usato il runtime CPU."));
         }
     }
 

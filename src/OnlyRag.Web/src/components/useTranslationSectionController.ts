@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   apiRequest,
-  type ImportedDocument,
   type OllamaModel,
   type OllamaStatusResponse,
   type OperationMessageResponse,
@@ -14,12 +13,16 @@ import {
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import {
   getFirstAvailableCompareUnit,
-  getPreferredTranslationModel,
-  loadCompareDraft,
-  saveOrClearCompareDraft
+  getPreferredTranslationModel
 } from "./TranslationSection.controllerHelpers";
 import { buildCompareDraftKey } from "./TranslationSection.helpers";
+import {
+  clearCompareDraft,
+  loadCompareDraft,
+  saveOrClearCompareDraft
+} from "./TranslationSection.storage";
 import type { ExportFormat, FeedbackState } from "./TranslationSection.types";
+import { useTranslationLibraryController } from "./useTranslationLibraryController";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
 export function useTranslationSectionController({
@@ -31,13 +34,8 @@ export function useTranslationSectionController({
   defaultModel: string | null;
   ollamaStatus: OllamaStatusResponse | null;
 }) {
-  const [documents, setDocuments] = useState<ImportedDocument[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState("English");
   const [selectedModel, setSelectedModel] = useState("");
-  const [translations, setTranslations] = useState<TranslationSummary[]>([]);
-  const [selectedTranslationId, setSelectedTranslationId] = useState<number | null>(null);
-  const [selectedTranslation, setSelectedTranslation] = useState<TranslationDetail | null>(null);
   const [compareTranslationId, setCompareTranslationId] = useState<number | null>(null);
   const [comparePage, setComparePage] = useState<number | null>(null);
   const [compareData, setCompareData] = useState<TranslationCompare | null>(null);
@@ -50,116 +48,25 @@ export function useTranslationSectionController({
   const [isExporting, setIsExporting] = useState(false);
   const [lastExportPath, setLastExportPath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const {
+    documents,
+    handleDocumentChange,
+    selectedDocument,
+    selectedDocumentId,
+    selectedTranslation,
+    selectedTranslationId,
+    setSelectedTranslation,
+    setSelectedTranslationId,
+    setTranslations,
+    translations
+  } = useTranslationLibraryController(setFeedback);
   const compareDialogRef = useRef<HTMLDivElement | null>(null);
   const compareOpenerRef = useRef<HTMLElement | null>(null);
   const detailsPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedDocument = useMemo(
-    () => documents.find((document) => document.id === selectedDocumentId) ?? null,
-    [documents, selectedDocumentId]
-  );
-
   useEffect(() => {
     setSelectedModel(getPreferredTranslationModel(models, defaultModel));
   }, [defaultModel, models]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadDocuments() {
-      try {
-        const docs = await apiRequest<ImportedDocument[]>("/api/documents");
-        if (isCancelled) {
-          return;
-        }
-
-        setDocuments(docs);
-        setSelectedDocumentId((current) => current ?? docs[0]?.id ?? null);
-      } catch (error) {
-        if (!isCancelled) {
-          setFeedback({
-            tone: "error",
-            message: error instanceof Error ? error.message : "Impossibile leggere i documenti."
-          });
-        }
-      }
-    }
-
-    void loadDocuments();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function refreshTranslations() {
-      if (!selectedDocumentId) {
-        setTranslations([]);
-        setSelectedTranslation(null);
-        return;
-      }
-
-      try {
-        const items = await apiRequest<TranslationSummary[]>(
-          `/api/documents/${selectedDocumentId}/translations`
-        );
-        if (isCancelled) {
-          return;
-        }
-
-        setTranslations(items);
-        setSelectedTranslationId((current) => current ?? items[0]?.id ?? null);
-      } catch (error) {
-        if (!isCancelled) {
-          setFeedback({
-            tone: "error",
-            message: error instanceof Error ? error.message : "Impossibile leggere le traduzioni."
-          });
-        }
-      }
-    }
-
-    void refreshTranslations();
-    const interval = window.setInterval(() => void refreshTranslations(), 3000);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedDocumentId]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function refreshTranslationDetail() {
-      if (!selectedTranslationId) {
-        setSelectedTranslation(null);
-        return;
-      }
-
-      try {
-        const detail = await apiRequest<TranslationDetail>(`/api/translations/${selectedTranslationId}`);
-        if (!isCancelled) {
-          setSelectedTranslation(detail);
-        }
-      } catch {
-        if (!isCancelled) {
-          setSelectedTranslation(null);
-        }
-      }
-    }
-
-    void refreshTranslationDetail();
-    const interval = window.setInterval(() => void refreshTranslationDetail(), 3000);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [selectedTranslationId]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -415,12 +322,7 @@ export function useTranslationSectionController({
             }
           : current
       );
-      if (compareDraftKey) {
-        try {
-          window.localStorage.removeItem(compareDraftKey);
-        } catch {
-        }
-      }
+      clearCompareDraft(compareDraftKey);
 
       if (!isSilent) {
         setSaveState({ tone: "info", message: "Correzione salvata." });
@@ -443,12 +345,6 @@ export function useTranslationSectionController({
     && Boolean(selectedDocumentId)
     && Boolean(selectedModel)
     && !isStarting;
-
-  function handleDocumentChange(documentId: number | null) {
-    setSelectedDocumentId(documentId);
-    setSelectedTranslationId(null);
-    setSelectedTranslation(null);
-  }
 
   return {
     activeCompareUnit,

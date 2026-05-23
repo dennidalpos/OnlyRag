@@ -63,7 +63,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         }
         catch (OllamaApiException ex) when (ex.Kind == OllamaErrorKind.ContextLengthExceeded)
         {
-            string message = $"Chunk troppo lungo per la finestra di contesto del modello. Imposta un num_ctx più alto nelle impostazioni o riduci la dimensione dei chunk. Dettaglio: {ex.Message}";
+            string message = "Chunk troppo lungo per la finestra di contesto del modello. Imposta un num_ctx più alto nelle impostazioni o riduci la dimensione dei chunk.";
             await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
             await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
         }
@@ -80,8 +80,11 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         }
         catch (InvalidOperationException ex)
         {
-            await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, ex.Message, cancellationToken);
-            await queue.FailAsync(job.Id, ex.Message, retryable: false, cancellationToken);
+            string message = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Embedding non completato. Dettagli tecnici disponibili nei log locali.");
+            await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
+            await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
         }
     }
 

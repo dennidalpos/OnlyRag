@@ -1,86 +1,18 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-23T16:04:31+02:00",
-  "status": "active",
-  "production_target": true,
-  "active_objective": "webview-storage-validation",
+  "last_updated": "2026-05-23T16:28:52+02:00",
+  "status": "blocked",
+  "active_objective": "signed-release-verification",
   "residual_plan": [
     {
-      "order": 1,
-      "priority": 4,
+      "execution_order": 1,
+      "priority": "P1",
       "id": "signed-release",
       "status": "blocked",
-      "task": "Complete signed installer verification",
-      "blocked_by": "Trusted Windows code-signing certificate, signtool.exe, and clean Windows verification machine.",
-      "done_when": "Signed installer and clean-machine install, upgrade, rollback, and uninstall verification pass."
-    },
-    {
-      "order": 2,
-      "priority": 3,
-      "id": "rag-prompt-injection-hardening",
-      "status": "completed",
-      "task": "Harden RAG prompt handling for untrusted document content",
-      "done_when": "Document snippets are explicitly isolated and documented as untrusted context, with tests covering instruction-in-document attempts.",
-      "completed_at": "2026-05-23T15:39:28+02:00",
-      "evidence": "RAG context is serialized as untrusted JSON fields and ChatServiceTests covers marker and role injection attempts."
-    },
-    {
-      "order": 3,
-      "priority": 3,
-      "id": "api-contract-tests",
-      "status": "completed",
-      "task": "Add focused API contract drift tests",
-      "done_when": "Critical C# DTO responses and TypeScript client expectations are checked by focused contract tests or generated contract validation.",
-      "completed_at": "2026-05-23T15:48:44+02:00",
-      "evidence": "InProcessBackendContractTests now compares critical C# DTO response property names and enum literals against src/OnlyRag.Web/src/api.ts TypeScript client contracts; dotnet test OnlyRag.sln passed."
-    },
-    {
-      "order": 4,
-      "priority": 3,
-      "id": "ocr-provisioning-cancel",
-      "status": "completed",
-      "task": "Add user-facing cancellation or bounded timeout for OCR provisioning",
-      "done_when": "OCR runtime provisioning has a documented cancel or timeout path that stops child processes and leaves a clear recoverable status.",
-      "completed_at": "2026-05-23T16:04:31+02:00",
-      "evidence": "OCR provisioning now has a confirmed cancel endpoint, UI cancel action, 45-minute backend timeout, process-tree cancellation through LocalProcessLauncher, tests for cancellation token propagation, and documentation in docs/OCR_PIPELINE.md and docs/OPERATIONS.md."
-    },
-    {
-      "order": 5,
-      "priority": 3,
-      "id": "webview-storage-validation",
-      "status": "open",
-      "task": "Validate and bound WebView chat and draft storage",
-      "done_when": "Session/local storage payloads used for chat and translation drafts are schema-checked, size-bounded, and safely cleared when corrupt."
-    },
-    {
-      "order": 6,
-      "priority": 3,
-      "id": "user-error-redaction",
-      "status": "open",
-      "task": "Redact sensitive local details from user-facing external error messages",
-      "done_when": "Errors from external tools and services separate user-facing text from technical log detail and avoid unnecessary local path, host, or environment disclosure."
-    },
-    {
-      "order": 7,
-      "priority": 2,
-      "id": "oversized-ui-controller-splits",
-      "status": "deferred",
-      "task": "Split broad UI controller files when next touched",
-      "done_when": "Large active UI controller files above review thresholds are split by responsibility during related feature work, with focused tests preserved."
+      "objective": "Complete trusted signed installer verification.",
+      "blocked_by": "Trusted Windows code-signing certificate, signtool.exe, Inno Setup 6, and clean Windows release verification machine.",
+      "next_action": "Run scripts\\Sign-Release.ps1 with an external PFX or installed certificate thumbprint, then run scripts\\Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle on a clean verification machine.",
+      "done_when": "Signed installer and clean-machine install, upgrade, rollback, uninstall, signature, and evidence verification pass."
     }
-  ],
-  "quality_gates": {
-    "rag_prompt_injection": "passed",
-    "api_contract_tests": "passed",
-    "ocr_provisioning_cancel": "passed",
-    "frontend": "passed",
-    "backend": "passed",
-    "build": "passed",
-    "structure_review": "passed"
-  },
-  "commands": {
-    "frontend": "cd src\\OnlyRag.Web; npm run format:check; npm run typecheck; npm run lint; npm run test:unit; npm run test:e2e; npm run build",
-    "backend": "dotnet test OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "build": "dotnet build OnlyRag.sln --configuration Release --no-restore"
-  }
+  ]
 }

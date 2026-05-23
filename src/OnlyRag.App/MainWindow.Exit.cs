@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Windows;
+using OnlyRag.Api;
 
 namespace OnlyRag.App;
 
@@ -63,9 +64,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            string detail = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Dettagli tecnici disponibili nei log locali.");
             MessageBox.Show(
                 this,
-                $"OnlyRag non e riuscito a preparare l'uscita.\n\nDettaglio: {ex.Message}",
+                $"OnlyRag non e riuscito a preparare l'uscita.\n\nDettaglio: {detail}",
                 "Uscita annullata",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);

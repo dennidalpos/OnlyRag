@@ -207,11 +207,14 @@ public sealed partial class DependencyProvisioningService
         }
         catch (Exception ex)
         {
+            string lastError = UserFacingErrorText.FromExternalDetail(
+                ex.Message,
+                "Errore tecnico durante la configurazione OCR. Dettagli disponibili nei log locali.");
             SetLastOcrStatus(new OcrProvisionStatus(
                 false,
                 false,
                 "Configurazione OCR non completata.",
-                ex.Message,
+                lastError,
                 runtimeTarget,
                 "unknown",
                 null));
