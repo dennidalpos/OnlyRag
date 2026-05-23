@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using OnlyRag.Api;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
@@ -256,7 +257,31 @@ public sealed class LocalJobWorkerServiceTests
         {
             if (Directory.Exists(Root))
             {
-                Directory.Delete(Root, recursive: true);
+                DeleteDirectoryWithRetry(Root);
+            }
+        }
+
+        private static void DeleteDirectoryWithRetry(string path)
+        {
+            const int maxAttempts = 10;
+            SqliteConnection.ClearAllPools();
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    Directory.Delete(path, recursive: true);
+                    return;
+                }
+                catch (IOException) when (attempt < maxAttempts)
+                {
+                    SqliteConnection.ClearAllPools();
+                    Thread.Sleep(100 * attempt);
+                }
+                catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+                {
+                    SqliteConnection.ClearAllPools();
+                    Thread.Sleep(100 * attempt);
+                }
             }
         }
     }

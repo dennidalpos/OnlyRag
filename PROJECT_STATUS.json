@@ -1,106 +1,77 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-23T11:28:48+02:00",
+  "last_updated": "2026-05-23T15:32:14+02:00",
   "status": "active",
-  "current_phase": "documentation-alignment-complete",
   "production_target": true,
-  "summary": "README, documentation index, operational docs, application flow notes, and translation pipeline notes are aligned with the current repository structure, commands, persistence model, and gate results.",
-  "active_objective": "Complete signed installer verification when external release prerequisites are available.",
-  "residuals": [
+  "active_objective": "rag-prompt-injection-hardening",
+  "residual_plan": [
     {
+      "order": 1,
       "priority": 4,
       "id": "signed-release",
-      "title": "Complete signed installer verification",
       "status": "blocked",
+      "task": "Complete signed installer verification",
       "blocked_by": "Trusted Windows code-signing certificate, signtool.exe, and clean Windows verification machine.",
       "done_when": "Signed installer and clean-machine install, upgrade, rollback, and uninstall verification pass."
     },
     {
-      "priority": 3,
-      "id": "translation-language-display-localization",
-      "title": "Localize translation target language labels",
-      "status": "open",
-      "done_when": "The translation target selector displays language names consistently with the Italian UI without introducing a broad i18n migration."
-    },
-    {
-      "priority": 3,
-      "id": "backend-job-status-sql-predicates",
-      "title": "Consolidate remaining SQLite job status SQL predicates",
-      "status": "open",
-      "done_when": "Repeated job status string predicates in SQLite queue SQL are centralized or documented without changing persisted status values."
-    },
-    {
-      "priority": 3,
-      "id": "oversized-ui-controller-splits",
-      "title": "Split broad UI controller files when next touched",
-      "status": "open",
-      "done_when": "Large active UI controller files above review thresholds are split by responsibility during related feature work, with focused tests preserved."
-    },
-    {
+      "order": 2,
       "priority": 3,
       "id": "rag-prompt-injection-hardening",
-      "title": "Harden RAG prompt handling for untrusted document content",
       "status": "open",
+      "task": "Harden RAG prompt handling for untrusted document content",
       "done_when": "Document snippets are explicitly isolated and documented as untrusted context, with tests covering instruction-in-document attempts."
     },
     {
+      "order": 3,
       "priority": 3,
       "id": "api-contract-tests",
-      "title": "Add focused API contract drift tests",
       "status": "open",
+      "task": "Add focused API contract drift tests",
       "done_when": "Critical C# DTO responses and TypeScript client expectations are checked by focused contract tests or generated contract validation."
     },
     {
+      "order": 4,
       "priority": 3,
       "id": "ocr-provisioning-cancel",
-      "title": "Add user-facing cancellation or bounded timeout for OCR provisioning",
       "status": "open",
+      "task": "Add user-facing cancellation or bounded timeout for OCR provisioning",
       "done_when": "OCR runtime provisioning has a documented cancel or timeout path that stops child processes and leaves a clear recoverable status."
     },
     {
+      "order": 5,
       "priority": 3,
       "id": "webview-storage-validation",
-      "title": "Validate and bound WebView chat and draft storage",
       "status": "open",
+      "task": "Validate and bound WebView chat and draft storage",
       "done_when": "Session/local storage payloads used for chat and translation drafts are schema-checked, size-bounded, and safely cleared when corrupt."
     },
     {
+      "order": 6,
       "priority": 3,
       "id": "user-error-redaction",
-      "title": "Redact sensitive local details from user-facing external error messages",
       "status": "open",
+      "task": "Redact sensitive local details from user-facing external error messages",
       "done_when": "Errors from external tools and services separate user-facing text from technical log detail and avoid unnecessary local path, host, or environment disclosure."
+    },
+    {
+      "order": 7,
+      "priority": 2,
+      "id": "oversized-ui-controller-splits",
+      "status": "deferred",
+      "task": "Split broad UI controller files when next touched",
+      "done_when": "Large active UI controller files above review thresholds are split by responsibility during related feature work, with focused tests preserved."
     }
   ],
   "quality_gates": {
-    "frontend_format": "passed",
-    "frontend_typecheck": "passed",
-    "frontend_lint": "passed",
-    "frontend_unit_tests": "passed",
-    "frontend_build": "passed",
-    "backend_tests": "passed",
-    "backend_api_tests": "passed",
-    "dotnet_build": "passed",
+    "frontend": "passed",
+    "backend": "passed",
+    "build": "passed",
     "structure_review": "passed"
   },
   "commands": {
-    "frontend_format": "cd src\\OnlyRag.Web; npm run format:check",
-    "frontend_typecheck": "cd src\\OnlyRag.Web; npm run typecheck",
-    "frontend_lint": "cd src\\OnlyRag.Web; npm run lint",
-    "frontend_unit_tests": "cd src\\OnlyRag.Web; npm run test:unit",
-    "frontend_build": "cd src\\OnlyRag.Web; npm run build",
-    "backend_tests": "dotnet test OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "backend_api_tests": "dotnet test tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj",
-    "dotnet_build": "dotnet build OnlyRag.sln",
-    "status": "git status --short"
-  },
-  "structure_notes": [
-    "Reset actions were split into src/OnlyRag.Web/src/components/useSettingsSectionController.resetActions.ts after the Settings actions controller exceeded the split threshold.",
-    "Some existing broad UI controller and test files remain above review thresholds but below split-required thresholds; no unrelated broad split was opened."
-  ],
-  "last_completed_work": "Aligned README and docs with the implemented setup, script, CI, persistence, application flow, and translation migration state; the canonical repository gate passed without installer packaging.",
-  "notes": [
-    "Keep this file current-only: no completed history.",
-    "Do not store secrets or release credentials here."
-  ]
+    "frontend": "cd src\\OnlyRag.Web; npm run format:check; npm run typecheck; npm run lint; npm run test:unit; npm run test:e2e; npm run build",
+    "backend": "dotnet test OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "build": "dotnet build OnlyRag.sln --configuration Release --no-restore"
+  }
 }

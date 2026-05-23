@@ -8,7 +8,12 @@ import type {
 } from "../api";
 import { formatDateTime } from "../pollingStatus";
 import { ProgressBar } from "./ProgressBar";
-import { formatTranslationStatus, formatUnitKind, targetLanguages } from "./TranslationSection.helpers";
+import {
+  formatTargetLanguageLabel,
+  formatTranslationStatus,
+  formatUnitKind,
+  targetLanguageOptions
+} from "./TranslationSection.helpers";
 import type { ExportFormat } from "./TranslationSection.types";
 
 export function TranslationStartCard({
@@ -73,9 +78,9 @@ export function TranslationStartCard({
           value={selectedLanguage}
           onChange={(event) => onLanguageChange(event.target.value)}
         >
-          {targetLanguages.map((language) => (
-            <option key={language} value={language}>
-              {language}
+          {targetLanguageOptions.map((language) => (
+            <option key={language.value} value={language.value}>
+              {language.label}
             </option>
           ))}
         </select>
@@ -146,7 +151,7 @@ export function TranslationListCard({
             <article className="job-row" key={translation.id}>
               <div className="job-row__header">
                 <div>
-                  <strong>{translation.targetLanguage}</strong>
+                  <strong>{formatTargetLanguageLabel(translation.targetLanguage)}</strong>
                   <span>{translation.model}</span>
                 </div>
                 <span className={`job-status job-status--${translation.status.toLowerCase()}`}>

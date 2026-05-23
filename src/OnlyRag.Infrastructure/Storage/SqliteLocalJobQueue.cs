@@ -5,6 +5,15 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class SqliteLocalJobQueue : ILocalJobQueue
 {
+    private static readonly JobStatus[] CheckpointWritableStatuses =
+        [JobStatus.Pending, JobStatus.Running, JobStatus.Pausing, JobStatus.Paused];
+    private static readonly JobStatus[] InterruptedStatuses = [JobStatus.Running, JobStatus.Pausing];
+    private static readonly JobStatus[] PauseRequestStatuses = [JobStatus.Pending, JobStatus.Running];
+    private static readonly JobStatus[] DeleteBlockedStatuses =
+        [JobStatus.Running, JobStatus.Pausing, JobStatus.Pending];
+    private static readonly JobStatus[] PurgeableStatuses =
+        [JobStatus.Completed, JobStatus.Cancelled, JobStatus.Failed];
+
     private readonly ISqliteConnectionFactory connectionFactory;
     private readonly LocalJobQueueDescriptor descriptor;
 
@@ -160,18 +169,19 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         int progressPercent = Math.Clamp(checkpoint.ProgressPercent, 0, 100);
         string checkpointJson = string.IsNullOrWhiteSpace(checkpoint.CheckpointJson) ? "{}" : checkpoint.CheckpointJson;
         string now = DateTimeOffset.UtcNow.ToString("O");
+        string writableStatusPredicate = SqliteStatusConstraints.BuildJobStatusInPredicate(CheckpointWritableStatuses);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
-            """
+            $"""
             UPDATE jobs
             SET progress_percent = $progressPercent,
                 current_step = $currentStep,
                 checkpoint_json = $checkpointJson,
                 updated_at_utc = $now
             WHERE id = $id
-              AND status IN ('Pending', 'Running', 'Pausing', 'Paused');
+              AND {writableStatusPredicate};
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$progressPercent", progressPercent);
@@ -186,21 +196,25 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
     public async Task<int> RecoverInterruptedJobsAsync(CancellationToken cancellationToken = default)
     {
         string now = DateTimeOffset.UtcNow.ToString("O");
+        string interruptedStatusPredicate = SqliteStatusConstraints.BuildJobStatusInPredicate(InterruptedStatuses);
+        string pausingStatusPredicate = SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Pausing);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
-            """
+            $"""
             UPDATE jobs
-            SET status = CASE WHEN status = 'Pausing' THEN 'Paused' ELSE 'Pending' END,
+            SET status = CASE WHEN {pausingStatusPredicate} THEN $pausedStatus ELSE $pendingStatus END,
                 current_step = CASE
-                    WHEN status = 'Pausing' THEN 'Paused'
+                    WHEN {pausingStatusPredicate} THEN $pausedStatus
                     WHEN current_step = '' THEN 'Ripresa dopo interruzione'
                     ELSE current_step
                 END,
                 updated_at_utc = $now
-            WHERE status IN ('Running', 'Pausing');
+            WHERE {interruptedStatusPredicate};
             """;
+        command.AddParameter("$pausedStatus", JobStatus.Paused.ToString());
+        command.AddParameter("$pendingStatus", JobStatus.Pending.ToString());
         command.AddParameter("$now", now);
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -208,6 +222,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
     public async Task<LocalJob?> TryLeaseNextAsync(CancellationToken cancellationToken = default)
     {
         string now = DateTimeOffset.UtcNow.ToString("O");
+        string pendingStatusPredicate = SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Pending);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
@@ -217,10 +232,10 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         {
             select.Transaction = transaction;
             select.CommandText =
-                """
+                $"""
                 SELECT id
                 FROM jobs
-                WHERE status = 'Pending'
+                WHERE {pendingStatusPredicate}
                 ORDER BY priority DESC, created_at_utc ASC
                 LIMIT 1;
                 """;
@@ -237,16 +252,17 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         {
             update.Transaction = transaction;
             update.CommandText =
-                """
+                $"""
                 UPDATE jobs
-                SET status = 'Running',
+                SET status = $runningStatus,
                     error = NULL,
                     current_step = CASE WHEN current_step = '' THEN 'In esecuzione' ELSE current_step END,
                     updated_at_utc = $now
                 WHERE id = $id
-                  AND status = 'Pending';
+                  AND {pendingStatusPredicate};
                 """;
             update.AddParameter("$id", id);
+            update.AddParameter("$runningStatus", JobStatus.Running.ToString());
             update.AddParameter("$now", now);
             int changed = await update.ExecuteNonQueryAsync(cancellationToken);
             if (changed != 1)
@@ -277,6 +293,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         CancellationToken cancellationToken = default)
     {
         string now = DateTimeOffset.UtcNow.ToString("O");
+        string runningStatusPredicate = SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Running);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         LocalJob? current = await GetAsync(connection, id, cancellationToken);
@@ -295,7 +312,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
-            """
+            $"""
             UPDATE jobs
             SET status = $status,
                 error = $error,
@@ -303,7 +320,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
                 current_step = $currentStep,
                 updated_at_utc = $now
             WHERE id = $id
-              AND status = 'Running';
+              AND {runningStatusPredicate};
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$status", nextStatus.ToString());
@@ -321,25 +338,29 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         CancellationToken cancellationToken)
     {
         string now = DateTimeOffset.UtcNow.ToString("O");
+        string pauseRequestStatusPredicate = SqliteStatusConstraints.BuildJobStatusInPredicate(PauseRequestStatuses);
+        string runningStatusPredicate = SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Running);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
-            """
+            $"""
             UPDATE jobs
             SET status = CASE
-                    WHEN status = 'Running' THEN 'Pausing'
-                    ELSE 'Paused'
+                    WHEN {runningStatusPredicate} THEN $pausingStatus
+                    ELSE $pausedStatus
                 END,
                 current_step = CASE
-                    WHEN status = 'Running' THEN 'Pausa in corso'
-                    ELSE 'Paused'
+                    WHEN {runningStatusPredicate} THEN 'Pausa in corso'
+                    ELSE $pausedStatus
                 END,
                 updated_at_utc = $now
             WHERE id = $id
-              AND status IN ('Pending', 'Running');
+              AND {pauseRequestStatusPredicate};
             """;
         command.AddParameter("$id", id);
+        command.AddParameter("$pausingStatus", JobStatus.Pausing.ToString());
+        command.AddParameter("$pausedStatus", JobStatus.Paused.ToString());
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -354,7 +375,7 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         CancellationToken cancellationToken)
     {
         string now = DateTimeOffset.UtcNow.ToString("O");
-        string allowed = string.Join(", ", allowedCurrentStatuses.Select(status => $"'{status}'"));
+        string allowedStatusPredicate = SqliteStatusConstraints.BuildJobStatusInPredicate(allowedCurrentStatuses);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
@@ -363,15 +384,16 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
             UPDATE jobs
             SET status = $status,
                 error = $error,
-                progress_percent = CASE WHEN $status = 'Completed' THEN 100 ELSE progress_percent END,
+                progress_percent = CASE WHEN $status = $completedStatus THEN 100 ELSE progress_percent END,
                 current_step = $currentStep,
                 updated_at_utc = $now
             WHERE id = $id
-              AND status IN ({allowed});
+              AND {allowedStatusPredicate};
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$status", targetStatus.ToString());
         command.AddParameter("$error", error);
+        command.AddParameter("$completedStatus", JobStatus.Completed.ToString());
         command.AddParameter("$currentStep", targetStatus.ToString());
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -399,9 +421,10 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
     public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
+        string deleteStatusPredicate = SqliteStatusConstraints.BuildJobStatusNotInPredicate(DeleteBlockedStatuses);
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM jobs WHERE id = $id AND status NOT IN ('Running', 'Pausing', 'Pending');";
+        command.CommandText = $"DELETE FROM jobs WHERE id = $id AND {deleteStatusPredicate};";
         command.AddParameter("$id", id);
         int affected = await command.ExecuteNonQueryAsync(cancellationToken);
         return affected > 0;
@@ -409,9 +432,10 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
     public async Task<int> PurgeCompletedAsync(CancellationToken cancellationToken = default)
     {
+        string purgeStatusPredicate = SqliteStatusConstraints.BuildJobStatusInPredicate(PurgeableStatuses);
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM jobs WHERE status IN ('Completed', 'Cancelled', 'Failed');";
+        command.CommandText = $"DELETE FROM jobs WHERE {purgeStatusPredicate};";
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

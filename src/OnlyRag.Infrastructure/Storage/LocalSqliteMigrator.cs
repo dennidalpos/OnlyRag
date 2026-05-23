@@ -47,16 +47,30 @@ public sealed partial class LocalSqliteMigrator
             await ApplyFreshSchemaAsync(connection, textSearchBackend, cancellationToken);
             currentVersion = TargetSchemaVersion;
         }
-        else if (currentVersion < TargetSchemaVersion)
-        {
-            await BackupDatabaseAsync(connection, currentVersion, TargetSchemaVersion, cancellationToken);
-            await ApplyPendingMigrationsAsync(connection, currentVersion, textSearchBackend, cancellationToken);
-            currentVersion = await GetCurrentSchemaVersionAsync(connection, cancellationToken);
-        }
         else if (currentVersion > TargetSchemaVersion)
         {
             throw new InvalidOperationException(
                 $"Schema SQLite OnlyRag non supportato: versione {currentVersion}, attesa {TargetSchemaVersion}. Avviare una versione di OnlyRag compatibile o ripristinare un backup.");
+        }
+        else
+        {
+            bool requiresCompatibilityRepair = currentVersion >= 9
+                && await SchemaVersion9CompatibilityRepairRequiredAsync(connection, cancellationToken);
+            if (requiresCompatibilityRepair || currentVersion < TargetSchemaVersion)
+            {
+                await BackupDatabaseAsync(connection, currentVersion, TargetSchemaVersion, cancellationToken);
+            }
+
+            if (requiresCompatibilityRepair)
+            {
+                await ApplySchemaVersion9CompatibilityRepairAsync(connection, textSearchBackend, cancellationToken);
+            }
+
+            if (currentVersion < TargetSchemaVersion)
+            {
+                await ApplyPendingMigrationsAsync(connection, currentVersion, textSearchBackend, cancellationToken);
+                currentVersion = await GetCurrentSchemaVersionAsync(connection, cancellationToken);
+            }
         }
 
         return BuildStatus(currentVersion, textSearchBackend);

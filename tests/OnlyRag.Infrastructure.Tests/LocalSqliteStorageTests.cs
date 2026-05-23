@@ -100,6 +100,41 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
+    public async Task InitializeAsync_RepairsCurrentSchemaMissingVersion9ColumnsAndCreatesBackup()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateVersion12SchemaMissingVersion9ColumnsAsync(tempStorage);
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.InitializeAsync();
+
+        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal("Current", status.MigrationStatus);
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
+        Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("embeddings", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
+        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
+        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
+
+        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
+        await using SqliteConnection backupConnection = new($"Data Source={backupPath};Mode=ReadOnly;Pooling=False");
+        await backupConnection.OpenAsync();
+        await using SqliteCommand backupCommand = backupConnection.CreateCommand();
+        backupCommand.CommandText = "PRAGMA table_info(translation_units);";
+        bool backupHadLayoutMetadata = false;
+        await using SqliteDataReader reader = await backupCommand.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            backupHadLayoutMetadata |= string.Equals(reader.GetString(1), "layout_metadata_json", StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.False(backupHadLayoutMetadata);
+    }
+
+    [Fact]
     public async Task InitializeAsync_CreatesBackupBeforeFailedSupportedMigration()
     {
         using TempStorage tempStorage = TempStorage.Create();

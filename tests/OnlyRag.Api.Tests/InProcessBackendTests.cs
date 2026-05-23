@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DocumentFormat.OpenXml.Packaging;
+using Microsoft.Data.Sqlite;
 using W = DocumentFormat.OpenXml.Wordprocessing;
 using OnlyRag.Api;
 using OnlyRag.Core;
@@ -171,7 +172,8 @@ public sealed partial class InProcessBackendTests
 
     private static void DeleteDirectoryWithRetry(string path)
     {
-        const int maxAttempts = 5;
+        const int maxAttempts = 10;
+        SqliteConnection.ClearAllPools();
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
@@ -181,10 +183,12 @@ public sealed partial class InProcessBackendTests
             }
             catch (IOException) when (attempt < maxAttempts)
             {
+                SqliteConnection.ClearAllPools();
                 System.Threading.Thread.Sleep(100 * attempt);
             }
             catch (UnauthorizedAccessException) when (attempt < maxAttempts)
             {
+                SqliteConnection.ClearAllPools();
                 System.Threading.Thread.Sleep(100 * attempt);
             }
         }

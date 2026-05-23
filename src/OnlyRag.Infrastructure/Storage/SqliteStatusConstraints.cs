@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using OnlyRag.Worker;
 
 namespace OnlyRag.Infrastructure.Storage;
 
@@ -14,6 +15,37 @@ internal static class SqliteStatusConstraints
         {
             throw new ArgumentOutOfRangeException(nameof(status), status, "Translation status is not supported.");
         }
+    }
+
+    public static string BuildJobStatusInPredicate(IReadOnlyCollection<JobStatus> statuses)
+    {
+        return $"status IN ({BuildJobStatusList(statuses)})";
+    }
+
+    public static string BuildJobStatusNotInPredicate(IReadOnlyCollection<JobStatus> statuses)
+    {
+        return $"status NOT IN ({BuildJobStatusList(statuses)})";
+    }
+
+    public static string BuildJobStatusEqualsPredicate(JobStatus status)
+    {
+        return $"status = {FormatJobStatusLiteral(status)}";
+    }
+
+    private static string BuildJobStatusList(IReadOnlyCollection<JobStatus> statuses)
+    {
+        ArgumentNullException.ThrowIfNull(statuses);
+        if (statuses.Count == 0)
+        {
+            throw new ArgumentException("At least one job status is required.", nameof(statuses));
+        }
+
+        return string.Join(", ", statuses.Select(FormatJobStatusLiteral));
+    }
+
+    private static string FormatJobStatusLiteral(JobStatus status)
+    {
+        return $"'{status}'";
     }
 
     public static async Task ValidateExistingStatusesAsync(

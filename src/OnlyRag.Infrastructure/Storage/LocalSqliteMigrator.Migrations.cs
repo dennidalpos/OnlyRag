@@ -4,6 +4,17 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed partial class LocalSqliteMigrator
 {
+    private static readonly (string TableName, string ColumnName)[] SchemaVersion9CompatibilityColumns =
+    [
+        ("documents", "file_extension"),
+        ("documents", "current_job_id"),
+        ("chunks", "content_hash"),
+        ("embeddings", "content_hash"),
+        ("jobs", "checkpoint_json"),
+        ("translation_units", "layout_metadata_json"),
+        ("translation_units", "machine_translated_text")
+    ];
+
     private static async Task ApplySchemaVersion9Async(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -21,6 +32,40 @@ public sealed partial class LocalSqliteMigrator
         await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);", cancellationToken);
         await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_embeddings_content_hash ON embeddings(content_hash);", cancellationToken);
         await EnsureChunkFtsObjectsAsync(connection, transaction, textSearchBackend, cancellationToken);
+    }
+
+    private static async Task<bool> SchemaVersion9CompatibilityRepairRequiredAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        foreach ((string tableName, string columnName) in SchemaVersion9CompatibilityColumns)
+        {
+            if (await TableExistsAsync(connection, tableName, cancellationToken)
+                && !await ColumnExistsAsync(connection, tableName, columnName, cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task ApplySchemaVersion9CompatibilityRepairAsync(
+        SqliteConnection connection,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ApplySchemaVersion9Async(connection, transaction, textSearchBackend, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private static Task ApplySchemaVersion10Async(
@@ -123,8 +168,31 @@ public sealed partial class LocalSqliteMigrator
         string columnName,
         CancellationToken cancellationToken)
     {
+        return await ColumnExistsCoreAsync(connection, transaction, tableName, columnName, cancellationToken);
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        return await ColumnExistsCoreAsync(connection, transaction: null, tableName, columnName, cancellationToken);
+    }
+
+    private static async Task<bool> ColumnExistsCoreAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
         await using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
+        if (transaction is not null)
+        {
+            command.Transaction = transaction;
+        }
+
         command.CommandText = $"PRAGMA table_info({tableName});";
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))

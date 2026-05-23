@@ -1,19 +1,23 @@
-export const targetLanguages = [
-  "English",
-  "Spanish",
-  "French",
-  "German",
-  "Italian",
-  "Portuguese",
-  "Dutch",
-  "Polish",
-  "Romanian",
-  "Chinese",
-  "Japanese",
-  "Korean",
-  "Arabic",
-  "Russian"
-];
+export const targetLanguageOptions = [
+  { value: "English", label: "Inglese" },
+  { value: "Spanish", label: "Spagnolo" },
+  { value: "French", label: "Francese" },
+  { value: "German", label: "Tedesco" },
+  { value: "Italian", label: "Italiano" },
+  { value: "Portuguese", label: "Portoghese" },
+  { value: "Dutch", label: "Olandese" },
+  { value: "Polish", label: "Polacco" },
+  { value: "Romanian", label: "Rumeno" },
+  { value: "Chinese", label: "Cinese" },
+  { value: "Japanese", label: "Giapponese" },
+  { value: "Korean", label: "Coreano" },
+  { value: "Arabic", label: "Arabo" },
+  { value: "Russian", label: "Russo" }
+] as const;
+
+export function formatTargetLanguageLabel(language: string): string {
+  return targetLanguageOptions.find((option) => option.value === language)?.label ?? language;
+}
 
 export function formatTranslationStatus(status: string): string {
   switch (status) {

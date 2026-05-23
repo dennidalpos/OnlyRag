@@ -2,11 +2,30 @@ using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Worker;
 
 namespace OnlyRag.Infrastructure.Tests;
 
 public sealed class SqliteStatusConstraintTests
 {
+    [Fact]
+    public void JobStatusSqlPredicates_UsePersistedEnumNames()
+    {
+        string allJobStatuses = string.Join(", ", Enum.GetNames<JobStatus>().Select(status => $"'{status}'"));
+
+        Assert.Equal(SqliteStatusConstraints.JobStatusPredicate, allJobStatuses);
+        Assert.Equal(
+            "status IN ('Pending', 'Running')",
+            SqliteStatusConstraints.BuildJobStatusInPredicate([JobStatus.Pending, JobStatus.Running]));
+        Assert.Equal(
+            "status NOT IN ('Running', 'Pausing', 'Pending')",
+            SqliteStatusConstraints.BuildJobStatusNotInPredicate(
+                [JobStatus.Running, JobStatus.Pausing, JobStatus.Pending]));
+        Assert.Equal(
+            "status = 'Pending'",
+            SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Pending));
+    }
+
     [Fact]
     public async Task InitializeAsync_FreshSchemaRejectsInvalidJobAndTranslationStatuses()
     {
