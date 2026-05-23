@@ -38,6 +38,7 @@ export function DocumentsSection() {
     isLoadingPreview,
     isUploading,
     loadPreviewPage,
+    ocrDefaultLanguage,
     ocrLanguages,
     ocrStatus,
     pendingImport,
@@ -56,6 +57,7 @@ export function DocumentsSection() {
         <OcrChoiceDialog
           fileCount={Array.from(pendingImport.files).length}
           languages={ocrLanguages}
+          defaultLanguage={ocrDefaultLanguage}
           onChoice={handleOcrChoice}
         />
       )}
@@ -69,6 +71,7 @@ export function DocumentsSection() {
               ? "Rileggi tutto con OCR"
               : "Riesegui lettura testo"}
           languages={ocrLanguages}
+          defaultLanguage={ocrDefaultLanguage}
           onChoice={handleOcrActionLanguage}
         />
       )}

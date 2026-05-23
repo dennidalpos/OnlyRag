@@ -14,6 +14,7 @@ public sealed record AppStoragePaths(
     string TempDirectory)
 {
     public const string ProductName = "OnlyRag";
+    public string PendingResetMarkerPath => Path.Combine(DataRoot, ".reset-on-startup");
 
     public static AppStoragePaths FromLocalAppData()
     {

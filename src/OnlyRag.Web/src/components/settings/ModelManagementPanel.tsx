@@ -54,20 +54,22 @@ export function ModelManagementPanel() {
               )}
               {models.map((model) => (
                 <div className="model-row" key={model.name}>
-                  <div>
+                  <div className="model-row__details">
                     <strong>{model.name}</strong>
                     <span>
                       {model.family ?? "Famiglia non indicata"} | {formatModelSize(model.size)}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="button-danger"
-                    onClick={() => void removeModel(model.name)}
-                    disabled={isBusy}
-                  >
-                    Rimuovi
-                  </button>
+                  <div className="model-row__actions">
+                    <button
+                      type="button"
+                      className="button-danger model-row__remove"
+                      onClick={() => void removeModel(model.name)}
+                      disabled={isBusy}
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

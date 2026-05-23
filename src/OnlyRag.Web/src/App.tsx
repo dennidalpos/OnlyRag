@@ -248,14 +248,14 @@ export default function App() {
                   "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."}
             </div>
           )}
-          {activeSection === "chat" && (
+          <div hidden={activeSection !== "chat"}>
             <ChatSection
               models={ollamaModels}
               defaultModel={ollamaSettings?.defaultChatModel ?? null}
               ollamaStatus={ollamaStatus}
               loadError={ollamaLoadError}
             />
-          )}
+          </div>
           {activeSection === "documents" && <DocumentsSection />}
           {activeSection === "jobs" && (
             <JobsSection onJobsChanged={() => void refreshBackendStatus()} />

@@ -38,7 +38,7 @@ export function ChatSection({
   const minChatPanelWidth = 360;
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatLayoutRef = useRef<HTMLDivElement | null>(null);
-  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedModel, setSelectedModel] = useState(() => loadChatSession()?.selectedModel ?? "");
   const [documents, setDocuments] = useState<ImportedDocument[]>([]);
 
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>(() => loadChatSession()?.selectedDocumentIds ?? []);
@@ -75,8 +75,8 @@ export function ChatSection({
   }, [input]);
 
   useEffect(() => {
-    saveChatSession({ conversationId, messages, selectedDocumentIds });
-  }, [conversationId, messages, selectedDocumentIds]);
+    saveChatSession({ conversationId, messages, selectedDocumentIds, selectedModel: selectedModel || null });
+  }, [conversationId, messages, selectedDocumentIds, selectedModel]);
 
   useEffect(() => {
     try {
@@ -128,9 +128,17 @@ export function ChatSection({
 
   useEffect(() => {
     const modelNames = models.map((model) => model.name);
-    const nextValue =
-      defaultModel && modelNames.includes(defaultModel) ? defaultModel : modelNames[0] ?? "";
-    setSelectedModel(nextValue);
+    if (modelNames.length === 0) {
+      return;
+    }
+
+    setSelectedModel((current) => {
+      if (current && modelNames.includes(current)) {
+        return current;
+      }
+
+      return defaultModel && modelNames.includes(defaultModel) ? defaultModel : modelNames[0];
+    });
   }, [defaultModel, models]);
 
   useEffect(() => {

@@ -11,6 +11,7 @@ export type PersistedChatSession = {
   conversationId: string | null;
   messages: ChatMessage[];
   selectedDocumentIds: number[];
+  selectedModel: string | null;
 };
 
 export function loadChatSession(): PersistedChatSession | null {

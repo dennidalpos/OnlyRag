@@ -36,6 +36,9 @@ export function OcrRuntimeSettingsPanel() {
                 ))}
               </select>
             </label>
+            <div className="panel-note">
+              <p>Questa lingua viene usata come predefinita per import, reindicizzazione e OCR. La scelta nel dialogo del documento vale solo per quella operazione.</p>
+            </div>
             <SettingsRangeField
               id="ocr-processing-retries"
               label="Retry OCR"

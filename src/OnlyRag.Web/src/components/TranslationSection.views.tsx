@@ -137,11 +137,11 @@ export function TranslationListCard({
         <span>{translations.length}</span>
       </div>
       {translations.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state" role="status">
           <p>Nessuna traduzione per il documento selezionato.</p>
         </div>
       ) : (
-        <div className="jobs-list">
+        <div className="jobs-list" aria-label="Traduzioni esistenti">
           {translations.map((translation) => (
             <article className="job-row" key={translation.id}>
               <div className="job-row__header">
@@ -168,6 +168,7 @@ export function TranslationListCard({
                 <button
                   className={`button-secondary${selectedTranslationId === translation.id ? " button-secondary--active" : ""}`}
                   type="button"
+                  aria-pressed={selectedTranslationId === translation.id}
                   onClick={() => {
                     onSelectTranslation(translation.id);
                     setTimeout(() => detailsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -240,7 +241,7 @@ export function TranslationDetailsPanel({
           disabled={isExporting}
           onClick={onExportTranslation}
         >
-          {isExporting ? "Export..." : "Esporta"}
+          {isExporting ? "Esportazione..." : "Esporta"}
         </button>
         {lastExportPath && (
           <button

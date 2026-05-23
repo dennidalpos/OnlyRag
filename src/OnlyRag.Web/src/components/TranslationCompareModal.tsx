@@ -31,15 +31,15 @@ export function TranslationCompareModal({
   onEditedTextChange: (text: string) => void;
 }) {
   return (
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="compare-title"
-      ref={compareDialogRef}
-      tabIndex={-1}
-    >
-      <div className="compare-modal">
+    <div className="modal-backdrop">
+      <div
+        className="compare-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compare-title"
+        ref={compareDialogRef}
+        tabIndex={-1}
+      >
         <div className="compare-modal__header">
           <div>
             <h3 id="compare-title">Confronto traduzione</h3>
@@ -81,21 +81,26 @@ export function TranslationCompareModal({
           </button>
         </div>
 
-        {isCompareLoading && <div className="empty-state compare-empty">Caricamento confronto...</div>}
+        {isCompareLoading && (
+          <div className="empty-state compare-empty" role="status" aria-live="polite">
+            Caricamento confronto...
+          </div>
+        )}
 
         {!isCompareLoading && compareData && compareData.units.length === 0 && (
-          <div className="empty-state compare-empty">
+          <div className="empty-state compare-empty" role="status">
             <p>Traduzione non ancora disponibile.</p>
           </div>
         )}
 
         {!isCompareLoading && compareData && compareData.units.length > 0 && (
           <>
-            <div className="compare-unit-list">
+            <div className="compare-unit-list" aria-label="Unità tradotte nella pagina">
               {compareData.units.map((unit) => (
                 <button
                   key={unit.id}
                   type="button"
+                  aria-pressed={unit.id === activeCompareUnitId}
                   className={
                     unit.id === activeCompareUnitId
                       ? "compare-unit-pill compare-unit-pill--active"
@@ -130,7 +135,7 @@ export function TranslationCompareModal({
                   </div>
                   {!activeCompareUnit.translatedText && (
                     <div className="panel-note panel-note--warning" role="alert">
-                      <p>Traduzione non ancora disponibile per questa unita.</p>
+                      <p>Traduzione non ancora disponibile per questa unità.</p>
                     </div>
                   )}
                   <textarea
@@ -153,7 +158,11 @@ export function TranslationCompareModal({
 
             {saveState && (
               <div className="compare-footer">
-                <span className={`compare-save-state compare-save-state--${saveState.tone}`}>
+                <span
+                  className={`compare-save-state compare-save-state--${saveState.tone}`}
+                  role={saveState.tone === "error" ? "alert" : "status"}
+                  aria-live={saveState.tone === "error" ? "assertive" : "polite"}
+                >
                   {saveState.message}
                 </span>
               </div>

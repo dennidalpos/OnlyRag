@@ -6,6 +6,7 @@ import {
   type ImportedDocument,
   type OcrLanguage,
   type OcrPolicy,
+  type OcrProcessingSettings,
   type VectorBackendHealth
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
@@ -40,6 +41,7 @@ export function useDocumentsSectionController() {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [pendingOcrAction, setPendingOcrAction] = useState<PendingOcrAction | null>(null);
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>(fallbackOcrLanguages);
+  const [ocrDefaultLanguage, setOcrDefaultLanguage] = useState(DEFAULT_OCR_LANGUAGE);
   const [documentRefreshStatus, setDocumentRefreshStatus] = useState(initialRefreshStatus);
   const {
     detailRefreshStatus,
@@ -67,6 +69,9 @@ export function useDocumentsSectionController() {
     apiRequest<OcrLanguage[]>("/api/ocr/languages")
       .then((languages) => setOcrLanguages(languages.length > 0 ? languages : fallbackOcrLanguages))
       .catch(() => setOcrLanguages(fallbackOcrLanguages));
+    apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing")
+      .then((settings) => setOcrDefaultLanguage(settings.language || DEFAULT_OCR_LANGUAGE))
+      .catch(() => setOcrDefaultLanguage(DEFAULT_OCR_LANGUAGE));
   }, []);
 
   useEffect(() => {
@@ -135,7 +140,7 @@ export function useDocumentsSectionController() {
     setDetailRefreshStatus(markRefreshSuccess());
   }
 
-  async function importFiles(files: FileList | File[], policy: OcrPolicy, ocrLanguage: string = DEFAULT_OCR_LANGUAGE) {
+  async function importFiles(files: FileList | File[], policy: OcrPolicy, ocrLanguage: string = ocrDefaultLanguage) {
     if (files.length === 0) return;
     setIsUploading(true);
     setFeedback(null);
@@ -179,11 +184,11 @@ export function useDocumentsSectionController() {
     if (anyOcrCandidate(files)) {
       setPendingImport({ files });
     } else {
-      void importFiles(files, "Auto", DEFAULT_OCR_LANGUAGE);
+      void importFiles(files, "Auto", ocrDefaultLanguage);
     }
   }
 
-  function handleOcrChoice(policy: OcrPolicy | "cancel", ocrLanguage: string = DEFAULT_OCR_LANGUAGE) {
+  function handleOcrChoice(policy: OcrPolicy | "cancel", ocrLanguage: string = ocrDefaultLanguage) {
     if (policy === "cancel" || !pendingImport) {
       setPendingImport(null);
       return;
@@ -212,7 +217,7 @@ export function useDocumentsSectionController() {
       return;
     }
 
-    void executeReindex(document, DEFAULT_OCR_LANGUAGE);
+    void executeReindex(document, ocrDefaultLanguage);
   }
 
   async function executeReindex(document: ImportedDocument, ocrLanguage: string) {
@@ -373,6 +378,7 @@ export function useDocumentsSectionController() {
     isLoading,
     isLoadingPreview: preview.isLoadingPreview,
     isUploading,
+    ocrDefaultLanguage,
     ocrLanguages,
     ocrStatus,
     pendingImport,

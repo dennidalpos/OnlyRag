@@ -119,4 +119,33 @@ describe("ChatSection", () => {
     expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveValue("");
     expect(screen.getByText("Inizia una conversazione.")).toBeInTheDocument();
   });
+
+  it("preserves a valid chat-specific model when defaults refresh", async () => {
+    window.sessionStorage.setItem(
+      "onlyrag.chat.session",
+      JSON.stringify({
+        conversationId: null,
+        messages: [],
+        selectedDocumentIds: [],
+        selectedModel: "mistral:7b"
+      })
+    );
+    mockApi([{ path: "/api/documents", response: [] }]);
+
+    render(
+      <ChatSection
+        models={[
+          createModel({ name: "llama3.2:3b", model: "llama3.2:3b" }),
+          createModel({ name: "mistral:7b", model: "mistral:7b" })
+        ]}
+        defaultModel="llama3.2:3b"
+        ollamaStatus={createOllamaStatus({ installedModelCount: 2 })}
+        loadError={null}
+      />
+    );
+
+    const select = await screen.findByLabelText("Modello chat");
+    expect(select).toHaveValue("mistral:7b");
+    expect(window.sessionStorage.getItem("onlyrag.chat.session")).toContain("mistral:7b");
+  });
 });

@@ -367,7 +367,9 @@ export function useSettingsSectionController({
     saveOcrProcessingSettings: actions.saveOcrProcessingSettings,
     applyOcrProfile: actions.applyOcrProfile,
     updateOcrSettings: actions.updateOcrSettings,
-    saveOcrSettings: actions.saveOcrSettings
+    saveOcrSettings: actions.saveOcrSettings,
+    restoreBalancedDefaults: actions.restoreBalancedDefaults,
+    requestAppDataReset: actions.requestAppDataReset
   } as const;
 }
 

@@ -34,11 +34,30 @@ public sealed class AppStoragePathsTests
         Assert.StartsWith(paths.DataRoot, paths.LogsDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith(paths.DataRoot, paths.WebView2UserDataDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith(paths.DataRoot, paths.TempDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith(paths.DataRoot, paths.PendingResetMarkerPath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void FromRoot_RejectsMissingRoot()
     {
         Assert.Throws<ArgumentException>(() => AppStoragePaths.FromRoot(" "));
+    }
+
+    [Fact]
+    public void AppDataReset_RequestAndApplyPendingResetDeletesDataRootContents()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "OnlyRag-reset-tests", Guid.NewGuid().ToString("N"));
+        AppStoragePaths paths = AppStoragePaths.FromRoot(root);
+        Directory.CreateDirectory(paths.DataDirectory);
+        File.WriteAllText(Path.Combine(paths.DataDirectory, "data.txt"), "data");
+
+        AppDataReset.RequestResetOnNextStartup(paths);
+        bool applied = AppDataReset.ApplyPendingReset(paths);
+
+        Assert.True(applied);
+        Assert.True(Directory.Exists(paths.DataRoot));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(paths.DataRoot));
+
+        Directory.Delete(paths.DataRoot, recursive: true);
     }
 }

@@ -254,6 +254,31 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsImport_UsesSavedOcrLanguageWhenRequestOmitsLanguage()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("ocr-language-import-default-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await httpClient.PutAsJsonAsync(
+            "/api/settings/ocr-processing",
+            new OcrProcessingSettings("de", 2, 180, 0.55d),
+            JsonOptions);
+        using MultipartFormDataContent content = new();
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("api-document")), "files", "Spec.pdf");
+        content.Add(new StringContent("ForceAll"), "ocrPolicy");
+
+        using HttpResponseMessage importResponse = await httpClient.PostAsync("/api/documents/import", content);
+        SqliteLocalJobQueue queue = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store), queueDescriptor);
+        LocalJob job = Assert.Single(await queue.ListAsync());
+        DocumentIngestionJobPayload? payload = JsonSerializer.Deserialize<DocumentIngestionJobPayload>(job.PayloadJson, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, importResponse.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("de", payload.OcrLanguage);
+    }
+
+    [Fact]
     public async Task DocumentsOcr_SerializesOcrLanguageInIngestionJob()
     {
         LocalJobQueueDescriptor queueDescriptor = new("ocr-language-force-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
@@ -289,6 +314,46 @@ public sealed partial class InProcessBackendTests
         Assert.NotNull(payload);
         Assert.True(payload.ForceOcr);
         Assert.Equal("de", payload.OcrLanguage);
+    }
+
+    [Fact]
+    public async Task DocumentsOcr_UsesSavedOcrLanguageWhenRequestOmitsLanguage()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("ocr-language-force-default-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
+        SqliteDocumentRepository documentRepository = new(connectionFactory);
+        ImportedDocument document = await documentRepository.CreateAsync(new CreateDocumentRecordRequest(
+            Guid.NewGuid().ToString("N"),
+            "scan.pdf",
+            Path.Combine(tempDescriptor.Root, "scan.pdf"),
+            "sha-ocr-language-default",
+            "application/pdf",
+            ".pdf",
+            128,
+            DocumentStatus.Indexed,
+            PageCount: 0,
+            CurrentJobId: null,
+            LastError: null,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow));
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await httpClient.PutAsJsonAsync(
+            "/api/settings/ocr-processing",
+            new OcrProcessingSettings("fr", 2, 180, 0.55d),
+            JsonOptions);
+
+        using HttpResponseMessage response = await httpClient.PostAsync(
+            $"/api/documents/{document.Id}/ocr?force=true",
+            content: null);
+        SqliteLocalJobQueue queue = new(connectionFactory, queueDescriptor);
+        LocalJob job = Assert.Single(await queue.ListAsync());
+        DocumentIngestionJobPayload? payload = JsonSerializer.Deserialize<DocumentIngestionJobPayload>(job.PayloadJson, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("fr", payload.OcrLanguage);
     }
 
     [Fact]

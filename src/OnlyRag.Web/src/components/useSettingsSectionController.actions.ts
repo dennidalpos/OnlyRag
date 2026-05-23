@@ -28,6 +28,7 @@ import {
   createSettingsSectionDependencyActions,
   type SettingsSectionDependencyActionParams
 } from "./useSettingsSectionController.dependencyActions";
+import { createSettingsSectionResetActions } from "./useSettingsSectionController.resetActions";
 import type { Dispatch, SetStateAction } from "react";
 
 type SettingsSectionActionParams = SettingsSectionDependencyActionParams & {
@@ -181,6 +182,26 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
 
   const dependencyActions = createSettingsSectionDependencyActions(params);
   const { refreshDependencyStatus, refreshOfficeConverter } = dependencyActions;
+  const resetActions = createSettingsSectionResetActions({
+    onDataChanged,
+    setFormState,
+    setSavedFormState,
+    setOfficeFormState,
+    setSavedOfficeFormState,
+    setPerformanceFormState,
+    setSavedPerformanceFormState,
+    setIngestionFormState,
+    setSavedIngestionFormState,
+    setOcrProcessingFormState,
+    setSavedOcrProcessingFormState,
+    setOcrFormState,
+    setSavedOcrFormState,
+    setInfoMessage,
+    setErrorMessage,
+    setIsBusy,
+    refreshOfficeConverter,
+    refreshDependencyStatus
+  });
 
   async function savePerformanceSettings() {
     setIsBusy(true);
@@ -407,6 +428,8 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     applyOcrProfile,
     updateOcrSettings,
     saveOfficeSettings,
+    restoreBalancedDefaults: resetActions.restoreBalancedDefaults,
+    requestAppDataReset: resetActions.requestAppDataReset,
     persistAllDirtyChanges
   } as const;
 }

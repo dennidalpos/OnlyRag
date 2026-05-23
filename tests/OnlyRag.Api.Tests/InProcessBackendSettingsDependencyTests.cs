@@ -510,6 +510,38 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task AppDataResetEndpoint_RequiresExplicitConfirmation()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            "/api/app/reset-on-next-startup",
+            new ProcessLaunchRequest(false),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(File.Exists(tempDescriptor.Descriptor.StoragePaths.PendingResetMarkerPath));
+    }
+
+    [Fact]
+    public async Task AppDataResetEndpoint_WritesPendingResetMarker()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            "/api/app/reset-on-next-startup",
+            new ProcessLaunchRequest(true),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(File.Exists(tempDescriptor.Descriptor.StoragePaths.PendingResetMarkerPath));
+    }
+
+    [Fact]
     public async Task OpenLogsFolder_DoesNotReturnProcessFailureDetails()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

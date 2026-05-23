@@ -47,6 +47,23 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await shutdown.PrepareAsync(cancellationToken)));
 
+        app.MapPost("/api/app/reset-on-next-startup", (
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor) =>
+        {
+            if (!request.Confirmed)
+            {
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "Il reset totale dei dati locali richiede conferma esplicita dalla UI.",
+                    "confirmation_required");
+            }
+
+            AppDataReset.RequestResetOnNextStartup(descriptor.StoragePaths);
+            return Results.Ok(new OperationMessageResponse(
+                "Reset dati pianificato. Riavvia OnlyRag per cancellare dati locali, profilo WebView2, cache, log e impostazioni."));
+        });
+
         app.MapGet("/api/health", () =>
             Results.Ok(new BackendHealthResponse("Healthy")));
 

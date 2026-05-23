@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Diagnostics;
+using System.IO;
 using OnlyRag.Api;
+using OnlyRag.Core;
 
 namespace OnlyRag.App;
 
@@ -14,10 +16,26 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        BackendWebSettings backendSettings = await StartBackendAsync();
+        string? resetError = TryApplyPendingDataReset();
+        BackendWebSettings backendSettings = resetError is null
+            ? await StartBackendAsync()
+            : BackendWebSettings.Offline(resetError);
         MainWindow mainWindow = new(backendSettings);
         MainWindow = mainWindow;
         mainWindow.Show();
+    }
+
+    private static string? TryApplyPendingDataReset()
+    {
+        try
+        {
+            AppDataReset.ApplyPendingReset(AppStoragePaths.FromLocalAppData());
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "Reset dati locali non completato. Chiudi eventuali istanze di OnlyRag e riprova. Dettaglio: " + ex.Message;
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

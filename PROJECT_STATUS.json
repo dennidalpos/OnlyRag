@@ -1,69 +1,55 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-22T22:19:57+02:00",
+  "last_updated": "2026-05-23T11:11:50+02:00",
   "status": "active",
-  "current_phase": "final-readiness-verified",
+  "current_phase": "ui-a11y-maintenance-complete",
   "production_target": true,
-  "summary": "Final readiness pass completed. Repository gate, security audits, build, tests, installer prerequisite self-test, unsigned installer packaging, and non-invasive release evidence passed. Release signing and lifecycle verification remain blocked on external prerequisites.",
-  "active_objective": "Complete signed installer verification when a trusted Windows code-signing certificate and clean verification machine are available.",
+  "summary": "OCR language precedence, settings clarity, chat state persistence, installed-model layout, reset controls, and focused translation UI accessibility fixes are implemented and verified.",
+  "active_objective": "Complete signed installer verification when external release prerequisites are available.",
   "residuals": [
     {
-      "priority": 1,
+      "priority": 4,
       "id": "signed-release",
       "title": "Complete signed installer verification",
-      "reason": "A trusted Windows code-signing certificate and clean-machine installer lifecycle verification are still required before signed release handoff.",
-      "status": "blocked"
-    }
-  ],
-  "execution_plan": [
+      "status": "blocked",
+      "blocked_by": "Trusted Windows code-signing certificate, signtool.exe, and clean Windows verification machine.",
+      "done_when": "Signed installer and clean-machine install, upgrade, rollback, and uninstall verification pass."
+    },
     {
-      "order": 1,
-      "task": "After a signing certificate is available, run signed installer build and clean-machine install, upgrade, rollback, uninstall verification.",
-      "done_when": "Release evidence is generated without unsigned-warning status."
+      "priority": 3,
+      "id": "translation-language-display-localization",
+      "title": "Localize translation target language labels",
+      "status": "open",
+      "done_when": "The translation target selector displays language names consistently with the Italian UI without introducing a broad i18n migration."
     }
-  ],
-  "verification_commands": [
-    "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller -InnoSetupCompiler \"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\"",
-    "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe"
   ],
   "quality_gates": {
-    "repository_gate_with_installer": "passed",
-    "npm_production_audit": "passed",
-    "nuget_vulnerability_audit": "passed",
     "frontend_format": "passed",
-    "frontend_lint": "passed",
     "frontend_typecheck": "passed",
+    "frontend_lint": "passed",
     "frontend_unit_tests": "passed",
-    "frontend_e2e_tests": "passed",
     "frontend_build": "passed",
     "backend_tests": "passed",
     "dotnet_build": "passed",
-    "installer_prerequisite_self_test": "passed",
-    "unsigned_installer_package": "passed",
-    "release_evidence_non_invasive": "passed_with_unsigned_warning",
-    "signed_installer_verification": "blocked",
-    "install_lifecycle": "not_run",
     "structure_review": "passed"
   },
-  "blockers": [
-    "Signed release completion requires a trusted Windows code-signing certificate and signtool.exe.",
-    "Install, upgrade, rollback, and uninstall lifecycle verification must run with -RunInstallLifecycle on a clean Windows verification machine."
-  ],
-  "risks": [
-    "The generated installer is unsigned in this environment; Test-InstallerRelease reports signing-status NotSigned.",
-    "The local dev server must be stopped before running the gate because npm ci replaces node_modules and can be blocked by a running esbuild service."
-  ],
+  "commands": {
+    "frontend_format": "cd src\\OnlyRag.Web; npm run format:check",
+    "frontend_typecheck": "cd src\\OnlyRag.Web; npm run typecheck",
+    "frontend_lint": "cd src\\OnlyRag.Web; npm run lint",
+    "frontend_unit_tests": "cd src\\OnlyRag.Web; npm run test:unit",
+    "frontend_build": "cd src\\OnlyRag.Web; npm run build",
+    "backend_tests": "dotnet test OnlyRag.sln",
+    "dotnet_build": "dotnet build OnlyRag.sln",
+    "status": "git status --short"
+  },
   "structure_notes": [
-    "No script or CSS file remains above the repository split threshold after the final pass.",
-    "Some pre-existing source and test files remain above review thresholds but below split-required thresholds; no broad structural split was opened during final readiness."
+    "Reset actions were split into src/OnlyRag.Web/src/components/useSettingsSectionController.resetActions.ts after the Settings actions controller exceeded the split threshold.",
+    "Some existing broad UI controller and test files remain above review thresholds but below split-required thresholds; no unrelated broad split was opened."
   ],
-  "last_completed_work": "Final readiness pass: stopped a local Vite/esbuild process that blocked npm ci, split CSS residual was already complete, kept scripts under size threshold, hardened a test cleanup retry for transient SQLite file locks, ran the full Release gate with installer packaging, and generated non-invasive installer evidence.",
-  "next_actions": [
-    "Provide a trusted Windows code-signing certificate and signtool.exe, then run Sign-Release.ps1.",
-    "Run Test-InstallerRelease.ps1 with -RequireSigned -RunInstallLifecycle on a clean Windows verification machine."
-  ],
+  "last_completed_work": "Improved translation UI accessibility by moving dialog semantics to the compare modal content, announcing compare loading/empty/save states, marking selected translation actions and compare units, and fixing localized copy.",
   "notes": [
-    "Do not re-add completed task history to this file.",
-    "Update this tracker only when residual scope, priority, blockers, or verification status changes."
+    "Keep this file current-only: no completed history.",
+    "Do not store secrets or release credentials here."
   ]
 }

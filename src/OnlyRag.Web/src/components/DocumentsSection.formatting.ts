@@ -26,6 +26,15 @@ export function getDefaultOcrLanguage(languages: OcrLanguage[]): string {
     ?? DEFAULT_OCR_LANGUAGE;
 }
 
+export function getPreferredOcrLanguage(languages: OcrLanguage[], preferredLanguage: string | null): string {
+  const normalized = preferredLanguage?.trim() ?? "";
+  if (normalized.length > 0 && languages.some((language) => language.code === normalized)) {
+    return normalized;
+  }
+
+  return getDefaultOcrLanguage(languages);
+}
+
 export function formatDocumentType(document: ImportedDocument): string {
   switch (document.fileExtension?.toLowerCase()) {
     case ".docx":

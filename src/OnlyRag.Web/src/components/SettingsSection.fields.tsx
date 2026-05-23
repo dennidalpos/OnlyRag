@@ -121,6 +121,9 @@ export function AdjustableModelContextBar({
         />
         <span>Automatico</span>
       </label>
+      <span className="model-context-bar__hint">
+        In Automatico OnlyRag non invia num_ctx e lascia il valore nativo del modello.
+      </span>
       {value != null && (
         <SettingsRangeField
           id={sliderLabel.replaceAll(" ", "-")}

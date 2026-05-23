@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
 
 namespace OnlyRag.Api;
@@ -13,6 +14,7 @@ public static partial class InProcessBackend
             HttpRequest request,
             IDocumentLibraryService documents,
             LocalDocumentStorageGuard storageGuard,
+            OcrProcessingSettingsStore ocrProcessingSettings,
             CancellationToken cancellationToken) =>
         {
             if (!request.HasFormContentType)
@@ -74,7 +76,10 @@ public static partial class InProcessBackend
                 form["ocrPolicy"].ToString(),
                 "ForceAll",
                 StringComparison.OrdinalIgnoreCase);
-            string ocrLanguage = OcrLanguages.NormalizeCode(form["ocrLanguage"].ToString());
+            string ocrLanguage = await ResolveOcrLanguageAsync(
+                form["ocrLanguage"].ToString(),
+                ocrProcessingSettings,
+                cancellationToken);
 
             List<DocumentImportFileResult> results = [];
             foreach (IFormFile file in form.Files)

@@ -133,7 +133,7 @@ export function PerformanceSettingsPanel() {
                 min={1}
                 max={24}
                 value={performanceFormState.maxContextChunks}
-                hint={recommendedMaxContextChunks ? `Suggerito: ${recommendedMaxContextChunks}` : null}
+                hint={recommendedMaxContextChunks ? `RAG app, suggerito: ${recommendedMaxContextChunks}` : "RAG app"}
                 disabled={!manualControlsEnabled}
                 onChange={(value) =>
                   setPerformanceFormState((current) => ({ ...current, maxContextChunks: value }))
@@ -157,6 +157,9 @@ export function PerformanceSettingsPanel() {
                 <p>Lettura dettagli modello in corso.</p>
               </div>
             )}
+            <div className="panel-note">
+              <p>Chunk contesto limita quanti chunk recuperati entrano nella risposta RAG. La finestra Ollama num_ctx e separata e viene inviata solo quando impostata manualmente nei modelli predefiniti.</p>
+            </div>
             <div className="settings-actions">
               <button type="button" onClick={savePerformanceSettings} disabled={isBusy}>
                 Salva prestazioni

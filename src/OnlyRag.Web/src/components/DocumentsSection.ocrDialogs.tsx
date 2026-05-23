@@ -1,19 +1,21 @@
 import { useRef, useState } from "react";
 import type { OcrLanguage, OcrPolicy } from "../api";
 import { useModalFocusTrap } from "./useModalFocusTrap";
-import { getDefaultOcrLanguage } from "./DocumentsSection.formatting";
+import { getPreferredOcrLanguage } from "./DocumentsSection.formatting";
 
 export function OcrChoiceDialog({
   fileCount,
   languages,
+  defaultLanguage,
   onChoice
 }: {
   fileCount: number;
   languages: OcrLanguage[];
+  defaultLanguage: string;
   onChoice: (policy: OcrPolicy | "cancel", ocrLanguage?: string) => void;
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState(getDefaultOcrLanguage(languages));
+  const [selectedLanguage, setSelectedLanguage] = useState(getPreferredOcrLanguage(languages, defaultLanguage));
   useModalFocusTrap(dialogRef, true, { onEscape: () => onChoice("cancel") });
 
   return (
@@ -39,6 +41,9 @@ export function OcrChoiceDialog({
           value={selectedLanguage}
           onChange={setSelectedLanguage}
         />
+        <div className="panel-note">
+          <p>La lingua salvata in Impostazioni viene proposta come predefinita; questa scelta vale solo per questo import.</p>
+        </div>
 
         <div className="ocr-choice-options">
           <button
@@ -76,15 +81,17 @@ export function OcrLanguageDialog({
   documentName,
   actionLabel,
   languages,
+  defaultLanguage,
   onChoice
 }: {
   documentName: string;
   actionLabel: string;
   languages: OcrLanguage[];
+  defaultLanguage: string;
   onChoice: (language: string | "cancel") => void;
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState(getDefaultOcrLanguage(languages));
+  const [selectedLanguage, setSelectedLanguage] = useState(getPreferredOcrLanguage(languages, defaultLanguage));
   useModalFocusTrap(dialogRef, true, { onEscape: () => onChoice("cancel") });
 
   return (
@@ -107,6 +114,9 @@ export function OcrLanguageDialog({
           value={selectedLanguage}
           onChange={setSelectedLanguage}
         />
+        <div className="panel-note">
+          <p>La lingua salvata in Impostazioni viene proposta come predefinita; questa scelta vale solo per questa operazione.</p>
+        </div>
 
         <div className="settings-actions" style={{ justifyContent: "flex-end" }}>
           <button className="button-secondary" type="button" onClick={() => onChoice("cancel")}>

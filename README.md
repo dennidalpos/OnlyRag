@@ -27,6 +27,8 @@ For RAG answers, OnlyRag sends retrieved snippets to the model, not full source 
   DOCX, or PDF output.
 - Configure Ollama endpoint, chat/embedding/translation models, `num_ctx` behavior, ingestion,
   OCR, Office conversion, and performance settings from the desktop UI.
+- Restore balanced default settings without deleting data, or schedule a confirmed full local data
+  reset for the next app startup.
 - Track ingestion, embedding, OCR, and translation jobs in the desktop UI.
 - Confirm app exit when local jobs or unsaved UI work exist; confirmed exit saves available work,
   cancels active local jobs, and stops the in-process backend.

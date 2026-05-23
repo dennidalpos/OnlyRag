@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Worker;
 
@@ -52,6 +53,7 @@ public static partial class InProcessBackend
             IDocumentLibraryService documents,
             ILocalJobQueue jobs,
             RunningJobCancellationRegistry cancellationRegistry,
+            OcrProcessingSettingsStore ocrProcessingSettings,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
@@ -61,7 +63,11 @@ public static partial class InProcessBackend
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
-            ImportedDocument? queued = await documents.QueueForIndexingAsync(id, OcrLanguages.NormalizeCode(ocrLanguage), cancellationToken);
+            string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
+                ocrLanguage,
+                ocrProcessingSettings,
+                cancellationToken);
+            ImportedDocument? queued = await documents.QueueForIndexingAsync(id, resolvedOcrLanguage, cancellationToken);
             return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
         });
 
@@ -93,6 +99,7 @@ public static partial class InProcessBackend
             IDocumentLibraryService documents,
             ILocalJobQueue jobs,
             RunningJobCancellationRegistry cancellationRegistry,
+            OcrProcessingSettingsStore ocrProcessingSettings,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
@@ -102,13 +109,17 @@ public static partial class InProcessBackend
             }
 
             await CancelDocumentJobIfNeededAsync(document, jobs, cancellationRegistry, cancellationToken);
+            string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
+                ocrLanguage,
+                ocrProcessingSettings,
+                cancellationToken);
             string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DocumentIngestionJobPayload(
                 document.Id,
                 document.DocumentUid,
                 document.OriginalFileName,
                 document.Sha256 ?? string.Empty,
                 ForceOcr: force ?? false,
-                OcrLanguage: OcrLanguages.NormalizeCode(ocrLanguage)));
+                OcrLanguage: resolvedOcrLanguage));
             LocalJob job = await jobs.CreateAsync(
                 new CreateLocalJobRequest(
                     LocalDocumentLibraryService.DocumentIngestionJobType,
@@ -232,6 +243,20 @@ public static partial class InProcessBackend
         });
 
         MapDocumentPipelineEndpoints(app);
+    }
+
+    private static async Task<string> ResolveOcrLanguageAsync(
+        string? requestedLanguage,
+        OcrProcessingSettingsStore ocrProcessingSettings,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedLanguage))
+        {
+            return OcrLanguages.NormalizeCode(requestedLanguage);
+        }
+
+        OcrProcessingSettings settings = await ocrProcessingSettings.GetAsync(cancellationToken);
+        return OcrLanguages.NormalizeCode(settings.Language);
     }
 
 }

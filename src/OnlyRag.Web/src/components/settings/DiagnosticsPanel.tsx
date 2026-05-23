@@ -11,7 +11,9 @@ export function DiagnosticsPanel() {
     refreshDiagnostics,
     isBusy,
     openLogsFolder,
-    configureOcrRuntime
+    configureOcrRuntime,
+    restoreBalancedDefaults,
+    requestAppDataReset
   } = useSettingsSectionContext();
 
   return (
@@ -161,6 +163,27 @@ export function DiagnosticsPanel() {
                 disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
               >
                 {ocrProvisionStatus?.isRunning ? "Configurazione OCR..." : "Configura OCR"}
+              </button>
+            </div>
+            <div className="panel-note panel-note--warning">
+              <p>Ripristina default aggiorna solo le impostazioni. Reset dati elimina tutto al prossimo avvio dopo conferma.</p>
+            </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => void restoreBalancedDefaults()}
+                disabled={isBusy}
+              >
+                Ripristina default
+              </button>
+              <button
+                type="button"
+                className="button-danger"
+                onClick={() => void requestAppDataReset()}
+                disabled={isBusy}
+              >
+                Reset dati al riavvio
               </button>
             </div>
           </div>
