@@ -125,6 +125,8 @@ pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 
 The gate includes npm production dependency audit, NuGet transitive vulnerability audit, frontend
 typecheck/lint/format/test, .NET tests, installer prerequisite self-test, web build, and .NET build.
+Use `-ContinueOnError` when diagnosing a failing checkout and you want the gate to keep running
+independent checks before printing a consolidated failure summary.
 
 Run web tests, lint, and formatter checks directly:
 

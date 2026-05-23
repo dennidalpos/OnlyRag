@@ -6,6 +6,8 @@ param(
 
     [switch]$IncludeInstaller,
 
+    [switch]$ContinueOnError,
+
     [string]$InnoSetupCompiler
 )
 
@@ -19,62 +21,12 @@ $buildWebScript = Join-Path $PSScriptRoot "Build-Web.ps1"
 $buildAppScript = Join-Path $PSScriptRoot "Build-App.ps1"
 $buildInstallerScript = Join-Path $PSScriptRoot "Build-Installer.ps1"
 $testInstallerPrerequisitesScript = Join-Path $PSScriptRoot "Test-InstallerPrerequisites.ps1"
+$gateDiagnosticsScript = Join-Path $PSScriptRoot "support\GateDiagnostics.ps1"
+. $gateDiagnosticsScript
 
-function Invoke-GateStep {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Name,
-
-        [Parameter(Mandatory)]
-        [scriptblock]$Action
-    )
-
-    Write-Host ""
-    Write-Host "==> $Name" -ForegroundColor Cyan
-
-    $global:LASTEXITCODE = 0
-    & $Action
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Name failed with exit code $LASTEXITCODE."
-    }
-}
-
-function Assert-CommandAvailable {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Name,
-
-        [Parameter(Mandatory)]
-        [string]$InstallHint
-    )
-
-    $command = Get-Command $Name -ErrorAction SilentlyContinue
-    if (-not $command) {
-        throw "$Name was not found. $InstallHint"
-    }
-
-    Write-Host "  ${Name}: $($command.Source)"
-}
-
-function Get-JsonPropertyValue {
-    param(
-        [object]$Object,
-
-        [Parameter(Mandatory)]
-        [string]$Name
-    )
-
-    if ($null -eq $Object) {
-        return $null
-    }
-
-    $property = $Object.PSObject.Properties[$Name]
-    if ($null -eq $property) {
-        return $null
-    }
-
-    return $property.Value
-}
+$script:GateResults = New-Object System.Collections.Generic.List[object]
+$script:GateFailures = New-Object System.Collections.Generic.List[object]
+$gateStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 function Test-DotNetPackageVulnerabilities {
     param(
@@ -134,6 +86,7 @@ Write-Host "OnlyRag repository gate" -ForegroundColor Cyan
 Write-Host "Repository: $repoRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Installer: $(if ($IncludeInstaller) { 'included' } else { 'skipped by default' })"
+Write-Host "Continue on error: $(if ($ContinueOnError) { 'enabled' } else { 'disabled' })"
 Write-Host "Inno Setup: $(if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) { 'auto-detect when installer is included' } else { $InnoSetupCompiler })"
 
 Invoke-GateStep "preflight" {
@@ -142,7 +95,11 @@ Invoke-GateStep "preflight" {
     }
 
     Assert-CommandAvailable -Name "dotnet" -InstallHint "Install .NET 10 SDK for Windows."
+    Assert-CommandAvailable -Name "node" -InstallHint "Install Node.js matching src\OnlyRag.Web\package.json."
     Assert-CommandAvailable -Name "npm" -InstallHint "Install Node.js with npm matching src\OnlyRag.Web\package.json."
+    Write-GateToolVersion -Name "dotnet" -Arguments @("--version")
+    Write-GateToolVersion -Name "node" -Arguments @("--version")
+    Write-GateToolVersion -Name "npm" -Arguments @("--version")
 
     if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) {
         throw "Solution not found: $solution"
@@ -252,6 +209,11 @@ if ($IncludeInstaller) {
 
         & $buildInstallerScript @installerArguments
     }
+}
+
+Write-GateSummary
+if ($script:GateFailures.Count -gt 0) {
+    throw "Gate failed with $($script:GateFailures.Count) failing step(s)."
 }
 
 Write-Host ""

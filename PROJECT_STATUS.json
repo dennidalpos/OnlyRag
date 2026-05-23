@@ -1,6 +1,6 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-24T00:30:44+02:00",
+  "last_updated": "2026-05-24T00:46:05+02:00",
   "status": "active",
   "active_objective": "Complete trusted signed installer verification when external signing prerequisites are available.",
   "current_plan": [
@@ -31,5 +31,5 @@
     "Automatic install is limited to per-user OCR/PaddleOCR provisioning; Ollama, LibreOffice, Python, and WebView2 remain user-confirmed external/manual installs.",
     "Live metrics use 5-second diagnostics polling rather than streaming."
   ],
-  "last_completed_work": "Aligned developer OCR bootstrap with app GPU provisioning: auto-selects CUDA requirements, preserves runtime selection with a stamp, verifies GPU bridge on gpu:0, and documents the behavior."
+  "last_completed_work": "Enhanced scripts\\Invoke-Gate.ps1 with a support diagnostics helper, toolchain version output, step timings, optional continue-on-error diagnostics, and a consolidated failure summary; the Release gate passed."
 }
