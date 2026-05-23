@@ -49,7 +49,9 @@ Optional dependencies are configured from **Settings** in the desktop app:
   provisioning mode selects NVIDIA GPU packages for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi`
   reports a compatible Windows driver, otherwise it installs the CPU runtime and reports the
   fallback reason in Diagnostics. GPU selection is blocked until the local PaddleOCR check proves
-  CUDA support with a visible CUDA device.
+  CUDA support with a visible CUDA device. While provisioning is running, **Annulla OCR** requests
+  cancellation and the backend stops the active child process tree. Provisioning is also bounded to
+  45 minutes, after which OnlyRag records a recoverable timeout status and the user can retry.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
@@ -222,6 +224,11 @@ The in-process backend requires a random per-session API token for every non-hea
 The WPF shell injects this token into the trusted WebView bridge. Endpoints that launch local
 processes, such as opening Explorer, PowerShell, browser downloads, or OCR provisioning, also
 require an explicit UI confirmation payload.
+
+OCR provisioning exposes `POST /api/dependencies/ocr/cancel` for the confirmed UI cancel action.
+The cancellation path uses the same local process launcher as other backend child work, so active
+Python or pip child processes are terminated as a process tree before the backend records the
+cancelled status.
 
 When the backend cancels a process it started through the shared local process launcher, it attempts
 to terminate the whole process tree and waits briefly for exit before returning cancellation to the

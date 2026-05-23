@@ -360,6 +360,7 @@ export function useSettingsSectionController({
     installOllama: actions.installOllama,
     openLibreOfficeDownload: actions.openLibreOfficeDownload,
     configureOcrRuntime: actions.configureOcrRuntime,
+    cancelOcrRuntimeConfiguration: actions.cancelOcrRuntimeConfiguration,
     openLogsFolder: actions.openLogsFolder,
     saveOfficeSettings: actions.saveOfficeSettings,
     savePerformanceSettings: actions.savePerformanceSettings,

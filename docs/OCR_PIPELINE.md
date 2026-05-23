@@ -41,6 +41,9 @@ Bridge and prerequisites:
   `requirements-nvidia-cu118.txt`.
 - Supported Python versions: 3.10 through 3.13. The pinned PaddlePaddle runtime does not publish Windows wheels for Python 3.14.
 - End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
+- Provisioning can be cancelled from **Settings > Diagnostica > Annulla OCR** while it is running.
+  OnlyRag also applies a 45-minute upper bound; cancellation and timeout stop the active child process tree
+  and leave a recoverable status so the user can retry **Configura OCR**.
 - GPU setup: **Configura OCR** uses `auto` mode. It chooses NVIDIA only when `nvidia-smi`
   reports a driver compatible with the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 PaddlePaddle GPU wheels;
   otherwise it installs CPU OCR and reports the fallback reason in Diagnostics. Provisioning removes both
@@ -85,5 +88,5 @@ Notes:
   `%LOCALAPPDATA%\OnlyRag\ocr-python` when Python is available. PaddleOCR may download models on
   first OCR use into the user profile cache.
 - OCR bridge operations have per-operation timeouts and terminate the Python process tree on timeout
-  or caller cancellation. OCR provisioning records progress/status in Settings, but it still does
-  not expose a user-facing cancel button once provisioning has started.
+  or caller cancellation. OCR provisioning records progress/status in Settings and can be cancelled
+  from the UI; if left running, the backend stops it after 45 minutes and reports that it can be retried.

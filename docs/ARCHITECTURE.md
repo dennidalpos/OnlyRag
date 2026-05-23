@@ -41,7 +41,7 @@ for pull requests.
 
 ## Chat and RAG
 
-`POST /api/chat` accepts a message, optional `documentIds`, and optional `conversationId`. When `documentIds` is supplied the service runs hybrid retrieval first, injects retrieved chunk snippets as context, and returns a grounded answer with visible sources. Without `documentIds` the endpoint forwards the message directly to Ollama as a general conversation. Chat history is persisted in SQLite under `chat_history`.
+`POST /api/chat` accepts a message, optional `documentIds`, and optional `conversationId`. When `documentIds` is supplied the service runs hybrid retrieval first, injects retrieved chunk snippets as untrusted JSON context, and returns a grounded answer with visible sources. The RAG system prompt explicitly tells the model that document snippets are data, not instructions, and to ignore any role, policy, delimiter-like, or operational command text inside retrieved snippets. Without `documentIds` the endpoint forwards the message directly to Ollama as a general conversation. Chat history is persisted in SQLite under `chat_history`.
 
 `POST /api/search` searches only the supplied `documentIds` and returns ranked chunk snippets without generating an answer. Both endpoints use the same `HybridRetrievalService`.
 

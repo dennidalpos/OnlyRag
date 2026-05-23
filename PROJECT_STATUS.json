@@ -1,9 +1,9 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-23T15:32:14+02:00",
+  "last_updated": "2026-05-23T16:04:31+02:00",
   "status": "active",
   "production_target": true,
-  "active_objective": "rag-prompt-injection-hardening",
+  "active_objective": "webview-storage-validation",
   "residual_plan": [
     {
       "order": 1,
@@ -18,25 +18,31 @@
       "order": 2,
       "priority": 3,
       "id": "rag-prompt-injection-hardening",
-      "status": "open",
+      "status": "completed",
       "task": "Harden RAG prompt handling for untrusted document content",
-      "done_when": "Document snippets are explicitly isolated and documented as untrusted context, with tests covering instruction-in-document attempts."
+      "done_when": "Document snippets are explicitly isolated and documented as untrusted context, with tests covering instruction-in-document attempts.",
+      "completed_at": "2026-05-23T15:39:28+02:00",
+      "evidence": "RAG context is serialized as untrusted JSON fields and ChatServiceTests covers marker and role injection attempts."
     },
     {
       "order": 3,
       "priority": 3,
       "id": "api-contract-tests",
-      "status": "open",
+      "status": "completed",
       "task": "Add focused API contract drift tests",
-      "done_when": "Critical C# DTO responses and TypeScript client expectations are checked by focused contract tests or generated contract validation."
+      "done_when": "Critical C# DTO responses and TypeScript client expectations are checked by focused contract tests or generated contract validation.",
+      "completed_at": "2026-05-23T15:48:44+02:00",
+      "evidence": "InProcessBackendContractTests now compares critical C# DTO response property names and enum literals against src/OnlyRag.Web/src/api.ts TypeScript client contracts; dotnet test OnlyRag.sln passed."
     },
     {
       "order": 4,
       "priority": 3,
       "id": "ocr-provisioning-cancel",
-      "status": "open",
+      "status": "completed",
       "task": "Add user-facing cancellation or bounded timeout for OCR provisioning",
-      "done_when": "OCR runtime provisioning has a documented cancel or timeout path that stops child processes and leaves a clear recoverable status."
+      "done_when": "OCR runtime provisioning has a documented cancel or timeout path that stops child processes and leaves a clear recoverable status.",
+      "completed_at": "2026-05-23T16:04:31+02:00",
+      "evidence": "OCR provisioning now has a confirmed cancel endpoint, UI cancel action, 45-minute backend timeout, process-tree cancellation through LocalProcessLauncher, tests for cancellation token propagation, and documentation in docs/OCR_PIPELINE.md and docs/OPERATIONS.md."
     },
     {
       "order": 5,
@@ -64,6 +70,9 @@
     }
   ],
   "quality_gates": {
+    "rag_prompt_injection": "passed",
+    "api_contract_tests": "passed",
+    "ocr_provisioning_cancel": "passed",
     "frontend": "passed",
     "backend": "passed",
     "build": "passed",

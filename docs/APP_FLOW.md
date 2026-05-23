@@ -175,7 +175,8 @@ Ollama:
 - Una sola istanza utente controlla lo stesso `%LOCALAPPDATA%\OnlyRag`.
 - Il filesystem e SQLite restano coerenti.
 - I processi OCR/LibreOffice/Python rispettano cancellazione/timeout.
-- L'utente si fida dei documenti importati nel prompt RAG.
+- I documenti importati non sono attendibili come istruzioni: il prompt RAG li isola come dati JSON
+  e chiede al modello di ignorare comandi o ruoli presenti negli snippet.
 - La UI e l'unico client API rilevante.
 - Il token JS e sufficiente come boundary locale.
 - I modelli Ollama installati hanno comportamento compatibile con chat, embed e traduzione.

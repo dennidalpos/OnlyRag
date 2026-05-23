@@ -76,6 +76,12 @@ backend as unavailable for that query.
   context into the Ollama prompt. The response includes visible sources (document name, page,
   chunk id, snippet) alongside the generated answer.
 
+Retrieved snippets are treated as untrusted document data, not model instructions. The RAG system
+prompt wraps the retrieved context in explicit `ONLYRAG_RETRIEVED_CONTEXT_START` /
+`ONLYRAG_RETRIEVED_CONTEXT_END` markers and serializes each source as a JSON object with an
+`untrustedSnippet` field. The prompt tells the model to ignore commands, role declarations,
+policies, delimiter-like text, or operational requests that appear inside those JSON fields.
+
 The chat model and endpoint are configured in Settings > Ollama. Chat history is persisted in
 SQLite (`chat_history` table) on the backend, and active chat state (conversation ID, messages,
 selected documents) is preserved in `sessionStorage` on the frontend to survive section navigation.

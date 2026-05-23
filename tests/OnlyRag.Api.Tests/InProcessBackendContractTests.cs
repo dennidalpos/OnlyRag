@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Worker;
@@ -155,6 +158,66 @@ public sealed partial class InProcessBackendTests
             "chat_validation_failed");
     }
 
+    [Fact]
+    public void ApiContracts_TypeScriptClientResponseShapesMatchCoreDtos()
+    {
+        string apiSource = ReadTypeScriptApiSource();
+
+        AssertTypeScriptContractMatchesDto<OllamaSettings>(apiSource, "OllamaSettings");
+        AssertTypeScriptContractMatchesDto<OllamaModelDetails>(apiSource, "OllamaModelDetails");
+        AssertTypeScriptContractMatchesDto<OfficeConversionSettings>(apiSource, "OfficeConversionSettings");
+        AssertTypeScriptContractMatchesDto<IngestionSettings>(apiSource, "IngestionSettings");
+        AssertTypeScriptContractMatchesDto<OcrProcessingSettings>(apiSource, "OcrProcessingSettings");
+        AssertTypeScriptContractMatchesDto<PerformanceSettings>(apiSource, "PerformanceSettings");
+        AssertTypeScriptContractMatchesDto<OcrSettings>(apiSource, "OcrSettings");
+        AssertTypeScriptContractMatchesDto<OfficeConverterStatusResponse>(apiSource, "OfficeConverterStatusResponse");
+        AssertTypeScriptContractMatchesDto<OllamaStatusResponse>(apiSource, "OllamaStatusResponse");
+        AssertTypeScriptContractMatchesDto<OllamaModelSummary>(apiSource, "OllamaModel");
+        AssertTypeScriptContractMatchesDto<OllamaModelsResponse>(apiSource, "OllamaModelsResponse");
+        AssertTypeScriptContractMatchesDto<OperationMessageResponse>(apiSource, "OperationMessageResponse");
+        AssertTypeScriptContractMatchesDto<OllamaInstallStatus>(apiSource, "OllamaInstallStatus");
+        AssertTypeScriptContractMatchesDto<DependencyActionResponse>(apiSource, "DependencyActionResponse");
+        AssertTypeScriptContractMatchesDto<OcrProvisionStatus>(apiSource, "OcrProvisionStatus");
+        AssertTypeScriptContractMatchesDto<OcrStartupAnalysisResponse>(apiSource, "OcrStartupAnalysis");
+        AssertTypeScriptContractMatchesDto<ImportedDocument>(apiSource, "ImportedDocument");
+        AssertTypeScriptContractMatchesDto<DocumentEmbeddingStatusResponse>(apiSource, "DocumentEmbeddingStatus");
+        AssertTypeScriptContractMatchesDto<DocumentOcrStatusResponse>(apiSource, "DocumentOcrStatus");
+        AssertTypeScriptContractMatchesDto<DocumentSearchResult>(apiSource, "DocumentSearchResult");
+        AssertTypeScriptContractMatchesDto<DocumentSearchDocumentStatus>(apiSource, "DocumentSearchDocumentStatus");
+        AssertTypeScriptContractMatchesDto<DocumentSearchResponse>(apiSource, "DocumentSearchResponse");
+        AssertTypeScriptContractMatchesDto<ChatSource>(apiSource, "ChatSource");
+        AssertTypeScriptContractMatchesDto<ChatNotice>(apiSource, "ChatNotice");
+        AssertTypeScriptContractMatchesDto<ChatResponse>(apiSource, "ChatResponse");
+        AssertTypeScriptContractMatchesDto<TranslationSummaryResponse>(apiSource, "TranslationSummary");
+        AssertTypeScriptContractMatchesDto<TranslationUnitResponse>(apiSource, "TranslationUnit");
+        AssertTypeScriptContractMatchesDto<TranslationDetailResponse>(apiSource, "TranslationDetail");
+        AssertTypeScriptContractMatchesDto<TranslationCompareResponse>(apiSource, "TranslationCompare");
+        AssertTypeScriptContractMatchesDto<TranslationExportResponse>(apiSource, "TranslationExport");
+        AssertTypeScriptContractMatchesDto<DocumentImportResult>(apiSource, "DocumentImportResult");
+        AssertTypeScriptContractMatchesDto<DocumentImportFileResult>(apiSource, "DocumentImportFileResult");
+        AssertTypeScriptContractMatchesDto<DocumentImportResponse>(apiSource, "DocumentImportResponse");
+        AssertTypeScriptContractMatchesDto<OcrGpuCapabilityResponse>(apiSource, "OcrGpuCapability");
+        AssertTypeScriptContractMatchesDto<SystemTelemetryResponse>(apiSource, "SystemTelemetry");
+        AssertTypeScriptContractMatchesDto<CpuTelemetryResponse>(apiSource, "CpuTelemetry");
+        AssertTypeScriptContractMatchesDto<MemoryTelemetryResponse>(apiSource, "MemoryTelemetry");
+        AssertTypeScriptContractMatchesDto<DiskTelemetryResponse>(apiSource, "DiskTelemetry");
+        AssertTypeScriptContractMatchesDto<GpuTelemetryResponse>(apiSource, "GpuTelemetry");
+        AssertTypeScriptContractMatchesDto<DocumentPageInfo>(apiSource, "DocumentPageInfo");
+        AssertTypeScriptContractMatchesDto<DocumentPipelineStatus>(apiSource, "DocumentPipelineStatus");
+        AssertTypeScriptContractMatchesDto<PipelinePhaseInfo>(apiSource, "PipelinePhaseInfo");
+        AssertTypeScriptContractMatchesDto<DocumentPreviewResponse>(apiSource, "DocumentPreviewResponse");
+    }
+
+    [Fact]
+    public void ApiContracts_TypeScriptClientEnumLiteralsMatchCoreEnums()
+    {
+        string apiSource = ReadTypeScriptApiSource();
+
+        AssertTypeScriptUnionMatchesEnum<DocumentStatus>(apiSource, "DocumentStatus");
+        AssertTypeScriptUnionMatchesEnum<JobStatus>(apiSource, "JobStatus");
+        AssertTypeScriptUnionMatchesEnum<PhaseState>(apiSource, "PhaseState");
+    }
+
     private static async Task AssertProblemAsync(
         HttpResponseMessage response,
         HttpStatusCode expectedStatus,
@@ -171,5 +234,101 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(expectedTitle, root.GetProperty("title").GetString());
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("detail").GetString()));
         Assert.Equal(expectedCode, root.GetProperty("code").GetString());
+    }
+
+    private static void AssertTypeScriptContractMatchesDto<TDto>(string apiSource, string typeScriptTypeName)
+    {
+        string[] expectedProperties = typeof(TDto)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetMethod is not null)
+            .Select(GetJsonPropertyName)
+            .ToArray();
+        string[] actualProperties = ReadTypeScriptObjectPropertyNames(apiSource, typeScriptTypeName).ToArray();
+
+        Assert.Equal(expectedProperties, actualProperties);
+    }
+
+    private static void AssertTypeScriptUnionMatchesEnum<TEnum>(string apiSource, string typeScriptTypeName)
+        where TEnum : struct, Enum
+    {
+        string[] expectedValues = Enum.GetNames<TEnum>();
+        string[] actualValues = ReadTypeScriptStringUnionValues(apiSource, typeScriptTypeName).ToArray();
+
+        Assert.Equal(expectedValues, actualValues);
+    }
+
+    private static string GetJsonPropertyName(PropertyInfo property)
+    {
+        JsonPropertyNameAttribute? jsonName = property.GetCustomAttribute<JsonPropertyNameAttribute>();
+        if (jsonName is not null)
+        {
+            return jsonName.Name;
+        }
+
+        return JsonOptions.PropertyNamingPolicy?.ConvertName(property.Name) ?? property.Name;
+    }
+
+    private static IReadOnlyList<string> ReadTypeScriptObjectPropertyNames(string apiSource, string typeName)
+    {
+        string body = ReadTypeScriptObjectBody(apiSource, typeName);
+        return body.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal))
+            .Select(ReadTypeScriptPropertyName)
+            .Where(propertyName => propertyName is not null)
+            .Select(propertyName => propertyName!)
+            .ToArray();
+
+        static string? ReadTypeScriptPropertyName(string line)
+        {
+            int colonIndex = line.IndexOf(':', StringComparison.Ordinal);
+            return colonIndex > 0
+                ? line[..colonIndex].Trim().TrimEnd('?')
+                : null;
+        }
+    }
+
+    private static IReadOnlyList<string> ReadTypeScriptStringUnionValues(string apiSource, string typeName)
+    {
+        Match match = Regex.Match(
+            apiSource,
+            $@"export\s+type\s+{Regex.Escape(typeName)}\s*=\s*(?<body>.*?);",
+            RegexOptions.Singleline);
+        Assert.True(match.Success, $"TypeScript union {typeName} was not found in api.ts.");
+
+        return Regex.Matches(match.Groups["body"].Value, "\"(?<value>[^\"]+)\"")
+            .Cast<Match>()
+            .Select(valueMatch => valueMatch.Groups["value"].Value)
+            .ToArray();
+    }
+
+    private static string ReadTypeScriptObjectBody(string apiSource, string typeName)
+    {
+        string marker = $"export type {typeName} = {{";
+        int markerIndex = apiSource.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(markerIndex >= 0, $"TypeScript object type {typeName} was not found in api.ts.");
+
+        int bodyStart = markerIndex + marker.Length;
+        int bodyEnd = apiSource.IndexOf("\n};", bodyStart, StringComparison.Ordinal);
+        Assert.True(bodyEnd >= 0, $"TypeScript object type {typeName} has no closing marker.");
+
+        return apiSource[bodyStart..bodyEnd];
+    }
+
+    private static string ReadTypeScriptApiSource()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            string candidate = Path.Combine(current.FullName, "src", "OnlyRag.Web", "src", "api.ts");
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException("Could not find src\\OnlyRag.Web\\src\\api.ts from the test output directory.");
     }
 }

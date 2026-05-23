@@ -218,6 +218,25 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     }
   }
 
+  async function cancelOcrRuntimeConfiguration() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/cancel", {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
+      });
+      setInfoMessage(response.message);
+      await refreshDependencyStatus();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Annullamento OCR non avviato.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function openLogsFolder() {
     setIsBusy(true);
     setErrorMessage(null);
@@ -249,6 +268,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     installOllama,
     openLibreOfficeDownload,
     configureOcrRuntime,
+    cancelOcrRuntimeConfiguration,
     openLogsFolder
   } as const;
 }

@@ -117,5 +117,20 @@ public static partial class InProcessBackend
                 return CreateUnexpectedErrorProblem("Configurazione OCR non avviata", httpContext.TraceIdentifier);
             }
         });
+
+        app.MapPost("/api/dependencies/ocr/cancel", (
+            ProcessLaunchRequest request,
+            DependencyProvisioningService dependencies) =>
+        {
+            if (!request.Confirmed)
+            {
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'annullamento della configurazione OCR richiede una conferma esplicita dalla UI.",
+                    "confirmation_required");
+            }
+
+            return Results.Ok(dependencies.CancelOcrProvision());
+        });
     }
 }

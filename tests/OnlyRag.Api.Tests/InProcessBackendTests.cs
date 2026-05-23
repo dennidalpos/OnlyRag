@@ -200,6 +200,8 @@ public sealed partial class InProcessBackendTests
 
         public string? TryStartErrorMessage { get; init; }
 
+        public Func<string, IReadOnlyList<string>, string?, CancellationToken, Task<LocalProcessResult>>? RunAsyncHandler { get; init; }
+
         public bool TryStart(ProcessStartInfo startInfo, out string? errorMessage)
         {
             StartedProcesses.Add(startInfo);
@@ -225,6 +227,11 @@ public sealed partial class InProcessBackendTests
             }
 
             StartedProcesses.Add(startInfo);
+            if (RunAsyncHandler is not null)
+            {
+                return RunAsyncHandler(fileName, arguments, workingDirectory, cancellationToken);
+            }
+
             return Task.FromResult(new LocalProcessResult(0, string.Empty, string.Empty));
         }
     }
