@@ -161,6 +161,53 @@ public sealed partial class OcrPipelineTests
     }
 
     [Fact]
+    public async Task IngestAsync_ScannedPdfResumePreservesExistingChunkOrdinals()
+    {
+        using TempStorage storage = await TempStorage.CreateInitializedAsync();
+        ImportedDocument document = await storage.CreateBinaryDocumentAsync(
+            "resume-scan.pdf",
+            CreateMultiPageTextPdf("First page text before OCR.", string.Empty));
+        FakeOcrEngine engine = new("Second page OCR text.", 0.91d);
+        DocumentIngestionService service = storage.CreateIngestionService(engine);
+        DocumentIngestionCheckpoint? checkpoint = null;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await service.IngestAsync(
+                document,
+                checkpoint: null,
+                (item, _) =>
+                {
+                    if (item.Checkpoint is { Mode: "ocr", NextBlock: 2 })
+                    {
+                        checkpoint = item.Checkpoint;
+                        throw new OperationCanceledException();
+                    }
+
+                    return Task.CompletedTask;
+                });
+        });
+
+        Assert.NotNull(checkpoint);
+        Assert.Equal(1, checkpoint.NextChunkOrdinal);
+        IReadOnlyList<string> chunksBeforeResume = await storage.ReadChunkTextsAsync(document.Id);
+        Assert.Single(chunksBeforeResume);
+        Assert.Contains("First page text before OCR.", chunksBeforeResume[0], StringComparison.Ordinal);
+
+        DocumentIngestionResult result = await service.IngestAsync(
+            document,
+            checkpoint,
+            (_, _) => Task.CompletedTask);
+
+        IReadOnlyList<string> chunksAfterResume = await storage.ReadChunkTextsAsync(document.Id);
+        Assert.Equal(2, result.PageCount);
+        Assert.Equal(2, result.ChunkCount);
+        Assert.Equal(2, chunksAfterResume.Count);
+        Assert.Contains("First page text before OCR.", chunksAfterResume[0], StringComparison.Ordinal);
+        Assert.Contains("Second page OCR text.", chunksAfterResume[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task IngestAsync_Image_UsesJobOcrLanguageBeforeStoredDefault()
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();

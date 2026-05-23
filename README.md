@@ -113,6 +113,10 @@ Build the .NET solution:
 pwsh .\scripts\Build-App.ps1 -Configuration Release
 ```
 
+`Build-App.ps1` builds the web UI first and then the .NET solution, so the desktop output includes
+the static assets required at runtime. Use `-SkipWebBuild` only after `Build-Web.ps1` has already
+produced `src\OnlyRag.Web\dist\index.html`.
+
 Run the canonical repository gate:
 
 ```powershell
@@ -131,6 +135,10 @@ npm run typecheck
 npm run lint
 npm run format:check
 ```
+
+`npm run test:e2e` starts Vite plus a temporary .NET backend host under
+`tests\OnlyRag.PlaywrightBackendHost`, so the Playwright suite covers both mocked UI smoke paths
+and a real UI/backend contract path.
 
 Run the desktop app:
 

@@ -190,6 +190,37 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task TranslationExport_PostIncompleteTranslation_ReturnsBadRequestWithoutWritingFile()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
+        SqliteDocumentRepository documentRepository = new(connectionFactory);
+        SqliteTranslationRepository translationRepository = new(connectionFactory);
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempDescriptor.Root);
+        IReadOnlyList<TranslationSourceUnit> units = await translationRepository.BuildSourceUnitsAsync(document.Id);
+        StoredTranslation translation = await translationRepository.CreateAsync(
+            document.Id,
+            "English",
+            "llama-test",
+            jobId: null,
+            units,
+            CancellationToken.None);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"/api/translations/{translation.Id}/export",
+            new TranslationExportRequest("txt"),
+            JsonOptions);
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Traduzione incompleta", body, StringComparison.Ordinal);
+        string exportDirectory = tempDescriptor.Descriptor.StoragePaths.DocumentExportsDirectory;
+        Assert.True(!Directory.Exists(exportDirectory) || !Directory.EnumerateFiles(exportDirectory).Any());
+    }
+
+    [Fact]
     public async Task TranslationExport_PostPdf_UsesAppTempDirectoryAndCleansIt()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

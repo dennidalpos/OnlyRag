@@ -218,7 +218,42 @@ public static partial class InProcessBackend
             }
         });
 
+        app.MapDelete("/api/ollama/models", async (
+            string name,
+            IOllamaClient ollamaClient,
+            IOllamaSettingsService settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                string modelName = OllamaSettingsService.NormalizeRequiredModelName(name);
+                await ollamaClient.DeleteModelAsync(modelName, cancellationToken);
+                await settings.ClearMissingDefaultModelAsync(modelName, cancellationToken);
+                return Results.Ok(new OperationMessageResponse($"Modello {modelName} rimosso."));
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
         app.MapGet("/api/ollama/models/{name}/details", async (
+            string name,
+            IOllamaClient ollamaClient,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                OllamaModelDetails details = await ollamaClient.ShowModelAsync(name, cancellationToken);
+                return Results.Ok(details);
+            }
+            catch (OllamaApiException ex)
+            {
+                return MapOllamaException(ex);
+            }
+        });
+
+        app.MapGet("/api/ollama/models/details", async (
             string name,
             IOllamaClient ollamaClient,
             CancellationToken cancellationToken) =>

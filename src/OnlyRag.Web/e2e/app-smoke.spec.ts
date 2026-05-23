@@ -1,6 +1,7 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
+import { installBackendBridge, mockApiBaseUrl } from "./backendBridge";
 
-const apiBaseUrl = "http://127.0.0.1:49152";
+const apiBaseUrl = mockApiBaseUrl;
 
 type ImportedDocument = {
   id: number;
@@ -277,21 +278,6 @@ test("smoke: import, job state, backend offline, and preview modal", async ({ pa
   await page.reload();
   await expect(page.getByText("Il backend locale non è raggiungibile.").first()).toBeVisible();
 });
-
-async function installBackendBridge(page: Page, isRunning: boolean) {
-  await page.addInitScript(
-    ({ apiBaseUrl: baseUrl, isRunning: running }) => {
-      window.__ONLYRAG_BACKEND__ = {
-        isRunning: running,
-        baseUrl,
-        apiToken: "test-token",
-        apiTokenHeaderName: "X-OnlyRag-Test",
-        errorMessage: running ? null : "Il backend locale non è raggiungibile."
-      };
-    },
-    { apiBaseUrl, isRunning }
-  );
-}
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({

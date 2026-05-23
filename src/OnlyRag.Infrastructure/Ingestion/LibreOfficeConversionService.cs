@@ -112,6 +112,8 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        string trustedExecutablePath = OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(executablePath)
+            ?? throw new OfficeConversionException("Percorso LibreOffice non valido: usa soffice.exe.");
         using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -120,7 +122,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = executablePath,
+                FileName = trustedExecutablePath,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardError = true,
@@ -193,12 +195,12 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
             return null;
         }
 
-        return ResolveExecutableFromPath(configuredPath);
+        return OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(configuredPath);
     }
 
     private static string? ResolveEnvironmentExecutable()
     {
-        return ResolveExecutableFromPath(Environment.GetEnvironmentVariable("ONLYRAG_LIBREOFFICE_PATH"));
+        return OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(Environment.GetEnvironmentVariable("ONLYRAG_LIBREOFFICE_PATH"));
     }
 
     private static string? ResolveKnownInstallExecutable()
@@ -216,40 +218,15 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
 
         foreach (string directory in pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            string candidate = Path.Combine(directory.Trim(), "soffice.exe");
-            if (File.Exists(candidate))
+            string? candidate = OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(
+                Path.Combine(directory.Trim(), "soffice.exe"));
+            if (candidate is not null)
             {
                 return candidate;
             }
         }
 
         return null;
-    }
-
-    private static string? ResolveExecutableFromPath(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return null;
-        }
-
-        string normalized = path.Trim().Trim('"');
-        if (File.Exists(normalized))
-        {
-            return normalized;
-        }
-
-        if (!Directory.Exists(normalized))
-        {
-            return null;
-        }
-
-        string[] candidates =
-        [
-            Path.Combine(normalized, "soffice.exe"),
-            Path.Combine(normalized, "program", "soffice.exe")
-        ];
-        return candidates.FirstOrDefault(File.Exists);
     }
 
     private static void TryKill(Process process)

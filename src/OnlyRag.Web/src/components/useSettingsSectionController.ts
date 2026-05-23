@@ -123,7 +123,7 @@ export function useSettingsSectionController({
 
     let cancelled = false;
     setEmbeddingModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/${encodeURIComponent(modelName)}/details`)
+    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
       .then((details) => { if (!cancelled) { setEmbeddingModelDetails(details); } })
       .catch(() => { if (!cancelled) { setEmbeddingModelDetails(null); } })
       .finally(() => { if (!cancelled) { setEmbeddingModelDetailsLoading(false); } });
@@ -140,7 +140,7 @@ export function useSettingsSectionController({
 
     let cancelled = false;
     setChatModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/${encodeURIComponent(modelName)}/details`)
+    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
       .then((details) => { if (!cancelled) { setChatModelDetails(details); } })
       .catch(() => { if (!cancelled) { setChatModelDetails(null); } })
       .finally(() => { if (!cancelled) { setChatModelDetailsLoading(false); } });
@@ -157,7 +157,7 @@ export function useSettingsSectionController({
 
     let cancelled = false;
     setTranslationModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/${encodeURIComponent(modelName)}/details`)
+    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
       .then((details) => { if (!cancelled) { setTranslationModelDetails(details); } })
       .catch(() => { if (!cancelled) { setTranslationModelDetails(null); } })
       .finally(() => { if (!cancelled) { setTranslationModelDetailsLoading(false); } });

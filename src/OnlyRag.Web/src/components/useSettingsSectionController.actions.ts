@@ -165,7 +165,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
 
     try {
       const response = await apiRequest<OperationMessageResponse>(
-        `/api/ollama/models/${encodeURIComponent(name)}`,
+        `/api/ollama/models?name=${encodeURIComponent(name)}`,
         {
           method: "DELETE"
         }

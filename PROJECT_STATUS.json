@@ -1,124 +1,35 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-23T00:00:00+02:00",
+  "last_updated": "2026-05-23T23:09:02+02:00",
   "status": "blocked",
-  "active_objective": "resolve-audit-critical-high-and-release-blockers",
+  "active_objective": "complete trusted signed installer verification",
   "residual_plan": [
     {
       "execution_order": 1,
-      "priority": "P0",
-      "id": "AUD-001",
-      "status": "todo",
-      "objective": "Fix OCR resume checkpoint corruption risk.",
-      "next_action": "Persist the current chunk ordinal in the OCR checkpoint and add a multi-page resume regression test.",
-      "verify": "dotnet test \"OnlyRag.sln\" --configuration Release --no-restore --filter DocumentIngestion"
-    },
-    {
-      "execution_order": 2,
-      "priority": "P0",
-      "id": "AUD-002",
-      "status": "todo",
-      "objective": "Restore the .NET test gate.",
-      "next_action": "Fix the SQLite/job-worker lifetime issue that leaves onlyrag.db locked in LocalJobWorkerServiceTests.",
-      "verify": "dotnet test \"OnlyRag.sln\" --configuration Release --no-restore --logger \"console;verbosity=minimal\""
-    },
-    {
-      "execution_order": 3,
-      "priority": "P1",
-      "id": "AUD-003",
-      "status": "todo",
-      "objective": "Prevent misleading completed translation exports.",
-      "next_action": "Define and enforce export behavior for incomplete or failed translation units, with tests.",
-      "verify": "Run targeted TranslationExportService tests and a manual incomplete-export check."
-    },
-    {
-      "execution_order": 4,
-      "priority": "P1",
-      "id": "AUD-004",
-      "status": "todo",
-      "objective": "Constrain custom LibreOffice executable handling.",
-      "next_action": "Validate configured LibreOffice paths before saving or executing them.",
-      "verify": "Test rejection of a non-LibreOffice executable and successful conversion with a valid LibreOffice path."
-    },
-    {
-      "execution_order": 5,
-      "priority": "P1",
-      "id": "AUD-006",
-      "status": "todo",
-      "objective": "Make desktop builds require fresh web assets or fail clearly.",
-      "next_action": "Update the build flow so app build/package cannot succeed silently without src/OnlyRag.Web/dist/index.html.",
-      "verify": "Run the app build from a clean checkout without dist and confirm it builds web assets or fails with an actionable error."
-    },
-    {
-      "execution_order": 6,
-      "priority": "P2",
-      "id": "AUD-005",
-      "status": "todo",
-      "objective": "Support real Ollama model names in delete/details endpoints.",
-      "next_action": "Change the endpoint contract to handle names containing slash, colon, and namespace segments.",
-      "verify": "Add API/frontend tests for a model name like namespace/model:tag."
-    },
-    {
-      "execution_order": 7,
-      "priority": "P2",
-      "id": "AUD-008",
-      "status": "todo",
-      "objective": "Add at least one integration path that exercises the real backend contract.",
-      "next_action": "Introduce a backend-backed E2E or integration test instead of relying only on mocked API routes.",
-      "verify": "A deliberate backend/UI contract mismatch fails a test."
-    },
-    {
-      "execution_order": 8,
-      "priority": "P2",
-      "id": "AUD-007",
-      "status": "todo",
-      "objective": "Limit peer process termination to owned app instances.",
-      "next_action": "Replace process-name-only matching with an ownership marker and avoid broad process-tree kills.",
-      "verify": "Manual multi-instance check confirms unrelated instances are not terminated."
-    },
-    {
-      "execution_order": 9,
-      "priority": "P2",
-      "id": "AUD-010",
-      "status": "todo",
-      "objective": "Run dependency vulnerability checks in an environment where restore/network side effects are allowed.",
-      "next_action": "Run Invoke-Gate.ps1 or the npm/NuGet audit steps in CI or a disposable workspace.",
-      "verify": "Dependency audit results are clean or tracked as separate findings."
-    },
-    {
-      "execution_order": 10,
       "priority": "P2",
       "id": "signed-release",
       "status": "blocked",
       "objective": "Complete trusted signed installer verification.",
       "next_action": "Run scripts\\Sign-Release.ps1 with an external PFX or certificate thumbprint, then scripts\\Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle on a clean Windows machine.",
       "verify": "Signed installer install, upgrade, rollback, uninstall, signature, and evidence checks pass."
-    },
-    {
-      "execution_order": 11,
-      "priority": "P3",
-      "id": "AUD-009",
-      "status": "todo",
-      "objective": "Reduce oversized high-churn files after behavioral fixes are stable.",
-      "next_action": "Split the largest API, storage, UI action, and test files along existing responsibility boundaries.",
-      "verify": "Relevant build, test, lint, and typecheck gates still pass after each split."
     }
   ],
   "blockers": [
-    "dotnet test currently fails on LocalJobWorkerServiceTests due to onlyrag.db file lock.",
     "Signed installer verification needs a trusted Windows code-signing certificate, signtool.exe, Inno Setup 6, and a clean Windows verification machine."
   ],
   "quality_gates": {
     "dotnet_build": "passed",
-    "dotnet_tests": "failed",
+    "dotnet_tests": "passed",
     "web_typecheck": "passed",
     "web_lint": "passed",
     "web_format": "passed",
     "web_unit_tests": "passed",
     "web_e2e": "passed",
     "web_build": "passed",
-    "dependency_audit": "not_run",
+    "dependency_audit": "passed",
+    "installer_prerequisites": "passed",
     "signed_installer": "blocked"
   },
+  "last_completed_work": "Added a Playwright UI/backend contract test with a real ASP.NET Core backend host, split API type contracts by domain, split large settings/dependency tests, split document repository ingestion responsibilities, and kept AUD-008/AUD-009 current.",
   "audit_tracker": "AUDIT_TRACKER.md"
 }

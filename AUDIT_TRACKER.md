@@ -4,25 +4,19 @@
 
 ## 1. Executive summary
 
-- Stato progetto: Rischioso
-- Motivazione sintetica: build .NET e frontend passano, ma il gate test .NET fallisce e il codice di ingestione PDF/OCR contiene un bug verificabile di checkpoint che puo' corrompere chunk gia' salvati in caso di resume durante OCR. Sono presenti anche rischi di sicurezza/robustezza su esecuzione LibreOffice configurabile, contratti API per modelli Ollama e copertura E2E insufficiente.
+- Stato progetto: Bloccato solo da verifica release firmata
+- Motivazione sintetica: i finding Critical/High, la copertura UI-level con backend reale e gli split principali dei file grandi sono stati risolti e verificati. Resta la verifica installer firmata, che richiede materiale e macchina esterni.
 - Numero finding per gravita':
-  - Critical: 1
-  - High: 3
-  - Medium: 5
-  - Low: 1
+  - Critical: 0 aperti
+  - High: 0 aperti
+  - Medium: 0 aperti
+  - Low: 0 aperti
 - Rischi principali:
-  - Corruzione dati e indice ricerca durante resume OCR.
-  - Gate di test .NET non affidabile su percorso job/SQLite.
-  - Export traduzioni che puo' dichiarare completato un file contenente testo sorgente non tradotto.
-  - Esecuzione di un binario configurabile come LibreOffice senza vincoli forti.
-  - Packaging/build app non atomico rispetto agli asset web richiesti a runtime.
+  - Verifica installer firmato non eseguita per assenza di materiale di signing e macchina pulita.
+  - Alcuni file restano sopra soglia review ma sotto soglia split-required e sono stati lasciati coesi per responsabilita'.
 - Priorita' immediate:
-  1. Correggere checkpoint OCR e aggiungere test di resume con pagine precedenti gia' salvate.
-  2. Riparare il test .NET fallente o il lifetime SQLite che lo rende non deterministico.
-  3. Bloccare/exportare esplicitamente traduzioni incomplete.
-  4. Restringere/validare il path LibreOffice configurato.
-  5. Rendere il build app dipendente dalla build web o fallire con errore chiaro.
+  1. Completare verifica installer firmata su macchina Windows pulita.
+  2. Eseguire il gate completo in ambiente release dedicato prima del tag.
 
 ## 2. Contesto audit
 
@@ -67,7 +61,7 @@
 | `npm run lint` in `src/OnlyRag.Web` | ok | ESLint passato. | Frontend. |
 | `npm run format:check` in `src/OnlyRag.Web` | ok | Prettier check passato. | Frontend. |
 | `npm run test:unit` in `src/OnlyRag.Web` | ok | Vitest: 11 file, 35 test passati. | Frontend unit. |
-| `npm run test:e2e` in `src/OnlyRag.Web` | ok | Playwright: 1 test passato. | Test completamente mockato lato API. |
+| `npm run test:e2e` in `src/OnlyRag.Web` | ok | Playwright: 2 test passati. | Smoke mockato e test UI/backend reale con host ASP.NET Core temporaneo. |
 | `dotnet build "OnlyRag.sln" --configuration Release --no-restore` | ok | Build passata, 0 warning/errori. | Non garantisce asset web aggiornati. |
 | `npm run build` in `src/OnlyRag.Web` | ok | Vite build passata; output in `dist`. | Genera output ignorato. |
 | `pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest` | ok | Self-test prerequisiti installer passato. | Non crea installer. |
@@ -185,22 +179,22 @@ flowchart TD
 
 | ID | Stato | Gravita' | Tipo | Categoria | Titolo | File/area | Verifica |
 |---|---|---|---|---|---|---|---|
-| AUD-001 | TODO | Critical | Bug certo | Persistence | Resume OCR puo' sovrascrivere chunk gia' salvati | `DocumentIngestionService.PdfOcr.cs`, `SqliteDocumentRepository.cs` | Test resume OCR multi-pagina con crash/pausa durante OCR |
-| AUD-002 | TODO | High | Bug certo | Tests | Gate .NET fallisce per SQLite bloccato nel test job | `LocalJobWorkerServiceTests.cs` | `dotnet test ... --no-restore` |
-| AUD-003 | TODO | High | Bug certo | Logic | Export traduzione dichiara completato anche con testo non tradotto | `TranslationExportService*.cs` | Test export con unita' pending/failed |
-| AUD-004 | TODO | High | Rischio probabile | Security | Path LibreOffice configurabile consente esecuzione binario arbitrario | `OfficeConversionSettingsStore.cs`, `LibreOfficeConversionService.cs` | Test validazione path e conversione con path non ammesso |
-| AUD-005 | TODO | Medium | Rischio probabile | API | Route Ollama non gestiscono nomi modello con slash | `InProcessBackend.SettingsEndpoints.cs`, frontend actions | Test delete/details su modello `namespace/name:tag` |
-| AUD-006 | TODO | Medium | Rischio probabile | DevEx | Build app puo' passare senza asset web richiesti a runtime | `Build-App.ps1`, `.csproj`, startup WPF | Build da checkout pulito senza `dist` |
-| AUD-007 | TODO | Medium | Rischio probabile | Robustness | Exit app puo' terminare processi peer omonimi | `App.xaml.cs` | Test multi-istanza/profilo distinto |
-| AUD-008 | TODO | Medium | Ipotesi da verificare | Tests | E2E copre solo API mockate e non il contratto reale | `app-smoke.spec.ts` | E2E/integration con backend reale |
-| AUD-009 | TODO | Medium | Perplessita' architetturale | Maintainability | File oltre soglia concentrano responsabilita' diverse | file grandi web/backend/storage/test | Split mirati e test invariati |
-| AUD-010 | TODO | Low | Ipotesi da verificare | Security | Stato vulnerabilita' dipendenze non verificato in questo audit | `Invoke-Gate.ps1`, npm/NuGet | Audit dependency in ambiente con rete |
+| AUD-001 | DONE | Critical | Bug certo | Persistence | Resume OCR puo' sovrascrivere chunk gia' salvati | `DocumentIngestionService.PdfOcr.cs`, `SqliteDocumentRepository.cs` | Test resume OCR multi-pagina con crash/pausa durante OCR |
+| AUD-002 | DONE | High | Bug certo | Tests | Gate .NET fallisce per SQLite bloccato nel test job | `LocalJobWorkerServiceTests.cs` | `dotnet test ... --no-restore` |
+| AUD-003 | DONE | High | Bug certo | Logic | Export traduzione dichiara completato anche con testo non tradotto | `TranslationExportService*.cs` | Test export con unita' pending/failed |
+| AUD-004 | DONE | High | Rischio probabile | Security | Path LibreOffice configurabile consente esecuzione binario arbitrario | `OfficeConversionSettingsStore.cs`, `LibreOfficeConversionService.cs` | Test validazione path e conversione con path non ammesso |
+| AUD-005 | DONE | Medium | Rischio probabile | API | Route Ollama non gestiscono nomi modello con slash | `InProcessBackend.SettingsEndpoints.cs`, frontend actions | Test delete/details su modello `namespace/name:tag` |
+| AUD-006 | DONE | Medium | Rischio probabile | DevEx | Build app puo' passare senza asset web richiesti a runtime | `Build-App.ps1`, `.csproj`, startup WPF | Build da checkout pulito senza `dist` |
+| AUD-007 | DONE | Medium | Rischio probabile | Robustness | Exit app puo' terminare processi peer omonimi | `App.xaml.cs` | Test multi-istanza/profilo distinto |
+| AUD-008 | DONE | Medium | Ipotesi da verificare | Tests | E2E copre solo API mockate e non il contratto reale | `backend-contract.spec.ts`, `OnlyRag.PlaywrightBackendHost` | `npm run test:e2e` |
+| AUD-009 | DONE | Medium | Perplessita' architetturale | Maintainability | File oltre soglia concentrano responsabilita' diverse | type API, settings test, dependency tests, repository SQLite | Split mirati e test/build invariati |
+| AUD-010 | DONE | Low | Ipotesi da verificare | Security | Stato vulnerabilita' dipendenze non verificato in questo audit | `Invoke-Gate.ps1`, npm/NuGet | Audit dependency in ambiente con rete |
 
 ## 7. Finding dettagliati
 
 ### AUD-001 — Resume OCR puo' sovrascrivere chunk gia' salvati
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Bug certo
 - **Gravita':** Critical
 - **Categoria:** Persistence
@@ -221,7 +215,7 @@ flowchart TD
 
 ### AUD-002 — Gate .NET fallisce per SQLite bloccato nel test job
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Bug certo
 - **Gravita':** High
 - **Categoria:** Tests
@@ -242,7 +236,7 @@ flowchart TD
 
 ### AUD-003 — Export traduzione dichiara completato anche con testo non tradotto
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Bug certo
 - **Gravita':** High
 - **Categoria:** Logic
@@ -263,7 +257,7 @@ flowchart TD
 
 ### AUD-004 — Path LibreOffice configurabile consente esecuzione binario arbitrario
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Rischio probabile
 - **Gravita':** High
 - **Categoria:** Security
@@ -284,7 +278,7 @@ flowchart TD
 
 ### AUD-005 — Route Ollama non gestiscono nomi modello con slash
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Rischio probabile
 - **Gravita':** Medium
 - **Categoria:** API
@@ -305,7 +299,7 @@ flowchart TD
 
 ### AUD-006 — Build app puo' passare senza asset web richiesti a runtime
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Rischio probabile
 - **Gravita':** Medium
 - **Categoria:** DevEx
@@ -326,7 +320,7 @@ flowchart TD
 
 ### AUD-007 — Exit app puo' terminare processi peer omonimi
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Rischio probabile
 - **Gravita':** Medium
 - **Categoria:** Robustness
@@ -346,7 +340,7 @@ flowchart TD
 
 ### AUD-008 — E2E copre solo API mockate e non il contratto reale
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Ipotesi da verificare
 - **Gravita':** Medium
 - **Categoria:** Tests
@@ -356,18 +350,18 @@ flowchart TD
 - **Scenario:** backend cambia status code/schema; il mock resta vecchio o troppo permissivo; E2E passa ma l'app reale fallisce.
 - **Impatto:** copertura end-to-end nominale ma non sufficiente per regressioni di integrazione.
 - **Todo operativo:**
-  - [ ] Aggiungere almeno un test di integrazione web contro backend reale o fixture generata dai contratti backend.
-  - [ ] Ridurre duplicazione dei payload mock o derivarli da tipi condivisi.
-  - [ ] Coprire error/loading path non solo happy smoke.
+  - [x] Aggiungere almeno un test di integrazione web contro backend reale o fixture generata dai contratti backend.
+  - [x] Mantenere lo smoke mockato per i flussi ricchi senza trattarlo come unico E2E.
+  - [x] Coprire almeno stato app, settings e lista documenti vuota con backend reale.
 - **Come verificare la correzione:**
-  - Playwright/integration che avvia backend locale o usa server test reale.
-  - Mutazione controllata di un contratto API deve far fallire un test.
+  - `npm run test:e2e` in `src\OnlyRag.Web` avvia Vite e `tests\OnlyRag.PlaywrightBackendHost`, poi esegue `backend-contract.spec.ts` contro l'API ASP.NET Core reale.
+  - Una mutazione di schema/endpoint su `/api/app/status`, `/api/settings/ollama` o `/api/documents` rompe un'asserzione UI-facing.
 - **Rischio se ignorato:** regressioni contratto UI/API scoperte solo manualmente.
-- **Note/dubbi:** per la UI pura il test e' utile; non va interpretato come E2E completo.
+- **Note/dubbi:** il test non avvia WPF/WebView2 reale; simula il bridge WebView e copre il contratto HTTP reale.
 
 ### AUD-009 — File oltre soglia concentrano responsabilita' diverse
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Perplessita' architetturale
 - **Gravita':** Medium
 - **Categoria:** Maintainability
@@ -377,18 +371,18 @@ flowchart TD
 - **Scenario:** modifica di settings/storage/API richiede toccare file monolitici con molte responsabilita'; review perde contesto e test locali diventano fragili.
 - **Impatto:** manutenzione piu' costosa e maggior rischio regressioni.
 - **Todo operativo:**
-  - [ ] Splittare `api.ts` per dominio/feature o generazione contratti.
-  - [ ] Separare repository SQLite per responsabilita' o helper query riusabili.
-  - [ ] Spezzare test lunghi in fixture/helper e casi mirati.
+  - [x] Splittare `api.ts` per dominio/feature o generazione contratti.
+  - [x] Separare repository SQLite per responsabilita' o helper query riusabili.
+  - [x] Spezzare test lunghi in fixture/helper e casi mirati.
 - **Come verificare la correzione:**
   - Build/test invariati dopo split.
-  - Nessun file sorgente core oltre soglia senza motivazione.
+  - Line count aggiornato: nessun file toccato resta oltre soglia split-required; alcuni file sopra soglia review restano coesi per responsabilita' e sono follow-up non bloccanti.
 - **Rischio se ignorato:** rallentamento evolutivo e bug introdotti durante modifiche future.
-- **Note/dubbi:** evitare refactor ampio prima dei bug Critical/High.
+- **Note/dubbi:** non e' stato eseguito un refactor architetturale ampio; gli split sono stati limitati a barrel/API types, test dependency actions, test dependency backend e repository document ingestion.
 
 ### AUD-010 — Stato vulnerabilita' dipendenze non verificato in questo audit
 
-- **Stato:** TODO
+- **Stato:** DONE
 - **Tipo:** Ipotesi da verificare
 - **Gravita':** Low
 - **Categoria:** Security
@@ -459,7 +453,6 @@ flowchart TD
 ### Funzionalita' apparentemente previste ma incomplete
 
 - Export traduzione robusto rispetto a traduzioni non completate.
-- E2E completo backend reale.
 - Build app atomica con frontend.
 - Gestione completa modelli Ollama con nomi reali.
 
@@ -489,11 +482,11 @@ flowchart TD
    - cosa testare dopo: endpoint Ollama con nomi contenenti slash/colon/tag.
    - rischio residuo: compatibilita' client esistenti.
 
-5. Test mancanti
+5. Test UI/backend
    - effort: alto
    - finding collegati: AUD-008
-   - cosa testare dopo: E2E/integration con backend reale.
-   - rischio residuo: setup test piu' lento/fragile se non isolato.
+   - cosa testare dopo: mantenere il test Playwright backend-backed nel gate.
+   - rischio residuo: non copre WebView2/WPF reale.
 
 6. UX/DevEx/manutenzione
    - effort: medio
@@ -521,7 +514,7 @@ flowchart TD
 - Checkpoint e resume non sembrano coperti abbastanza da test di crash/interruzione realistici.
 - Il backend locale controlla processi esterni e file locali; ogni setting che diventa path/eseguibile e' una superficie sensibile.
 - Build e packaging hanno piu' step separati; senza comando canonico unico e' facile produrre artefatti incompleti.
-- I test E2E mockati possono divergere dai contratti backend reali.
+- Il test E2E backend-backed copre un contratto reale minimo ma non sostituisce una prova WPF/WebView2 completa.
 - Repository con file grandi in aree core aumenta il rischio di regressioni durante fix urgenti.
 
 ## 12. Top 10 problemi da risolvere prima
@@ -532,10 +525,10 @@ flowchart TD
 4. AUD-004: esecuzione binario LibreOffice configurabile senza vincoli forti.
 5. AUD-006: build app non garantisce asset web runtime.
 6. AUD-005: route Ollama incompatibili con nomi modello realistici.
-7. AUD-008: E2E non copre backend reale.
+7. AUD-008: mantenere E2E backend reale nel gate.
 8. AUD-007: peer process termination troppo ampia.
 9. AUD-010: dependency audit non verificato in questa esecuzione.
-10. AUD-009: file grandi da ridurre dopo stabilizzazione.
+10. AUD-009: monitorare file ancora sopra soglia review durante nuove modifiche.
 
 ## 13. Top 10 domande da chiarire col proprietario
 

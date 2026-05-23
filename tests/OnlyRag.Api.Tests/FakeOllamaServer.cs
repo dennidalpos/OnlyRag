@@ -17,16 +17,28 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
 
     private readonly WebApplication app;
 
-    private FakeOllamaServer(WebApplication app, string baseUrl)
+    private FakeOllamaServer(
+        WebApplication app,
+        string baseUrl,
+        List<string> deletedModels,
+        List<string> shownModels)
     {
         this.app = app;
         BaseUrl = baseUrl;
+        DeletedModels = deletedModels;
+        ShownModels = shownModels;
     }
 
     public string BaseUrl { get; }
 
+    public IReadOnlyList<string> DeletedModels { get; }
+
+    public IReadOnlyList<string> ShownModels { get; }
+
     public static async Task<FakeOllamaServer> StartAsync()
     {
+        List<string> deletedModels = [];
+        List<string> shownModels = [];
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
             Args = []
@@ -39,9 +51,25 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
             Results.Json(EmbedPayload(await ReadBodyAsync(request)), JsonOptions));
         app.MapPost("/api/chat", async (HttpRequest request) =>
             Results.Json(ChatPayload(await ReadBodyAsync(request)), JsonOptions));
+        app.MapDelete("/api/delete", async (HttpRequest request) =>
+        {
+            deletedModels.Add(ExtractModelName(await ReadBodyAsync(request)));
+            return Results.Json(new { }, JsonOptions);
+        });
+        app.MapPost("/api/show", async (HttpRequest request) =>
+        {
+            shownModels.Add(ExtractModelName(await ReadBodyAsync(request)));
+            return Results.Json(new
+            {
+                model_info = new Dictionary<string, int>
+                {
+                    ["llama.context_length"] = 4096
+                }
+            }, JsonOptions);
+        });
 
         await app.StartAsync();
-        return new FakeOllamaServer(app, ResolveBaseUrl(app));
+        return new FakeOllamaServer(app, ResolveBaseUrl(app), deletedModels, shownModels);
     }
 
     public async ValueTask DisposeAsync()
@@ -104,6 +132,12 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
             done = true,
             message = new { role = "assistant", content = answer }
         };
+    }
+
+    private static string ExtractModelName(string body)
+    {
+        using JsonDocument document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("model").GetString() ?? string.Empty;
     }
 
     private static string ExtractTranslationSource(string body)

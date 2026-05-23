@@ -106,6 +106,12 @@ public partial class App : Application
     private static void TerminatePeerProcesses()
     {
         using Process current = Process.GetCurrentProcess();
+        string? currentExecutablePath = TryGetExecutablePath(current);
+        if (string.IsNullOrWhiteSpace(currentExecutablePath))
+        {
+            return;
+        }
+
         foreach (Process process in Process.GetProcessesByName(current.ProcessName))
         {
             if (process.Id == current.Id)
@@ -115,10 +121,16 @@ public partial class App : Application
 
             try
             {
+                string? peerExecutablePath = TryGetExecutablePath(process);
+                if (!string.Equals(currentExecutablePath, peerExecutablePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 bool closeRequested = process.MainWindowHandle != IntPtr.Zero && process.CloseMainWindow();
                 if (!closeRequested || !process.WaitForExit(5000))
                 {
-                    process.Kill(entireProcessTree: true);
+                    process.Kill(entireProcessTree: false);
                     process.WaitForExit(3000);
                 }
             }
@@ -129,6 +141,19 @@ public partial class App : Application
             {
                 process.Dispose();
             }
+        }
+    }
+
+    private static string? TryGetExecutablePath(Process process)
+    {
+        try
+        {
+            string? fileName = process.MainModule?.FileName;
+            return string.IsNullOrWhiteSpace(fileName) ? null : Path.GetFullPath(fileName);
+        }
+        catch
+        {
+            return null;
         }
     }
 }

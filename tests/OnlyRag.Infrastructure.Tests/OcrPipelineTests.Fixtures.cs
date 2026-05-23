@@ -169,6 +169,29 @@ public sealed partial class OcrPipelineTests
             return pages;
         }
 
+        public async Task<IReadOnlyList<string>> ReadChunkTextsAsync(long documentId)
+        {
+            await using Microsoft.Data.Sqlite.SqliteConnection connection = await ConnectionFactory.OpenConnectionAsync();
+            await using Microsoft.Data.Sqlite.SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT content
+                FROM chunks
+                WHERE document_id = $documentId
+                ORDER BY chunk_index;
+                """;
+            command.Parameters.AddWithValue("$documentId", documentId);
+
+            List<string> chunks = [];
+            await using Microsoft.Data.Sqlite.SqliteDataReader reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                chunks.Add(reader.GetString(0));
+            }
+
+            return chunks;
+        }
+
         public void Dispose()
         {
             if (Directory.Exists(Root))
@@ -180,23 +203,37 @@ public sealed partial class OcrPipelineTests
 
     private static byte[] CreateSinglePageTextPdf(string text)
     {
-        string escapedText = text.Replace(@"\", @"\\", StringComparison.Ordinal)
-            .Replace("(", @"\(", StringComparison.Ordinal)
-            .Replace(")", @"\)", StringComparison.Ordinal);
-        string stream = $"BT /F1 24 Tf 100 700 Td ({escapedText}) Tj ET";
-        string[] objects =
+        return CreateMultiPageTextPdf(text);
+    }
+
+    private static byte[] CreateMultiPageTextPdf(params string[] pageTexts)
+    {
+        string[] pageObjects = pageTexts.Select((_, index) => $"{4 + (index * 2)} 0 R").ToArray();
+        List<string> objects =
         [
             "<< /Type /Catalog /Pages 2 0 R >>",
-            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-            $"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}\nendstream"
+            $"<< /Type /Pages /Kids [{string.Join(' ', pageObjects)}] /Count {pageTexts.Length} >>",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
         ];
+
+        foreach ((string text, int index) in pageTexts.Select((text, index) => (text, index)))
+        {
+            int contentObjectNumber = 5 + (index * 2);
+            string escapedText = text.Replace(@"\", @"\\", StringComparison.Ordinal)
+                .Replace("(", @"\(", StringComparison.Ordinal)
+                .Replace(")", @"\)", StringComparison.Ordinal);
+            string stream = string.IsNullOrEmpty(text)
+                ? string.Empty
+                : $"BT /F1 24 Tf 100 700 Td ({escapedText}) Tj ET";
+            objects.Add(
+                $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents {contentObjectNumber} 0 R >>");
+            objects.Add($"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}\nendstream");
+        }
 
         StringBuilder builder = new();
         List<int> offsets = [];
         builder.Append("%PDF-1.4\n");
-        for (int index = 0; index < objects.Length; index++)
+        for (int index = 0; index < objects.Count; index++)
         {
             offsets.Add(Encoding.ASCII.GetByteCount(builder.ToString()));
             builder.Append(index + 1).Append(" 0 obj\n")
@@ -204,14 +241,14 @@ public sealed partial class OcrPipelineTests
         }
 
         int xrefOffset = Encoding.ASCII.GetByteCount(builder.ToString());
-        builder.Append("xref\n0 ").Append(objects.Length + 1).Append('\n')
+        builder.Append("xref\n0 ").Append(objects.Count + 1).Append('\n')
             .Append("0000000000 65535 f \n");
         foreach (int offset in offsets)
         {
             builder.Append(offset.ToString("D10")).Append(" 00000 n \n");
         }
 
-        builder.Append("trailer\n<< /Size ").Append(objects.Length + 1).Append(" /Root 1 0 R >>\n")
+        builder.Append("trailer\n<< /Size ").Append(objects.Count + 1).Append(" /Root 1 0 R >>\n")
             .Append("startxref\n").Append(xrefOffset).Append("\n%%EOF\n");
         return Encoding.ASCII.GetBytes(builder.ToString());
     }

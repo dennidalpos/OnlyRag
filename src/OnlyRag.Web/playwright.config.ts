@@ -10,14 +10,23 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     ...devices["Desktop Edge"],
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: "http://127.0.0.1:5173",
     channel: "msedge",
     trace: "retain-on-failure"
   },
-  webServer: {
-    command: "npm run dev -- --port 4173",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000
-  }
+  webServer: [
+    {
+      command:
+        "dotnet run --project ../../tests/OnlyRag.PlaywrightBackendHost/OnlyRag.PlaywrightBackendHost.csproj -- --port 49153 --session-token playwright-token",
+      url: "http://127.0.0.1:49153/health",
+      reuseExistingServer: false,
+      timeout: 120_000
+    },
+    {
+      command: "npm run dev -- --port 5173",
+      url: "http://127.0.0.1:5173",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000
+    }
+  ]
 });

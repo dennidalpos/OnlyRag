@@ -294,7 +294,7 @@ public sealed partial class InProcessBackendTests
             apiSource,
             $@"export\s+type\s+{Regex.Escape(typeName)}\s*=\s*(?<body>.*?);",
             RegexOptions.Singleline);
-        Assert.True(match.Success, $"TypeScript union {typeName} was not found in api.ts.");
+        Assert.True(match.Success, $"TypeScript union {typeName} was not found in the API type sources.");
 
         return Regex.Matches(match.Groups["body"].Value, "\"(?<value>[^\"]+)\"")
             .Cast<Match>()
@@ -306,7 +306,7 @@ public sealed partial class InProcessBackendTests
     {
         string marker = $"export type {typeName} = {{";
         int markerIndex = apiSource.IndexOf(marker, StringComparison.Ordinal);
-        Assert.True(markerIndex >= 0, $"TypeScript object type {typeName} was not found in api.ts.");
+        Assert.True(markerIndex >= 0, $"TypeScript object type {typeName} was not found in the API type sources.");
 
         int bodyStart = markerIndex + marker.Length;
         int bodyEnd = apiSource.IndexOf("\n};", bodyStart, StringComparison.Ordinal);
@@ -320,15 +320,22 @@ public sealed partial class InProcessBackendTests
         DirectoryInfo? current = new(AppContext.BaseDirectory);
         while (current is not null)
         {
-            string candidate = Path.Combine(current.FullName, "src", "OnlyRag.Web", "src", "api.ts");
-            if (File.Exists(candidate))
+            string sourceDirectory = Path.Combine(current.FullName, "src", "OnlyRag.Web", "src");
+            string apiFile = Path.Combine(sourceDirectory, "api.ts");
+            string apiTypesFile = Path.Combine(sourceDirectory, "apiTypes.ts");
+            string apiTypesDirectory = Path.Combine(sourceDirectory, "apiTypes");
+            if (File.Exists(apiFile) && File.Exists(apiTypesFile) && Directory.Exists(apiTypesDirectory))
             {
-                return File.ReadAllText(candidate);
+                IEnumerable<string> typeFiles = Directory.EnumerateFiles(apiTypesDirectory, "*.ts")
+                    .OrderBy(file => file, StringComparer.OrdinalIgnoreCase);
+                return string.Join(
+                    Environment.NewLine,
+                    new[] { apiFile, apiTypesFile }.Concat(typeFiles).Select(File.ReadAllText));
             }
 
             current = current.Parent;
         }
 
-        throw new FileNotFoundException("Could not find src\\OnlyRag.Web\\src\\api.ts from the test output directory.");
+        throw new FileNotFoundException("Could not find src\\OnlyRag.Web\\src API type sources from the test output directory.");
     }
 }

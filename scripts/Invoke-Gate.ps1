@@ -238,7 +238,7 @@ Invoke-GateStep "web build" {
 }
 
 Invoke-GateStep ".NET build" {
-    & $buildAppScript -Configuration $Configuration -NoRestore
+    & $buildAppScript -Configuration $Configuration -NoRestore -SkipWebBuild
 }
 
 if ($IncludeInstaller) {

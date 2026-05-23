@@ -75,7 +75,7 @@ public sealed partial class DocumentIngestionService
                 text = string.Empty;
             }
             IngestedDocumentPage page = string.IsNullOrWhiteSpace(text)
-                ? await RunOcrForPageAsync(document, "pdf", pageNumber, totalPages, forceOcr, ocrLanguage, saveProgressAsync, cancellationToken)
+                ? await RunOcrForPageAsync(document, "pdf", pageNumber, totalPages, nextChunkOrdinal, forceOcr, ocrLanguage, saveProgressAsync, cancellationToken)
                 : new IngestedDocumentPage(pageNumber, text);
 
             IReadOnlyList<IngestedDocumentChunk> chunks = string.IsNullOrWhiteSpace(page.Text)
@@ -143,6 +143,7 @@ public sealed partial class DocumentIngestionService
             "image",
             1,
             1,
+            nextChunkOrdinal,
             forceOcr,
             ocrLanguage,
             saveProgressAsync,
@@ -179,6 +180,7 @@ public sealed partial class DocumentIngestionService
         string sourceKind,
         int pageNumber,
         int totalPages,
+        int nextChunkOrdinal,
         bool forceOcr,
         string? ocrLanguage,
         Func<DocumentIngestionProgress, CancellationToken, Task> saveProgressAsync,
@@ -238,7 +240,7 @@ public sealed partial class DocumentIngestionService
             new DocumentIngestionProgress(
                 CalculateProgress(pageNumber - 1, totalPages),
                 $"OCR pagina {pageNumber}/{totalPages}",
-                new DocumentIngestionCheckpoint(1, document.Id, pageNumber, totalPages, 0, "ocr")),
+                new DocumentIngestionCheckpoint(1, document.Id, pageNumber, totalPages, nextChunkOrdinal, "ocr")),
             cancellationToken);
 
         OcrPageResult result = await ocrRetryPolicy.ExecuteAsync(

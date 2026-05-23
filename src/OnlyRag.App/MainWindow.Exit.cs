@@ -206,7 +206,7 @@ public partial class MainWindow
     {
         if (exitState is null)
         {
-            return "OnlyRag chiudera l'applicazione e terminera le altre istanze aperte.\n\nUscire?";
+            return "OnlyRag chiudera l'applicazione e terminera le altre istanze aperte della stessa installazione.\n\nUscire?";
         }
 
         List<string> lines = [];
@@ -217,7 +217,7 @@ public partial class MainWindow
             lines.Add(string.Empty);
         }
 
-        lines.Add("OnlyRag salvera il lavoro disponibile, cancellera i job locali attivi e terminera le altre istanze aperte dell'app.");
+        lines.Add("OnlyRag salvera il lavoro disponibile, cancellera i job locali attivi e terminera le altre istanze aperte della stessa installazione.");
         lines.Add(string.Empty);
         lines.Add("Uscire?");
         return string.Join(Environment.NewLine, lines);

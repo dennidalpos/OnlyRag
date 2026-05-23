@@ -41,6 +41,7 @@ public sealed partial class TranslationExportService
         IReadOnlyList<StoredTranslationUnit> units = await translations.ListUnitsAsync(
             translationId,
             cancellationToken);
+        ValidateExportCompleteness(translation, units);
         string outputPath = CreateOutputPath(translation, format);
 
         switch (format)
@@ -63,6 +64,36 @@ public sealed partial class TranslationExportService
         }
 
         return new TranslationExportResponse(translationId, format, outputPath, "Completed");
+    }
+
+    private static void ValidateExportCompleteness(
+        StoredTranslation translation,
+        IReadOnlyList<StoredTranslationUnit> units)
+    {
+        if (!string.Equals(translation.Status, "Completed", StringComparison.Ordinal))
+        {
+            throw new TranslationExportException(
+                "Traduzione incompleta",
+                "Completa la traduzione prima di esportarla.");
+        }
+
+        if (units.Count == 0 || units.Count != translation.UnitCount)
+        {
+            throw new TranslationExportException(
+                "Traduzione incompleta",
+                "Le unita della traduzione non sono complete. Riprova dopo il completamento del job.");
+        }
+
+        bool hasIncompleteUnit = units.Any(unit =>
+            unit.Status is not ("Completed" or "Corrected")
+            || string.IsNullOrWhiteSpace(unit.TranslatedText)
+                && string.IsNullOrWhiteSpace(unit.MachineTranslatedText));
+        if (hasIncompleteUnit)
+        {
+            throw new TranslationExportException(
+                "Traduzione incompleta",
+                "Una o piu unita non hanno testo tradotto. Correggi o rilancia la traduzione prima di esportarla.");
+        }
     }
 
     private string CreateOutputPath(StoredTranslation translation, string format)
