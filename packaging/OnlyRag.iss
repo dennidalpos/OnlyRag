@@ -73,6 +73,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "ocrpreinstall"; Description: "Prepare PaddleOCR runtime during setup (requires Python 3.10-3.13 and Internet)"; GroupDescription: "Optional local runtimes"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -83,6 +84,7 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\ocr\install_ocr_runtime.ps1"""; StatusMsg: "Preparing PaddleOCR runtime..."; Flags: runhidden waituntilterminated skipifdoesntexist; Tasks: ocrpreinstall
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -183,7 +185,7 @@ begin
     BulletLine('Install', 'Download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/') + #13#10 +
     BulletLine('Verify', 'Open Settings > Apps and confirm Microsoft Edge WebView2 Runtime is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application') + #13#10 + #13#10 +
     ParagraphLine('After installing WebView2, run this {#AppName} setup again.') + #13#10 + #13#10 +
-    ParagraphLine('The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Ollama, LibreOffice, Python OCR packages, and OCR GPU wheels remain optional feature dependencies configured from the app settings.');
+    ParagraphLine('The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. The optional OCR setup task can prepare PaddleOCR packages during setup when compatible Python and Internet access are available. Ollama and LibreOffice remain user-confirmed external/manual installs.');
 end;
 
 function FindNvidiaSmiPath(): String;
@@ -205,7 +207,7 @@ begin
   if FindNvidiaSmiPath() <> '' then
   begin
     Result :=
-      BulletLine('NVIDIA OCR', 'NVIDIA management tools were detected. The installed app includes OCR GPU provisioning manifests. After setup, open Settings > Diagnostics > Configure OCR, then select GPU in OCR settings.');
+      BulletLine('NVIDIA OCR', 'NVIDIA management tools were detected. Keep the OCR runtime setup task selected to prepare the GPU runtime during installation, then select GPU in OCR settings after Diagnostics reports it usable.');
   end
   else
   begin

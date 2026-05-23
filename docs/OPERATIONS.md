@@ -44,14 +44,17 @@ Optional dependencies are configured from **Settings** in the desktop app:
   for manual installation. OnlyRag does not execute remote PowerShell installer scripts.
   In offline or enterprise-managed environments, use an approved software distribution path.
 - **LibreOffice**: when missing, the app opens the official LibreOffice download page.
-- **OCR**: **Configura OCR** creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`
-  and installs the pinned PaddleOCR requirements shipped with the app. The default `auto`
-  provisioning mode selects NVIDIA GPU packages for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi`
-  reports a compatible Windows driver, otherwise it installs the CPU runtime and reports the
-  fallback reason in Diagnostics. GPU selection is blocked until the local PaddleOCR check proves
-  CUDA support with a visible CUDA device. While provisioning is running, **Annulla OCR** requests
-  cancellation and the backend stops the active child process tree. Provisioning is also bounded to
-  45 minutes, after which OnlyRag records a recoverable timeout status and the user can retry.
+- **OCR**: the installer selects the PaddleOCR setup task by default. When Python 3.10 through
+  3.13 and Internet access are available, setup creates or updates
+  `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv` before first launch and installs the pinned
+  PaddleOCR requirements shipped with the app. The same provisioning remains available through
+  **Configura OCR** for repair/retry. The default `auto` mode selects NVIDIA GPU packages for
+  CUDA 12.9, 12.6, or 11.8 when `nvidia-smi` reports a compatible Windows driver, otherwise it
+  installs the CPU runtime and reports the fallback reason in Diagnostics. GPU selection is blocked
+  until the local PaddleOCR check proves CUDA support with a visible CUDA device. While UI
+  provisioning is running, **Annulla OCR** requests cancellation and the backend stops the active
+  child process tree. UI provisioning is also bounded to 45 minutes, after which OnlyRag records a
+  recoverable timeout status and the user can retry.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in

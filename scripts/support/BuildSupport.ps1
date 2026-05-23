@@ -214,6 +214,7 @@ function Test-OnlyRagPublishPayload {
         "e_sqlite3.dll",
         "wwwroot\index.html",
         "vec0.dll",
+        "scripts\ocr\install_ocr_runtime.ps1",
         "scripts\ocr\paddle_ocr_bridge.py",
         "scripts\ocr\requirements.txt",
         "scripts\ocr\requirements-common.txt",

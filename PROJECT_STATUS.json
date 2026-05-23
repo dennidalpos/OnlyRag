@@ -1,6 +1,6 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-24T00:46:05+02:00",
+  "last_updated": "2026-05-24T01:07:19+02:00",
   "status": "active",
   "active_objective": "Complete trusted signed installer verification when external signing prerequisites are available.",
   "current_plan": [
@@ -24,12 +24,19 @@
     "web_tests": "passed",
     "web_build": "passed",
     "dotnet_tests": "passed",
+    "api_ocr_tests": "passed",
+    "ocr_preinstall_script_parse": "passed",
+    "publish_payload": "passed",
+    "installer_prerequisite_self_test": "passed",
     "build": "passed",
     "signed_installer": "blocked"
   },
   "assumptions": [
-    "Automatic install is limited to per-user OCR/PaddleOCR provisioning; Ollama, LibreOffice, Python, and WebView2 remain user-confirmed external/manual installs.",
+    "Installer OCR setup prepares only the per-user PaddleOCR runtime when compatible Python and Internet access are available; Ollama, LibreOffice, Python, and WebView2 remain user-confirmed external/manual installs.",
     "Live metrics use 5-second diagnostics polling rather than streaming."
   ],
-  "last_completed_work": "Enhanced scripts\\Invoke-Gate.ps1 with a support diagnostics helper, toolchain version output, step timings, optional continue-on-error diagnostics, and a consolidated failure summary; the Release gate passed."
+  "risks": [
+    "Installer OCR preinstall depends on compatible Python 3.10-3.13, pip network access, and PaddlePaddle wheel availability on the target machine."
+  ],
+  "last_completed_work": "Added a default-selected installer OCR setup task that preinstalls the per-user PaddleOCR runtime and selects NVIDIA GPU wheels when the local driver is compatible."
 }

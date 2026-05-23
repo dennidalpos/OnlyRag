@@ -261,6 +261,7 @@ else {
     Test-PathExpectation -Id "webview2-loader-native-asset" -Path (Join-Path $installDir "WebView2Loader.dll") -Kind "file"
     Test-PathExpectation -Id "sqlite-native-provider" -Path (Join-Path $installDir "e_sqlite3.dll") -Kind "file"
     Test-PathExpectation -Id "sqlite-vec-native-asset" -Path (Join-Path $installDir "vec0.dll") -Kind "file"
+    Test-PathExpectation -Id "ocr-setup-preinstall-script" -Path (Join-Path $installDir "scripts\ocr\install_ocr_runtime.ps1") -Kind "file"
     Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements-common" -Path (Join-Path $installDir "scripts\ocr\requirements-common.txt") -Kind "file"

@@ -40,11 +40,13 @@ Bridge and prerequisites:
 - NVIDIA requirements: `requirements-nvidia-cu129.txt`, `requirements-nvidia-cu126.txt`, and
   `requirements-nvidia-cu118.txt`.
 - Supported Python versions: 3.10 through 3.13. The pinned PaddlePaddle runtime does not publish Windows wheels for Python 3.14.
-- End-user setup: **Settings > Diagnostica > Configura OCR** prepares the local OCR environment when Python is available.
+- End-user setup: the default-selected installer OCR setup task prepares the local OCR environment
+  before first launch when compatible Python and Internet access are available. **Settings >
+  Diagnostica > Configura OCR** remains the repair/retry path.
 - Provisioning can be cancelled from **Settings > Diagnostica > Annulla OCR** while it is running.
   OnlyRag also applies a 45-minute upper bound; cancellation and timeout stop the active child process tree
   and leave a recoverable status so the user can retry **Configura OCR**.
-- GPU setup: **Configura OCR** uses `auto` mode. It chooses NVIDIA only when `nvidia-smi`
+- GPU setup: installer OCR setup and **Configura OCR** use `auto` mode. They choose NVIDIA only when `nvidia-smi`
   reports a driver compatible with the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 PaddlePaddle GPU wheels;
   otherwise it installs CPU OCR and reports the fallback reason in Diagnostics. Provisioning removes both
   `paddlepaddle` and `paddlepaddle-gpu` before installing the selected wheel so CPU and GPU packages cannot mask each other.
@@ -83,9 +85,9 @@ Notes:
   configuration error for pages that require OCR.
 - The real PaddleOCR engine is not exercised by unit tests. Tests use a fake `IOcrEngine` for
   cache, retry, checkpoint, and ingestion behavior.
-- The installer does not bundle OCR Python packages or PaddleOCR models. The supported delivery
-  model is per-user provisioning from **Configura OCR** in Settings, which prepares and verifies
-  `%LOCALAPPDATA%\OnlyRag\ocr-python` when Python is available. PaddleOCR may download models on
+- The installer does not bundle OCR Python packages or PaddleOCR models, but its default-selected
+  OCR setup task can download and prepare them into `%LOCALAPPDATA%\OnlyRag\ocr-python` during
+  installation when Python and Internet access are available. PaddleOCR may download models on
   first OCR use into the user profile cache.
 - OCR bridge operations have per-operation timeouts and terminate the Python process tree on timeout
   or caller cancellation. OCR provisioning records progress/status in Settings and can be cancelled
