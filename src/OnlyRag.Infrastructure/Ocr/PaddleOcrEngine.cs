@@ -75,7 +75,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
                 response.Available,
                 EngineName,
                 string.IsNullOrWhiteSpace(response.EngineVersion) ? EngineVersion : response.EngineVersion,
-                response.Message,
+                FormatAvailabilityMessage(response.Message),
                 response.CompiledWithCuda,
                 response.CudaDeviceCount,
                 response.ActiveDevice,
@@ -83,7 +83,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            return new OcrEngineAvailability(false, EngineName, EngineVersion, ex.Message);
+            return new OcrEngineAvailability(false, EngineName, EngineVersion, FormatAvailabilityMessage(ex.Message));
         }
     }
 
@@ -282,6 +282,34 @@ public sealed class PaddleOcrEngine : IOcrEngine
     private static string NormalizeDevice(string value)
     {
         return string.Equals(value, "gpu", StringComparison.OrdinalIgnoreCase) ? "gpu" : "cpu";
+    }
+
+    private static string? FormatAvailabilityMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return message;
+        }
+
+        if (IsBrokenPaddleRuntimeMessage(message))
+        {
+            return "Runtime OCR locale incompleto o danneggiato. " +
+                "Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.";
+        }
+
+        return message;
+    }
+
+    private static bool IsBrokenPaddleRuntimeMessage(string message)
+    {
+        return message.Contains("partially initialized module 'paddle", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("partially initialized module \"paddle", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("cannot import name 'backward'", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("No module named 'paddle'", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("paddlepaddle-gpu", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("paddlepaddle", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolvePythonPath()

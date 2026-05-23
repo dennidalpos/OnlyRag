@@ -169,6 +169,99 @@ describe("SettingsSection", () => {
     expect(await screen.findByText("Office non disponibile.")).toBeInTheDocument();
   });
 
+  it("shows a repair action when the OCR runtime is damaged", async () => {
+    mockApi([
+      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      {
+        path: "/api/office-converter/status",
+        response: {
+          state: "Missing",
+          isAvailable: false,
+          executablePath: null,
+          message: "LibreOffice non installato.",
+          suggestion: null,
+          conversionTimeoutSeconds: 120
+        }
+      },
+      { path: "/api/settings/performance", response: createPerformanceSettings() },
+      { path: "/api/settings/ingestion", response: { chunkSizeTokens: 800, overlapTokens: 120 } },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
+      {
+        path: "/api/settings/ocr",
+        response: {
+          profile: "balanced",
+          pdfDpi: 220,
+          modelPreset: "PP-OCRv5",
+          modelVersion: "PP-OCRv5",
+          detectionSideLimit: 1152,
+          detectionThreshold: 0.3,
+          detectionBoxThreshold: 0.6,
+          detectionUnclipRatio: 1.5,
+          recognitionScoreThreshold: 0.5,
+          useTextlineOrientation: true,
+          useDocumentOrientationClassification: false,
+          useDocumentUnwarping: false,
+          recognitionBatchSize: 6,
+          cpuThreads: 2,
+          device: "cpu"
+        }
+      },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      {
+        path: "/api/diagnostics",
+        response: createDiagnostics({
+          ocrStatus: "Non configurato",
+          ocrIsConfigured: false,
+          ocrGpuCapability: {
+            isUsable: false,
+            status: "Runtime OCR da riparare",
+            blockReason:
+              "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+            runtimeDetail: "NVIDIA compatibile.",
+            engineVersion: "3.5.0",
+            nvidiaName: "NVIDIA RTX",
+            driverVersion: "596.49",
+            compiledWithCuda: false,
+            cudaDeviceCount: 0,
+            activeDevice: null,
+            packageVersions: {}
+          }
+        })
+      },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: false,
+          isRunning: false,
+          message:
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cuda129",
+          runtimeDetail: "NVIDIA compatibile."
+        }
+      }
+    ]);
+
+    render(
+      <SettingsSection
+        settings={createOllamaSettings()}
+        status={createOllamaStatus()}
+        models={[createModel()]}
+        loadError={null}
+        onDataChanged={async () => {}}
+      />
+    );
+
+    expect((await screen.findAllByText(/Runtime OCR locale incompleto o danneggiato/)).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Ripara OCR" })).toBeInTheDocument();
+    expect(screen.queryByText(/paddle.base/)).not.toBeInTheDocument();
+  });
+
   it("renders bounded settings sections and saves a performance preset", async () => {
     const api = mockApi([
       { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },

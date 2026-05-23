@@ -44,10 +44,11 @@ public sealed class OcrGpuCapabilityService
 
         if (!availability.IsConfigured)
         {
+            string blockReason = availability.Message ?? "Il runtime OCR GPU non e utilizzabile.";
             return new OcrGpuCapabilityResponse(
                 false,
-                "Runtime CUDA non utilizzabile",
-                availability.Message ?? "Il runtime OCR GPU non e utilizzabile.",
+                IsRepairableOcrRuntimeIssue(blockReason) ? "Runtime OCR da riparare" : "Runtime CUDA non utilizzabile",
+                blockReason,
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -63,7 +64,7 @@ public sealed class OcrGpuCapabilityService
             return new OcrGpuCapabilityResponse(
                 false,
                 "Runtime PaddlePaddle senza CUDA",
-                "PaddlePaddle e installato senza supporto CUDA.",
+                "Il runtime OCR installato non supporta CUDA. Apri Impostazioni > Diagnostica e premi Configura OCR per installare il runtime NVIDIA GPU, oppure usa OCR CPU.",
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -118,5 +119,10 @@ public sealed class OcrGpuCapabilityService
             null,
             null,
             new Dictionary<string, string>());
+    }
+
+    private static bool IsRepairableOcrRuntimeIssue(string message)
+    {
+        return message.StartsWith("Runtime OCR locale incompleto o danneggiato.", StringComparison.OrdinalIgnoreCase);
     }
 }

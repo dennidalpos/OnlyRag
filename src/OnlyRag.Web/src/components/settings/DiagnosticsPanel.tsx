@@ -12,6 +12,14 @@ export function DiagnosticsPanel() {
     restoreBalancedDefaults,
     requestAppDataReset
   } = useSettingsSectionContext();
+  const canRepairOcrRuntime =
+    diagnostics?.ocrGpuCapability.status === "Runtime OCR da riparare" ||
+    ocrProvisionStatus?.message.startsWith("Runtime OCR locale incompleto o danneggiato.") === true;
+  const ocrConfigureButtonLabel = ocrProvisionStatus?.isRunning
+    ? "Configurazione OCR..."
+    : canRepairOcrRuntime
+      ? "Ripara OCR"
+      : "Configura OCR";
 
   return (
         <div className="settings-card">
@@ -99,7 +107,7 @@ export function DiagnosticsPanel() {
                 onClick={() => void configureOcrRuntime()}
                 disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
               >
-                {ocrProvisionStatus?.isRunning ? "Configurazione OCR..." : "Configura OCR"}
+                {ocrConfigureButtonLabel}
               </button>
               {ocrProvisionStatus?.isRunning && (
                 <button

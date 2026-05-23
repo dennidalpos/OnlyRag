@@ -38,6 +38,27 @@ public sealed class PaddleOcrEngineProcessTests
         Assert.Contains("Timeout bridge PaddleOCR", availability.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("PaddleOCR non configurato: paddle: No module named 'paddle'")]
+    [InlineData("PaddleOCR non configurato: paddle: cannot import name 'backward' from partially initialized module 'paddle.base'")]
+    public async Task CheckAvailabilityExplainsRepairablePaddleRuntimeFailures(string bridgeMessage)
+    {
+        using TempBridge bridge = TempBridge.Create(
+            $$"""
+            [Console]::Out.Write(@'
+            {"available":false,"engineVersion":"3.5.0","message":"{{bridgeMessage}}"}
+            '@)
+            """);
+        PaddleOcrEngine engine = bridge.CreateEngine();
+
+        OcrEngineAvailability availability = await engine.CheckAvailabilityAsync("gpu");
+
+        Assert.False(availability.IsConfigured);
+        Assert.Contains("Runtime OCR locale incompleto o danneggiato", availability.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Configura OCR", availability.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("paddle.base", availability.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task RecognizeKillsBridgeOnCancellation()
     {
