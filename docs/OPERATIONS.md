@@ -111,7 +111,7 @@ settings actions above.
 |---|---|---|
 | Developer setup / dependency install | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` | Verifies prerequisites, restores .NET packages, and installs web dependencies when the lockfile is present. |
 | Web dependency install only | `npm ci` from `src\OnlyRag.Web` | npm is the supported package manager; `package-lock.json` is authoritative. |
-| .NET build | `pwsh .\scripts\Build-App.ps1` | Runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. Use `-NoRestore` only after a completed .NET restore in the same workspace. |
+| App build | `pwsh .\scripts\Build-App.ps1` | Builds the web UI first, verifies `src\OnlyRag.Web\dist\index.html`, then runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. Use `-SkipWebBuild` only when web assets already exist, and `-NoRestore` only after a completed .NET restore in the same workspace. |
 | Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. Use `-SkipInstallWhenUpToDate` only after a completed npm restore in the same workspace. |
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
 | Web lint | `npm run lint` from `src\OnlyRag.Web` | Runs ESLint over the React/Vite workspace. |
@@ -222,7 +222,7 @@ equivalent protections.
 
 The in-process backend requires a random per-session API token for every non-health `/api` request.
 The WPF shell injects this token into the trusted WebView bridge. Endpoints that launch local
-processes, such as opening Explorer, PowerShell, browser downloads, or OCR provisioning, also
+processes, such as opening Explorer, browser downloads, or OCR provisioning, also
 require an explicit UI confirmation payload.
 
 OCR provisioning exposes `POST /api/dependencies/ocr/cancel` for the confirmed UI cancel action.

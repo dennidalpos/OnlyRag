@@ -13,6 +13,8 @@ OnlyRag is a Windows-only local desktop application.
 - `tests\OnlyRag.Core.Tests`: unit tests for core contracts.
 - `tests\OnlyRag.Api.Tests`: unit tests for API handlers and job queue logic.
 - `tests\OnlyRag.Infrastructure.Tests`: unit tests for ingestion, OCR (fake engine), and storage.
+- `tests\OnlyRag.PlaywrightBackendHost`: temporary backend host used by Playwright contract tests.
+- `src\OnlyRag.Web\e2e` and `src\OnlyRag.Web\src\*.test.*`: Playwright smoke/contract tests and Vitest unit/component tests for the WebView UI.
 
 ## Runtime Model
 

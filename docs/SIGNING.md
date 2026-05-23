@@ -29,7 +29,7 @@ public `.cer` files used for enterprise trust distribution.
 3. Run the signing pipeline with the external path:
 
 ```powershell
-pwsh .\scripts\Sign-Release.ps1 -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" -Version "0.1.0"
+pwsh .\scripts\Sign-Release.ps1 -CertificatePath "<external-secure-folder>\OnlyRag-CodeSigning.pfx" -Version "0.1.0"
 ```
 
 4. Enter the PFX password when prompted.
@@ -75,7 +75,7 @@ After Group Policy applies on a target machine, verify enterprise trust:
 
 ```powershell
 pwsh .\scripts\Test-EnterpriseSigningTrust.ps1 `
-  -CertificateThumbprint "1E4A238A06A117710F11816DAB0C1833AC775712" `
+  -CertificateThumbprint "<SHA1 thumbprint>" `
   -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe
 ```
 
@@ -105,7 +105,7 @@ files:
 ```powershell
 $certificatePassword = Read-Host "PFX password" -AsSecureString
 pwsh .\scripts\Sign-Release.ps1 `
-  -CertificatePath "D:\SecureSigning\OnlyRag-CodeSigning.pfx" `
+  -CertificatePath "<external-secure-folder>\OnlyRag-CodeSigning.pfx" `
   -CertificatePassword $certificatePassword `
   -Version "0.1.0"
 ```

@@ -15,8 +15,9 @@ Persistenza locale:
 Integrazioni:
 - Ollama via HTTP per modelli, chat, embedding e traduzione;
 - LibreOffice `soffice.exe` per conversione Office legacy/PDF export;
-- Python PaddleOCR bridge per OCR;
-- Windows Explorer/PowerShell per aperture cartelle e provisioning.
+- Python, pip e PaddleOCR bridge per provisioning e runtime OCR;
+- browser predefinito per aprire pagine download ufficiali;
+- Windows Explorer per aperture cartelle confermate dalla UI.
 
 ## Mermaid
 
@@ -44,7 +45,7 @@ flowchart TD
     R -->|document-embedding| T["Ollama embed -> sqlite-vec"]
     R -->|document-translation| U["Ollama chat -> translation_units"]
     N --> V["Ollama chat/search/settings"]
-    N --> W["LibreOffice / Python / Explorer / PowerShell"]
+    N --> W["LibreOffice / Python+pip / Explorer / browser"]
     O --> X["Risposte UI e polling"]
     Q --> X
 ```
@@ -105,7 +106,7 @@ Traduzione:
 
 Punti fragili:
 - Un XSS nella UI o una pagina dev server con bridge iniettato avrebbe token completo.
-- Le azioni confermate di provisioning OCR e apertura cartelle possono avviare processi locali se il token e disponibile.
+- Le azioni confermate di provisioning OCR, download dipendenze e apertura cartelle possono avviare processi locali se il token e disponibile.
 
 ## Flusso persistenza/database
 
@@ -174,7 +175,7 @@ Ollama:
 
 - Una sola istanza utente controlla lo stesso `%LOCALAPPDATA%\OnlyRag`.
 - Il filesystem e SQLite restano coerenti.
-- I processi OCR/LibreOffice/Python rispettano cancellazione/timeout.
+- I processi OCR/LibreOffice/Python rispettano cancellazione/timeout e vengono avviati solo dai flussi locali previsti.
 - I documenti importati non sono attendibili come istruzioni: il prompt RAG li isola come dati JSON
   e chiede al modello di ignorare comandi o ruoli presenti negli snippet.
 - La UI e l'unico client API rilevante.
@@ -187,7 +188,7 @@ Ollama:
 
 - Pausa/ripresa job non e atomicamente coordinata con il worker.
 - Coerenza fra record DB e file originali/render/export resta affidata al codice applicativo e alle compensazioni dei job.
-- Provisioning OCR resta un processo esterno lungo senza pulsante di annullamento user-facing una volta avviato.
+- Provisioning OCR resta un processo esterno lungo; la UI espone annullamento e il backend applica timeout, ma la riuscita dipende da Python, pip, rete e wheel PaddlePaddle disponibili.
 - La UI puo diventare stale per catch silenziosi nei polling.
 - Non esiste contratto API generato.
 - I test frontend unit/component e smoke E2E esistono, ma la verifica popolata WPF/WebView/Ollama/OCR con dati reali resta fuori dal gate automatico.

@@ -42,7 +42,7 @@ export function OcrChoiceDialog({
           onChange={setSelectedLanguage}
         />
         <div className="panel-note">
-          <p>La lingua salvata in Impostazioni viene proposta come predefinita; questa scelta vale solo per questo import.</p>
+          <p>La lingua scelta viene usata per questo import e riproposta alla prossima operazione OCR.</p>
         </div>
 
         <div className="ocr-choice-options">
@@ -115,7 +115,7 @@ export function OcrLanguageDialog({
           onChange={setSelectedLanguage}
         />
         <div className="panel-note">
-          <p>La lingua salvata in Impostazioni viene proposta come predefinita; questa scelta vale solo per questa operazione.</p>
+          <p>La lingua scelta viene usata per questa operazione e riproposta alla prossima operazione OCR.</p>
         </div>
 
         <div className="settings-actions" style={{ justifyContent: "flex-end" }}>
@@ -154,7 +154,7 @@ export function OcrLanguageSelect({
 
   return (
     <label className="field-group" htmlFor="ocr-language">
-      <span>Lingua documento</span>
+      <span>Lingua del documento</span>
       <select
         id="ocr-language"
         value={value}

@@ -2,18 +2,22 @@ import { useState } from "react";
 import {
   apiRequest,
   type DependencyActionResponse,
+  type OcrProvisionStatus,
   type OcrStartupAnalysis
 } from "../api";
 
 export function useOcrStartupPrompt() {
   const [analysis, setAnalysis] = useState<OcrStartupAnalysis | null>(null);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [provisionStatus, setProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [isConfiguring, setIsConfiguring] = useState(false);
 
   async function refresh() {
-    const result = await apiRequest<OcrStartupAnalysis>("/api/dependencies/ocr/startup-analysis")
-      .catch(() => null);
-    setAnalysis(result);
+    const [analysisResult, statusResult] = await Promise.all([
+      apiRequest<OcrStartupAnalysis>("/api/dependencies/ocr/startup-analysis").catch(() => null),
+      apiRequest<OcrProvisionStatus>("/api/dependencies/ocr").catch(() => null)
+    ]);
+    setAnalysis(analysisResult);
+    setProvisionStatus(statusResult);
   }
 
   async function configure() {
@@ -30,23 +34,31 @@ export function useOcrStartupPrompt() {
           runtimeTarget: analysis.recommendedRuntimeTarget
         })
       });
-      setIsDismissed(true);
       await refresh();
     } finally {
       setIsConfiguring(false);
     }
   }
 
-  function dismiss() {
-    setIsDismissed(true);
+  async function cancel() {
+    setIsConfiguring(true);
+    try {
+      await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/cancel", {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
+      });
+      await refresh();
+    } finally {
+      setIsConfiguring(false);
+    }
   }
 
   return {
     analysis,
-    isDismissed,
+    provisionStatus,
     isConfiguring,
     refresh,
     configure,
-    dismiss
+    cancel
   } as const;
 }

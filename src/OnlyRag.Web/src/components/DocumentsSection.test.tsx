@@ -19,6 +19,10 @@ describe("DocumentsSection", () => {
     const api = mockApi([
       { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
       { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
       { path: "/api/documents", handler: () => ({ body: documents }) },
       { path: "/api/documents/1", handler: () => ({ body: documents[0] }) },
       { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
@@ -52,6 +56,11 @@ describe("DocumentsSection", () => {
             }
           };
         }
+      },
+      {
+        path: "/api/settings/ocr-processing",
+        method: "PUT",
+        handler: (request) => ({ body: JSON.parse(String(request.body)) })
       },
       {
         path: "/api/documents/1/preview?page=1&pageSize=1",
@@ -99,6 +108,12 @@ describe("DocumentsSection", () => {
     expect(importCall?.body).toBeInstanceOf(FormData);
     expect((importCall?.body as FormData).get("ocrPolicy")).toBe("Auto");
     expect((importCall?.body as FormData).get("ocrLanguage")).toBe("it");
+    await waitFor(() => {
+      const languageSaveCall = api.calls.find(
+        (call) => call.path === "/api/settings/ocr-processing" && call.method === "PUT"
+      );
+      expect(JSON.parse(String(languageSaveCall?.body))).toMatchObject({ language: "it" });
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Anteprima" }));
     expect(await screen.findByRole("dialog", { name: "Anteprima documento" })).toBeInTheDocument();

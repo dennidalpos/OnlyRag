@@ -5,6 +5,7 @@ import {
   markBackendOnline,
   resolveBackendErrorMessage,
   type DependencyActionResponse,
+  type DiagnosticsResponse,
   type OllamaInstallStatus,
   type OllamaModel,
   type OllamaModelsResponse,
@@ -15,9 +16,8 @@ import { initializeAppLifecycleBridge } from "./appLifecycle";
 import { AppHeader } from "./components/AppHeader";
 import { ChatSection } from "./components/ChatSection";
 import { DocumentsSection } from "./components/DocumentsSection";
+import { InitialSetupWizard } from "./components/InitialSetupWizard";
 import { JobsSection } from "./components/JobsSection";
-import { OllamaSetupGate } from "./components/OllamaSetupGate";
-import { OcrStartupPrompt } from "./components/OcrStartupPrompt";
 import { SectionId, Sidebar } from "./components/Sidebar";
 import { SettingsSection } from "./components/SettingsSection";
 import { TranslationSection } from "./components/TranslationSection";
@@ -80,6 +80,7 @@ export default function App() {
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusResponse | null>(null);
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -153,13 +154,9 @@ export default function App() {
     }
   }
 
-  async function handleRecheckOllama() {
-    setIsRecheckingOllama(true);
-    try {
-      await refreshOllamaData();
-    } finally {
-      setIsRecheckingOllama(false);
-    }
+  async function refreshDiagnostics() {
+    const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
+    setDiagnostics(data);
   }
 
   async function handleInstallOllama() {
@@ -170,6 +167,20 @@ export default function App() {
         body: JSON.stringify({ confirmed: true })
       });
       await refreshOllamaData();
+    } finally {
+      setIsRecheckingOllama(false);
+    }
+  }
+
+  async function handleRecheckInitialSetup() {
+    setIsRecheckingOllama(true);
+    try {
+      await Promise.all([
+        refreshBackendStatus(),
+        refreshOllamaData(),
+        refreshDiagnostics().catch(() => {}),
+        ocrStartupPrompt.refresh()
+      ]);
     } finally {
       setIsRecheckingOllama(false);
     }
@@ -193,7 +204,10 @@ export default function App() {
         return;
       }
 
-      await ocrStartupPrompt.refresh();
+      await Promise.all([
+        refreshDiagnostics().catch(() => {}),
+        ocrStartupPrompt.refresh()
+      ]);
       if (!isCancelled) {
         setInitialCheckDone(true);
       }
@@ -213,6 +227,13 @@ export default function App() {
     return () => clearInterval(handle);
   }, []);
 
+  useEffect(() => {
+    const handle = setInterval(() => {
+      void refreshDiagnostics().catch(() => {});
+    }, 5_000);
+    return () => clearInterval(handle);
+  }, []);
+
   const previousSectionRef = useRef<SectionId>(activeSection);
   useEffect(() => {
     if (previousSectionRef.current === "settings" && activeSection !== "settings") {
@@ -221,14 +242,6 @@ export default function App() {
     previousSectionRef.current = activeSection;
   }, [activeSection]);
 
-  const hasBlockingOllamaSetup =
-    Boolean(ollamaInstallStatus && !ollamaInstallStatus.cliInstalled)
-    || !ollamaStatus
-    || !ollamaStatus.isReachable
-    || ollamaModels.length === 0
-    || !ollamaSettings?.defaultChatModel
-    || !ollamaSettings?.defaultEmbeddingModel;
-
   return (
     <div className="desktop-shell">
       <Sidebar
@@ -236,6 +249,7 @@ export default function App() {
         sections={sectionLabels}
         onSectionChange={setActiveSection}
         activeJobCount={parseInt(backendStatus.jobsValue, 10) || 0}
+        diagnostics={diagnostics}
       />
       <main className="workspace">
         <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} />
@@ -283,27 +297,20 @@ export default function App() {
         </section>
       </main>
       {initialCheckDone && activeSection !== "settings" && (
-        <OllamaSetupGate
+        <InitialSetupWizard
           ollamaStatus={ollamaStatus}
           ollamaInstallStatus={ollamaInstallStatus}
           ollamaSettings={ollamaSettings}
           ollamaModels={ollamaModels}
+          ocrAnalysis={ocrStartupPrompt.analysis}
+          ocrProvisionStatus={ocrStartupPrompt.provisionStatus}
           isChecking={isRecheckingOllama}
+          isConfiguringOcr={ocrStartupPrompt.isConfiguring}
           onOpenSettings={() => setActiveSection("settings")}
           onInstallOllama={() => void handleInstallOllama()}
-          onRecheck={() => void handleRecheckOllama()}
-        />
-      )}
-      {initialCheckDone && activeSection !== "settings" && !hasBlockingOllamaSetup && !ocrStartupPrompt.isDismissed && (
-        <OcrStartupPrompt
-          analysis={ocrStartupPrompt.analysis}
-          isConfiguring={ocrStartupPrompt.isConfiguring}
-          onConfirm={() => void ocrStartupPrompt.configure()}
-          onDismiss={ocrStartupPrompt.dismiss}
-          onOpenSettings={() => {
-            ocrStartupPrompt.dismiss();
-            setActiveSection("settings");
-          }}
+          onConfigureOcr={() => void ocrStartupPrompt.configure()}
+          onCancelOcr={() => void ocrStartupPrompt.cancel()}
+          onRecheck={() => void handleRecheckInitialSetup()}
         />
       )}
     </div>

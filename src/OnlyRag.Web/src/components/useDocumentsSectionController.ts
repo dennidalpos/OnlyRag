@@ -42,6 +42,7 @@ export function useDocumentsSectionController() {
   const [pendingOcrAction, setPendingOcrAction] = useState<PendingOcrAction | null>(null);
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>(fallbackOcrLanguages);
   const [ocrDefaultLanguage, setOcrDefaultLanguage] = useState(DEFAULT_OCR_LANGUAGE);
+  const [ocrProcessingSettings, setOcrProcessingSettings] = useState<OcrProcessingSettings | null>(null);
   const [documentRefreshStatus, setDocumentRefreshStatus] = useState(initialRefreshStatus);
   const {
     detailRefreshStatus,
@@ -70,7 +71,10 @@ export function useDocumentsSectionController() {
       .then((languages) => setOcrLanguages(languages.length > 0 ? languages : fallbackOcrLanguages))
       .catch(() => setOcrLanguages(fallbackOcrLanguages));
     apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing")
-      .then((settings) => setOcrDefaultLanguage(settings.language || DEFAULT_OCR_LANGUAGE))
+      .then((settings) => {
+        setOcrProcessingSettings(settings);
+        setOcrDefaultLanguage(settings.language || DEFAULT_OCR_LANGUAGE);
+      })
       .catch(() => setOcrDefaultLanguage(DEFAULT_OCR_LANGUAGE));
   }, []);
 
@@ -195,6 +199,7 @@ export function useDocumentsSectionController() {
     }
     const { files } = pendingImport;
     setPendingImport(null);
+    void rememberDocumentOcrLanguage(ocrLanguage);
     void importFiles(files, policy, ocrLanguage);
   }
 
@@ -301,12 +306,40 @@ export function useDocumentsSectionController() {
 
     const action = pendingOcrAction;
     setPendingOcrAction(null);
+    void rememberDocumentOcrLanguage(language);
     if (action.kind === "reindex") {
       void executeReindex(action.document, language);
       return;
     }
 
     void executeRunOcr(action.document, action.force, language);
+  }
+
+  async function rememberDocumentOcrLanguage(language: string) {
+    const normalizedLanguage = language.trim();
+    if (normalizedLanguage.length === 0) {
+      return;
+    }
+
+    setOcrDefaultLanguage(normalizedLanguage);
+
+    const currentSettings = ocrProcessingSettings ?? {
+      language: DEFAULT_OCR_LANGUAGE,
+      maxRetries: 2,
+      pageTimeoutSeconds: 180,
+      lowConfidenceThreshold: 0.55
+    };
+    const nextSettings = { ...currentSettings, language: normalizedLanguage };
+    setOcrProcessingSettings(nextSettings);
+
+    try {
+      await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {
+        method: "PUT",
+        body: JSON.stringify(nextSettings)
+      });
+    } catch {
+      // The selected language is still used for the current operation; persistence can retry later.
+    }
   }
 
   async function handleDelete(document: ImportedDocument) {

@@ -179,7 +179,7 @@ residual work is tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
 ## Documentation
 
 - [Documentation index](docs/README.md)
-- [Operations](docs/OPERATIONS.md)
+- [Operations and handoff](docs/OPERATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Application flow](docs/APP_FLOW.md)
 - [Scripts](scripts/README.md)

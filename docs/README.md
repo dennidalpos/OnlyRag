@@ -5,8 +5,9 @@ product-facing and concise; keep operational and implementation details here.
 
 ## Canonical References
 
-- [Operations](OPERATIONS.md): Windows setup, canonical commands, build/test/run flows, local
-  data, troubleshooting, packaging status, and `PROJECT_STATUS.json` conventions.
+- [Operations](OPERATIONS.md): Windows setup, fresh-install path, canonical commands,
+  build/test/run flows, handoff checklist, local data, troubleshooting, packaging status, and
+  `PROJECT_STATUS.json` conventions.
 - [Architecture](ARCHITECTURE.md): stack, project layout, runtime model, backend boundaries, and
   core service responsibilities.
 - [Packaging](../packaging/README.md): Inno Setup model, installer contents, prerequisites, and

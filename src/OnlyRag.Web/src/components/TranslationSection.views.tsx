@@ -72,7 +72,7 @@ export function TranslationStartCard({
         </select>
       </label>
       <label className="field-group" htmlFor="translation-language">
-        <span>Lingua target</span>
+        <span>Traduci in</span>
         <select
           id="translation-language"
           value={selectedLanguage}

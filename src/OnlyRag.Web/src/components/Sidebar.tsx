@@ -1,3 +1,9 @@
+import type { DiagnosticsResponse } from "../api";
+import {
+  formatTelemetryBytes,
+  formatTelemetryPercent
+} from "./SettingsSection.formatting";
+
 export type SectionId = "chat" | "documents" | "jobs" | "translation" | "settings";
 
 type SidebarProps = {
@@ -5,11 +11,18 @@ type SidebarProps = {
   sections: Record<SectionId, string>;
   onSectionChange: (section: SectionId) => void;
   activeJobCount?: number;
+  diagnostics?: DiagnosticsResponse | null;
 };
 
 const sectionOrder: SectionId[] = ["chat", "documents", "jobs", "translation", "settings"];
 
-export function Sidebar({ activeSection, sections, onSectionChange, activeJobCount = 0 }: SidebarProps) {
+export function Sidebar({
+  activeSection,
+  sections,
+  onSectionChange,
+  activeJobCount = 0,
+  diagnostics = null
+}: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -37,6 +50,83 @@ export function Sidebar({ activeSection, sections, onSectionChange, activeJobCou
           );
         })}
       </nav>
+      <SidebarMetrics diagnostics={diagnostics} />
     </aside>
+  );
+}
+
+function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | null }) {
+  if (!diagnostics) {
+    return (
+      <section className="sidebar-metrics" aria-label="Metriche sistema">
+        <div className="sidebar-metrics__header">
+          <span>Metriche</span>
+          <small>in attesa</small>
+        </div>
+      </section>
+    );
+  }
+
+  const telemetry = diagnostics.systemTelemetry;
+  const gpu = telemetry.gpu;
+  const cudaValue = diagnostics.ocrGpuCapability.compiledWithCuda === null
+    ? "n/d"
+    : diagnostics.ocrGpuCapability.compiledWithCuda ? "Si" : "No";
+
+  return (
+    <section className="sidebar-metrics" aria-label="Metriche sistema">
+      <div className="sidebar-metrics__header">
+        <span>Metriche</span>
+        <small>live</small>
+      </div>
+      <MetricRow
+        label="CPU"
+        value={formatTelemetryPercent(telemetry.cpu.usagePercent)}
+        detail={`${telemetry.cpu.logicalProcessorCount} thread`}
+      />
+      <MetricRow
+        label="RAM"
+        value={formatTelemetryBytes(telemetry.memory.availableBytes)}
+        detail={`liberi di ${formatTelemetryBytes(telemetry.memory.totalBytes)}`}
+      />
+      <MetricRow
+        label={`Disco ${telemetry.systemDisk.name}`}
+        value={formatTelemetryBytes(telemetry.systemDisk.availableBytes)}
+        detail={`liberi di ${formatTelemetryBytes(telemetry.systemDisk.totalBytes)}`}
+      />
+      <MetricRow
+        label="GPU"
+        value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
+        detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non rilevata"}
+      />
+      <MetricRow
+        label="VRAM"
+        value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
+        detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
+      />
+      <MetricRow
+        label="CUDA Paddle"
+        value={cudaValue}
+        detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
+      />
+    </section>
+  );
+}
+
+function MetricRow({
+  label,
+  value,
+  detail
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="sidebar-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
   );
 }

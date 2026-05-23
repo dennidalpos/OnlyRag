@@ -1,9 +1,9 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-23T23:09:02+02:00",
-  "status": "blocked",
-  "active_objective": "complete trusted signed installer verification",
-  "residual_plan": [
+  "last_updated": "2026-05-23T23:46:09+02:00",
+  "status": "active",
+  "active_objective": "Complete trusted signed installer verification when external signing prerequisites are available.",
+  "current_plan": [
     {
       "execution_order": 1,
       "priority": "P2",
@@ -15,21 +15,21 @@
     }
   ],
   "blockers": [
-    "Signed installer verification needs a trusted Windows code-signing certificate, signtool.exe, Inno Setup 6, and a clean Windows verification machine."
+    "Signed release verification needs a trusted Windows code-signing certificate, signtool.exe, Inno Setup 6, and a clean Windows verification machine."
   ],
   "quality_gates": {
-    "dotnet_build": "passed",
-    "dotnet_tests": "passed",
     "web_typecheck": "passed",
     "web_lint": "passed",
     "web_format": "passed",
-    "web_unit_tests": "passed",
-    "web_e2e": "passed",
+    "web_tests": "passed",
     "web_build": "passed",
-    "dependency_audit": "passed",
-    "installer_prerequisites": "passed",
+    "dotnet_tests": "passed",
+    "build": "passed",
     "signed_installer": "blocked"
   },
-  "last_completed_work": "Added a Playwright UI/backend contract test with a real ASP.NET Core backend host, split API type contracts by domain, split large settings/dependency tests, split document repository ingestion responsibilities, and kept AUD-008/AUD-009 current.",
-  "audit_tracker": "AUDIT_TRACKER.md"
+  "assumptions": [
+    "Automatic install is limited to per-user OCR/PaddleOCR provisioning; Ollama, LibreOffice, Python, and WebView2 remain user-confirmed external/manual installs.",
+    "Live metrics use 5-second diagnostics polling rather than streaming."
+  ],
+  "last_completed_work": "Removed the completed temporary AUDIT_TRACKER.md, cleaned generated repository outputs, and reset OnlyRag local settings/cache while preserving local documents."
 }

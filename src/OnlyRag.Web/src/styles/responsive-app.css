@@ -74,6 +74,15 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
+  .sidebar-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 0;
+  }
+
+  .sidebar-metrics__header {
+    grid-column: 1 / -1;
+  }
+
   .nav-item {
     text-align: center;
     justify-content: center;
@@ -125,5 +134,8 @@
   .compare-grid {
     grid-template-columns: 1fr;
   }
-}
 
+  .setup-issue {
+    grid-template-columns: 1fr;
+  }
+}

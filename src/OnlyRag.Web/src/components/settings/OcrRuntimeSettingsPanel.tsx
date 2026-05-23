@@ -1,14 +1,10 @@
-import {
-  SettingsRangeField,
-  getOcrLanguageOptions
-} from "../SettingsSection.helpers";
+import { SettingsRangeField } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
 
 export function OcrRuntimeSettingsPanel() {
   const {
     ocrProcessingFormState,
     setOcrProcessingFormState,
-    ocrLanguages,
     saveOcrProcessingSettings,
     isBusy,
     hasDirtyOcrProcessingSettings
@@ -20,24 +16,8 @@ export function OcrRuntimeSettingsPanel() {
             <h3>OCR runtime</h3>
           </div>
           <div className="settings-form">
-            <label className="field-group" htmlFor="ocr-processing-language">
-              <span>Lingua OCR</span>
-              <select
-                id="ocr-processing-language"
-                value={ocrProcessingFormState.language}
-                onChange={(event) =>
-                  setOcrProcessingFormState((current) => ({ ...current, language: event.target.value }))
-                }
-              >
-                {getOcrLanguageOptions(ocrProcessingFormState.language, ocrLanguages).map((language) => (
-                  <option key={language.code} value={language.code}>
-                    {language.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <div className="panel-note">
-              <p>Questa lingua viene usata come predefinita per import, reindicizzazione e OCR. La scelta nel dialogo del documento vale solo per quella operazione.</p>
+              <p>La lingua documento si sceglie durante import, reindicizzazione o OCR e viene riproposta alla prossima operazione.</p>
             </div>
             <SettingsRangeField
               id="ocr-processing-retries"

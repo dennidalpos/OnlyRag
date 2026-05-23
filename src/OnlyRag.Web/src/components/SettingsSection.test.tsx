@@ -250,6 +250,7 @@ describe("SettingsSection", () => {
     expect(screen.getAllByRole("heading", { name: "Ingestion" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Diagnostica" }).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Modalità PC poco performante")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Lingua OCR")).not.toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText("Profilo prestazioni"), "power");
     await userEvent.click(screen.getByRole("button", { name: "Salva prestazioni" }));

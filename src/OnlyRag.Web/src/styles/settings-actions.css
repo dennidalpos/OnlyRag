@@ -128,40 +128,6 @@
   font-size: 13px;
 }
 
-.telemetry-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.telemetry-item {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid #d9e0e8;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.telemetry-item span {
-  color: #425066;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.telemetry-item strong {
-  color: #172033;
-  font-size: 17px;
-  font-weight: 750;
-}
-
-.telemetry-item small {
-  color: #627084;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
 .panel-note {
   display: grid;
   gap: 6px;

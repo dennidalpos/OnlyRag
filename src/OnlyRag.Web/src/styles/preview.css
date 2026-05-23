@@ -290,10 +290,6 @@
     grid-template-columns: 1fr;
   }
 
-  .telemetry-grid {
-    grid-template-columns: 1fr;
-  }
-
   .modal-backdrop {
     padding: 12px;
   }
@@ -322,4 +318,3 @@
     overflow-x: hidden;
   }
 }
-
