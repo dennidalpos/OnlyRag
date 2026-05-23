@@ -6,7 +6,6 @@ namespace OnlyRag.Api;
 public sealed class OcrStartupAnalysisService
 {
     private const long MinimumOcrProvisionDiskBytes = 2L * 1024L * 1024L * 1024L;
-    private static readonly int[] SupportedOcrPythonMinors = [13, 12, 11, 10];
 
     private readonly ILocalProcessLauncher processLauncher;
     private readonly OcrProvisionRuntimeResolver ocrRuntimeResolver;
@@ -100,8 +99,8 @@ public sealed class OcrStartupAnalysisService
                 continue;
             }
 
-            Version? version = DependencyProvisioningService.ParsePythonVersion(GetProcessVersionText(result));
-            if (version is not null && DependencyProvisioningService.IsSupportedOcrPythonVersion(version))
+            Version? version = OcrPythonRuntime.ParseVersion(OcrPythonRuntime.GetVersionText(result));
+            if (version is not null && OcrPythonRuntime.IsSupportedVersion(version))
             {
                 return true;
             }
@@ -126,22 +125,7 @@ public sealed class OcrStartupAnalysisService
 
     private static IEnumerable<OcrPythonCommand> ResolvePythonCandidates()
     {
-        string? python = DependencyProvisioningService.ResolveExecutable("python");
-        if (python is not null)
-        {
-            yield return new OcrPythonCommand(python, []);
-        }
-
-        string? py = DependencyProvisioningService.ResolveExecutable("py");
-        if (py is null)
-        {
-            yield break;
-        }
-
-        foreach (int minor in SupportedOcrPythonMinors)
-        {
-            yield return new OcrPythonCommand(py, [$"-3.{minor}"]);
-        }
+        return OcrPythonRuntime.ResolveCandidates(DependencyProvisioningService.ResolveExecutable);
     }
 
     private static long GetProvisioningDriveAvailableBytes()
@@ -160,18 +144,4 @@ public sealed class OcrStartupAnalysisService
         }
     }
 
-    private static string GetProcessVersionText(LocalProcessResult result)
-    {
-        return (string.IsNullOrWhiteSpace(result.StandardOutput)
-            ? result.StandardError
-            : result.StandardOutput).Trim();
-    }
-
-    private sealed record OcrPythonCommand(string FileName, IReadOnlyList<string> PrefixArguments)
-    {
-        public string[] WithArguments(IReadOnlyList<string> arguments)
-        {
-            return [.. PrefixArguments, .. arguments];
-        }
-    }
 }

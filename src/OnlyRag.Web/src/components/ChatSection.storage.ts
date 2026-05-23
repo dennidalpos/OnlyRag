@@ -4,6 +4,7 @@ import {
   removeStorageItem,
   writeBoundedStorageItem
 } from "../storage/webViewStorage";
+import { clampNumber } from "../numberUtils";
 
 const chatDraftStorageKey = "onlyrag.chat.draft";
 const chatSessionStorageKey = "onlyrag.chat.session";
@@ -251,5 +252,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+  return clampNumber(value, min, max);
 }

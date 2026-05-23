@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 
@@ -7,7 +6,6 @@ namespace OnlyRag.Api;
 public sealed partial class DependencyProvisioningService
 {
     private static readonly TimeSpan DefaultOcrProvisionTimeout = TimeSpan.FromMinutes(45);
-    private static readonly int[] SupportedOcrPythonMinors = [13, 12, 11, 10];
     private readonly OcrProvisionRuntimeResolver ocrRuntimeResolver;
     private readonly Func<string, string?> executableResolver;
     private readonly string? ocrScriptsRootOverride;
@@ -160,7 +158,7 @@ public sealed partial class DependencyProvisioningService
                     ["--version"],
                     null,
                     cancellationToken);
-                string venvVersionText = GetProcessVersionText(venvVersionResult);
+                string venvVersionText = OcrPythonRuntime.GetVersionText(venvVersionResult);
                 Version? venvVersion = ParsePythonVersion(venvVersionText);
                 if (venvVersionResult.ExitCode != 0 || venvVersion is null || !IsSupportedOcrPythonVersion(venvVersion))
                 {
@@ -240,21 +238,8 @@ public sealed partial class DependencyProvisioningService
 
     private async Task<OcrPythonCommand> ResolveOcrPythonCommandAsync(CancellationToken cancellationToken)
     {
-        List<OcrPythonCommand> candidates = [];
-        string? python = executableResolver("python");
-        if (python is not null)
-        {
-            candidates.Add(new OcrPythonCommand(python, []));
-        }
-
-        string? py = executableResolver("py");
-        if (py is not null)
-        {
-            candidates.AddRange(SupportedOcrPythonMinors.Select(minor => new OcrPythonCommand(py, [$"-3.{minor}"])));
-        }
-
         List<string> unsupported = [];
-        foreach (OcrPythonCommand candidate in candidates)
+        foreach (OcrPythonCommand candidate in OcrPythonRuntime.ResolveCandidates(executableResolver))
         {
             LocalProcessResult result = await processLauncher.RunAsync(
                 candidate.FileName,
@@ -266,7 +251,7 @@ public sealed partial class DependencyProvisioningService
                 continue;
             }
 
-            string versionText = GetProcessVersionText(result);
+            string versionText = OcrPythonRuntime.GetVersionText(result);
             Version? version = ParsePythonVersion(versionText);
             if (version is null)
             {
@@ -352,29 +337,11 @@ public sealed partial class DependencyProvisioningService
 
     internal static Version? ParsePythonVersion(string text)
     {
-        Match match = Regex.Match(text, @"(\d+)\.(\d+)\.(\d+)");
-        return match.Success
-            ? new Version(int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value))
-            : null;
-    }
-
-    private static string GetProcessVersionText(LocalProcessResult result)
-    {
-        return (string.IsNullOrWhiteSpace(result.StandardOutput)
-            ? result.StandardError
-            : result.StandardOutput).Trim();
+        return OcrPythonRuntime.ParseVersion(text);
     }
 
     internal static bool IsSupportedOcrPythonVersion(Version version)
     {
-        return version.Major == 3 && version.Minor >= 10 && version.Minor <= 13;
-    }
-
-    private sealed record OcrPythonCommand(string FileName, IReadOnlyList<string> PrefixArguments)
-    {
-        public string[] WithArguments(IReadOnlyList<string> arguments)
-        {
-            return [.. PrefixArguments, .. arguments];
-        }
+        return OcrPythonRuntime.IsSupportedVersion(version);
     }
 }

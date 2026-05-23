@@ -8,6 +8,7 @@ import type {
   PerformanceProfile,
   PerformanceSettings
 } from "../api";
+import { clampNumber } from "../numberUtils";
 export {
   AdjustableModelContextBar,
   OcrFieldLabel,
@@ -264,14 +265,6 @@ export function buildContextChunkRecommendation(numCtx: number | null): number |
   }
 
   return clampNumber(Math.round(numCtx / 1024), 1, 24);
-}
-
-export function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-
-  return Math.min(max, Math.max(min, value));
 }
 
 

@@ -1,5 +1,7 @@
+import { clampNumber } from "../numberUtils";
+
 export function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+  return clampNumber(value, min, max);
 }
 
 export function getMaxDocumentsPanelWidth(
