@@ -130,7 +130,9 @@ function Test-OcrPinnedPackageSet {
     param(
         [Parameter(Mandatory)]
         [string]$PythonPath,
-        [object]$Manifest
+        [object]$Manifest,
+        [Parameter(Mandatory)]
+        [object]$RuntimeSelection
     )
 
     if (-not $Manifest -or -not $Manifest.packages) {
@@ -138,7 +140,24 @@ function Test-OcrPinnedPackageSet {
     }
 
     $verifyScript = Join-Path (Split-Path -Parent $PythonPath) "onlyrag_verify_ocr_runtime.py"
-    $packagesJson = ($Manifest.packages | ConvertTo-Json -Compress)
+    $packages = @(
+        $Manifest.packages |
+            Where-Object { $_.name -ne "paddlepaddle" -and $_.name -ne "paddlepaddle-gpu" }
+    )
+    $packages += [pscustomobject]@{
+        name = $RuntimeSelection.PaddlePackage
+        version = $RuntimeSelection.PaddleVersion
+        importName = "paddle"
+    }
+    if ($RuntimeSelection.CudnnPackage) {
+        $packages += [pscustomobject]@{
+            name = $RuntimeSelection.CudnnPackage
+            version = $RuntimeSelection.CudnnVersion
+            importName = $null
+        }
+    }
+
+    $packagesJson = ($packages | ConvertTo-Json -Compress)
     $python = @"
 import importlib
 import importlib.metadata
@@ -150,7 +169,7 @@ failures = []
 for package in packages:
     name = package["name"]
     expected = package["version"]
-    import_name = package["importName"]
+    import_name = package.get("importName")
     try:
         actual = importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
@@ -159,7 +178,8 @@ for package in packages:
     if actual != expected:
         failures.append(f"{name} expected {expected}, found {actual}")
     try:
-        importlib.import_module(import_name)
+        if import_name:
+            importlib.import_module(import_name)
     except Exception as exc:
         failures.append(f"{import_name} import failed: {exc}")
 
@@ -171,12 +191,27 @@ print("OCR runtime packages verified.")
 "@
     [System.IO.File]::WriteAllText($verifyScript, $python)
     try {
-        Invoke-Native -FilePath $PythonPath -Arguments @($verifyScript)
-        Add-Verified "OCR package versions and imports match scripts\ocr\runtime-manifest.json."
+        Invoke-OcrNativeCaptured -FilePath $PythonPath -Arguments @($verifyScript) -Quiet | Out-Null
+        Add-Verified "OCR $($RuntimeSelection.RuntimeName) package versions and imports match scripts\ocr\runtime-manifest.json."
         Invoke-Native -FilePath $PythonPath -Arguments @("-m", "pip", "check")
         Add-Verified "OCR Python dependency graph passed pip check."
-        Invoke-Native -FilePath $PythonPath -Arguments @($ocrBridgePath, "--mode", "check")
-        Add-Verified "OCR bridge check completed with pinned runtime."
+        $bridgeOutput = Invoke-OcrNativeCaptured -FilePath $PythonPath -Arguments @($ocrBridgePath, "--mode", "check", "--device", $RuntimeSelection.Device) -Quiet
+        $bridgeJson = @($bridgeOutput -split "(`r`n|`n|`r)" | Where-Object { $_.TrimStart().StartsWith("{") } | Select-Object -First 1)
+        if ($bridgeJson.Count -eq 0) {
+            throw "OCR bridge check did not return JSON."
+        }
+
+        $bridgeStatus = $bridgeJson[0] | ConvertFrom-Json
+        if (-not $bridgeStatus.available) {
+            throw "OCR bridge check failed: $($bridgeStatus.message)"
+        }
+
+        if ($RuntimeSelection.Device -eq "gpu" -and (-not $bridgeStatus.compiledWithCuda -or $bridgeStatus.cudaDeviceCount -lt 1)) {
+            throw "OCR GPU bridge check did not report CUDA support."
+        }
+
+        $activeDevice = if ($bridgeStatus.activeDevice) { [string]$bridgeStatus.activeDevice } else { $RuntimeSelection.Device }
+        Add-Verified "OCR bridge check completed with pinned $($RuntimeSelection.RuntimeName) runtime on $activeDevice."
     }
     finally {
         Remove-Item -LiteralPath $verifyScript -Force -ErrorAction SilentlyContinue
@@ -197,6 +232,12 @@ function Ensure-OcrEnvironment {
 
     $ocrManifest = Get-OcrRuntimeManifest
     Test-OcrDiskSpace -Manifest $ocrManifest
+    $runtimeSelection = Get-OcrNvidiaRuntimeSelection -Manifest $ocrManifest
+    if (-not (Test-Path -LiteralPath $runtimeSelection.RequirementsPath -PathType Leaf)) {
+        Add-Warning "OCR requirements $($runtimeSelection.RequirementsFile) not found. Falling back to scripts\ocr\requirements.txt."
+        $runtimeSelection = Get-OcrCpuRuntimeSelection -Manifest $ocrManifest -Detail "Runtime OCR CPU selezionato per fallback requirements."
+    }
+    Add-Verified "OCR runtime selected: $($runtimeSelection.RuntimeName). $($runtimeSelection.Detail)"
 
     $pythonCommand = Get-OcrPythonCommand
     if (-not $pythonCommand) {
@@ -236,30 +277,50 @@ function Ensure-OcrEnvironment {
             Add-Verified "OCR Python virtual environment already present at $venvPath."
         }
 
-        Invoke-Native -FilePath $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check")
+        Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check") -Quiet | Out-Null
 
         # Upgrade OCR packages only when OCR requirement files changed; otherwise just install missing.
         $requirementsStamp = Join-Path $venvPath ".requirements-stamp"
         $requirementsChanged = $true
-        $requirementFiles = Get-ChildItem -LiteralPath (Split-Path -Parent $ocrRequirementsPath) -Filter "requirements*.txt" -File
+        $previousRuntimeName = $null
+        $previousRequirementsFile = $null
+        $requirementFiles = Get-ChildItem -LiteralPath (Split-Path -Parent $runtimeSelection.RequirementsPath) -Filter "requirements*.txt" -File
         if (Test-Path -LiteralPath $requirementsStamp) {
             $stampMtime = (Get-Item $requirementsStamp).LastWriteTimeUtc
             $reqMtime = ($requirementFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
             $requirementsChanged = $reqMtime -gt $stampMtime
+            try {
+                $stamp = Get-Content -Raw -LiteralPath $requirementsStamp | ConvertFrom-Json
+                $previousRuntimeName = $stamp.runtimeName
+                $previousRequirementsFile = $stamp.requirementsFile
+            }
+            catch {
+                $requirementsChanged = $true
+            }
+        }
+
+        $runtimeChanged = $previousRuntimeName -ne $runtimeSelection.RuntimeName -or $previousRequirementsFile -ne $runtimeSelection.RequirementsFile
+        if ($runtimeChanged) {
+            Add-Verified "OCR runtime package set changed to $($runtimeSelection.RuntimeName); removing stale PaddlePaddle packages before install."
+            Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu") -Quiet | Out-Null
         }
 
         if ($requirementsChanged) {
-            Write-Host "  requirements.txt changed — upgrading OCR packages..." -ForegroundColor Cyan
-            Invoke-Native -FilePath $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "-r", $ocrRequirementsPath, "--disable-pip-version-check")
+            Write-Host "  $($runtimeSelection.RequirementsFile) changed - upgrading OCR $($runtimeSelection.RuntimeName) packages..." -ForegroundColor Cyan
+            Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "-r", $runtimeSelection.RequirementsPath, "--disable-pip-version-check") -Quiet | Out-Null
         }
         else {
-            Write-Host "  requirements.txt unchanged — installing missing OCR packages only..." -ForegroundColor DarkGray
-            Invoke-Native -FilePath $venvPython -Arguments @("-m", "pip", "install", "-r", $ocrRequirementsPath, "--disable-pip-version-check")
+            Write-Host "  $($runtimeSelection.RequirementsFile) unchanged - installing missing OCR $($runtimeSelection.RuntimeName) packages only..." -ForegroundColor DarkGray
+            Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "install", "-r", $runtimeSelection.RequirementsPath, "--disable-pip-version-check") -Quiet | Out-Null
         }
-        (Get-Item $ocrRequirementsPath).LastWriteTimeUtc | Out-Null
-        [System.IO.File]::WriteAllText($requirementsStamp, (Get-Date -Format 'o'))
-        Add-Installed "OCR Python packages prepared from scripts\ocr\requirements.txt."
-        Test-OcrPinnedPackageSet -PythonPath $venvPython -Manifest $ocrManifest
+        $stampPayload = [pscustomobject]@{
+            runtimeName = $runtimeSelection.RuntimeName
+            requirementsFile = $runtimeSelection.RequirementsFile
+            updatedAt = (Get-Date -Format 'o')
+        } | ConvertTo-Json -Compress
+        [System.IO.File]::WriteAllText($requirementsStamp, $stampPayload)
+        Add-Installed "OCR Python packages prepared for $($runtimeSelection.RuntimeName) from scripts\ocr\$($runtimeSelection.RequirementsFile)."
+        Test-OcrPinnedPackageSet -PythonPath $venvPython -Manifest $ocrManifest -RuntimeSelection $runtimeSelection
         Add-Manual "Set ONLYRAG_OCR_PYTHON=$venvPython only when running outside the default user profile."
         Add-Manual "PaddleOCR downloads models on first OCR use into the user profile cache; keep at least 5 GB free for packages and models."
     }

@@ -28,6 +28,7 @@ $script:Installed = [System.Collections.Generic.List[string]]::new()
 $script:Manual = [System.Collections.Generic.List[string]]::new()
 
 . (Join-Path $PSScriptRoot "support\BootstrapPrerequisites.Core.ps1")
+. (Join-Path $PSScriptRoot "support\BootstrapPrerequisites.OcrRuntime.ps1")
 . (Join-Path $PSScriptRoot "support\BootstrapPrerequisites.Ocr.ps1")
 
 Write-Host "OnlyRag Windows bootstrap" -ForegroundColor Cyan

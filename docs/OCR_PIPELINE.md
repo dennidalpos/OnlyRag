@@ -48,7 +48,7 @@ Bridge and prerequisites:
   reports a driver compatible with the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 PaddlePaddle GPU wheels;
   otherwise it installs CPU OCR and reports the fallback reason in Diagnostics. Provisioning removes both
   `paddlepaddle` and `paddlepaddle-gpu` before installing the selected wheel so CPU and GPU packages cannot mask each other.
-- Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup; use `-SkipOcr` to skip it.
+- Developer bootstrap: `scripts\Bootstrap-Prerequisites.ps1` can prepare the same local OCR environment during repository setup. It auto-selects the NVIDIA requirements when `nvidia-smi` reports a compatible driver, verifies the bridge on the selected device, and uses CPU as the fallback; use `-SkipOcr` to skip it.
 - Default OCR Python path: `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv\Scripts\python.exe`.
 - Override Python with `ONLYRAG_OCR_PYTHON`.
 - Override bridge path with `ONLYRAG_OCR_BRIDGE`.
