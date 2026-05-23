@@ -33,7 +33,7 @@ internal sealed class ApplicationShutdownService
     {
         IReadOnlyList<LocalJob> jobList = await jobs.ListAsync(cancellationToken: cancellationToken);
         LocalJob[] activeJobs = jobList
-            .Where(job => job.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused)
+            .Where(job => job.Status.IsActive())
             .ToArray();
 
         foreach (LocalJob job in activeJobs)
@@ -43,7 +43,7 @@ internal sealed class ApplicationShutdownService
         }
 
         string[] runningJobIds = activeJobs
-            .Where(job => job.Status is JobStatus.Running or JobStatus.Pausing)
+            .Where(job => job.Status.IsRunningOrPausing())
             .Select(job => job.Id)
             .ToArray();
         string[] unstoppedJobIds = await WaitForRunningJobsToStopAsync(

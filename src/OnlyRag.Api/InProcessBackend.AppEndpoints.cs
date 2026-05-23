@@ -25,8 +25,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             IReadOnlyList<LocalJob> jobList = await jobs.ListAsync(cancellationToken: cancellationToken);
-            int activeJobs = jobList.Count(job =>
-                job.Status is JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused);
+            int activeJobs = jobList.Count(job => job.Status.IsActive());
             OllamaSettings settings = await ollamaSettings.GetAsync(cancellationToken);
             PerformanceSettings performance = await performanceSettings.GetAsync(cancellationToken);
 
@@ -134,33 +133,15 @@ public static partial class InProcessBackend
             InProcessBackendDescriptor descriptor,
             ILocalProcessLauncher processLauncher) =>
         {
-            if (!request.Confirmed)
-            {
-                return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
-                    "confirmation_required");
-            }
-
-            try
-            {
-                Directory.CreateDirectory(descriptor.StoragePaths.LogsDirectory);
-                ProcessStartInfo startInfo = CreateExplorerStartInfo(descriptor.StoragePaths.LogsDirectory);
-                if (!processLauncher.TryStart(startInfo, out string? errorMessage))
-                {
-                    BackendLog.Write(
-                        descriptor.StoragePaths,
-                        $"Open logs folder failed [{httpContext.TraceIdentifier}]: {errorMessage ?? "Windows Explorer did not accept the request."}");
-                    return CreateUnexpectedErrorProblem("Cartella log non aperta", httpContext.TraceIdentifier);
-                }
-
-                return Results.Ok(new OperationMessageResponse("Cartella log aperta."));
-            }
-            catch (Exception ex)
-            {
-                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open logs folder failed.", ex);
-                return CreateUnexpectedErrorProblem("Cartella log non aperta", httpContext.TraceIdentifier);
-            }
+            return OpenConfirmedFolder(
+                httpContext,
+                request,
+                descriptor,
+                processLauncher,
+                descriptor.StoragePaths.LogsDirectory,
+                "Open logs folder",
+                "Cartella log aperta.",
+                "Cartella log non aperta");
         });
 
         app.MapPost("/api/documents/exports/open-folder", (
@@ -169,34 +150,55 @@ public static partial class InProcessBackend
             InProcessBackendDescriptor descriptor,
             ILocalProcessLauncher processLauncher) =>
         {
-            if (!request.Confirmed)
-            {
-                return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
-                    "confirmation_required");
-            }
-
-            try
-            {
-                Directory.CreateDirectory(descriptor.StoragePaths.DocumentExportsDirectory);
-                ProcessStartInfo startInfo = CreateExplorerStartInfo(descriptor.StoragePaths.DocumentExportsDirectory);
-                if (!processLauncher.TryStart(startInfo, out string? errorMessage))
-                {
-                    BackendLog.Write(
-                        descriptor.StoragePaths,
-                        $"Open exports folder failed [{httpContext.TraceIdentifier}]: {errorMessage ?? "Windows Explorer did not accept the request."}");
-                    return CreateUnexpectedErrorProblem("Cartella export non aperta", httpContext.TraceIdentifier);
-                }
-
-                return Results.Ok(new OperationMessageResponse("Cartella export aperta."));
-            }
-            catch (Exception ex)
-            {
-                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open exports folder failed.", ex);
-                return CreateUnexpectedErrorProblem("Cartella export non aperta", httpContext.TraceIdentifier);
-            }
+            return OpenConfirmedFolder(
+                httpContext,
+                request,
+                descriptor,
+                processLauncher,
+                descriptor.StoragePaths.DocumentExportsDirectory,
+                "Open exports folder",
+                "Cartella export aperta.",
+                "Cartella export non aperta");
         });
+    }
+
+    private static IResult OpenConfirmedFolder(
+        HttpContext httpContext,
+        ProcessLaunchRequest request,
+        InProcessBackendDescriptor descriptor,
+        ILocalProcessLauncher processLauncher,
+        string folderPath,
+        string operationName,
+        string successMessage,
+        string failureTitle)
+    {
+        if (!request.Confirmed)
+        {
+            return CreateBadRequestProblem(
+                "Conferma richiesta",
+                "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                "confirmation_required");
+        }
+
+        try
+        {
+            Directory.CreateDirectory(folderPath);
+            ProcessStartInfo startInfo = CreateExplorerStartInfo(folderPath);
+            if (!processLauncher.TryStart(startInfo, out string? errorMessage))
+            {
+                BackendLog.Write(
+                    descriptor.StoragePaths,
+                    $"{operationName} failed [{httpContext.TraceIdentifier}]: {errorMessage ?? "Windows Explorer did not accept the request."}");
+                return CreateUnexpectedErrorProblem(failureTitle, httpContext.TraceIdentifier);
+            }
+
+            return Results.Ok(new OperationMessageResponse(successMessage));
+        }
+        catch (Exception ex)
+        {
+            BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, $"{operationName} failed.", ex);
+            return CreateUnexpectedErrorProblem(failureTitle, httpContext.TraceIdentifier);
+        }
     }
 
     private static ProcessStartInfo CreateExplorerStartInfo(string folderPath)

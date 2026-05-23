@@ -213,6 +213,10 @@ The SQLite schema is initialized automatically at startup for a fresh database. 
 OnlyRag schema versions are upgraded in place at startup after creating a pre-migration backup under
 `%LOCALAPPDATA%\OnlyRag\data\backups`. Unsupported unversioned schemas are rejected instead of
 migrated, and there is no separate migration command.
+The same `onlyrag.db` stores documents, chunks, embeddings, settings, chat, translations, OCR cache,
+and the persistent local job queue. Fresh schemas include the current status constraints and the
+non-null document SHA-256 uniqueness index; migrations validate existing rows before adding the
+equivalent protections.
 
 The in-process backend requires a random per-session API token for every non-health `/api` request.
 The WPF shell injects this token into the trusted WebView bridge. Endpoints that launch local

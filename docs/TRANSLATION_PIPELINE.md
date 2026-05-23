@@ -33,8 +33,9 @@ Manual corrections:
 - `translation_units.manually_edited` is set when the user saves a correction.
 - `translation_units.layout_metadata_json` records the source extension, page number, page row id,
   unit index, and unit kind used by layout-aware export renderers.
-- Fresh SQLite schema initialization includes `machine_translated_text`, `translated_text`, and
-  `manually_edited`; this repository does not migrate existing translation data.
+- Fresh SQLite schema initialization includes `layout_metadata_json`, `machine_translated_text`,
+  `translated_text`, and `manually_edited`; supported older OnlyRag schemas are migrated in place
+  for the added translation-unit columns.
 
 Compare UI endpoints:
 

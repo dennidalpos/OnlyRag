@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { DocumentPageInfo, DocumentPreviewResponse, ImportedDocument } from "../api";
+import { formatFileSize } from "./DocumentsSection.formatting";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
 type Props = {
@@ -204,11 +205,4 @@ function PageOcrBadge({ page }: { page: DocumentPageInfo }) {
       : "page-ocr-badge";
   const label = isError ? "Errore OCR" : isOk ? (page.ocrConfidence != null ? `OCR ${Math.round(page.ocrConfidence * 100)}%` : "OCR ✓") : page.ocrStatus;
   return <span className={className}>{label}</span>;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }

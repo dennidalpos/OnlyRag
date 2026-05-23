@@ -1,14 +1,14 @@
-# APP_FLOW.md
+# Application Flow
 
-Audit del flusso reale ricostruito dal codice, non dal README.
+Flusso operativo ricostruito dal codice corrente. Questo documento descrive il comportamento
+implementato; backlog e rischi residui restano in `PROJECT_STATUS.json`.
 
 ## Schema alto livello
 
 OnlyRag e una app desktop Windows WPF che avvia un backend ASP.NET Core Minimal API in-process su loopback. La UI React/Vite viene caricata dentro WebView2: in Debug puo usare Vite su `127.0.0.1:5173`, altrimenti usa asset statici mappati su `https://app.onlyrag.local`. Il backend protegge quasi tutte le API `/api/*` con token di sessione generato all'avvio e iniettato nella pagina WebView.
 
 Persistenza locale:
-- database documenti, settings, chat, OCR cache e traduzioni: SQLite `onlyrag.db`;
-- coda job: SQLite `jobs.db`;
+- database documenti, settings, chat, OCR cache, traduzioni e job: SQLite `onlyrag.db`;
 - file originali/render/export/log/temp sotto `%LOCALAPPDATA%\OnlyRag`;
 - vettori embedding in SQLite con `sqlite-vec`.
 
@@ -25,7 +25,7 @@ flowchart TD
     A["Avvio WPF App"] --> B["Start InProcessBackend"]
     B --> C["Crea directory LocalAppData"]
     C --> D["Migra SQLite onlyrag.db"]
-    D --> E["Recover Running jobs -> Pending"]
+    D --> E["Recover Running/Pausing jobs -> Pending"]
     E --> F["Verifica sqlite-vec"]
     F --> G["Kestrel loopback + token sessione"]
     G --> H["WebView2 inject window.__ONLYRAG_BACKEND__"]
@@ -72,7 +72,7 @@ Import:
 2. `InProcessBackend.DocumentEndpoints` valida content type, dimensioni e batch.
 3. `LocalDocumentLibraryService.ImportAsync` normalizza nome/estensione, copia stream in file temporaneo, calcola SHA-256, controlla deduplica, sposta in `documents/originals`.
 4. `SqliteDocumentRepository` crea `documents`.
-5. `SqliteLocalJobQueue` crea `jobs`.
+5. `SqliteLocalJobQueue` crea una riga nella tabella `jobs` dello stesso database locale.
 6. Worker esegue `DocumentIngestionJobHandler`.
 7. `DocumentIngestionService` estrae testo o chiama OCR/conversione, salva `document_pages` e `chunks`.
 8. Se embedding model presente, `DocumentEmbeddingJobHandler` chiama Ollama `/api/embed` e salva `embeddings`.
@@ -105,20 +105,20 @@ Traduzione:
 
 Punti fragili:
 - Un XSS nella UI o una pagina dev server con bridge iniettato avrebbe token completo.
-- Le azioni di provisioning possono avviare processi locali se il token e disponibile.
+- Le azioni confermate di provisioning OCR e apertura cartelle possono avviare processi locali se il token e disponibile.
 
 ## Flusso persistenza/database
 
 - `LocalSqliteMigrator` crea/migra schema.
 - `LocalSqliteConnectionFactory` abilita WAL, foreign_keys e busy_timeout.
-- `documents` punta a file fisico `original_path`.
+- `documents` punta a file fisico `original_path` e usa `document_uid` univoco.
 - `document_pages`, `chunks`, `embeddings`, `translations`, `translation_units`, `chat_messages`, `settings`, `ocr_cache` vivono nello stesso DB.
-- `jobs` vive in coda SQLite dedicata.
-- La coda usa stati stringa: Pending, Running, Completed, Failed, Cancelled, Paused.
+- `jobs` vive nello stesso DB e rappresenta la coda locale persistente.
+- `documents.sha256` e protetto da indice univoco quando il valore non e null; la migrazione rifiuta database con duplicati esistenti.
+- `jobs.status`, `translations.status` e `translation_units.status` sono validati da `CHECK` sullo schema fresco e da trigger sui database migrati.
+- La coda usa stati stringa: Pending, Running, Pausing, Completed, Failed, Cancelled, Paused.
 
 Punti fragili:
-- `sha256` documento non e unique.
-- Stati DB sono TEXT senza CHECK.
 - Coerenza DB/filesystem dipende dal codice applicativo.
 - Job pause/resume ha race tra DB status e token cancellation.
 
@@ -144,6 +144,7 @@ Documenti:
 Job:
 - Pending
 - Running
+- Pausing
 - Completed
 - Failed
 - Cancelled
@@ -184,9 +185,8 @@ Ollama:
 ## Punti fragili del flusso
 
 - Pausa/ripresa job non e atomicamente coordinata con il worker.
-- Deduplica documento non e protetta da vincolo DB.
-- OCR bridge puo bloccarsi su I/O processo.
-- Provisioning OCR/Ollama avvia processi esterni con controllo limitato.
+- Coerenza fra record DB e file originali/render/export resta affidata al codice applicativo e alle compensazioni dei job.
+- Provisioning OCR resta un processo esterno lungo senza pulsante di annullamento user-facing una volta avviato.
 - La UI puo diventare stale per catch silenziosi nei polling.
 - Non esiste contratto API generato.
 - I test frontend unit/component e smoke E2E esistono, ma la verifica popolata WPF/WebView/Ollama/OCR con dati reali resta fuori dal gate automatico.

@@ -18,6 +18,8 @@ product-facing and concise; keep operational and implementation details here.
 
 ## Pipeline Notes
 
+- [Application flow](APP_FLOW.md): current WPF, WebView2, backend, persistence, job, and shutdown
+  flow reconstructed from the implemented code.
 - [Application flow diagram](APP_FLOW.drawio): editable draw.io diagram with runtime architecture
   and main product flows.
 - [RAG pipeline](RAG_PIPELINE.md): ingestion, embeddings, sqlite-vec retrieval, chat behavior, and
