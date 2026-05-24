@@ -198,6 +198,15 @@ function detectSetupIssues(
       action: "configure-ocr",
       actionLabel: "Riprova OCR"
     });
+  } else if (ocrProvisionStatus && isRepairableOcrRuntimeStatus(ocrProvisionStatus)) {
+    issues.push({
+      key: "ocr",
+      title: "Runtime OCR da riparare",
+      detail: ocrProvisionStatus.message,
+      badge: ocrProvisionStatus.resolvedRuntime,
+      action: "configure-ocr",
+      actionLabel: "Ripara OCR"
+    });
   } else if (ocrAnalysis?.shouldPrompt && !hasVerifiedOcrRuntime) {
     issues.push({
       key: "ocr",
@@ -235,6 +244,10 @@ function isFailedOcrProvisionStatus(status: OcrProvisionStatus): boolean {
   return Boolean(status.lastError)
     || status.resolvedRuntime === "cancelled"
     || status.message.startsWith("Configurazione OCR non completata");
+}
+
+function isRepairableOcrRuntimeStatus(status: OcrProvisionStatus): boolean {
+  return status.message.startsWith("Runtime OCR locale incompleto o danneggiato.");
 }
 
 function formatSetupTime(value: Date | null): string {

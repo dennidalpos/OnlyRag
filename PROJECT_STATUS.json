@@ -1,14 +1,14 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T00:03:02+02:00",
-  "active_objective": "Verifica prerequisiti OCR a ogni apertura/riattivazione app completata.",
+  "last_updated": "2026-05-25T00:26:14+02:00",
+  "active_objective": "Prompt iniziale OCR coerente per runtime PaddleOCR riparabile.",
   "current_tasks": [],
   "blockers": [],
   "risks": [],
   "decisions": [
     "Il wizard OCR usa lo stato verificato /api/dependencies/ocr come fonte autoritativa quando startup-analysis e lo stato non sono allineati.",
-    "La UI riesegue i controlli iniziali quando il WebView torna attivo o visibile, cosi i prerequisiti vengono rivalutati anche se la finestra viene riaperta senza ricreare la pagina.",
+    "I messaggi OCR riparabili sono presentati come riparazione runtime invece che come generica configurazione mancante.",
     "InitialSetupWizard.tsx resta sopra la soglia review required, ma non e stato diviso per mantenere la correzione OCR circoscritta."
   ],
   "quality_gates": {
@@ -20,5 +20,5 @@
     "repository_gate": "passed",
     "structure_review": "passed"
   },
-  "last_completed_work": "Corretto il wizard iniziale OCR e aggiunta la rivalutazione automatica dei prerequisiti quando l'app torna attiva."
+  "last_completed_work": "Allineato il prompt iniziale OCR ai casi di runtime PaddleOCR incompleto o danneggiato."
 }

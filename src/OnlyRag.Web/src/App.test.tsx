@@ -79,6 +79,71 @@ describe("App initial setup", () => {
     });
   });
 
+  it("shows a repair action for a damaged OCR runtime in the startup wizard", async () => {
+    const api = mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings() },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: true,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 143.5 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 2 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: false,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "Runtime OCR da riparare",
+          message:
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: false,
+          isRunning: false,
+          message:
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      },
+      {
+        path: "/api/dependencies/ocr/provision",
+        method: "POST",
+        response: { started: true, message: "Configurazione OCR avviata." }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByText("Runtime OCR da riparare")).toBeInTheDocument();
+    expect(screen.getByText(/Runtime OCR locale incompleto o danneggiato/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ripara OCR" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ripara OCR" }));
+
+    await waitFor(() => {
+      const provisionCall = api.calls.find((call) => call.path === "/api/dependencies/ocr/provision");
+      expect(provisionCall).toBeDefined();
+      expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "auto" });
+    });
+  });
+
   it("auto-enables OCR GPU after the initial diagnostics report usable support", async () => {
     const api = mockApi([
       { path: "/api/app/status", response: createAppStatus() },

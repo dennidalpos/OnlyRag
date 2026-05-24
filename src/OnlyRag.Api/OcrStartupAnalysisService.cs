@@ -54,15 +54,20 @@ public sealed class OcrStartupAnalysisService
             : gpu.BlockReason ?? "PaddleOCR GPU non utilizzabile.");
 
         bool canProvision = isWindowsSupported && hasMinimumDiskSpace && hasCompatiblePython;
+        bool hasRepairableOcrRuntimeIssue = IsRepairableOcrRuntimeIssue(availability.Message);
         bool shouldPrompt = canProvision && !availability.IsConfigured;
         string recommendedTarget = OcrProvisionRuntimeResolver.AutoTarget;
         string title = shouldPrompt
-            ? "OCR non configurato in OnlyRag"
+            ? hasRepairableOcrRuntimeIssue
+                ? "Runtime OCR da riparare"
+                : "OCR non configurato in OnlyRag"
             : availability.IsConfigured
                 ? "OCR già configurato"
                 : "Configurazione OCR manuale richiesta";
         string message = shouldPrompt
-            ? "OnlyRag non vede ancora un runtime PaddleOCR funzionante. Premi Configura OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
+            ? hasRepairableOcrRuntimeIssue && !string.IsNullOrWhiteSpace(availability.Message)
+                ? availability.Message
+                : "OnlyRag non vede ancora un runtime PaddleOCR funzionante. Premi Configura OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
             : availability.IsConfigured
                 ? "Il runtime OCR locale è già disponibile."
                 : "Completa i prerequisiti indicati, poi configura OCR dalle Impostazioni.";
@@ -140,6 +145,13 @@ public sealed class OcrStartupAnalysisService
         {
             return 0;
         }
+    }
+
+    private static bool IsRepairableOcrRuntimeIssue(string? message)
+    {
+        return message?.StartsWith(
+            "Runtime OCR locale incompleto o danneggiato.",
+            StringComparison.OrdinalIgnoreCase) == true;
     }
 
 }
