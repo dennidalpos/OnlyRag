@@ -9,6 +9,7 @@ import {
 export function useOcrStartupPrompt() {
   const [analysis, setAnalysis] = useState<OcrStartupAnalysis | null>(null);
   const [provisionStatus, setProvisionStatus] = useState<OcrProvisionStatus | null>(null);
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [isConfiguring, setIsConfiguring] = useState(false);
 
   async function refresh() {
@@ -18,6 +19,7 @@ export function useOcrStartupPrompt() {
     ]);
     setAnalysis(analysisResult);
     setProvisionStatus(statusResult);
+    setLastCheckedAt(new Date());
   }
 
   async function configure() {
@@ -68,6 +70,7 @@ export function useOcrStartupPrompt() {
   return {
     analysis,
     provisionStatus,
+    lastCheckedAt,
     isConfiguring,
     refresh,
     configure,

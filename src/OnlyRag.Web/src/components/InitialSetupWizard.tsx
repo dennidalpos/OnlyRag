@@ -7,6 +7,7 @@ import type {
   OllamaSettings,
   OllamaStatusResponse
 } from "../api";
+import { ProgressBar } from "./ProgressBar";
 import { formatTelemetryBytes } from "./SettingsSection.formatting";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
@@ -17,6 +18,7 @@ type InitialSetupWizardProps = {
   ollamaModels: OllamaModel[];
   ocrAnalysis: OcrStartupAnalysis | null;
   ocrProvisionStatus: OcrProvisionStatus | null;
+  ocrLastCheckedAt: Date | null;
   isChecking: boolean;
   isConfiguringOcr: boolean;
   onOpenSettings: () => void;
@@ -30,6 +32,7 @@ type SetupIssue = {
   key: string;
   title: string;
   detail: string;
+  tone?: "warning" | "running" | "success";
   badge?: string;
   action?: "install-ollama" | "configure-ocr" | "cancel-ocr";
   actionLabel?: string;
@@ -45,6 +48,7 @@ export function InitialSetupWizard({
   ollamaModels,
   ocrAnalysis,
   ocrProvisionStatus,
+  ocrLastCheckedAt,
   isChecking,
   isConfiguringOcr,
   onOpenSettings,
@@ -62,10 +66,12 @@ export function InitialSetupWizard({
     ocrAnalysis,
     ocrProvisionStatus
   );
+  const statusItems = issues.length > 0 ? detectSetupStatusItems(ocrAnalysis, ocrProvisionStatus) : [];
+  const items = [...issues, ...statusItems];
 
-  useModalFocusTrap(modalRef, issues.length > 0);
+  useModalFocusTrap(modalRef, items.length > 0);
 
-  if (issues.length === 0) {
+  if (items.length === 0) {
     return null;
   }
 
@@ -81,17 +87,22 @@ export function InitialSetupWizard({
       >
         <div className="setup-wizard-header">
           <h2 id="setup-wizard-title">Configurazione iniziale richiesta</h2>
-          <span className="status-chip status-chip--muted">{issues.length} controlli</span>
+          <span className="status-chip status-chip--muted">{items.length} controlli</span>
         </div>
         <div className="setup-issue-list">
-          {issues.map((issue) => (
-            <article className="setup-issue" key={issue.key}>
+          {items.map((issue) => (
+            <article className={`setup-issue setup-issue--${issue.tone ?? "warning"}`} key={issue.key}>
               <div>
                 <div className="setup-issue__header">
                   <h3>{issue.title}</h3>
                   {issue.badge && <span className="status-chip status-chip--muted">{issue.badge}</span>}
                 </div>
                 <p>{issue.detail}</p>
+                {issue.isRunning && (
+                  <div className="setup-issue__progress">
+                    <ProgressBar label="Configurazione OCR in corso" value={0} indeterminate />
+                  </div>
+                )}
                 {issue.installCommand && <p>Pagina download: <code>{issue.installCommand}</code></p>}
                 {issue.networkAccessHint && <p>{issue.networkAccessHint}</p>}
                 {issue.key === "ocr" && ocrAnalysis && (
@@ -105,6 +116,17 @@ export function InitialSetupWizard({
                 )}
                 {issue.key === "ocr" && ocrProvisionStatus?.lastError && (
                   <p>{ocrProvisionStatus.lastError}</p>
+                )}
+                {issue.key === "ocr" && ocrProvisionStatus?.updatedAtUtc && (
+                  <p className="setup-issue__meta">
+                    Fase aggiornata: {formatSetupDateTime(ocrProvisionStatus.updatedAtUtc)}.
+                  </p>
+                )}
+                {issue.key === "ocr" && (
+                  <p className="setup-issue__meta">
+                    Ultima verifica: {formatSetupTime(ocrLastCheckedAt)}.
+                    {issue.isRunning ? " Aggiornamento automatico ogni 5 secondi." : ""}
+                  </p>
                 )}
               </div>
               {issue.action && (
@@ -161,10 +183,22 @@ function detectSetupIssues(
       key: "ocr",
       title: "Configurazione OCR in corso",
       detail: ocrProvisionStatus.message,
+      tone: "running",
       badge: ocrProvisionStatus.resolvedRuntime,
       action: "cancel-ocr",
       actionLabel: "Annulla OCR",
       isRunning: true
+    });
+  } else if (ocrProvisionStatus && isFailedOcrProvisionStatus(ocrProvisionStatus)) {
+    issues.push({
+      key: "ocr",
+      title: ocrProvisionStatus.resolvedRuntime === "cancelled"
+        ? "Configurazione OCR annullata"
+        : "Configurazione OCR non completata",
+      detail: ocrProvisionStatus.message,
+      badge: ocrProvisionStatus.resolvedRuntime,
+      action: "configure-ocr",
+      actionLabel: "Riprova OCR"
     });
   } else if (ocrAnalysis?.shouldPrompt) {
     issues.push({
@@ -178,6 +212,59 @@ function detectSetupIssues(
   }
 
   return issues;
+}
+
+function detectSetupStatusItems(
+  ocrAnalysis: OcrStartupAnalysis | null,
+  ocrProvisionStatus: OcrProvisionStatus | null
+): SetupIssue[] {
+  if (!ocrProvisionStatus?.isConfigured || ocrAnalysis?.shouldPrompt) {
+    return [];
+  }
+
+  return [
+    {
+      key: "ocr",
+      title: "OCR configurato",
+      detail: ocrProvisionStatus.message,
+      tone: "success",
+      badge: ocrProvisionStatus.resolvedRuntime
+    }
+  ];
+}
+
+function isFailedOcrProvisionStatus(status: OcrProvisionStatus): boolean {
+  return Boolean(status.lastError)
+    || status.resolvedRuntime === "cancelled"
+    || status.message.startsWith("Configurazione OCR non completata");
+}
+
+function formatSetupTime(value: Date | null): string {
+  if (!value) {
+    return "non ancora eseguita";
+  }
+
+  return value.toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function formatSetupDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 function detectOllamaIssue(

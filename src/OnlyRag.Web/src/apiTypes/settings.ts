@@ -127,6 +127,8 @@ export type OcrProvisionStatus = {
   runtimeTarget: string;
   resolvedRuntime: string;
   runtimeDetail: string | null;
+  startedAtUtc: string | null;
+  updatedAtUtc: string | null;
 };
 
 export type OcrStartupAnalysis = {

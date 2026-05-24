@@ -21,7 +21,9 @@ public sealed record OcrProvisionStatus(
     string? LastError,
     string RuntimeTarget = "auto",
     string ResolvedRuntime = "unknown",
-    string? RuntimeDetail = null);
+    string? RuntimeDetail = null,
+    DateTimeOffset? StartedAtUtc = null,
+    DateTimeOffset? UpdatedAtUtc = null);
 
 public sealed record OcrStartupAnalysisResponse(
     bool ShouldPrompt,

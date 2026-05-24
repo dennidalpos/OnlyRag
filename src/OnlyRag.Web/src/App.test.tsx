@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { mockApi } from "./test/apiMock";
 import {
@@ -10,6 +10,10 @@ import {
   createOllamaSettings,
   createOllamaStatus
 } from "./test/fixtures";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("App initial setup", () => {
   it("shows OCR setup in the startup wizard and starts confirmed provisioning", async () => {
@@ -48,7 +52,9 @@ describe("App initial setup", () => {
           lastError: null,
           runtimeTarget: "auto",
           resolvedRuntime: "cpu",
-          runtimeDetail: null
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
         }
       },
       {
@@ -129,7 +135,9 @@ describe("App initial setup", () => {
                 lastError: null,
                 runtimeTarget: "cpu",
                 resolvedRuntime: "cpu",
-                runtimeDetail: null
+                runtimeDetail: null,
+                startedAtUtc: "2026-05-24T14:00:00Z",
+                updatedAtUtc: "2026-05-24T14:03:00Z"
               }
             };
           }
@@ -142,7 +150,9 @@ describe("App initial setup", () => {
               lastError: null,
               runtimeTarget: "cpu",
               resolvedRuntime: "cpu",
-              runtimeDetail: null
+              runtimeDetail: provisionStarted ? "Installazione pacchetti PaddleOCR in corso." : null,
+              startedAtUtc: provisionStarted ? "2026-05-24T14:00:00Z" : null,
+              updatedAtUtc: provisionStarted ? "2026-05-24T14:01:00Z" : null
             }
           };
         }
@@ -163,12 +173,119 @@ describe("App initial setup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
     await flushPromises();
     expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
+    expect(screen.getByText(/Aggiornamento automatico ogni 5 secondi/)).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
 
     expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
+  });
+
+  it("shows the final OCR verification status when another startup check remains open", async () => {
+    vi.useFakeTimers();
+
+    const promptAnalysis = {
+      shouldPrompt: true,
+      isWindowsSupported: true,
+      hasMinimumDiskSpace: true,
+      availableDiskBytes: 240 * 1024 * 1024 * 1024,
+      requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+      hasCompatiblePython: true,
+      isOcrConfigured: false,
+      isNvidiaRuntimeAvailable: false,
+      isGpuUsable: false,
+      recommendedRuntimeTarget: "cpu",
+      title: "Configura OCR",
+      message: "Prepara il runtime OCR locale.",
+      findings: []
+    };
+    const configuredAnalysis = {
+      ...promptAnalysis,
+      shouldPrompt: false,
+      isOcrConfigured: true,
+      title: "",
+      message: ""
+    };
+    let provisionStarted = false;
+    let ocrStatusRequests = 0;
+
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings({ defaultChatModel: null }) },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        handler: () => ({
+          body: provisionStarted && ocrStatusRequests >= 2 ? configuredAnalysis : promptAnalysis
+        })
+      },
+      {
+        path: "/api/dependencies/ocr",
+        handler: () => {
+          ocrStatusRequests += 1;
+
+          if (provisionStarted && ocrStatusRequests >= 3) {
+            return {
+              body: {
+                isConfigured: true,
+                isRunning: false,
+                message: "OCR configurato: PaddleOCR 3.3.1.",
+                lastError: null,
+                runtimeTarget: "cpu",
+                resolvedRuntime: "cpu",
+                runtimeDetail: "Verifica OCR completata.",
+                startedAtUtc: "2026-05-24T14:00:00Z",
+                updatedAtUtc: "2026-05-24T14:04:00Z"
+              }
+            };
+          }
+
+          return {
+            body: {
+              isConfigured: false,
+              isRunning: provisionStarted,
+              message: provisionStarted ? "Installazione pacchetti PaddleOCR in corso." : "OCR non configurato.",
+              lastError: null,
+              runtimeTarget: "cpu",
+              resolvedRuntime: "cpu",
+              runtimeDetail: provisionStarted ? "Questa fase può durare diversi minuti." : null,
+              startedAtUtc: provisionStarted ? "2026-05-24T14:00:00Z" : null,
+              updatedAtUtc: provisionStarted ? "2026-05-24T14:02:00Z" : null
+            }
+          };
+        }
+      },
+      {
+        path: "/api/dependencies/ocr/provision",
+        method: "POST",
+        handler: () => {
+          provisionStarted = true;
+          return { body: { started: true, message: "Configurazione OCR avviata." } };
+        }
+      }
+    ]);
+
+    render(<App />);
+    await flushPromises();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    await flushPromises();
+    expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("OCR configurato")).toBeInTheDocument();
+    expect(screen.getByText("OCR configurato: PaddleOCR 3.3.1.")).toBeInTheDocument();
+    expect(screen.getByText("Verifica OCR completata.")).toBeInTheDocument();
+    expect(screen.getByText(/Ultima verifica:/)).toBeInTheDocument();
   });
 
   it("keeps Ollama download behind an explicit confirmed action", async () => {
@@ -207,7 +324,9 @@ describe("App initial setup", () => {
           lastError: null,
           runtimeTarget: "auto",
           resolvedRuntime: "configured",
-          runtimeDetail: null
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
         }
       },
       {

@@ -304,6 +304,7 @@ export default function App() {
           ollamaModels={ollamaModels}
           ocrAnalysis={ocrStartupPrompt.analysis}
           ocrProvisionStatus={ocrStartupPrompt.provisionStatus}
+          ocrLastCheckedAt={ocrStartupPrompt.lastCheckedAt}
           isChecking={isRecheckingOllama}
           isConfiguringOcr={ocrStartupPrompt.isConfiguring}
           onOpenSettings={() => setActiveSection("settings")}

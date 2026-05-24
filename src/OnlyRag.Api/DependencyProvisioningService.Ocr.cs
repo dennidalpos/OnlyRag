@@ -21,6 +21,7 @@ public sealed partial class DependencyProvisioningService
     private CancellationTokenSource? ocrProvisionCancellation;
     private bool ocrProvisionCancelRequested;
     private DateTimeOffset ocrProvisionDeadlineUtc;
+    private DateTimeOffset? ocrProvisionStartedAtUtc;
 
     public async Task<OcrProvisionStatus> GetOcrStatusAsync(
         IOcrEngine ocrEngine,
@@ -37,6 +38,12 @@ public sealed partial class DependencyProvisioningService
 
         OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
         OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+        OcrProvisionStatus recentStatus;
+        lock (syncRoot)
+        {
+            recentStatus = lastOcrProvisionStatus;
+        }
+
         if (availability.IsConfigured)
         {
             return new OcrProvisionStatus(
@@ -48,7 +55,18 @@ public sealed partial class DependencyProvisioningService
                 capability.IsUsable ? "gpu-usable" : "cpu",
                 capability.IsUsable
                     ? capability.RuntimeDetail
-                    : capability.BlockReason ?? availability.Message);
+                    : capability.BlockReason ?? availability.Message,
+                recentStatus.StartedAtUtc,
+                DateTimeOffset.UtcNow);
+        }
+
+        if (IsTerminalProvisionStatus(recentStatus))
+        {
+            return recentStatus with
+            {
+                IsConfigured = false,
+                IsRunning = false
+            };
         }
 
         string message = string.IsNullOrWhiteSpace(availability.Message)
@@ -56,7 +74,7 @@ public sealed partial class DependencyProvisioningService
             ? "OCR non configurato. Usa Configura OCR per preparare automaticamente le dipendenze locali."
             : availability.Message;
 
-        return new OcrProvisionStatus(false, false, message, null);
+        return new OcrProvisionStatus(false, false, message, null, UpdatedAtUtc: DateTimeOffset.UtcNow);
     }
 
     public DependencyActionResponse StartOcrProvision(string? runtimeTarget = null)
@@ -69,6 +87,8 @@ public sealed partial class DependencyProvisioningService
                 return new DependencyActionResponse(false, "Configurazione OCR già in corso.");
             }
 
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ocrProvisionStartedAtUtc = now;
             lastOcrProvisionStatus = new OcrProvisionStatus(
                 false,
                 true,
@@ -76,7 +96,9 @@ public sealed partial class DependencyProvisioningService
                 null,
                 normalizedTarget,
                 "resolving",
-                null);
+                "Preparazione avviata: OnlyRag sta scegliendo il runtime OCR compatibile.",
+                now,
+                now);
             ocrProvisionCancellation?.Dispose();
             ocrProvisionCancellation = new CancellationTokenSource(ocrProvisionTimeout);
             ocrProvisionCancelRequested = false;
@@ -102,7 +124,8 @@ public sealed partial class DependencyProvisioningService
             {
                 IsRunning = true,
                 Message = "Annullamento configurazione OCR richiesto. Arresto dei processi in corso...",
-                LastError = null
+                LastError = null,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
             };
             ocrProvisionCancellation.Cancel();
         }
@@ -134,15 +157,17 @@ public sealed partial class DependencyProvisioningService
                     $"Runtime OCR incompleto: {runtime.RequirementsFileName} non trovato.");
             }
 
-            SetLastOcrStatus(new OcrProvisionStatus(
-                false,
-                true,
-                $"Configurazione OCR runtime {runtime.ResolvedRuntime} in corso.",
-                null,
+            SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
+                "Runtime OCR selezionato.",
                 runtime.Detail));
 
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "Verifica interprete Python compatibile in corso.",
+                "OnlyRag cerca Python 3.10, 3.11, 3.12 o 3.13."));
             OcrPythonCommand python = await ResolveOcrPythonCommandAsync(cancellationToken);
 
             string installRoot = ResolveOcrInstallRoot();
@@ -169,6 +194,11 @@ public sealed partial class DependencyProvisioningService
 
             if (createVenv)
             {
+                SetLastOcrStatus(CreateRunningOcrStatus(
+                    runtimeTarget,
+                    runtime.ResolvedRuntime,
+                    "Creazione ambiente Python OCR in corso.",
+                    $"Cartella runtime: {installRoot}"));
                 await RunProcessAsync(
                     python.FileName,
                     python.WithArguments(["-m", "venv", venvPath]),
@@ -176,9 +206,31 @@ public sealed partial class DependencyProvisioningService
                     cancellationToken);
             }
 
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "Aggiornamento pip OCR in corso.",
+                "Fase breve prima dell'installazione dei pacchetti PaddleOCR."));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"], null, cancellationToken);
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "Pulizia vecchi pacchetti Paddle in corso.",
+                "OnlyRag rimuove runtime Paddle incompatibili prima di reinstallare quello corretto."));
             await RunProcessAsync(venvPython, ["-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu"], null, cancellationToken);
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "Installazione pacchetti PaddleOCR in corso.",
+                "Questa fase può durare diversi minuti e dipende da rete, pip e wheel disponibili."));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "-r", requirementsPath, "--disable-pip-version-check"], null, cancellationToken);
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "Verifica runtime OCR appena installato in corso.",
+                runtime.IsNvidia
+                    ? "OnlyRag controlla che PaddleOCR veda CUDA e la GPU."
+                    : "OnlyRag controlla che PaddleOCR CPU sia importabile e pronto."));
             await RunProcessAsync(venvPython, [bridgePath, "--mode", "check", "--device", runtime.IsNvidia ? "gpu" : "cpu"], null, cancellationToken);
 
             SetLastOcrStatus(new OcrProvisionStatus(
@@ -232,9 +284,37 @@ public sealed partial class DependencyProvisioningService
     {
         lock (syncRoot)
         {
-            lastOcrProvisionStatus = status;
+            lastOcrProvisionStatus = status with
+            {
+                StartedAtUtc = status.StartedAtUtc ?? ocrProvisionStartedAtUtc,
+                UpdatedAtUtc = status.UpdatedAtUtc ?? DateTimeOffset.UtcNow
+            };
         }
     }
+
+    private OcrProvisionStatus CreateRunningOcrStatus(
+        string runtimeTarget,
+        string resolvedRuntime,
+        string message,
+        string? runtimeDetail) =>
+        new(
+            false,
+            true,
+            message,
+            null,
+            runtimeTarget,
+            resolvedRuntime,
+            runtimeDetail,
+            ocrProvisionStartedAtUtc,
+            DateTimeOffset.UtcNow);
+
+    private static bool IsTerminalProvisionStatus(OcrProvisionStatus status) =>
+        !status.IsRunning
+        && (
+            !string.IsNullOrWhiteSpace(status.LastError)
+            || string.Equals(status.ResolvedRuntime, "cancelled", StringComparison.OrdinalIgnoreCase)
+            || status.Message.StartsWith("Configurazione OCR non completata", StringComparison.OrdinalIgnoreCase)
+        );
 
     private async Task<OcrPythonCommand> ResolveOcrPythonCommandAsync(CancellationToken cancellationToken)
     {
