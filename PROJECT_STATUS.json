@@ -2,7 +2,7 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "residual_tasks_complete",
-  "last_updated": "2026-05-24T19:44:15+02:00",
+  "last_updated": "2026-05-24T19:45:55+02:00",
   "production_target": true,
   "active_objective": "Feasible residual implementation and source-only cleanup are complete; signed release verification remains externally blocked.",
   "assumptions": [
@@ -17,6 +17,11 @@
       "task": "Provide trusted code-signing certificate and Windows SDK signtool.exe, then run signed release verification.",
       "status": "blocked",
       "blocked_by": "Trusted signing material is not available on this machine."
+    },
+    {
+      "priority": 9,
+      "task": "Review files above the repository review-size threshold before future edits; split only when responsibility mixing is confirmed or size crosses the split threshold.",
+      "status": "optional"
     }
   ],
   "blockers": [
@@ -29,10 +34,16 @@
   "oversized_files": [
     "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 468 lines; existing test file above review threshold but below split threshold.",
     "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 435 lines; existing action module above review threshold but below split threshold.",
+    "src\\OnlyRag.Api\\DependencyProvisioningService.Ocr.cs: 427 lines; existing OCR provisioning service above review threshold but below split threshold.",
     "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 427 lines; existing controller above review threshold but below split threshold.",
     "src\\OnlyRag.Web\\src\\components\\useTranslationSectionController.ts: 388 lines; existing controller above review threshold but below split threshold.",
+    "src\\OnlyRag.Infrastructure\\Retrieval\\HybridRetrievalService.cs: 386 lines; existing retrieval service above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\App.test.tsx: 375 lines; existing test file above review threshold but below split threshold.",
     "src\\OnlyRag.Web\\src\\components\\SettingsSection.dependencyActions.test.tsx: 373 lines; existing test file above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx: 371 lines; existing component above review threshold but below split threshold."
+    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx: 371 lines; existing component above review threshold but below split threshold.",
+    "src\\OnlyRag.Infrastructure\\Ocr\\PaddleOcrEngine.cs: 362 lines; existing OCR engine above review threshold but below split threshold.",
+    "src\\OnlyRag.Api\\TranslationExportService.cs: 356 lines; existing export service above review threshold but below split threshold.",
+    "src\\OnlyRag.Infrastructure\\Ingestion\\OfficeOpenXmlTextExtractor.cs: 356 lines; existing Office extractor above review threshold but below split threshold."
   ],
   "quality_gates": {
     "format": "passed",
@@ -61,5 +72,5 @@
       "Windows SDK signtool.exe for signing"
     ]
   },
-  "last_completed_work": "Split Settings controller model-detail loading and dirty-state calculation into focused hooks, fixed the empty-model loading reset, passed the canonical repository gate, and cleaned generated outputs while preserving installed dependencies."
+  "last_completed_work": "Analyzed repository residuals and updated the tracker with all current source files above the review-size threshold plus the optional follow-up policy for future edits."
 }
