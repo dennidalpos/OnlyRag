@@ -173,10 +173,7 @@ function detectSetupIssues(
 ): SetupIssue[] {
   const issues: SetupIssue[] = [];
 
-  const ollamaIssue = detectOllamaIssue(ollamaStatus, ollamaInstallStatus, ollamaSettings, ollamaModels);
-  if (ollamaIssue) {
-    issues.push(ollamaIssue);
-  }
+  issues.push(...detectOllamaIssues(ollamaStatus, ollamaInstallStatus, ollamaSettings, ollamaModels));
 
   if (ocrProvisionStatus?.isRunning) {
     issues.push({
@@ -267,14 +264,14 @@ function formatSetupDateTime(value: string): string {
   });
 }
 
-function detectOllamaIssue(
+function detectOllamaIssues(
   ollamaStatus: OllamaStatusResponse | null,
   ollamaInstallStatus: OllamaInstallStatus | null,
   ollamaSettings: OllamaSettings | null,
   ollamaModels: OllamaModel[]
-): SetupIssue | null {
+): SetupIssue[] {
   if (ollamaInstallStatus && !ollamaInstallStatus.cliInstalled) {
-    return {
+    return [{
       key: "ollama",
       title: "Ollama non installato",
       detail: "Installa Ollama manualmente per usare chat, embedding e traduzione con modelli locali.",
@@ -282,56 +279,83 @@ function detectOllamaIssue(
       actionLabel: "Apri download Ollama",
       installCommand: ollamaInstallStatus.installCommand,
       networkAccessHint: ollamaInstallStatus.networkAccessHint
-    };
+    }];
   }
 
   if (!ollamaStatus || !ollamaStatus.isReachable) {
-    return {
+    return [{
       key: "ollama",
       title: "Ollama non raggiungibile",
       detail: "Avvia Ollama e verifica l'indirizzo nelle Impostazioni.",
       networkAccessHint: ollamaInstallStatus?.networkAccessHint ?? null
-    };
+    }];
   }
 
   if (ollamaModels.length === 0) {
-    return {
+    return [{
       key: "models",
       title: "Nessun modello installato",
       detail:
         "Installa almeno un modello chat e un modello embedding in Ollama, poi selezionali nelle Impostazioni."
-    };
+    }];
   }
 
   const modelNames = new Set(ollamaModels.map((model) => model.name));
-  const chatModel = ollamaSettings?.defaultChatModel;
-  if (!chatModel) {
-    return {
+  return [
+    detectRequiredModelIssue({
       key: "chat-model",
-      title: "Modello chat non configurato",
-      detail: "Seleziona un modello da usare per la chat nelle Impostazioni."
-    };
-  }
-  if (!modelNames.has(chatModel)) {
+      modelName: ollamaSettings?.defaultChatModel,
+      modelNames,
+      missingTitle: "Modello chat non configurato",
+      missingDetail: "Seleziona un modello da usare per la chat nelle Impostazioni.",
+      unavailableTitlePrefix: "Modello chat non disponibile"
+    }),
+    detectRequiredModelIssue({
+      key: "embedding-model",
+      modelName: ollamaSettings?.defaultEmbeddingModel,
+      modelNames,
+      missingTitle: "Modello embedding non configurato",
+      missingDetail: "Seleziona un modello da usare per l'indicizzazione dei documenti nelle Impostazioni.",
+      unavailableTitlePrefix: "Modello embedding non disponibile"
+    }),
+    detectRequiredModelIssue({
+      key: "translation-model",
+      modelName: ollamaSettings?.defaultTranslationModel,
+      modelNames,
+      missingTitle: "Modello traduzione non configurato",
+      missingDetail: "Seleziona un modello da usare per la traduzione dei documenti nelle Impostazioni.",
+      unavailableTitlePrefix: "Modello traduzione non disponibile"
+    })
+  ].filter((issue): issue is SetupIssue => issue !== null);
+}
+
+function detectRequiredModelIssue({
+  key,
+  modelName,
+  modelNames,
+  missingTitle,
+  missingDetail,
+  unavailableTitlePrefix
+}: {
+  key: string;
+  modelName: string | null | undefined;
+  modelNames: Set<string>;
+  missingTitle: string;
+  missingDetail: string;
+  unavailableTitlePrefix: string;
+}): SetupIssue | null {
+  if (!modelName) {
     return {
-      key: "chat-model",
-      title: `Modello chat non disponibile: ${chatModel}`,
-      detail: "Installa il modello configurato oppure seleziona un modello diverso nelle Impostazioni."
+      key,
+      title: missingTitle,
+      detail: missingDetail
     };
   }
 
-  const embeddingModel = ollamaSettings?.defaultEmbeddingModel;
-  if (!embeddingModel) {
+  if (!modelNames.has(modelName)) {
     return {
-      key: "embedding-model",
-      title: "Modello embedding non configurato",
-      detail: "Seleziona un modello da usare per l'indicizzazione dei documenti nelle Impostazioni."
-    };
-  }
-  if (!modelNames.has(embeddingModel)) {
-    return {
-      key: "embedding-model",
-      title: `Modello embedding non disponibile: ${embeddingModel}`,
+      key,
+      title: `${unavailableTitlePrefix}: ${modelName}`,
       detail: "Installa il modello configurato oppure seleziona un modello diverso nelle Impostazioni."
     };
   }

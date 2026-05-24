@@ -57,8 +57,6 @@ Typography follows the app stack in `src\OnlyRag.Web\src\styles.css`: `"Segoe UI
 | Installer wizard small image | `assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp` | BMP `55x55` | `packaging\OnlyRag.iss` `WizardSmallImageFile`. |
 | App package metadata | `src\OnlyRag.App\OnlyRag.App.csproj` | MSBuild properties | Windows executable product, company, version, description, and project URL metadata. |
 | Web package metadata | `src\OnlyRag.Web\package.json` | npm package metadata | Private WebView shell package name, version, description, and homepage. |
-| Payhip listing copy | `assets\payhip\payhip-listing-it.md` | Markdown | Italian listing draft and screenshot ordering for the current Payhip asset folder. |
-| Payhip screenshots | `assets\payhip\Screenshot_1.png`, `Screenshot_2.png`, `Screenshot_3.png` | PNG | Current product listing screenshots. |
 
 OnlyRag does not currently expose light/dark brand-asset switching. The editable SVG and generated
 rasters are single-theme assets matched to the current app icon, installer artwork, and light UI.

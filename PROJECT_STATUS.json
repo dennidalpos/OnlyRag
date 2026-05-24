@@ -1,66 +1,34 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-24T22:59:40+02:00",
-  "active_objective": "Produrre AUDIT_TRACKER.md come unico report/tracker di audit, poi correggere i residui identificati su primo avvio, modelli e OCR GPU.",
-  "current_tasks": [
-    {
-      "priority": 1,
-      "task": "Creare AUDIT_TRACKER.md nella root, registrando preflight audit: git status, branch main, AUDIT_TRACKER assente, working tree gia sporca.",
-      "status": "todo"
-    },
-    {
-      "priority": 2,
-      "task": "Completare audit statico e tracker finding nel solo AUDIT_TRACKER.md, includendo almeno AUD-001 wizard senza modello traduzione, AUD-002 auto-enable OCR GPU solo al load iniziale, AUD-003 Settings senza refresh OCR settings post-provisioning, AUD-004 node_modules assente per check web, AUD-005 asset payhip/non_utilizzare.png da verificare.",
-      "status": "todo"
-    },
-    {
-      "priority": 3,
-      "task": "Validare solo AUDIT_TRACKER.md e git status; non modificare altri file durante l'audit.",
-      "status": "todo"
-    },
-    {
-      "priority": 4,
-      "task": "Correggere InitialSetupWizard per controllare a ogni avvio i modelli chat, embeddings e traduzione, distinguendo modello mancante da modello salvato non installato.",
-      "status": "todo"
-    },
-    {
-      "priority": 5,
-      "task": "Aggiornare il flusso post-provisioning OCR: wizard e Settings devono rileggere diagnostica/settings e applicare auto-enable GPU quando disponibile.",
-      "status": "todo"
-    },
-    {
-      "priority": 6,
-      "task": "Aggiungere test frontend per prerequisiti modelli iniziali e completamento OCR GPU senza refresh manuale.",
-      "status": "todo"
-    },
-    {
-      "priority": 7,
-      "task": "Eseguire verifiche mirate: web unit tests, typecheck e lint dopo ripristino dipendenze web.",
-      "status": "todo"
-    }
-  ],
-  "blockers": [
-    "I check web locali falliscono finche src\\OnlyRag.Web\\node_modules non viene ripristinato; npm ci non va eseguito automaticamente durante audit se richiede installazioni/rete."
-  ],
+  "last_updated": "2026-05-24T23:14:04+02:00",
+  "active_objective": "Audit tracker creato, residui frontend completati e riferimenti marketplace esterni rimossi dal repository.",
+  "current_tasks": [],
+  "blockers": [],
   "risks": [
-    "La working tree contiene molte modifiche preesistenti: evitare sovrascritture e attribuire solo le modifiche effettivamente fatte.",
     "La preferenza manuale CPU deve restare rispettata dall'endpoint auto-enable esistente.",
-    "Il controllo modelli richiesto e all'avvio app/WebView, non un monitor continuo."
+    "Gate non eseguiti in questo passaggio: test e2e Playwright, build web, build .NET e gate repository completo."
   ],
   "quality_gates": {
-    "audit_tracker_validation": "not_run",
-    "web_unit_tests": "not_run",
-    "web_typecheck": "not_run",
-    "web_lint": "not_run"
+    "npm_ci": "passed",
+    "npm_audit": "passed",
+    "audit_tracker_validation": "passed",
+    "web_format": "passed",
+    "web_unit_tests": "passed",
+    "web_typecheck": "passed",
+    "web_lint": "passed",
+    "external_marketplace_reference_search": "passed",
+    "structure_review": "passed"
   },
   "commands": {
     "audit_preflight": "git status --short; git branch --show-current; Test-Path AUDIT_TRACKER.md",
     "audit_validate": "Test-Path .\\AUDIT_TRACKER.md; Get-Content -Raw .\\AUDIT_TRACKER.md; git status --short",
     "web_unit_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit -- App SettingsSection.dependencyActions",
+    "web_unit_tests_full": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
+    "web_format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
     "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
     "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint"
   },
-  "last_completed_work": "",
-  "handoff_notes": "Ordine operativo: audit tracker prima, correzioni UI/OCR dopo. L'audit puo modificare solo AUDIT_TRACKER.md."
+  "last_completed_work": "Rimossi riferimenti e asset marketplace esterni; creato AUDIT_TRACKER.md, corretto il controllo dei tre modelli iniziali e aggiunto auto-enable OCR GPU dopo provisioning in wizard e Settings con test frontend dedicati.",
+  "handoff_notes": "Node dependencies ripristinate con npm ci; node_modules resta ignorato. Full repository gate ancora da eseguire prima di un rilascio."
 }

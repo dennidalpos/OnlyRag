@@ -7,6 +7,7 @@ import {
   type OfficeConversionSettings,
   type OfficeConverterStatusResponse,
   type OcrLanguage,
+  type OcrAutoGpuEnableResponse,
   type OcrProcessingSettings,
   type OcrProvisionRequest,
   type OcrProvisionStatus,
@@ -127,8 +128,10 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
       const normalizedOcr = normalizeOcrSettings(ocr);
       setOcrFormState(normalizedOcr);
       setSavedOcrFormState(normalizedOcr);
+      return normalizedOcr;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni OCR.");
+      return null;
     }
   }
 
@@ -147,10 +150,12 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
       const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
       setDiagnostics(data);
       setDiagnosticsStatus("ready");
+      return data;
     } catch {
       setDiagnostics(null);
       setDiagnosticsStatus("unavailable");
       // Diagnostics are non-critical; silence the error to avoid overwriting other messages.
+      return null;
     }
   }
 
@@ -162,9 +167,29 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
       ]);
       setOllamaInstallStatus(ollamaDependency);
       setOcrProvisionStatus(ocrDependency);
+      if (ocrDependency.isConfigured && !ocrDependency.isRunning) {
+        await refreshConfiguredOcrRuntime();
+      }
     } catch {
       // Dependency helpers are non-critical; the rest of Settings must remain usable.
     }
+  }
+
+  async function refreshConfiguredOcrRuntime() {
+    const diagnostics = await refreshDiagnostics();
+    if (diagnostics?.ocrGpuCapability.isUsable) {
+      const autoGpu = await apiRequest<OcrAutoGpuEnableResponse>("/api/settings/ocr/auto-enable-gpu", {
+        method: "POST"
+      }).catch(() => null);
+
+      if (autoGpu) {
+        const normalizedOcr = normalizeOcrSettings(autoGpu.settings);
+        setOcrFormState(normalizedOcr);
+        setSavedOcrFormState(normalizedOcr);
+      }
+    }
+
+    await refreshOcrSettings();
   }
 
   async function installOllama() {
