@@ -13,6 +13,7 @@ export {
   AdjustableModelContextBar,
   OcrFieldLabel,
   OcrRangeField,
+  OcrSelectField,
   SettingsRangeField
 } from "./SettingsSection.fields";
 export {

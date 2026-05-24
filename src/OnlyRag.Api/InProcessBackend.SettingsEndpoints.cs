@@ -144,21 +144,13 @@ public static partial class InProcessBackend
             IOfficeConversionService converter,
             OfficeConversionSettingsStore settings,
             CancellationToken cancellationToken) =>
-        {
-            OfficeConversionSettings currentSettings = await settings.GetAsync(cancellationToken);
-            OfficeConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
-            return Results.Ok(CreateOfficeConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds));
-        });
+            Results.Ok(await BuildOfficeConverterStatusAsync(converter, settings, cancellationToken)));
 
         app.MapPost("/api/office-converter/test", async (
             IOfficeConversionService converter,
             OfficeConversionSettingsStore settings,
             CancellationToken cancellationToken) =>
-        {
-            OfficeConversionSettings currentSettings = await settings.GetAsync(cancellationToken);
-            OfficeConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
-            return Results.Ok(CreateOfficeConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds));
-        });
+            Results.Ok(await BuildOfficeConverterStatusAsync(converter, settings, cancellationToken)));
 
         app.MapGet("/api/ollama/status", async (
             IOllamaClient ollamaClient,
@@ -223,69 +215,47 @@ public static partial class InProcessBackend
             IOllamaClient ollamaClient,
             IOllamaSettingsService settings,
             CancellationToken cancellationToken) =>
-        {
-            try
-            {
-                string modelName = OllamaSettingsService.NormalizeRequiredModelName(name);
-                await ollamaClient.DeleteModelAsync(modelName, cancellationToken);
-                await settings.ClearMissingDefaultModelAsync(modelName, cancellationToken);
-                return Results.Ok(new OperationMessageResponse($"Modello {modelName} rimosso."));
-            }
-            catch (OllamaApiException ex)
-            {
-                return MapOllamaException(ex, app.Services, "/api/ollama/models/{name}");
-            }
-        });
+            await DeleteOllamaModelAsync(
+                name,
+                ollamaClient,
+                settings,
+                app.Services,
+                "/api/ollama/models/{name}",
+                cancellationToken));
 
         app.MapDelete("/api/ollama/models", async (
             string name,
             IOllamaClient ollamaClient,
             IOllamaSettingsService settings,
             CancellationToken cancellationToken) =>
-        {
-            try
-            {
-                string modelName = OllamaSettingsService.NormalizeRequiredModelName(name);
-                await ollamaClient.DeleteModelAsync(modelName, cancellationToken);
-                await settings.ClearMissingDefaultModelAsync(modelName, cancellationToken);
-                return Results.Ok(new OperationMessageResponse($"Modello {modelName} rimosso."));
-            }
-            catch (OllamaApiException ex)
-            {
-                return MapOllamaException(ex, app.Services, "/api/ollama/models delete");
-            }
-        });
+            await DeleteOllamaModelAsync(
+                name,
+                ollamaClient,
+                settings,
+                app.Services,
+                "/api/ollama/models delete",
+                cancellationToken));
 
         app.MapGet("/api/ollama/models/{name}/details", async (
             string name,
             IOllamaClient ollamaClient,
             CancellationToken cancellationToken) =>
-        {
-            try
-            {
-                OllamaModelDetails details = await ollamaClient.ShowModelAsync(name, cancellationToken);
-                return Results.Ok(details);
-            }
-            catch (OllamaApiException ex)
-            {
-                return MapOllamaException(ex, app.Services, "/api/ollama/models/{name}/details");
-            }
-        });
+            await ShowOllamaModelDetailsAsync(
+                name,
+                ollamaClient,
+                app.Services,
+                "/api/ollama/models/{name}/details",
+                cancellationToken));
 
         app.MapGet("/api/ollama/models/details", async (
             string name,
             IOllamaClient ollamaClient,
             CancellationToken cancellationToken) =>
-        {
-            try
-            {
-                OllamaModelDetails details = await ollamaClient.ShowModelAsync(name, cancellationToken);
-                return Results.Ok(details);
-            }
-            catch (OllamaApiException ex)
-            {
-                return MapOllamaException(ex, app.Services, "/api/ollama/models/details");
-            }
-        });
+            await ShowOllamaModelDetailsAsync(
+                name,
+                ollamaClient,
+                app.Services,
+                "/api/ollama/models/details",
+                cancellationToken));
     }
 }

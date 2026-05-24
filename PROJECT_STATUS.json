@@ -1,34 +1,17 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-24T23:14:04+02:00",
-  "active_objective": "Audit tracker creato, residui frontend completati e riferimenti marketplace esterni rimossi dal repository.",
+  "last_updated": "2026-05-24T23:41:50+02:00",
+  "active_objective": "Residui UI/accessibilita e verifica repository completati.",
   "current_tasks": [],
   "blockers": [],
-  "risks": [
-    "La preferenza manuale CPU deve restare rispettata dall'endpoint auto-enable esistente.",
-    "Gate non eseguiti in questo passaggio: test e2e Playwright, build web, build .NET e gate repository completo."
+  "risks": [],
+  "decisions": [
+    "DependencyProvisioningService.Ocr.cs e stato rivalutato dopo il gate: 384 righe, sopra review required ma sotto split required; nessuno split eseguito per evitare refactor non necessario dopo gate verde."
   ],
   "quality_gates": {
-    "npm_ci": "passed",
-    "npm_audit": "passed",
-    "audit_tracker_validation": "passed",
-    "web_format": "passed",
-    "web_unit_tests": "passed",
-    "web_typecheck": "passed",
-    "web_lint": "passed",
-    "external_marketplace_reference_search": "passed",
-    "structure_review": "passed"
+    "web_e2e": "passed",
+    "repository_gate": "passed"
   },
-  "commands": {
-    "audit_preflight": "git status --short; git branch --show-current; Test-Path AUDIT_TRACKER.md",
-    "audit_validate": "Test-Path .\\AUDIT_TRACKER.md; Get-Content -Raw .\\AUDIT_TRACKER.md; git status --short",
-    "web_unit_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit -- App SettingsSection.dependencyActions",
-    "web_unit_tests_full": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
-    "web_format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
-    "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint"
-  },
-  "last_completed_work": "Rimossi riferimenti e asset marketplace esterni; creato AUDIT_TRACKER.md, corretto il controllo dei tre modelli iniziali e aggiunto auto-enable OCR GPU dopo provisioning in wizard e Settings con test frontend dedicati.",
-  "handoff_notes": "Node dependencies ripristinate con npm ci; node_modules resta ignorato. Full repository gate ancora da eseguire prima di un rilascio."
+  "last_completed_work": "Completati accessibilita OCR select, allineamento e2e, verifica Release e rivalutazione split OCR."
 }

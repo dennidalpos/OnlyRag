@@ -71,7 +71,7 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
   const gpu = telemetry.gpu;
   const cudaValue = diagnostics.ocrGpuCapability.compiledWithCuda === null
     ? "n/d"
-    : diagnostics.ocrGpuCapability.compiledWithCuda ? "Si" : "No";
+    : diagnostics.ocrGpuCapability.compiledWithCuda ? "Sì" : "No";
 
   return (
     <section className="sidebar-metrics" aria-label="Metriche sistema">

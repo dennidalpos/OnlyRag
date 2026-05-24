@@ -1,6 +1,6 @@
 import {
-  OcrFieldLabel,
   OcrRangeField,
+  OcrSelectField,
   formatOcrDecimal,
   getOcrSelectOptions
 } from "../SettingsSection.helpers";
@@ -33,36 +33,30 @@ export function OcrEngineSettingsPanel() {
           </div>
           <div className="settings-form">
             <div className="settings-grid">
-              <label className="field-group" htmlFor="ocr-profile">
-                <OcrFieldLabel
-                  text="Profilo"
-                  tooltip="Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
-                />
-                <select
-                  id="ocr-profile"
-                  value={ocrFormState.profile}
-                  onChange={(event) => applyOcrProfile(event.target.value)}
-                >
-                  <option value="fast">Veloce</option>
-                  <option value="balanced">Bilanciato</option>
-                  <option value="accurate">Accurato</option>
-                  <option value="custom">Personalizzato</option>
-                </select>
-              </label>
-              <label className="field-group" htmlFor="ocr-device">
-                <OcrFieldLabel
-                  text="Dispositivo"
-                  tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
-                />
-                <select
-                  id="ocr-device"
-                  value={ocrFormState.device}
-                  onChange={(event) => updateOcrSettings({ device: event.target.value })}
-                >
-                  <option value="cpu">CPU</option>
-                  <option value="gpu" disabled={!isGpuUsable}>GPU</option>
-                </select>
-              </label>
+              <OcrSelectField
+                id="ocr-profile"
+                label="Profilo"
+                tooltip="Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
+                value={ocrFormState.profile}
+                options={[
+                  { value: "fast", label: "Veloce" },
+                  { value: "balanced", label: "Bilanciato" },
+                  { value: "accurate", label: "Accurato" },
+                  { value: "custom", label: "Personalizzato" }
+                ]}
+                onChange={applyOcrProfile}
+              />
+              <OcrSelectField
+                id="ocr-device"
+                label="Dispositivo"
+                tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
+                value={ocrFormState.device}
+                options={[
+                  { value: "cpu", label: "CPU" },
+                  { value: "gpu", label: "GPU", disabled: !isGpuUsable }
+                ]}
+                onChange={(value) => updateOcrSettings({ device: value })}
+              />
               <OcrRangeField
                 id="ocr-pdf-dpi"
                 label="DPI PDF"
@@ -72,36 +66,28 @@ export function OcrEngineSettingsPanel() {
                 value={ocrFormState.pdfDpi}
                 onChange={(value) => updateOcrSettings({ pdfDpi: value })}
               />
-              <label className="field-group" htmlFor="ocr-model-preset">
-                <OcrFieldLabel
-                  text="Preset modello"
-                  tooltip="Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
-                />
-                <select
-                  id="ocr-model-preset"
-                  value={ocrFormState.modelPreset}
-                  onChange={(event) => updateOcrSettings({ modelPreset: event.target.value })}
-                >
-                  {getOcrSelectOptions(ocrFormState.modelPreset, PADDLE_OCR_MODEL_PRESETS).map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field-group" htmlFor="ocr-model-version">
-                <OcrFieldLabel
-                  text="Versione modello"
-                  tooltip="Versione OCR passata a PaddleOCR come ocr_version quando supportata. Il valore salvato resta selezionabile anche se non e' nell'elenco noto."
-                />
-                <select
-                  id="ocr-model-version"
-                  value={ocrFormState.modelVersion}
-                  onChange={(event) => updateOcrSettings({ modelVersion: event.target.value })}
-                >
-                  {getOcrSelectOptions(ocrFormState.modelVersion, PADDLE_OCR_MODEL_VERSIONS).map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
+              <OcrSelectField
+                id="ocr-model-preset"
+                label="Preset modello"
+                tooltip="Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
+                value={ocrFormState.modelPreset}
+                options={getOcrSelectOptions(ocrFormState.modelPreset, PADDLE_OCR_MODEL_PRESETS).map((option) => ({
+                  value: option,
+                  label: option
+                }))}
+                onChange={(value) => updateOcrSettings({ modelPreset: value })}
+              />
+              <OcrSelectField
+                id="ocr-model-version"
+                label="Versione modello"
+                tooltip="Versione OCR passata a PaddleOCR come ocr_version quando supportata. Il valore salvato resta selezionabile anche se non e' nell'elenco noto."
+                value={ocrFormState.modelVersion}
+                options={getOcrSelectOptions(ocrFormState.modelVersion, PADDLE_OCR_MODEL_VERSIONS).map((option) => ({
+                  value: option,
+                  label: option
+                }))}
+                onChange={(value) => updateOcrSettings({ modelVersion: value })}
+              />
               <OcrRangeField
                 id="ocr-detection-side-limit"
                 label="Lato massimo detection"

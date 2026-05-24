@@ -59,7 +59,11 @@ describe("TranslationListCard", () => {
     );
 
     expect(screen.getByLabelText("Traduzioni esistenti")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Dettagli" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Mostra dettagli traduzione Inglese per manuale.pdf" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Apri confronto traduzione Inglese per manuale.pdf" })).toBeInTheDocument();
     expect(screen.getByText("Inglese")).toBeInTheDocument();
     expect(screen.queryByText("English")).not.toBeInTheDocument();
   });

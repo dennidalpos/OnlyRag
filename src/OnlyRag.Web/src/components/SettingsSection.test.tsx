@@ -342,6 +342,18 @@ describe("SettingsSection", () => {
     expect(screen.getByRole("heading", { name: "OCR" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Ingestione" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Diagnostica" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("combobox", { name: "Profilo" })).toHaveAccessibleDescription(
+      "Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
+    );
+    expect(screen.getByRole("combobox", { name: "Dispositivo" })).toHaveAccessibleDescription(
+      "CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
+    );
+    expect(screen.getByRole("combobox", { name: "Preset modello" })).toHaveAccessibleDescription(
+      "Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
+    );
+    expect(screen.getByRole("combobox", { name: "Versione modello" })).toHaveAccessibleDescription(
+      "Versione OCR passata a PaddleOCR come ocr_version quando supportata. Il valore salvato resta selezionabile anche se non e' nell'elenco noto."
+    );
     expect(screen.getByRole("slider", { name: "DPI PDF" })).toHaveAccessibleDescription(
       "Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
     );

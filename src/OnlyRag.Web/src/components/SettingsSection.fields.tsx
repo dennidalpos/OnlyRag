@@ -14,6 +14,21 @@ type OcrRangeFieldProps = {
   onChange: (value: number) => void;
 };
 
+type OcrSelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+type OcrSelectFieldProps = {
+  id: string;
+  label: string;
+  tooltip: string;
+  value: string;
+  options: OcrSelectOption[];
+  onChange: (value: string) => void;
+};
+
 type SettingsRangeFieldProps = {
   id: string;
   label: string;
@@ -151,6 +166,38 @@ export function AdjustableModelContextBar({
         </div>
       )}
     </div>
+  );
+}
+
+export function OcrSelectField({
+  id,
+  label,
+  tooltip,
+  value,
+  options,
+  onChange
+}: OcrSelectFieldProps) {
+  const descriptionId = useId();
+
+  return (
+    <label className="field-group" htmlFor={id}>
+      <OcrFieldLabel text={label} tooltip={tooltip} />
+      <span className="sr-only" id={descriptionId}>{tooltip}</span>
+      <select
+        id={id}
+        value={value}
+        title={tooltip}
+        aria-label={label}
+        aria-describedby={descriptionId}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -34,6 +34,11 @@ function formatJobType(type: string): string {
   return typeLabels[type] ?? type;
 }
 
+function formatJobActionLabel(action: string, job: LocalJob): string {
+  const jobLabel = `${formatJobType(job.type)} ${job.id}`;
+  return `${action} ${jobLabel}`;
+}
+
 type JobsSectionProps = {
   onJobsChanged?: () => void;
 };
@@ -136,7 +141,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
               Rimuovi completati
             </button>
           )}
-          {error && <span className="jobs-error">{error}</span>}
+          {error && <span className="jobs-error" role="alert">{error}</span>}
         </div>
       </div>
       {shouldSurfaceRefreshFailure(refreshStatus) && (
@@ -173,6 +178,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                     <button
                       type="button"
                       className="button-secondary"
+                      aria-label={formatJobActionLabel("Metti in pausa", job)}
                       onClick={() => void transitionJob(job.id, "pause")}
                     >
                       Pausa
@@ -180,6 +186,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                     <button
                       type="button"
                       className="button-danger"
+                      aria-label={formatJobActionLabel("Annulla", job)}
                       onClick={() => void transitionJob(job.id, "cancel")}
                     >
                       Annulla
@@ -190,6 +197,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                   <button
                     type="button"
                     className="button-danger"
+                    aria-label={formatJobActionLabel("Annulla", job)}
                     onClick={() => void transitionJob(job.id, "cancel")}
                   >
                     Annulla
@@ -199,6 +207,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                   <button
                     type="button"
                     className="button-secondary"
+                    aria-label={formatJobActionLabel("Riprendi", job)}
                     onClick={() => void transitionJob(job.id, "resume")}
                   >
                     Riprendi
@@ -208,6 +217,7 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
                   <button
                     type="button"
                     className="button-danger"
+                    aria-label={formatJobActionLabel("Elimina", job)}
                     onClick={() => void deleteJob(job.id)}
                   >
                     Elimina

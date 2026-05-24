@@ -173,6 +173,7 @@ export function TranslationListCard({
                 <button
                   className={`button-secondary${selectedTranslationId === translation.id ? " button-secondary--active" : ""}`}
                   type="button"
+                  aria-label={`Mostra dettagli traduzione ${formatTargetLanguageLabel(translation.targetLanguage)} per ${translation.documentName}`}
                   aria-pressed={selectedTranslationId === translation.id}
                   onClick={() => {
                     onSelectTranslation(translation.id);
@@ -184,6 +185,7 @@ export function TranslationListCard({
                 <button
                   className="button-secondary"
                   type="button"
+                  aria-label={`Apri confronto traduzione ${formatTargetLanguageLabel(translation.targetLanguage)} per ${translation.documentName}`}
                   onClick={() => onOpenCompare(translation.id)}
                 >
                   Apri confronto
