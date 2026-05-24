@@ -380,6 +380,121 @@ describe("App initial setup", () => {
     expect(screen.getByText(/Ultima verifica:/)).toBeInTheDocument();
   });
 
+  it("prefers the verified OCR status over a stale startup prompt", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings({ defaultChatModel: null }) },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: true,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: false,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "OCR non configurato in OnlyRag",
+          message: "OnlyRag non vede ancora un runtime PaddleOCR funzionante.",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato: PaddleOCR 3.3.1.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: "Runtime CPU verificato.",
+          startedAtUtc: "2026-05-24T14:00:00Z",
+          updatedAtUtc: "2026-05-24T14:04:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("OCR configurato")).toBeInTheDocument();
+    expect(screen.getByText("OCR configurato: PaddleOCR 3.3.1.")).toBeInTheDocument();
+    expect(screen.getByText("Runtime CPU verificato.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Configura OCR" })).not.toBeInTheDocument();
+  });
+
+  it("rechecks OCR prerequisites when the app window becomes active again", async () => {
+    let ocrStartupChecks = 0;
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings() },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        handler: () => {
+          ocrStartupChecks += 1;
+          return {
+            body: {
+              shouldPrompt: false,
+              isWindowsSupported: true,
+              hasMinimumDiskSpace: true,
+              availableDiskBytes: 240 * 1024 * 1024 * 1024,
+              requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+              hasCompatiblePython: true,
+              isOcrConfigured: true,
+              isNvidiaRuntimeAvailable: false,
+              isGpuUsable: false,
+              recommendedRuntimeTarget: "auto",
+              title: "OCR configurato",
+              message: "Runtime OCR locale disponibile.",
+              findings: []
+            }
+          };
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(ocrStartupChecks).toBe(1);
+    });
+    await flushPromises();
+
+    window.dispatchEvent(new Event("focus"));
+
+    await waitFor(() => {
+      expect(ocrStartupChecks).toBe(2);
+    });
+  });
+
   it("keeps Ollama download behind an explicit confirmed action", async () => {
     const api = mockApi([
       { path: "/api/app/status", response: createAppStatus() },

@@ -85,6 +85,7 @@ export default function App() {
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const initialSetupCheckInProgressRef = useRef(false);
   const ocrStartupPrompt = useOcrStartupPrompt();
 
   async function refreshBackendStatus() {
@@ -180,8 +181,16 @@ export default function App() {
     }
   }
 
-  async function handleRecheckInitialSetup() {
-    setIsRecheckingOllama(true);
+  async function runInitialSetupChecks({ showBusy = false }: { showBusy?: boolean } = {}) {
+    if (initialSetupCheckInProgressRef.current) {
+      return;
+    }
+
+    initialSetupCheckInProgressRef.current = true;
+    if (showBusy) {
+      setIsRecheckingOllama(true);
+    }
+
     try {
       await Promise.all([
         refreshBackendStatus(),
@@ -190,8 +199,15 @@ export default function App() {
         ocrStartupPrompt.refresh()
       ]);
     } finally {
-      setIsRecheckingOllama(false);
+      initialSetupCheckInProgressRef.current = false;
+      if (showBusy) {
+        setIsRecheckingOllama(false);
+      }
     }
+  }
+
+  async function handleRecheckInitialSetup() {
+    await runInitialSetupChecks({ showBusy: true });
   }
 
   useEffect(() => {
@@ -202,25 +218,30 @@ export default function App() {
     let isCancelled = false;
 
     async function load() {
-      await refreshBackendStatus();
-      if (isCancelled) {
-        return;
-      }
+      initialSetupCheckInProgressRef.current = true;
+      try {
+        await refreshBackendStatus();
+        if (isCancelled) {
+          return;
+        }
 
-      await refreshOllamaData();
-      if (isCancelled) {
-        return;
-      }
+        await refreshOllamaData();
+        if (isCancelled) {
+          return;
+        }
 
-      const [diagnosticsResult] = await Promise.all([
-        refreshDiagnostics().catch(() => null),
-        ocrStartupPrompt.refresh()
-      ]);
-      if (!isCancelled && diagnosticsResult?.ocrGpuCapability.isUsable) {
-        await autoEnableOcrGpu().catch(() => {});
-      }
-      if (!isCancelled) {
-        setInitialCheckDone(true);
+        const [diagnosticsResult] = await Promise.all([
+          refreshDiagnostics().catch(() => null),
+          ocrStartupPrompt.refresh()
+        ]);
+        if (!isCancelled && diagnosticsResult?.ocrGpuCapability.isUsable) {
+          await autoEnableOcrGpu().catch(() => {});
+        }
+        if (!isCancelled) {
+          setInitialCheckDone(true);
+        }
+      } finally {
+        initialSetupCheckInProgressRef.current = false;
       }
     }
 
@@ -243,6 +264,29 @@ export default function App() {
       void refreshDiagnostics().catch(() => {});
     }, 5_000);
     return () => clearInterval(handle);
+  }, []);
+
+  useEffect(() => {
+    function recheckWhenAppOpens() {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      void runInitialSetupChecks();
+    }
+
+    function recheckWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void runInitialSetupChecks();
+      }
+    }
+
+    window.addEventListener("focus", recheckWhenAppOpens);
+    document.addEventListener("visibilitychange", recheckWhenVisible);
+    return () => {
+      window.removeEventListener("focus", recheckWhenAppOpens);
+      document.removeEventListener("visibilitychange", recheckWhenVisible);
+    };
   }, []);
 
   const previousSectionRef = useRef<SectionId>(activeSection);

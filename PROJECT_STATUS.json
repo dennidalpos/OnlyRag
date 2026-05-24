@@ -1,17 +1,24 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-24T23:41:50+02:00",
-  "active_objective": "Residui UI/accessibilita e verifica repository completati.",
+  "last_updated": "2026-05-25T00:03:02+02:00",
+  "active_objective": "Verifica prerequisiti OCR a ogni apertura/riattivazione app completata.",
   "current_tasks": [],
   "blockers": [],
   "risks": [],
   "decisions": [
-    "DependencyProvisioningService.Ocr.cs e stato rivalutato dopo il gate: 384 righe, sopra review required ma sotto split required; nessuno split eseguito per evitare refactor non necessario dopo gate verde."
+    "Il wizard OCR usa lo stato verificato /api/dependencies/ocr come fonte autoritativa quando startup-analysis e lo stato non sono allineati.",
+    "La UI riesegue i controlli iniziali quando il WebView torna attivo o visibile, cosi i prerequisiti vengono rivalutati anche se la finestra viene riaperta senza ricreare la pagina.",
+    "InitialSetupWizard.tsx resta sopra la soglia review required, ma non e stato diviso per mantenere la correzione OCR circoscritta."
   ],
   "quality_gates": {
-    "web_e2e": "passed",
-    "repository_gate": "passed"
+    "web_unit_app": "passed",
+    "web_typecheck": "passed",
+    "web_format": "passed",
+    "web_lint": "passed",
+    "api_tests": "passed",
+    "repository_gate": "passed",
+    "structure_review": "passed"
   },
-  "last_completed_work": "Completati accessibilita OCR select, allineamento e2e, verifica Release e rivalutazione split OCR."
+  "last_completed_work": "Corretto il wizard iniziale OCR e aggiunta la rivalutazione automatica dei prerequisiti quando l'app torna attiva."
 }

@@ -175,6 +175,7 @@ function detectSetupIssues(
 
   issues.push(...detectOllamaIssues(ollamaStatus, ollamaInstallStatus, ollamaSettings, ollamaModels));
 
+  const hasVerifiedOcrRuntime = Boolean(ocrProvisionStatus?.isConfigured && !ocrProvisionStatus.isRunning);
   if (ocrProvisionStatus?.isRunning) {
     issues.push({
       key: "ocr",
@@ -197,11 +198,11 @@ function detectSetupIssues(
       action: "configure-ocr",
       actionLabel: "Riprova OCR"
     });
-  } else if (ocrAnalysis?.shouldPrompt) {
+  } else if (ocrAnalysis?.shouldPrompt && !hasVerifiedOcrRuntime) {
     issues.push({
       key: "ocr",
       title: ocrAnalysis.title,
-      detail: ocrAnalysis.message,
+      detail: ocrProvisionStatus?.message ?? ocrAnalysis.message,
       badge: ocrAnalysis.recommendedRuntimeTarget === "nvidia" ? "NVIDIA GPU" : "CPU",
       action: "configure-ocr",
       actionLabel: "Configura OCR"
@@ -215,7 +216,7 @@ function detectSetupStatusItems(
   ocrAnalysis: OcrStartupAnalysis | null,
   ocrProvisionStatus: OcrProvisionStatus | null
 ): SetupIssue[] {
-  if (!ocrProvisionStatus?.isConfigured || ocrAnalysis?.shouldPrompt) {
+  if (!ocrProvisionStatus?.isConfigured) {
     return [];
   }
 

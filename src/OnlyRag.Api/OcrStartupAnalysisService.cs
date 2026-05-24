@@ -57,14 +57,14 @@ public sealed class OcrStartupAnalysisService
         bool shouldPrompt = canProvision && !availability.IsConfigured;
         string recommendedTarget = OcrProvisionRuntimeResolver.AutoTarget;
         string title = shouldPrompt
-            ? "Configurazione OCR disponibile"
+            ? "OCR non configurato in OnlyRag"
             : availability.IsConfigured
-                ? "OCR gia configurato"
+                ? "OCR già configurato"
                 : "Configurazione OCR manuale richiesta";
         string message = shouldPrompt
-            ? "OnlyRag puo preparare il runtime PaddleOCR per utente. La configurazione parte solo dopo conferma."
+            ? "OnlyRag non vede ancora un runtime PaddleOCR funzionante. Premi Configura OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
             : availability.IsConfigured
-                ? "Il runtime OCR locale e gia disponibile."
+                ? "Il runtime OCR locale è già disponibile."
                 : "Completa i prerequisiti indicati, poi configura OCR dalle Impostazioni.";
 
         return new OcrStartupAnalysisResponse(
