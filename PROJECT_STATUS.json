@@ -1,76 +1,66 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "residual_tasks_complete",
-  "last_updated": "2026-05-24T19:45:55+02:00",
-  "production_target": true,
-  "active_objective": "Feasible residual implementation and source-only cleanup are complete; signed release verification remains externally blocked.",
-  "assumptions": [
-    "Local development is Windows/PowerShell-first.",
-    "Saved default models must apply immediately to active Chat and Translation selections.",
-    "PaddleOCR CPU is the default install target; NVIDIA GPU support requires explicit user choice."
-  ],
-  "current_tasks": [],
-  "next_tasks": [
+  "last_updated": "2026-05-24T22:59:40+02:00",
+  "active_objective": "Produrre AUDIT_TRACKER.md come unico report/tracker di audit, poi correggere i residui identificati su primo avvio, modelli e OCR GPU.",
+  "current_tasks": [
     {
-      "priority": 8,
-      "task": "Provide trusted code-signing certificate and Windows SDK signtool.exe, then run signed release verification.",
-      "status": "blocked",
-      "blocked_by": "Trusted signing material is not available on this machine."
+      "priority": 1,
+      "task": "Creare AUDIT_TRACKER.md nella root, registrando preflight audit: git status, branch main, AUDIT_TRACKER assente, working tree gia sporca.",
+      "status": "todo"
     },
     {
-      "priority": 9,
-      "task": "Review files above the repository review-size threshold before future edits; split only when responsibility mixing is confirmed or size crosses the split threshold.",
-      "status": "optional"
+      "priority": 2,
+      "task": "Completare audit statico e tracker finding nel solo AUDIT_TRACKER.md, includendo almeno AUD-001 wizard senza modello traduzione, AUD-002 auto-enable OCR GPU solo al load iniziale, AUD-003 Settings senza refresh OCR settings post-provisioning, AUD-004 node_modules assente per check web, AUD-005 asset payhip/non_utilizzare.png da verificare.",
+      "status": "todo"
+    },
+    {
+      "priority": 3,
+      "task": "Validare solo AUDIT_TRACKER.md e git status; non modificare altri file durante l'audit.",
+      "status": "todo"
+    },
+    {
+      "priority": 4,
+      "task": "Correggere InitialSetupWizard per controllare a ogni avvio i modelli chat, embeddings e traduzione, distinguendo modello mancante da modello salvato non installato.",
+      "status": "todo"
+    },
+    {
+      "priority": 5,
+      "task": "Aggiornare il flusso post-provisioning OCR: wizard e Settings devono rileggere diagnostica/settings e applicare auto-enable GPU quando disponibile.",
+      "status": "todo"
+    },
+    {
+      "priority": 6,
+      "task": "Aggiungere test frontend per prerequisiti modelli iniziali e completamento OCR GPU senza refresh manuale.",
+      "status": "todo"
+    },
+    {
+      "priority": 7,
+      "task": "Eseguire verifiche mirate: web unit tests, typecheck e lint dopo ripristino dipendenze web.",
+      "status": "todo"
     }
   ],
   "blockers": [
-    "Trusted Windows code-signing certificate required for signed release verification."
+    "I check web locali falliscono finche src\\OnlyRag.Web\\node_modules non viene ripristinato; npm ci non va eseguito automaticamente durante audit se richiede installazioni/rete."
   ],
   "risks": [
-    "OCR provisioning depends on compatible Python 3.10-3.13, network access, and PaddlePaddle wheel availability.",
-    "Unsigned installer may trigger Windows SmartScreen warnings until signed release verification is completed."
-  ],
-  "oversized_files": [
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 468 lines; existing test file above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 435 lines; existing action module above review threshold but below split threshold.",
-    "src\\OnlyRag.Api\\DependencyProvisioningService.Ocr.cs: 427 lines; existing OCR provisioning service above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 427 lines; existing controller above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\useTranslationSectionController.ts: 388 lines; existing controller above review threshold but below split threshold.",
-    "src\\OnlyRag.Infrastructure\\Retrieval\\HybridRetrievalService.cs: 386 lines; existing retrieval service above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\App.test.tsx: 375 lines; existing test file above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.dependencyActions.test.tsx: 373 lines; existing test file above review threshold but below split threshold.",
-    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx: 371 lines; existing component above review threshold but below split threshold.",
-    "src\\OnlyRag.Infrastructure\\Ocr\\PaddleOcrEngine.cs: 362 lines; existing OCR engine above review threshold but below split threshold.",
-    "src\\OnlyRag.Api\\TranslationExportService.cs: 356 lines; existing export service above review threshold but below split threshold.",
-    "src\\OnlyRag.Infrastructure\\Ingestion\\OfficeOpenXmlTextExtractor.cs: 356 lines; existing Office extractor above review threshold but below split threshold."
+    "La working tree contiene molte modifiche preesistenti: evitare sovrascritture e attribuire solo le modifiche effettivamente fatte.",
+    "La preferenza manuale CPU deve restare rispettata dall'endpoint auto-enable esistente.",
+    "Il controllo modelli richiesto e all'avvio app/WebView, non un monitor continuo."
   ],
   "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
-    "tests": "passed",
-    "build": "passed",
-    "security_review": "not_run",
-    "structure_review": "passed"
+    "audit_tracker_validation": "not_run",
+    "web_unit_tests": "not_run",
+    "web_typecheck": "not_run",
+    "web_lint": "not_run"
   },
   "commands": {
-    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "web_test_unit": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
+    "audit_preflight": "git status --short; git branch --show-current; Test-Path AUDIT_TRACKER.md",
+    "audit_validate": "Test-Path .\\AUDIT_TRACKER.md; Get-Content -Raw .\\AUDIT_TRACKER.md; git status --short",
+    "web_unit_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit -- App SettingsSection.dependencyActions",
     "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
-    "dotnet_test": "dotnet test .\\OnlyRag.sln",
-    "clean": "pwsh .\\scripts\\Clean.ps1"
+    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint"
   },
-  "environment": {
-    "os_target": "Windows 10 1809+ or Windows 11",
-    "shell": "PowerShell 7",
-    "required_tools": [
-      ".NET 10 SDK",
-      "Node.js with npm",
-      "Inno Setup 6",
-      "Windows SDK signtool.exe for signing"
-    ]
-  },
-  "last_completed_work": "Analyzed repository residuals and updated the tracker with all current source files above the review-size threshold plus the optional follow-up policy for future edits."
+  "last_completed_work": "",
+  "handoff_notes": "Ordine operativo: audit tracker prima, correzioni UI/OCR dopo. L'audit puo modificare solo AUDIT_TRACKER.md."
 }

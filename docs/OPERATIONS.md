@@ -45,17 +45,16 @@ Optional dependencies are configured from **Settings** in the desktop app:
   for manual installation. OnlyRag does not execute remote PowerShell installer scripts.
   In offline or enterprise-managed environments, use an approved software distribution path.
 - **LibreOffice**: when missing, the app opens the official LibreOffice download page.
-- **OCR**: the installer selects the PaddleOCR setup task by default. When Python 3.10 through
-  3.13 and Internet access are available, setup creates or updates
-  `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv` before first launch and installs the pinned
-  PaddleOCR requirements shipped with the app. The same provisioning remains available through
-  **Configura OCR CPU** for repair/retry. CPU is the default provisioning target. Settings offers
-  **Configura OCR NVIDIA** only after diagnostics detect a local NVIDIA path, and the user must
-  choose it explicitly before OnlyRag installs CUDA-specific PaddlePaddle packages for CUDA 12.9,
-  12.6, or 11.8. GPU selection remains blocked until the local PaddleOCR check proves CUDA support
-  with a visible CUDA device. While UI provisioning is running, **Annulla OCR** requests
-  cancellation and the backend stops the active child process tree. UI provisioning is also bounded
-  to 45 minutes, after which OnlyRag records a recoverable timeout status and the user can retry.
+- **OCR**: when Python 3.10 through 3.13 and Internet access are available, setup automatically
+  creates or updates `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv` before first launch and installs the
+  pinned PaddleOCR requirements shipped with the app. The installer and **Configura OCR** use
+  automatic runtime selection: CUDA-specific PaddlePaddle packages for CUDA 12.9, 12.6, or 11.8
+  are installed only when diagnostics can resolve a compatible local NVIDIA driver, otherwise CPU
+  is used. At startup OnlyRag selects GPU automatically after the PaddleOCR check proves CUDA
+  support with a visible CUDA device, unless the user saved CPU manually. While UI provisioning is
+  running, **Annulla OCR** requests cancellation and the backend stops the active child process
+  tree. UI provisioning is also bounded to 45 minutes, after which OnlyRag records a recoverable
+  timeout status and the user can retry.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
@@ -209,7 +208,7 @@ Runtime data lives under `%LOCALAPPDATA%\OnlyRag`:
 | `documents\renders\` | Generated OCR page render assets used by document ingestion. |
 | `documents\ocr-cache\` | OCR cache artifacts and metadata referenced by the local SQLite store. |
 | `documents\exports\` | Translation export files. |
-| `ocr-python\` | PaddleOCR Python environment prepared by **Configura OCR** in Settings or by developer bootstrap. |
+| `ocr-python\` | PaddleOCR Python environment prepared by setup, **Configura OCR** in Settings, or developer bootstrap. |
 | `logs\` | Application log files. |
 | `webview2\` | WebView2 user data folder for the installed desktop shell, kept outside the install directory. |
 | `temp\` | App-scoped temporary work directories such as Office conversion and PDF export staging. |
@@ -356,8 +355,8 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
   `soffice.exe`, or set `ONLYRAG_LIBREOFFICE_PATH`.
 - OCR reports missing prerequisites: use **Configura OCR** in Settings after Python 3.10 through 3.13 is
   available, or set `ONLYRAG_OCR_PYTHON` and `ONLYRAG_OCR_BRIDGE`. For NVIDIA acceleration, update
-  the NVIDIA driver so PaddlePaddle can use the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 GPU wheel, rerun
-  **Configura OCR**, then select GPU in OCR settings after Diagnostics reports OCR GPU as usable.
+  the NVIDIA driver so PaddlePaddle can use the pinned CUDA 12.9, CUDA 12.6, or CUDA 11.8 GPU wheel,
+  rerun **Configura OCR**, then let startup auto-select GPU after Diagnostics reports OCR GPU usable.
 - App closes while work is active: confirm the running build includes the WPF shutdown flow and
   inspect `%LOCALAPPDATA%\OnlyRag\logs` for `Shutdown preparation` entries.
 - Installer build stops after publish: install Inno Setup 6 or pass `-InnoSetupCompiler` to

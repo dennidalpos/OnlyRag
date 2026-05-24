@@ -206,6 +206,36 @@ public sealed partial class OcrPipelineTests
     }
 
     [Fact]
+    public async Task OcrSettingsStore_AutoEnableGpuAppliesOnlyWithoutManualDevicePreference()
+    {
+        using TempStorage storage = await TempStorage.CreateInitializedAsync();
+        OcrSettingsStore store = new(storage.Settings);
+
+        OcrAutoGpuEnableResponse response = await store.AutoEnableGpuAsync();
+        OcrSettings loaded = await store.GetAsync();
+
+        Assert.True(response.Applied);
+        Assert.Equal("gpu", response.Settings.Device);
+        Assert.Equal("gpu", loaded.Device);
+        Assert.Equal(12, loaded.RecognitionBatchSize);
+    }
+
+    [Fact]
+    public async Task OcrSettingsStore_AutoEnableGpuPreservesManualCpuPreference()
+    {
+        using TempStorage storage = await TempStorage.CreateInitializedAsync();
+        OcrSettingsStore store = new(storage.Settings);
+
+        await store.UpdateAsync(OcrSettings.Default with { Device = "cpu" });
+        OcrAutoGpuEnableResponse response = await store.AutoEnableGpuAsync();
+        OcrSettings loaded = await store.GetAsync();
+
+        Assert.False(response.Applied);
+        Assert.Equal("cpu", response.Settings.Device);
+        Assert.Equal("cpu", loaded.Device);
+    }
+
+    [Fact]
     public async Task OcrProcessingSettingsStore_PersistsNormalizedSettings()
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();

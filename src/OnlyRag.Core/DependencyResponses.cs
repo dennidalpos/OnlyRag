@@ -39,3 +39,8 @@ public sealed record OcrStartupAnalysisResponse(
     string Title,
     string Message,
     IReadOnlyList<string> Findings);
+
+public sealed record OcrAutoGpuEnableResponse(
+    bool Applied,
+    string Message,
+    OcrSettings Settings);

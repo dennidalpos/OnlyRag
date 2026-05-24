@@ -20,11 +20,20 @@ export function DiagnosticsPanel() {
     ? "Configurazione OCR..."
     : canRepairOcrRuntime
       ? "Ripara OCR"
-      : "Configura OCR CPU";
-  const canOfferNvidiaOcrProvision = Boolean(
-    diagnostics?.ocrGpuCapability.nvidiaName
-    || diagnostics?.ocrGpuCapability.driverVersion
-    || diagnostics?.systemTelemetry.gpu
+      : "Configura OCR";
+  const detectedGpuName =
+    diagnostics?.ocrGpuCapability.nvidiaName ??
+    diagnostics?.systemTelemetry.gpu?.name ??
+    null;
+  const detectedGpuDriver =
+    diagnostics?.ocrGpuCapability.driverVersion ??
+    diagnostics?.systemTelemetry.gpu?.driverVersion ??
+    null;
+  const gpuDetected = Boolean(detectedGpuName || detectedGpuDriver);
+  const shouldShowOcrProvisionStatus = Boolean(
+    ocrProvisionStatus?.isRunning ||
+    ocrProvisionStatus?.lastError ||
+    (!diagnostics?.ocrIsConfigured && ocrProvisionStatus)
   );
 
   return (
@@ -63,30 +72,39 @@ export function DiagnosticsPanel() {
                   </span>
                 </div>
                 <div className="diagnostic-row">
-                  <span className="diagnostic-label">OCR GPU</span>
+                  <span className="diagnostic-label">GPU rilevata</span>
+                  <span
+                    className={`status-chip status-chip--${gpuDetected ? "online" : "offline"}`}
+                  >
+                    {gpuDetected ? "Sì" : "No"}
+                  </span>
+                  {gpuDetected && (
+                    <span className="diagnostic-value">
+                      {[detectedGpuName, detectedGpuDriver].filter(Boolean).join(" - ")}
+                    </span>
+                  )}
+                </div>
+                <div className="diagnostic-row">
+                  <span className="diagnostic-label">Supporto OCR GPU</span>
                   <span
                     className={`status-chip status-chip--${diagnostics.ocrGpuCapability.isUsable ? "online" : "offline"}`}
                   >
-                    {diagnostics.ocrGpuCapability.status}
+                    {diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile"}
                   </span>
-                  {diagnostics.ocrGpuCapability.runtimeDetail && (
-                    <span className="diagnostic-value">{diagnostics.ocrGpuCapability.runtimeDetail}</span>
-                  )}
-                  {diagnostics.ocrGpuCapability.blockReason && (
-                    <span className="diagnostic-value">{diagnostics.ocrGpuCapability.blockReason}</span>
-                  )}
+                  <span className="diagnostic-value">
+                    {diagnostics.ocrGpuCapability.isUsable
+                      ? diagnostics.ocrGpuCapability.runtimeDetail ?? diagnostics.ocrGpuCapability.status
+                      : diagnostics.ocrGpuCapability.blockReason ?? diagnostics.ocrGpuCapability.status}
+                  </span>
                 </div>
-                {!diagnostics.ocrIsConfigured && (
-                  <div className="panel-note panel-note--warning" role="alert">
+                {shouldShowOcrProvisionStatus && (
+                  <div
+                    className={`panel-note${ocrProvisionStatus?.lastError ? " panel-note--warning" : ""}`}
+                    role={ocrProvisionStatus?.isRunning ? "status" : "alert"}
+                  >
                     <p>{ocrProvisionStatus?.message ?? "OCR non configurato. Configura le dipendenze locali per abilitare OCR."}</p>
                     {ocrProvisionStatus?.runtimeDetail && <p>{ocrProvisionStatus.runtimeDetail}</p>}
                     {ocrProvisionStatus?.lastError && <p>{ocrProvisionStatus.lastError}</p>}
-                  </div>
-                )}
-                {ocrProvisionStatus?.isRunning && (
-                  <div className="panel-note" role="status">
-                    <p>{ocrProvisionStatus.message}</p>
-                    {ocrProvisionStatus.runtimeDetail && <p>{ocrProvisionStatus.runtimeDetail}</p>}
                   </div>
                 )}
               </>
@@ -114,21 +132,11 @@ export function DiagnosticsPanel() {
               <button
                 type="button"
                 className="button-secondary"
-                onClick={() => void configureOcrRuntime("cpu")}
+                onClick={() => void configureOcrRuntime("auto")}
                 disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
               >
                 {ocrConfigureButtonLabel}
               </button>
-              {canOfferNvidiaOcrProvision && (
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={() => void configureOcrRuntime("nvidia")}
-                  disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
-                >
-                  Configura OCR NVIDIA
-                </button>
-              )}
               {ocrProvisionStatus?.isRunning && (
                 <button
                   type="button"

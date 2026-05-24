@@ -95,11 +95,11 @@ End users configure optional dependencies from **Settings** in the app:
 - **Ollama**: if missing, the UI opens the official download page for manual installation.
   OnlyRag does not execute remote PowerShell installer scripts.
 - **LibreOffice**: if missing, the UI opens the LibreOffice download page.
-- **OCR**: the installer selects the PaddleOCR setup task by default. When Python 3.10 through 3.13
-  and Internet access are available, setup prepares the CPU runtime under
-  `%LOCALAPPDATA%\OnlyRag\ocr-python` before the first launch. Settings keeps **Configura OCR CPU**
-  as the default repair/retry action and offers **Configura OCR NVIDIA** only when diagnostics show
-  a local NVIDIA path, so GPU package installation is always an explicit user choice.
+- **OCR**: when Python 3.10 through 3.13 and Internet access are available, setup automatically
+  prepares the PaddleOCR runtime under `%LOCALAPPDATA%\OnlyRag\ocr-python` before first launch.
+  The installer and **Configura OCR** use automatic runtime selection: NVIDIA is prepared only
+  when a compatible local driver is detected, otherwise CPU is used. At startup OnlyRag selects GPU
+  automatically after Diagnostics proves OCR GPU usable, unless the user saved CPU manually.
 
 ## Commands
 

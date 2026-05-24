@@ -21,6 +21,9 @@ public sealed class OcrSettingsStore
     private const string RecognitionBatchSizeKey = "ocr.recognitionBatchSize";
     private const string CpuThreadsKey = "ocr.cpuThreads";
     private const string DeviceKey = "ocr.device";
+    private const string DeviceSourceKey = "ocr.deviceSource";
+    private const string AutoDeviceSource = "auto";
+    private const string ManualDeviceSource = "manual";
 
     private readonly ISettingsRepository settingsRepository;
 
@@ -55,7 +58,40 @@ public sealed class OcrSettingsStore
         CancellationToken cancellationToken = default)
     {
         OcrSettings normalized = OcrSettings.Normalize(settings);
+        await SaveAsync(normalized, ManualDeviceSource, cancellationToken);
+        return normalized;
+    }
 
+    public async Task<OcrAutoGpuEnableResponse> AutoEnableGpuAsync(CancellationToken cancellationToken = default)
+    {
+        string? storedDevice = await settingsRepository.GetValueAsync(DeviceKey, cancellationToken);
+        string? deviceSource = await settingsRepository.GetValueAsync(DeviceSourceKey, cancellationToken);
+        OcrSettings current = await GetAsync(cancellationToken);
+
+        if (current.Device == "gpu")
+        {
+            return new OcrAutoGpuEnableResponse(false, "OCR GPU già selezionata.", current);
+        }
+
+        if (!string.IsNullOrWhiteSpace(storedDevice)
+            && !string.Equals(deviceSource, AutoDeviceSource, StringComparison.OrdinalIgnoreCase))
+        {
+            return new OcrAutoGpuEnableResponse(
+                false,
+                "OCR CPU mantenuto: esiste una preferenza dispositivo salvata manualmente.",
+                current);
+        }
+
+        OcrSettings enabled = OcrSettings.Normalize(current with { Device = "gpu" });
+        await SaveAsync(enabled, AutoDeviceSource, cancellationToken);
+        return new OcrAutoGpuEnableResponse(true, "OCR GPU abilitata automaticamente.", enabled);
+    }
+
+    private async Task SaveAsync(
+        OcrSettings normalized,
+        string deviceSource,
+        CancellationToken cancellationToken)
+    {
         await settingsRepository.UpsertAsync(ProfileKey, normalized.Profile, cancellationToken);
         await settingsRepository.UpsertAsync(PdfDpiKey, normalized.PdfDpi.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await settingsRepository.UpsertAsync(ModelPresetKey, normalized.ModelPreset, cancellationToken);
@@ -71,8 +107,7 @@ public sealed class OcrSettingsStore
         await settingsRepository.UpsertAsync(RecognitionBatchSizeKey, normalized.RecognitionBatchSize.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await settingsRepository.UpsertAsync(CpuThreadsKey, normalized.CpuThreads.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await settingsRepository.UpsertAsync(DeviceKey, normalized.Device, cancellationToken);
-
-        return normalized;
+        await settingsRepository.UpsertAsync(DeviceSourceKey, deviceSource, cancellationToken);
     }
 
     private async Task<string> ReadStringAsync(string key, string defaultValue, CancellationToken cancellationToken)

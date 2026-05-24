@@ -101,7 +101,7 @@ describe("DocumentsSection", () => {
     const dialog = await screen.findByRole("dialog", { name: "Scegli modalità OCR" });
     await userEvent.click(within(dialog).getByRole("button", { name: /Usa testo esistente/i }));
 
-    expect(await screen.findByText("1 file importati. Analisi e indicizzazione in corso.")).toBeInTheDocument();
+    expect(await screen.findByText("1 file importato. Analisi e indicizzazione in corso.")).toBeInTheDocument();
     expect((await screen.findAllByText("contratto.pdf")).length).toBeGreaterThan(0);
 
     const importCall = api.calls.find((call) => call.path === "/api/documents/import");
@@ -117,6 +117,7 @@ describe("DocumentsSection", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Anteprima" }));
     expect(await screen.findByRole("dialog", { name: "Anteprima documento" })).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === "Stato: Pronto")).toBeInTheDocument();
     expect(await screen.findByText("Testo estratto dal contratto")).toBeInTheDocument();
   });
 
@@ -196,7 +197,7 @@ describe("DocumentsSection", () => {
       new File(["bad"], "bad.json", { type: "application/json" })
     ]);
 
-    expect(await screen.findByText(/1 file importati.*1 file non importati: bad\.json/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 file importato.*1 file non importato: bad\.json/)).toBeInTheDocument();
     expect((await screen.findAllByText("ok.txt")).length).toBeGreaterThan(0);
   });
 

@@ -42,7 +42,7 @@ export function SettingsSectionPanels() {
           </div>
         </section>
         <section className="settings-section" aria-labelledby="settings-ingestion-title">
-          <h3 id="settings-ingestion-title">Ingestion</h3>
+          <h3 id="settings-ingestion-title">Ingestione</h3>
           <div className="settings-section__grid">
             <IngestionSettingsPanel />
             <OfficeConversionPanel />

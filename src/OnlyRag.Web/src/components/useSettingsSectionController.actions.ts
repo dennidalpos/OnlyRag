@@ -250,10 +250,10 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       const normalizedSaved = normalizeIngestionSettings(saved);
       setIngestionFormState(normalizedSaved);
       setSavedIngestionFormState(normalizedSaved);
-      setInfoMessage("Impostazioni ingestion salvate.");
+      setInfoMessage("Impostazioni ingestione salvate.");
       await onDataChanged();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare ingestion.");
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni di ingestione.");
     } finally {
       setIsBusy(false);
     }

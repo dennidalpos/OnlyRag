@@ -55,9 +55,7 @@ public sealed class OcrStartupAnalysisService
 
         bool canProvision = isWindowsSupported && hasMinimumDiskSpace && hasCompatiblePython;
         bool shouldPrompt = canProvision && !availability.IsConfigured;
-        string recommendedTarget = isNvidiaRuntimeAvailable
-            ? OcrProvisionRuntimeResolver.NvidiaTarget
-            : OcrProvisionRuntimeResolver.CpuTarget;
+        string recommendedTarget = OcrProvisionRuntimeResolver.AutoTarget;
         string title = shouldPrompt
             ? "Configurazione OCR disponibile"
             : availability.IsConfigured

@@ -106,7 +106,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
       setIngestionFormState(normalizedIngestion);
       setSavedIngestionFormState(normalizedIngestion);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni ingestion.");
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni di ingestione.");
     }
   }
 
@@ -204,7 +204,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     }
   }
 
-  async function configureOcrRuntime(runtimeTarget: OcrProvisionRequest["runtimeTarget"] = "cpu") {
+  async function configureOcrRuntime(runtimeTarget: OcrProvisionRequest["runtimeTarget"] = "auto") {
     setIsBusy(true);
     setErrorMessage(null);
     setInfoMessage(null);

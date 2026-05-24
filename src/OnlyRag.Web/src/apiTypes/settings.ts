@@ -65,6 +65,12 @@ export type OcrSettings = {
   device: string;
 };
 
+export type OcrAutoGpuEnableResponse = {
+  applied: boolean;
+  message: string;
+  settings: OcrSettings;
+};
+
 export type OfficeConverterStatusResponse = {
   state: string;
   isAvailable: boolean;
@@ -141,7 +147,7 @@ export type OcrStartupAnalysis = {
   isOcrConfigured: boolean;
   isNvidiaRuntimeAvailable: boolean;
   isGpuUsable: boolean;
-  recommendedRuntimeTarget: "cpu" | "nvidia";
+  recommendedRuntimeTarget: "auto" | "cpu" | "nvidia";
   title: string;
   message: string;
   findings: string[];

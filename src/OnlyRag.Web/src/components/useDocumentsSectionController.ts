@@ -165,11 +165,11 @@ export function useDocumentsSectionController() {
       const importCount = imported.length - dedupCount;
       const failed = response.results.filter((result) => !result.succeeded);
       const failedSummary = failed.length > 0
-        ? ` ${failed.length} file non importati: ${failed.map((result) => result.fileName).join(", ")}.`
+        ? ` ${formatFileCount(failed.length, "non importato", "non importati")}: ${failed.map((result) => result.fileName).join(", ")}.`
         : "";
       const successSummary = dedupCount > 0
-        ? `${importCount} file importati, ${dedupCount} duplicati riutilizzati.`
-        : `${importCount} file importati. Analisi e indicizzazione in corso.`;
+        ? `${formatFileCount(importCount, "importato", "importati")}, ${formatFileCount(dedupCount, "duplicato riutilizzato", "duplicati riutilizzati")}.`
+        : `${formatFileCount(importCount, "importato", "importati")}. Analisi e indicizzazione in corso.`;
       setFeedback({
         tone: imported.length > 0 ? "info" : "error",
         message: imported.length > 0
@@ -424,4 +424,8 @@ export function useDocumentsSectionController() {
     vectorHealth,
     loadPreviewPage: preview.loadPreviewPage
   };
+}
+
+function formatFileCount(count: number, singular: string, plural: string): string {
+  return `${count} file ${count === 1 ? singular : plural}`;
 }

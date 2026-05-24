@@ -340,8 +340,11 @@ describe("SettingsSection", () => {
     expect(await screen.findByRole("heading", { name: "Connessioni" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Prestazioni" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "OCR" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "Ingestion" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "Ingestione" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Diagnostica" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("slider", { name: "DPI PDF" })).toHaveAccessibleDescription(
+      "Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
+    );
     expect(screen.queryByLabelText("Modalità PC poco performante")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Lingua OCR")).not.toBeInTheDocument();
 

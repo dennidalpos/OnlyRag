@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { DocumentPageInfo, DocumentPreviewResponse, ImportedDocument } from "../api";
-import { formatFileSize } from "./DocumentsSection.formatting";
+import { formatFileSize, statusLabels } from "./DocumentsSection.formatting";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
 type Props = {
@@ -71,7 +71,7 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
               <span><strong>Dimensione:</strong> {formatFileSize(preview.fileSizeBytes)}</span>
               <span><strong>Pagine/sezioni:</strong> {preview.pageCount}</span>
               <span><strong>Chunk:</strong> {preview.chunkCount}</span>
-              <span><strong>Stato:</strong> {preview.status}</span>
+              <span><strong>Stato:</strong> {formatDocumentPreviewStatus(preview.status)}</span>
             </div>
 
             <div className="preview-modal__body">
@@ -187,7 +187,7 @@ function PageContent({ page }: { page: DocumentPageInfo }) {
       ) : (
         <div className="preview-no-text" role="status">
           <p>Nessun testo estratto per questa pagina.</p>
-          {page.ocrStatus && <p>Stato OCR: {page.ocrStatus}</p>}
+          {page.ocrStatus && <p>Stato OCR: {formatPageOcrStatus(page.ocrStatus)}</p>}
         </div>
       )}
     </div>
@@ -203,6 +203,35 @@ function PageOcrBadge({ page }: { page: DocumentPageInfo }) {
     : isOk
       ? "page-ocr-badge page-ocr-badge--ok"
       : "page-ocr-badge";
-  const label = isError ? "Errore OCR" : isOk ? (page.ocrConfidence != null ? `OCR ${Math.round(page.ocrConfidence * 100)}%` : "OCR ✓") : page.ocrStatus;
+  const label = isError
+    ? "Errore OCR"
+    : isOk
+      ? (page.ocrConfidence != null ? `OCR ${Math.round(page.ocrConfidence * 100)}%` : "OCR completato")
+      : formatPageOcrStatus(page.ocrStatus);
   return <span className={className}>{label}</span>;
+}
+
+function formatDocumentPreviewStatus(status: string): string {
+  return statusLabels[status] ?? status;
+}
+
+function formatPageOcrStatus(status: string): string {
+  switch (status) {
+    case "Complete":
+    case "Cached":
+      return "Completato";
+    case "LowConfidence":
+      return "Bassa confidenza";
+    case "Failed":
+    case "Error":
+      return "Errore";
+    case "Pending":
+      return "In attesa";
+    case "Running":
+      return "In corso";
+    case "Skipped":
+      return "Saltato";
+    default:
+      return status;
+  }
 }

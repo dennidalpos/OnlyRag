@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { OllamaModelDetails } from "../api";
 import { formatOcrInteger } from "./SettingsSection.formatting";
 
@@ -164,10 +165,13 @@ export function OcrRangeField({
   formatValue = formatOcrInteger,
   onChange
 }: OcrRangeFieldProps) {
+  const descriptionId = useId();
+
   return (
     <label className="field-group ocr-range-field" htmlFor={id}>
       <OcrFieldLabel text={label} tooltip={tooltip} />
       <span className="ocr-range-field__value">{formatValue(value)}</span>
+      <span className="sr-only" id={descriptionId}>{tooltip}</span>
       <input
         id={id}
         type="range"
@@ -176,6 +180,8 @@ export function OcrRangeField({
         step={step}
         value={value}
         title={tooltip}
+        aria-label={label}
+        aria-describedby={descriptionId}
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <span className="ocr-range-field__scale" aria-hidden="true">
@@ -190,7 +196,7 @@ export function OcrFieldLabel({ text, tooltip }: { text: string; tooltip: string
   return (
     <span className="ocr-field-label">
       <span>{text}</span>
-      <span className="ocr-tooltip" title={tooltip} aria-label={tooltip}>?</span>
+      <span className="ocr-tooltip" title={tooltip} aria-hidden="true">?</span>
     </span>
   );
 }

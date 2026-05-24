@@ -108,7 +108,7 @@ describe("SettingsSection dependency actions", () => {
     expect(JSON.parse(String(cancelCall?.body))).toEqual({ confirmed: true });
   });
 
-  it("uses CPU as the default OCR provisioning target and requires an explicit NVIDIA action", async () => {
+  it("uses automatic OCR provisioning from a single Settings action", async () => {
     const api = mockApi([
       { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
@@ -187,9 +187,9 @@ describe("SettingsSection dependency actions", () => {
           isRunning: false,
           message: "OCR non configurato.",
           lastError: null,
-          runtimeTarget: "cpu",
+          runtimeTarget: "auto",
           resolvedRuntime: "cpu",
-          runtimeDetail: "CPU consigliata come default."
+          runtimeDetail: "Runtime scelto automaticamente."
         }
       },
       {
@@ -209,13 +209,13 @@ describe("SettingsSection dependency actions", () => {
       />
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "Configura OCR CPU" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Configura OCR" }));
     expect(await screen.findByText("Configurazione OCR avviata.")).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: "Configura OCR NVIDIA" }));
 
     const provisionCalls = api.calls.filter((call) => call.path === "/api/dependencies/ocr/provision");
-    expect(JSON.parse(String(provisionCalls[0]?.body))).toEqual({ confirmed: true, runtimeTarget: "cpu" });
-    expect(JSON.parse(String(provisionCalls[1]?.body))).toEqual({ confirmed: true, runtimeTarget: "nvidia" });
+    expect(provisionCalls).toHaveLength(1);
+    expect(JSON.parse(String(provisionCalls[0]?.body))).toEqual({ confirmed: true, runtimeTarget: "auto" });
+    expect(screen.queryByRole("button", { name: "Configura OCR NVIDIA" })).not.toBeInTheDocument();
   });
 
   it("renders cached diagnostics while Settings refreshes fresh diagnostics", async () => {

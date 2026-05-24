@@ -77,6 +77,25 @@ public static partial class InProcessBackend
             return Results.Ok(await settings.UpdateAsync(normalizedRequest, cancellationToken));
         });
 
+        app.MapPost("/api/settings/ocr/auto-enable-gpu", async (
+            OcrSettingsStore settings,
+            IOcrEngine ocrEngine,
+            OcrGpuCapabilityService gpuCapability,
+            CancellationToken cancellationToken) =>
+        {
+            OcrSettings currentSettings = await settings.GetAsync(cancellationToken);
+            OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+            if (!capability.IsUsable)
+            {
+                return Results.Ok(new OcrAutoGpuEnableResponse(
+                    false,
+                    capability.BlockReason ?? "Supporto OCR GPU non disponibile.",
+                    currentSettings));
+            }
+
+            return Results.Ok(await settings.AutoEnableGpuAsync(cancellationToken));
+        });
+
         app.MapGet("/api/settings/ingestion", async (
             IngestionSettingsStore settings,
             CancellationToken cancellationToken) =>

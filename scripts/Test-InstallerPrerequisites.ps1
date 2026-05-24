@@ -190,7 +190,7 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         ""
         New-OnlyRagInstallerParagraph "After installing WebView2, run this $AppName setup again."
         ""
-        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Ollama, LibreOffice, Python OCR packages, and OCR GPU wheels remain optional feature dependencies configured from the app settings."
+        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama and LibreOffice remain user-confirmed external/manual installs."
     ) -join [Environment]::NewLine
 
     return [pscustomobject]@{
@@ -205,9 +205,9 @@ function Get-OnlyRagNvidiaGpuOcrMemo {
 
     if ($NvidiaToolsPresent) {
         return @(
-            "- NVIDIA OCR: NVIDIA management tools were detected. The installed app includes"
-            "              OCR GPU provisioning manifests. After setup, open Settings >"
-            "              Diagnostics > Configure OCR, then select GPU in OCR settings."
+            "- NVIDIA OCR: NVIDIA management tools were detected. Setup will try the"
+            "              compatible GPU runtime automatically and OnlyRag will select GPU"
+            "              after Diagnostics reports it usable, unless CPU was saved manually."
         ) -join [Environment]::NewLine
     }
 

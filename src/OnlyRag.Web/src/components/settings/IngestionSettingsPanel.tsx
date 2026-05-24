@@ -16,7 +16,7 @@ export function IngestionSettingsPanel() {
   return (
         <div className="settings-card">
           <div className="settings-card__header">
-            <h3>Ingestion</h3>
+            <h3>Ingestione</h3>
             {embeddingRecommendations && (
               <span className="status-chip status-chip--muted">
                 {embeddingRecommendations.chunkMinimum.toLocaleString("it-IT")}-
@@ -58,7 +58,7 @@ export function IngestionSettingsPanel() {
             />
             <div className="settings-actions">
               <button type="button" onClick={saveIngestionSettings} disabled={isBusy}>
-                Salva ingestion
+                Salva ingestione
               </button>
               {hasDirtyIngestionSettings && <span className="dirty-hint">Modifiche non salvate</span>}
             </div>

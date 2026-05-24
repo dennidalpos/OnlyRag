@@ -37,7 +37,7 @@ describe("App initial setup", () => {
           isOcrConfigured: false,
           isNvidiaRuntimeAvailable: false,
           isGpuUsable: false,
-          recommendedRuntimeTarget: "cpu",
+          recommendedRuntimeTarget: "auto",
           title: "Configura OCR",
           message: "Prepara il runtime OCR locale.",
           findings: []
@@ -75,7 +75,99 @@ describe("App initial setup", () => {
     await waitFor(() => {
       const provisionCall = api.calls.find((call) => call.path === "/api/dependencies/ocr/provision");
       expect(provisionCall).toBeDefined();
-      expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "cpu" });
+      expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "auto" });
+    });
+  });
+
+  it("auto-enables OCR GPU after the initial diagnostics report usable support", async () => {
+    const api = mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings() },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      {
+        path: "/api/diagnostics",
+        response: createDiagnostics({
+          ocrGpuCapability: {
+            isUsable: true,
+            status: "GPU OCR utilizzabile",
+            blockReason: null,
+            runtimeDetail: "NVIDIA compatibile.",
+            engineVersion: "3.3.1",
+            nvidiaName: "NVIDIA RTX",
+            driverVersion: "596.49",
+            compiledWithCuda: true,
+            cudaDeviceCount: 1,
+            activeDevice: "gpu:0",
+            packageVersions: {}
+          }
+        })
+      },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: true,
+          isGpuUsable: true,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cuda129",
+          runtimeDetail: "NVIDIA compatibile.",
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      },
+      {
+        path: "/api/settings/ocr/auto-enable-gpu",
+        method: "POST",
+        response: {
+          applied: true,
+          message: "OCR GPU abilitata automaticamente.",
+          settings: {
+            profile: "balanced",
+            pdfDpi: 220,
+            modelPreset: "PP-OCRv5",
+            modelVersion: "PP-OCRv5",
+            detectionSideLimit: 1152,
+            detectionThreshold: 0.3,
+            detectionBoxThreshold: 0.6,
+            detectionUnclipRatio: 1.5,
+            recognitionScoreThreshold: 0.5,
+            useTextlineOrientation: true,
+            useDocumentOrientationClassification: false,
+            useDocumentUnwarping: false,
+            recognitionBatchSize: 12,
+            cpuThreads: 2,
+            device: "gpu"
+          }
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(api.calls.some((call) => call.path === "/api/settings/ocr/auto-enable-gpu")).toBe(true);
     });
   });
 
@@ -92,7 +184,7 @@ describe("App initial setup", () => {
       isOcrConfigured: false,
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
-      recommendedRuntimeTarget: "cpu",
+      recommendedRuntimeTarget: "auto",
       title: "Configura OCR",
       message: "Prepara il runtime OCR locale.",
       findings: []
@@ -195,7 +287,7 @@ describe("App initial setup", () => {
       isOcrConfigured: false,
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
-      recommendedRuntimeTarget: "cpu",
+      recommendedRuntimeTarget: "auto",
       title: "Configura OCR",
       message: "Prepara il runtime OCR locale.",
       findings: []
@@ -309,7 +401,7 @@ describe("App initial setup", () => {
           isOcrConfigured: true,
           isNvidiaRuntimeAvailable: false,
           isGpuUsable: false,
-          recommendedRuntimeTarget: "cpu",
+          recommendedRuntimeTarget: "auto",
           title: "",
           message: "",
           findings: []

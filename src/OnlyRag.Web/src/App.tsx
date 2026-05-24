@@ -6,6 +6,7 @@ import {
   resolveBackendErrorMessage,
   type DependencyActionResponse,
   type DiagnosticsResponse,
+  type OcrAutoGpuEnableResponse,
   type OllamaInstallStatus,
   type OllamaModel,
   type OllamaModelsResponse,
@@ -157,6 +158,13 @@ export default function App() {
   async function refreshDiagnostics() {
     const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
     setDiagnostics(data);
+    return data;
+  }
+
+  async function autoEnableOcrGpu() {
+    await apiRequest<OcrAutoGpuEnableResponse>("/api/settings/ocr/auto-enable-gpu", {
+      method: "POST"
+    });
   }
 
   async function handleInstallOllama() {
@@ -204,10 +212,13 @@ export default function App() {
         return;
       }
 
-      await Promise.all([
-        refreshDiagnostics().catch(() => {}),
+      const [diagnosticsResult] = await Promise.all([
+        refreshDiagnostics().catch(() => null),
         ocrStartupPrompt.refresh()
       ]);
+      if (!isCancelled && diagnosticsResult?.ocrGpuCapability.isUsable) {
+        await autoEnableOcrGpu().catch(() => {});
+      }
       if (!isCancelled) {
         setInitialCheckDone(true);
       }
