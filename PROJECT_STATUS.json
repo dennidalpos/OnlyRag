@@ -1,10 +1,10 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "settings_ocr_fix_complete",
-  "last_updated": "2026-05-24T18:51:32+02:00",
+  "current_phase": "residual_tasks_complete",
+  "last_updated": "2026-05-24T19:44:15+02:00",
   "production_target": true,
-  "active_objective": "Settings model propagation, OCR provisioning choice, diagnostics messaging, and compact Settings UI are implemented; signed release verification remains externally blocked.",
+  "active_objective": "Feasible residual implementation and source-only cleanup are complete; signed release verification remains externally blocked.",
   "assumptions": [
     "Local development is Windows/PowerShell-first.",
     "Saved default models must apply immediately to active Chat and Translation selections.",
@@ -17,16 +17,6 @@
       "task": "Provide trusted code-signing certificate and Windows SDK signtool.exe, then run signed release verification.",
       "status": "blocked",
       "blocked_by": "Trusted signing material is not available on this machine."
-    },
-    {
-      "priority": 9,
-      "task": "Clean generated local outputs before source-only handoff if requested.",
-      "status": "optional"
-    },
-    {
-      "priority": 10,
-      "task": "Consider splitting the Settings controller state/effect wiring if future Settings work expands it further.",
-      "status": "optional"
     }
   ],
   "blockers": [
@@ -37,7 +27,12 @@
     "Unsigned installer may trigger Windows SmartScreen warnings until signed release verification is completed."
   ],
   "oversized_files": [
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts: 367 lines; above review threshold but below split threshold, left intact to avoid an unrelated controller refactor."
+    "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 468 lines; existing test file above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 435 lines; existing action module above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 427 lines; existing controller above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\components\\useTranslationSectionController.ts: 388 lines; existing controller above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\components\\SettingsSection.dependencyActions.test.tsx: 373 lines; existing test file above review threshold but below split threshold.",
+    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx: 371 lines; existing component above review threshold but below split threshold."
   ],
   "quality_gates": {
     "format": "passed",
@@ -66,5 +61,5 @@
       "Windows SDK signtool.exe for signing"
     ]
   },
-  "last_completed_work": "Implemented Settings fixes for saved model propagation, explicit CPU/NVIDIA OCR provisioning, cached/neutral diagnostics messaging, compact cards, and accessible remove-model icon controls; frontend typecheck, lint, format check, unit tests, and build passed."
+  "last_completed_work": "Split Settings controller model-detail loading and dirty-state calculation into focused hooks, fixed the empty-model loading reset, passed the canonical repository gate, and cleaned generated outputs while preserving installed dependencies."
 }

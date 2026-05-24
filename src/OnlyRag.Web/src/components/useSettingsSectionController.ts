@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  apiRequest,
   type DiagnosticsResponse,
   type IngestionSettings,
   type OfficeConversionSettings,
@@ -11,24 +10,17 @@ import {
   type OcrSettings,
   type OllamaInstallStatus,
   type OllamaModel,
-  type OllamaModelDetails,
   type OllamaSettings,
   type OllamaStatusResponse,
   type PerformanceSettings
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import {
-  areIngestionSettingsEqual,
-  areOfficeSettingsEqual,
-  areOcrProcessingSettingsEqual,
-  areOcrSettingsEqual,
-  areOllamaSettingsEqual,
-  arePerformanceSettingsEqual,
   buildContextChunkRecommendation,
   buildEmbeddingRecommendations,
   buildNumCtxRecommendation,
   isNonLocalUrl,
-  normalizeOllamaSettings,
+  normalizeOllamaSettings
 } from "./SettingsSection.helpers";
 import {
   emptyIngestionSettings,
@@ -38,7 +30,9 @@ import {
   emptyPerformanceSettings,
   emptySettings
 } from "./SettingsSection.defaults";
+import { useSettingsDirtyState } from "./useSettingsDirtyState";
 import { createSettingsSectionActions } from "./useSettingsSectionController.actions";
+import { useSettingsModelDetails } from "./useSettingsModelDetails";
 
 export type SettingsSectionProps = {
   settings: OllamaSettings | null;
@@ -62,7 +56,8 @@ export function useSettingsSectionController({
   const [officeFormState, setOfficeFormState] = useState<OfficeConversionSettings>(emptyOfficeSettings);
   const [savedOfficeFormState, setSavedOfficeFormState] = useState<OfficeConversionSettings>(emptyOfficeSettings);
   const [performanceFormState, setPerformanceFormState] = useState<PerformanceSettings>(emptyPerformanceSettings);
-  const [savedPerformanceFormState, setSavedPerformanceFormState] = useState<PerformanceSettings>(emptyPerformanceSettings);
+  const [savedPerformanceFormState, setSavedPerformanceFormState] =
+    useState<PerformanceSettings>(emptyPerformanceSettings);
   const [ingestionFormState, setIngestionFormState] = useState<IngestionSettings>(emptyIngestionSettings);
   const [savedIngestionFormState, setSavedIngestionFormState] = useState<IngestionSettings>(emptyIngestionSettings);
   const [ocrProcessingFormState, setOcrProcessingFormState] =
@@ -74,20 +69,24 @@ export function useSettingsSectionController({
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>([]);
   const [officeStatus, setOfficeStatus] = useState<OfficeConverterStatusResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(initialDiagnostics);
-  const [diagnosticsStatus, setDiagnosticsStatus] =
-    useState<"loading" | "ready" | "unavailable">(initialDiagnostics ? "ready" : "loading");
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<"loading" | "ready" | "unavailable">(
+    initialDiagnostics ? "ready" : "loading"
+  );
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ocrProvisionStatus, setOcrProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [embeddingModelDetails, setEmbeddingModelDetails] = useState<OllamaModelDetails | null>(null);
-  const [chatModelDetails, setChatModelDetails] = useState<OllamaModelDetails | null>(null);
-  const [translationModelDetails, setTranslationModelDetails] = useState<OllamaModelDetails | null>(null);
-  const [embeddingModelDetailsLoading, setEmbeddingModelDetailsLoading] = useState(false);
-  const [chatModelDetailsLoading, setChatModelDetailsLoading] = useState(false);
-  const [translationModelDetailsLoading, setTranslationModelDetailsLoading] = useState(false);
+  const { details: embeddingModelDetails, isLoading: embeddingModelDetailsLoading } = useSettingsModelDetails(
+    formState.defaultEmbeddingModel
+  );
+  const { details: chatModelDetails, isLoading: chatModelDetailsLoading } = useSettingsModelDetails(
+    formState.defaultChatModel
+  );
+  const { details: translationModelDetails, isLoading: translationModelDetailsLoading } = useSettingsModelDetails(
+    formState.defaultTranslationModel
+  );
 
   useEffect(() => {
     if (settings) {
@@ -125,69 +124,13 @@ export function useSettingsSectionController({
     void actions.refreshDependencyStatus();
   }, []);
 
-  useEffect(() => {
-    const modelName = formState.defaultEmbeddingModel;
-    if (!modelName) {
-      setEmbeddingModelDetails(null);
-      return;
-    }
-
-    let cancelled = false;
-    setEmbeddingModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
-      .then((details) => { if (!cancelled) { setEmbeddingModelDetails(details); } })
-      .catch(() => { if (!cancelled) { setEmbeddingModelDetails(null); } })
-      .finally(() => { if (!cancelled) { setEmbeddingModelDetailsLoading(false); } });
-
-    return () => { cancelled = true; };
-  }, [formState.defaultEmbeddingModel]);
-
-  useEffect(() => {
-    const modelName = formState.defaultChatModel;
-    if (!modelName) {
-      setChatModelDetails(null);
-      return;
-    }
-
-    let cancelled = false;
-    setChatModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
-      .then((details) => { if (!cancelled) { setChatModelDetails(details); } })
-      .catch(() => { if (!cancelled) { setChatModelDetails(null); } })
-      .finally(() => { if (!cancelled) { setChatModelDetailsLoading(false); } });
-
-    return () => { cancelled = true; };
-  }, [formState.defaultChatModel]);
-
-  useEffect(() => {
-    const modelName = formState.defaultTranslationModel;
-    if (!modelName) {
-      setTranslationModelDetails(null);
-      return;
-    }
-
-    let cancelled = false;
-    setTranslationModelDetailsLoading(true);
-    apiRequest<OllamaModelDetails>(`/api/ollama/models/details?name=${encodeURIComponent(modelName)}`)
-      .then((details) => { if (!cancelled) { setTranslationModelDetails(details); } })
-      .catch(() => { if (!cancelled) { setTranslationModelDetails(null); } })
-      .finally(() => { if (!cancelled) { setTranslationModelDetailsLoading(false); } });
-
-    return () => { cancelled = true; };
-  }, [formState.defaultTranslationModel]);
-
   const installedModelNames = useMemo(() => models.map((model) => model.name), [models]);
-  const usesNonLocalOllamaEndpoint = useMemo(
-    () => isNonLocalUrl(formState.ollamaBaseUrl),
-    [formState.ollamaBaseUrl]
-  );
+  const usesNonLocalOllamaEndpoint = useMemo(() => isNonLocalUrl(formState.ollamaBaseUrl), [formState.ollamaBaseUrl]);
   const unavailableDefaults = useMemo(
     () =>
-      [
-        formState.defaultChatModel,
-        formState.defaultEmbeddingModel,
-        formState.defaultTranslationModel
-      ].filter((value): value is string => Boolean(value && !installedModelNames.includes(value))),
+      [formState.defaultChatModel, formState.defaultEmbeddingModel, formState.defaultTranslationModel].filter(
+        (value): value is string => Boolean(value && !installedModelNames.includes(value))
+      ),
     [
       formState.defaultChatModel,
       formState.defaultEmbeddingModel,
@@ -211,25 +154,28 @@ export function useSettingsSectionController({
     () => buildContextChunkRecommendation(chatModelDetails?.numCtx ?? embeddingModelDetails?.numCtx ?? null),
     [chatModelDetails, embeddingModelDetails]
   );
-  const hasDirtyOllamaSettings = !areOllamaSettingsEqual(formState, savedFormState);
-  const hasDirtyOfficeSettings = !areOfficeSettingsEqual(officeFormState, savedOfficeFormState);
-  const hasDirtyPerformanceSettings = !arePerformanceSettingsEqual(
+  const {
+    hasDirtyOllamaSettings,
+    hasDirtyOfficeSettings,
+    hasDirtyPerformanceSettings,
+    hasDirtyIngestionSettings,
+    hasDirtyOcrProcessingSettings,
+    hasDirtyOcrSettings,
+    hasPendingChanges
+  } = useSettingsDirtyState({
+    formState,
+    savedFormState,
+    officeFormState,
+    savedOfficeFormState,
     performanceFormState,
-    savedPerformanceFormState
-  );
-  const hasDirtyIngestionSettings = !areIngestionSettingsEqual(ingestionFormState, savedIngestionFormState);
-  const hasDirtyOcrProcessingSettings = !areOcrProcessingSettingsEqual(
+    savedPerformanceFormState,
+    ingestionFormState,
+    savedIngestionFormState,
     ocrProcessingFormState,
-    savedOcrProcessingFormState
-  );
-  const hasDirtyOcrSettings = !areOcrSettingsEqual(ocrFormState, savedOcrFormState);
-  const hasPendingChanges =
-    hasDirtyOllamaSettings
-    || hasDirtyOfficeSettings
-    || hasDirtyPerformanceSettings
-    || hasDirtyIngestionSettings
-    || hasDirtyOcrProcessingSettings
-    || hasDirtyOcrSettings;
+    savedOcrProcessingFormState,
+    ocrFormState,
+    savedOcrFormState
+  });
 
   const actions = createSettingsSectionActions({
     onDataChanged,
