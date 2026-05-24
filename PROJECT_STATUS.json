@@ -1,11 +1,11 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "final_readiness",
-  "last_updated": "2026-05-24T12:44:31+02:00",
+  "current_phase": "frontend_fix",
+  "last_updated": "2026-05-24T16:17:51+02:00",
   "production_target": true,
   "summary": "Windows-first local document RAG desktop app with WPF/WebView2 shell, in-process .NET backend, React/Vite frontend, SQLite/sqlite-vec storage, Ollama integration, optional LibreOffice conversion, optional PaddleOCR runtime, and Inno Setup packaging.",
-  "active_objective": "Maintain final handoff readiness for the current Windows setup, verification, build, installer package, and release-evidence workflow.",
+  "active_objective": "Keep the initial setup wizard current while OCR provisioning runs so completed OCR setup is reflected without a manual recheck.",
   "assumptions": [
     "Local development and packaging are Windows/PowerShell-first, while Node and .NET tooling remain standard package managers within that target.",
     "Ignored generated outputs currently present in the checkout are reusable local artifacts, not source state."
@@ -29,7 +29,8 @@
     "Local generated outputs are present under ignored paths; use scripts\\Clean.ps1 when a clean-output handoff is required.",
     "Installer install/upgrade/uninstall lifecycle was not executed in this pass; package build and non-invasive release evidence passed.",
     "The produced installer is unsigned until trusted signing material and signtool.exe are provided.",
-    "PaddleOcrEngine still reads OCR bridge stdout/stderr directly; keep OCR bridge output bounded if future bridge changes can emit large diagnostics."
+    "PaddleOcrEngine still reads OCR bridge stdout/stderr directly; keep OCR bridge output bounded if future bridge changes can emit large diagnostics.",
+    "The initial setup wizard can still remain open after OCR succeeds when chat or embedding models are not configured; those checks must be resolved separately in Settings."
   ],
   "oversized_files": [
     "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 446 lines",
@@ -117,7 +118,7 @@
       "python command resolves to Python 3.14; py launcher also exposes Python 3.10"
     ]
   },
-  "last_completed_work": "Serialized Ollama generation calls so chat requests wait behind in-flight translation/embedding work instead of competing with the same local model endpoint.",
+  "last_completed_work": "Added automatic polling for OCR provisioning in the initial setup wizard and covered it with a frontend unit test.",
   "open_questions": [],
   "handoff_notes": "Bootstrap passed with -NonInteractive -SkipOcr. Full gate with -IncludeInstaller passed on this checkout. Non-invasive installer evidence passed and wrote artifacts\\release-verification\\OnlyRag-release-verification-20260524-103909.json. The installer remains unsigned and lifecycle verification was not run; complete those on a clean Windows verification machine before release."
 }

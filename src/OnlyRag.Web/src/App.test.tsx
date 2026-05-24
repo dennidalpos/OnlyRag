@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { mockApi } from "./test/apiMock";
 import {
@@ -71,6 +71,104 @@ describe("App initial setup", () => {
       expect(provisionCall).toBeDefined();
       expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "cpu" });
     });
+  });
+
+  it("polls OCR provisioning status until the startup wizard can close", async () => {
+    vi.useFakeTimers();
+
+    const promptAnalysis = {
+      shouldPrompt: true,
+      isWindowsSupported: true,
+      hasMinimumDiskSpace: true,
+      availableDiskBytes: 240 * 1024 * 1024 * 1024,
+      requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+      hasCompatiblePython: true,
+      isOcrConfigured: false,
+      isNvidiaRuntimeAvailable: false,
+      isGpuUsable: false,
+      recommendedRuntimeTarget: "cpu",
+      title: "Configura OCR",
+      message: "Prepara il runtime OCR locale.",
+      findings: []
+    };
+    const configuredAnalysis = {
+      ...promptAnalysis,
+      shouldPrompt: false,
+      isOcrConfigured: true,
+      title: "",
+      message: ""
+    };
+    let provisionStarted = false;
+    let ocrStatusRequests = 0;
+
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings() },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        handler: () => ({
+          body: provisionStarted && ocrStatusRequests >= 2 ? configuredAnalysis : promptAnalysis
+        })
+      },
+      {
+        path: "/api/dependencies/ocr",
+        handler: () => {
+          ocrStatusRequests += 1;
+
+          if (provisionStarted && ocrStatusRequests >= 3) {
+            return {
+              body: {
+                isConfigured: true,
+                isRunning: false,
+                message: "OCR configurato.",
+                lastError: null,
+                runtimeTarget: "cpu",
+                resolvedRuntime: "cpu",
+                runtimeDetail: null
+              }
+            };
+          }
+
+          return {
+            body: {
+              isConfigured: false,
+              isRunning: provisionStarted,
+              message: provisionStarted ? "Configurazione OCR runtime cpu in corso." : "OCR non configurato.",
+              lastError: null,
+              runtimeTarget: "cpu",
+              resolvedRuntime: "cpu",
+              runtimeDetail: null
+            }
+          };
+        }
+      },
+      {
+        path: "/api/dependencies/ocr/provision",
+        method: "POST",
+        handler: () => {
+          provisionStarted = true;
+          return { body: { started: true, message: "Configurazione OCR avviata." } };
+        }
+      }
+    ]);
+
+    render(<App />);
+    await flushPromises();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    await flushPromises();
+    expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
   });
 
   it("keeps Ollama download behind an explicit confirmed action", async () => {
@@ -147,4 +245,12 @@ function createAppStatus() {
     startedAtUtc: "2026-05-23T20:00:00Z",
     lowResourceMode: false
   };
+}
+
+async function flushPromises() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }

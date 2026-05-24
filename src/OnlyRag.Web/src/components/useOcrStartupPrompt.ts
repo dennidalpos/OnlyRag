@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   apiRequest,
   type DependencyActionResponse,
@@ -52,6 +52,18 @@ export function useOcrStartupPrompt() {
       setIsConfiguring(false);
     }
   }
+
+  useEffect(() => {
+    if (!provisionStatus?.isRunning) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 5_000);
+
+    return () => window.clearInterval(interval);
+  }, [provisionStatus?.isRunning]);
 
   return {
     analysis,
