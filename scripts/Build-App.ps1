@@ -12,6 +12,9 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
+. $supportScript
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "OnlyRag.sln"
 $buildWebScript = Join-Path $PSScriptRoot "Build-Web.ps1"
@@ -26,7 +29,9 @@ if (-not (Test-Path -LiteralPath $webIndex -PathType Leaf)) {
 }
 
 if (-not $NoRestore) {
-    dotnet restore $solution
+    $dotnetCommand = Assert-OnlyRagDotNetSdk
+    & $dotnetCommand.Source restore $solution
 }
 
-dotnet build $solution --configuration $Configuration --no-restore
+$dotnetCommand = Assert-OnlyRagDotNetSdk
+& $dotnetCommand.Source build $solution --configuration $Configuration --no-restore

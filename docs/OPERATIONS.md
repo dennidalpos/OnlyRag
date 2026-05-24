@@ -34,7 +34,8 @@ Optional:
 
 - LibreOffice for legacy Office conversion (`.doc`, `.xls`, `.ppt`) and fallback conversion for
   Office files that cannot be read directly.
-- Python plus OCR requirements for the PaddleOCR bridge when scanned PDF/image OCR is needed.
+- Python 3.10 through 3.13 and Internet access for optional PaddleOCR provisioning when scanned
+  PDF/image OCR is needed. Python 3.14 is not supported by the pinned PaddlePaddle Windows runtime.
 
 ## End-user dependency setup
 
@@ -95,6 +96,8 @@ The bootstrap verifies Windows, PowerShell 7, .NET 10 SDK/runtimes, WebView2 Run
 npm, optional Ollama reachability, optional LibreOffice, and OCR prerequisites when the bridge is
 present. It creates `%LOCALAPPDATA%\OnlyRag`, runs `dotnet restore`, and runs `npm ci` in
 `src\OnlyRag.Web` when `package-lock.json` is present.
+Blocking bootstrap failures identify the missing software, supported version, why OnlyRag needs it,
+the official install action, and the command or Windows UI path to verify it before rerunning setup.
 
 Useful switches:
 
@@ -115,7 +118,7 @@ settings actions above.
 | Developer setup / dependency install | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` | Verifies prerequisites, restores .NET packages, and installs web dependencies when the lockfile is present. |
 | Web dependency install only | `npm ci` from `src\OnlyRag.Web` | npm is the supported package manager; `package-lock.json` is authoritative. |
 | App build | `pwsh .\scripts\Build-App.ps1` | Builds the web UI first, verifies `src\OnlyRag.Web\dist\index.html`, then runs `dotnet restore` and `dotnet build` for `OnlyRag.sln`. Use `-SkipWebBuild` only when web assets already exist, and `-NoRestore` only after a completed .NET restore in the same workspace. |
-| Web build | `pwsh .\scripts\Build-Web.ps1` | Runs `npm ci` when the lockfile exists, then `npm run build`. Use `-SkipInstallWhenUpToDate` only after a completed npm restore in the same workspace. |
+| Web build | `pwsh .\scripts\Build-Web.ps1` | Checks supported Node.js/npm first, runs `npm ci` when the lockfile exists, then `npm run build`. Use `-SkipInstallWhenUpToDate` only after a completed npm restore in the same workspace. |
 | Typecheck | `npm run typecheck` from `src\OnlyRag.Web` | Runs TypeScript without emit. |
 | Web lint | `npm run lint` from `src\OnlyRag.Web` | Runs ESLint over the React/Vite workspace. |
 | Web format check | `npm run format:check` from `src\OnlyRag.Web` | Runs Prettier plus the frontend text-format checker in check mode without rewriting files. |
@@ -150,6 +153,8 @@ Before handoff after technical or documentation changes:
 - Run `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` unless the change is explicitly
   documentation-only and the last successful gate still covers the current working tree.
 - Confirm documented scripts and linked paths exist.
+- Run the Markdown link and documented asset checks when documentation paths or asset references
+  change.
 - Keep generated outputs under ignored paths (`bin`, `obj`, `dist`, `node_modules`, `artifacts`)
   out of source changes unless the artifact is intentionally tracked.
 - Update `PROJECT_STATUS.json` for real residual risks, blocked release work, oversized files, or
@@ -319,6 +324,8 @@ unsigned installer when Inno Setup `ISCC.exe` is installed. For a release candid
 `signtool`, applies a timestamp, and verifies the signature before returning the artifact. See
 [../packaging/README.md](../packaging/README.md) for prerequisites, installer contents, OCR runtime
 packaging strategy, and the pre-release checklist.
+If .NET SDK, Node/npm, or Inno Setup are missing, the build/package scripts stop with an actionable
+prerequisite message before producing a partial installer.
 
 Packaging is distinct from release. Run `scripts\Test-InstallerRelease.ps1` to create the evidence
 artifact required for release verification. Use `-RequireSigned` for signed release candidates.
@@ -336,6 +343,9 @@ artifact required for release verification. Use `-RequireSigned` for signed rele
   `Program Files\Microsoft\EdgeWebView\Application`.
 - Web UI is blank in Debug: run `pwsh .\scripts\Build-Web.ps1`, or start `npm run dev` in
   `src\OnlyRag.Web`.
+- Build or package stops for a missing tool: install the named official prerequisite and run the
+  verification command printed by the script, such as `dotnet --list-sdks`, `node --version`,
+  `npm --version`, or `ISCC.exe /?`.
 - `ONLYRAG_WEB_DEV_SERVER` appears ignored: confirm the value is a loopback `http` or `https` URL,
   for example `http://127.0.0.1:5173/`, and does not include user info.
 - Ollama is offline: confirm the endpoint in **Settings > Ollama**, start Ollama, and for LAN

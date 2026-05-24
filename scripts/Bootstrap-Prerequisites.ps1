@@ -39,14 +39,24 @@ if ($NonInteractive) {
 }
 
 if (-not $IsWindows) {
-    Add-Failure "OnlyRag targets Windows; this bootstrap must be run on Windows."
+    Add-Failure (New-BootstrapPrerequisiteMessage `
+        -Software "Microsoft Windows" `
+        -MinimumVersion "Windows 10 versione 1809/build 17763 o Windows 11" `
+        -WhyRequired "OnlyRag e una app desktop Windows WPF/WebView2 e il bootstrap prepara percorsi utente Windows" `
+        -Instruction "Esegui il bootstrap su un client Windows 10/11 supportato" `
+        -Verify "Premi Win+R, esegui winver e controlla versione/build")
 }
 else {
     Add-Verified "Windows host detected."
 }
 
 if ($PSVersionTable.PSEdition -ne "Core" -or $PSVersionTable.PSVersion.Major -lt 7) {
-    Add-Failure "PowerShell 7+ is required. Current version: $($PSVersionTable.PSVersion)."
+    Add-Failure (New-BootstrapPrerequisiteMessage `
+        -Software "PowerShell" `
+        -MinimumVersion "PowerShell 7 o versione successiva" `
+        -WhyRequired "Gli script repository usano sintassi e comportamento PowerShell 7" `
+        -Instruction "Installa PowerShell 7 dal canale ufficiale Microsoft/GitHub e riesegui il comando con pwsh" `
+        -Verify "Esegui pwsh -NoLogo -Command `$PSVersionTable.PSVersion")
 }
 else {
     Add-Verified "PowerShell $($PSVersionTable.PSVersion) detected."
@@ -55,7 +65,12 @@ else {
 $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
 $canRunDotnet = $false
 if (-not $dotnetCommand) {
-    Add-Failure ".NET CLI was not found. Install .NET 10 SDK for Windows."
+    Add-Failure (New-BootstrapPrerequisiteMessage `
+        -Software ".NET SDK" `
+        -MinimumVersion ".NET 10 SDK per Windows, coerente con global.json 10.0.300 e roll-forward latestFeature" `
+        -WhyRequired "OnlyRag compila una app desktop WPF .NET 10 e un backend ASP.NET Core in-process" `
+        -Instruction "Installa il .NET 10 SDK ufficiale per Windows da https://dotnet.microsoft.com/download/dotnet/10.0" `
+        -Verify "Esegui dotnet --list-sdks e conferma una SDK 10.x")
 }
 else {
     $sdks = @(& $dotnetCommand.Source --list-sdks)
@@ -66,28 +81,48 @@ else {
     $aspNetRuntime10 = @($runtimes | Where-Object { $_ -match '^Microsoft\.AspNetCore\.App\s+10\.' })
 
     if ($sdk10.Count -eq 0) {
-        Add-Failure ".NET 10 SDK was not found. Install .NET 10 SDK for Windows."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software ".NET SDK" `
+            -MinimumVersion ".NET 10 SDK per Windows" `
+            -WhyRequired "Serve per restore, test, build e publish dei progetti OnlyRag" `
+            -Instruction "Installa il .NET 10 SDK ufficiale per Windows, poi riesegui il bootstrap" `
+            -Verify "Esegui dotnet --list-sdks e conferma una SDK 10.x")
     }
     else {
         Add-Verified ".NET 10 SDK detected: $($sdk10[0])."
     }
 
     if ($netRuntime10.Count -eq 0) {
-        Add-Failure ".NET 10 runtime was not found."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software ".NET runtime" `
+            -MinimumVersion ".NET 10 runtime" `
+            -WhyRequired "Serve per eseguire tool e progetti .NET 10 durante lo sviluppo locale" `
+            -Instruction "Installa o ripara il .NET 10 SDK ufficiale, che include il runtime richiesto" `
+            -Verify "Esegui dotnet --list-runtimes e conferma Microsoft.NETCore.App 10.x")
     }
     else {
         Add-Verified ".NET 10 runtime detected: $($netRuntime10[0])."
     }
 
     if ($desktopRuntime10.Count -eq 0) {
-        Add-Failure ".NET 10 Windows Desktop runtime was not found."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software ".NET Windows Desktop runtime" `
+            -MinimumVersion "Microsoft.WindowsDesktop.App 10.x" `
+            -WhyRequired "Serve per eseguire localmente la shell WPF OnlyRag durante sviluppo e test" `
+            -Instruction "Installa o ripara il .NET 10 SDK/Windows Desktop runtime ufficiale per Windows" `
+            -Verify "Esegui dotnet --list-runtimes e conferma Microsoft.WindowsDesktop.App 10.x")
     }
     else {
         Add-Verified ".NET 10 Windows Desktop runtime detected: $($desktopRuntime10[0])."
     }
 
     if ($aspNetRuntime10.Count -eq 0) {
-        Add-Failure ".NET 10 ASP.NET Core runtime was not found."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software ".NET ASP.NET Core runtime" `
+            -MinimumVersion "Microsoft.AspNetCore.App 10.x" `
+            -WhyRequired "Serve per il backend Minimal API in-process durante sviluppo e test" `
+            -Instruction "Installa o ripara il .NET 10 SDK ufficiale per Windows" `
+            -Verify "Esegui dotnet --list-runtimes e conferma Microsoft.AspNetCore.App 10.x")
     }
     else {
         Add-Verified ".NET 10 ASP.NET Core runtime detected: $($aspNetRuntime10[0])."
@@ -101,7 +136,12 @@ if ($webView2Runtime) {
     Add-Verified "WebView2 Runtime detected: $($webView2Runtime.Version)."
 }
 else {
-    Add-Failure "WebView2 Runtime was not found. Install Microsoft Edge WebView2 Runtime manually."
+    Add-Failure (New-BootstrapPrerequisiteMessage `
+        -Software "Microsoft Edge WebView2 Runtime" `
+        -MinimumVersion "Evergreen Runtime corrente per Windows 10 1809+ o Windows 11" `
+        -WhyRequired "OnlyRag mostra la UI React dentro la shell desktop WPF tramite WebView2" `
+        -Instruction "Installa il Microsoft Edge WebView2 Evergreen Runtime dal sito ufficiale Microsoft" `
+        -Verify "Apri Impostazioni > App e cerca Microsoft Edge WebView2 Runtime, oppure verifica msedgewebview2.exe sotto Program Files\Microsoft\EdgeWebView\Application")
 }
 
 $canRunNpm = $false
@@ -119,13 +159,23 @@ else {
     $npmCommand = Get-Command npm -ErrorAction SilentlyContinue
 
     if (-not $nodeCommand) {
-        Add-Failure "Node.js was not found. Install $supportedNodeVersionText for Windows."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software "Node.js" `
+            -MinimumVersion "$supportedNodeVersionText con npm" `
+            -WhyRequired "OnlyRag compila la UI React/Vite inclusa nella app desktop" `
+            -Instruction "Installa Node.js ufficiale per Windows da https://nodejs.org/ con npm incluso" `
+            -Verify "Esegui node --version e npm --version")
     }
     else {
         $nodeVersionText = (& $nodeCommand.Source --version 2>&1 | Out-String).Trim()
         $nodeVersion = ConvertTo-VersionOrNull $nodeVersionText
         if (-not $nodeVersion -or -not (Test-NodeSupportedVersion -Version $nodeVersion)) {
-            Add-Failure "$supportedNodeVersionText is required; found '$nodeVersionText'."
+            Add-Failure (New-BootstrapPrerequisiteMessage `
+                -Software "Node.js" `
+                -MinimumVersion "$supportedNodeVersionText dichiarato in src\OnlyRag.Web\package.json" `
+                -WhyRequired "Vite 7 e il toolchain frontend richiedono una versione Node supportata" `
+                -Instruction "Installa o seleziona una versione Node.js ufficiale supportata per Windows" `
+                -Verify "Esegui node --version; versione rilevata: $nodeVersionText")
         }
         else {
             Add-Verified "Node.js $nodeVersionText detected."
@@ -133,7 +183,12 @@ else {
     }
 
     if (-not $npmCommand) {
-        Add-Failure "npm was not found. Install Node.js with npm."
+        Add-Failure (New-BootstrapPrerequisiteMessage `
+            -Software "npm" `
+            -MinimumVersion "npm incluso con Node.js $supportedNodeVersionText" `
+            -WhyRequired "OnlyRag ripristina le dipendenze frontend da src\OnlyRag.Web\package-lock.json" `
+            -Instruction "Installa Node.js ufficiale per Windows con npm incluso" `
+            -Verify "Esegui npm --version da PowerShell")
     }
     else {
         $npmVersionText = (& $npmCommand.Source --version 2>&1 | Out-String).Trim()

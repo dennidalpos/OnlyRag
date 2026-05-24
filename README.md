@@ -76,6 +76,9 @@ The bootstrap verifies prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores
 installs web dependencies with `npm ci`, and prepares the optional OCR Python environment when
 Python is available. `Build-Web.ps1` produces the static UI consumed by the WPF app when the Vite
 development server is not running.
+When a blocking prerequisite is missing, bootstrap/build/package scripts stop with the software
+name, supported version, reason, official install action, and verification command instead of
+continuing to a generic tool failure.
 
 In Debug builds the WPF shell can use the Vite dev server on loopback. If `ONLYRAG_WEB_DEV_SERVER`
 is set, it must be an `http` or `https` loopback URL without embedded credentials; other URLs are

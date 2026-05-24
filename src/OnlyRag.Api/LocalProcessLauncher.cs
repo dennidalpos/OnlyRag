@@ -1,10 +1,14 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 
 namespace OnlyRag.Api;
 
 public sealed class LocalProcessLauncher : ILocalProcessLauncher
 {
+    internal const int MaxCapturedOutputCharacters = 64 * 1024;
+    private const string OutputTruncatedMarker = "\n[output truncated]";
+
     public bool TryStart(ProcessStartInfo startInfo, out string? errorMessage)
     {
         using Process process = new() { StartInfo = startInfo };
@@ -58,8 +62,8 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
             throw new InvalidOperationException($"Impossibile avviare {fileName}: {ex.Message}", ex);
         }
 
-        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        Task<string> stdoutTask = ReadToEndBoundedAsync(process.StandardOutput, cancellationToken);
+        Task<string> stderrTask = ReadToEndBoundedAsync(process.StandardError, cancellationToken);
         try
         {
             await process.WaitForExitAsync(cancellationToken);
@@ -71,6 +75,42 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
             KillProcessTree(process);
             throw;
         }
+    }
+
+    private static async Task<string> ReadToEndBoundedAsync(
+        TextReader reader,
+        CancellationToken cancellationToken)
+    {
+        char[] buffer = new char[4096];
+        StringBuilder builder = new(capacity: Math.Min(MaxCapturedOutputCharacters, buffer.Length));
+        bool truncated = false;
+
+        while (true)
+        {
+            int read = await reader.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            int remaining = MaxCapturedOutputCharacters - builder.Length;
+            if (remaining > 0)
+            {
+                builder.Append(buffer, 0, Math.Min(read, remaining));
+            }
+
+            if (read > remaining)
+            {
+                truncated = true;
+            }
+        }
+
+        if (truncated)
+        {
+            builder.Append(OutputTruncatedMarker);
+        }
+
+        return builder.ToString();
     }
 
     private static void KillProcessTree(Process process)

@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DocumentsSection } from "./DocumentsSection";
-import { ActionButton } from "./DocumentsSection.helpers";
+import { ActionButton, isOcrCandidate } from "./DocumentsSection.helpers";
 import { mockApi } from "../test/apiMock";
 import {
   createDocument,
@@ -256,5 +256,13 @@ describe("DocumentsSection", () => {
     expect(screen.getByRole("button", { name: "Ricostruisci indice" })).toHaveAccessibleDescription(
       "Ricrea testo, chunk e indice del documento."
     );
+  });
+
+  it("matches supported image extensions for document OCR actions", () => {
+    for (const fileExtension of [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"]) {
+      expect(isOcrCandidate(createDocument({ fileExtension }))).toBe(true);
+    }
+
+    expect(isOcrCandidate(createDocument({ fileExtension: ".txt" }))).toBe(false);
   });
 });

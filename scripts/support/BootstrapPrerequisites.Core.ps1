@@ -46,6 +46,27 @@ function Add-Manual {
     Write-Result -Status "INFO" -Message $Message
 }
 
+function New-BootstrapPrerequisiteMessage {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Software,
+
+        [Parameter(Mandatory)]
+        [string]$MinimumVersion,
+
+        [Parameter(Mandatory)]
+        [string]$WhyRequired,
+
+        [Parameter(Mandatory)]
+        [string]$Instruction,
+
+        [Parameter(Mandatory)]
+        [string]$Verify
+    )
+
+    return "Software: $Software. Versione minima/supportata: $MinimumVersion. Perche serve: $WhyRequired. Istruzione: $Instruction. Verifica: $Verify"
+}
+
 function Invoke-Native {
     param(
         [Parameter(Mandatory)]

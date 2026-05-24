@@ -171,6 +171,35 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public void BackendLog_WriteException_RedactsPathsAndUrls()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "OnlyRag.DiagTests", Guid.NewGuid().ToString("N"));
+        AppStoragePaths paths = AppStoragePaths.FromRoot(root);
+
+        try
+        {
+            Exception ex = new InvalidOperationException(
+                @"failed C:\Users\example\.ollama\secret.txt at https://example.test/token");
+
+            BackendLog.WriteException(paths, "job-xyz", @"processing C:\Users\example\input.pdf", ex);
+
+            string content = File.ReadAllText(Path.Combine(paths.LogsDirectory, "backend.log"));
+            Assert.Contains("InvalidOperationException", content, StringComparison.Ordinal);
+            Assert.Contains("[percorso locale]", content, StringComparison.Ordinal);
+            Assert.Contains("[endpoint esterno]", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("secret.txt", content, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("example.test", content, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void BackendLog_RotatesFileWhenSizeExceedsLimit()
     {
         string root = Path.Combine(Path.GetTempPath(), "OnlyRag.DiagTests", Guid.NewGuid().ToString("N"));

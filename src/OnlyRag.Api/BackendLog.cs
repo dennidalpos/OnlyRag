@@ -17,13 +17,13 @@ internal static class BackendLog
 
     public static void WriteException(AppStoragePaths paths, string? correlationId, string context, Exception exception)
     {
-        string exInfo = $"{exception.GetType().Name}: {exception.Message}";
+        string exInfo = $"{exception.GetType().Name}: {SanitizeLogMessage(exception.Message)}";
         if (exception.InnerException is not null)
         {
-            exInfo += $" [{exception.InnerException.GetType().Name}: {exception.InnerException.Message}]";
+            exInfo += $" [{exception.InnerException.GetType().Name}: {SanitizeLogMessage(exception.InnerException.Message)}]";
         }
 
-        WriteCore(paths, correlationId, $"{context} {exInfo}");
+        WriteCore(paths, correlationId, $"{SanitizeLogMessage(context)} {exInfo}");
     }
 
     public static string ResolveAppVersion()
@@ -37,7 +37,7 @@ internal static class BackendLog
     private static void WriteCore(AppStoragePaths paths, string? correlationId, string message)
     {
         string prefix = correlationId is not null ? $"[{correlationId}] " : string.Empty;
-        string line = $"{DateTimeOffset.Now:O} {prefix}{message}{Environment.NewLine}";
+        string line = $"{DateTimeOffset.Now:O} {prefix}{SanitizeLogMessage(message)}{Environment.NewLine}";
         Debug.Write(line);
 
         try
@@ -51,6 +51,11 @@ internal static class BackendLog
         {
             Debug.WriteLine($"OnlyRag backend log write failed: {ex.Message}");
         }
+    }
+
+    private static string SanitizeLogMessage(string? message)
+    {
+        return UserFacingErrorText.FromExternalDetail(message, "Messaggio log non disponibile.");
     }
 
     private static void RotateIfNeeded(string logPath)

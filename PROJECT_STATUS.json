@@ -1,42 +1,123 @@
 {
   "project_name": "OnlyRag",
-  "last_updated": "2026-05-24T01:07:19+02:00",
   "status": "active",
-  "active_objective": "Complete trusted signed installer verification when external signing prerequisites are available.",
-  "current_plan": [
-    {
-      "execution_order": 1,
-      "priority": "P2",
-      "id": "signed-release",
-      "status": "blocked",
-      "objective": "Complete trusted signed installer verification.",
-      "next_action": "Run scripts\\Sign-Release.ps1 with an external PFX or certificate thumbprint, then scripts\\Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle on a clean Windows machine.",
-      "verify": "Signed installer install, upgrade, rollback, uninstall, signature, and evidence checks pass."
-    }
+  "current_phase": "final_readiness",
+  "last_updated": "2026-05-24T10:41:59+02:00",
+  "production_target": true,
+  "summary": "Windows-first local document RAG desktop app with WPF/WebView2 shell, in-process .NET backend, React/Vite frontend, SQLite/sqlite-vec storage, Ollama integration, optional LibreOffice conversion, optional PaddleOCR runtime, and Inno Setup packaging.",
+  "active_objective": "Maintain final handoff readiness for the current Windows setup, verification, build, installer package, and release-evidence workflow.",
+  "assumptions": [
+    "Local development and packaging are Windows/PowerShell-first, while Node and .NET tooling remain standard package managers within that target.",
+    "Ignored generated outputs currently present in the checkout are reusable local artifacts, not source state."
+  ],
+  "decisions": [
+    "Keep the existing Inno Setup installer technology and add prerequisite checks to existing bootstrap/build/package paths instead of changing installer stack.",
+    "Use shared PowerShell prerequisite helpers for .NET SDK and Node/npm so Build-Web, Build-App, and Build-Installer fail before generic native tool errors.",
+    "Keep optional Ollama, LibreOffice, OCR Python, and NVIDIA OCR acceleration as manual or user-confirmed feature dependencies rather than blocking app installation."
+  ],
+  "current_tasks": [],
+  "next_tasks": [
+    "Run installer lifecycle verification with scripts\\Test-InstallerRelease.ps1 -RunInstallLifecycle on a clean Windows verification machine before release.",
+    "Provide trusted signing material and Windows SDK signtool.exe, then rerun signed release verification with -RequireSigned before publishing.",
+    "Use scripts\\Clean.ps1 before a source-only handoff when generated output directories should be removed from the local checkout."
   ],
   "blockers": [
-    "Signed release verification needs a trusted Windows code-signing certificate, signtool.exe, Inno Setup 6, and a clean Windows verification machine."
-  ],
-  "quality_gates": {
-    "web_typecheck": "passed",
-    "web_lint": "passed",
-    "web_format": "passed",
-    "web_tests": "passed",
-    "web_build": "passed",
-    "dotnet_tests": "passed",
-    "api_ocr_tests": "passed",
-    "ocr_preinstall_script_parse": "passed",
-    "publish_payload": "passed",
-    "installer_prerequisite_self_test": "passed",
-    "build": "passed",
-    "signed_installer": "blocked"
-  },
-  "assumptions": [
-    "Installer OCR setup prepares only the per-user PaddleOCR runtime when compatible Python and Internet access are available; Ollama, LibreOffice, Python, and WebView2 remain user-confirmed external/manual installs.",
-    "Live metrics use 5-second diagnostics polling rather than streaming."
+    "Signed release verification needs a trusted Windows code-signing certificate, signtool.exe, and a clean Windows verification machine."
   ],
   "risks": [
-    "Installer OCR preinstall depends on compatible Python 3.10-3.13, pip network access, and PaddlePaddle wheel availability on the target machine."
+    "Installer OCR preinstall depends on compatible Python 3.10-3.13, pip network access, and PaddlePaddle wheel availability on the target machine.",
+    "Local generated outputs are present under ignored paths; use scripts\\Clean.ps1 when a clean-output handoff is required.",
+    "Installer install/upgrade/uninstall lifecycle was not executed in this pass; package build and non-invasive release evidence passed.",
+    "The produced installer is unsigned until trusted signing material and signtool.exe are provided.",
+    "PaddleOcrEngine still reads OCR bridge stdout/stderr directly; keep OCR bridge output bounded if future bridge changes can emit large diagnostics."
   ],
-  "last_completed_work": "Added a default-selected installer OCR setup task that preinstalls the per-user PaddleOCR runtime and selects NVIDIA GPU wheels when the local driver is compatible."
+  "oversized_files": [
+    "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 446 lines",
+    "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 396 lines",
+    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 395 lines"
+  ],
+  "structure_notes": [
+    "Source roots: src\\OnlyRag.Core, src\\OnlyRag.Worker, src\\OnlyRag.Infrastructure, src\\OnlyRag.Api, src\\OnlyRag.App, src\\OnlyRag.Web.",
+    "Test roots: tests\\OnlyRag.Core.Tests, tests\\OnlyRag.Infrastructure.Tests, tests\\OnlyRag.Api.Tests, tests\\OnlyRag.PlaywrightBackendHost, and src\\OnlyRag.Web\\src\\*.test.* plus src\\OnlyRag.Web\\e2e.",
+    "Build prerequisite helper split: scripts\\support\\BuildPrerequisites.ps1 owns .NET SDK and Node/npm preflight messaging used by build/package scripts.",
+    "Ignored generated outputs currently present: artifacts, bin, obj, src\\OnlyRag.Web\\dist, src\\OnlyRag.Web\\node_modules, src\\OnlyRag.Web\\test-results, and src\\OnlyRag.Web\\tsconfig.tsbuildinfo."
+  ],
+  "dependencies": {
+    "runtime": [
+      ".NET 10 runtime and Windows Desktop runtime",
+      "Microsoft Edge WebView2 Runtime",
+      "Ollama for local or trusted LAN model features",
+      "SQLite with sqlite-vec native asset"
+    ],
+    "development": [
+      "PowerShell 7",
+      ".NET 10 SDK pinned by global.json to 10.0.300 with latestFeature roll-forward",
+      "Node.js ^20.19.0 || >=22.12.0 with npm and package-lock.json",
+      "Python 3.10-3.13 for optional OCR provisioning",
+      "Inno Setup 6 for installer generation",
+      "Windows SDK signtool.exe for signing"
+    ],
+    "external_services": [
+      "Ollama endpoint, normally http://localhost:11434",
+      "Optional LibreOffice executable for legacy Office conversion and PDF export",
+      "Optional pip/package index access for OCR runtime provisioning"
+    ]
+  },
+  "quality_gates": {
+    "preflight": "passed",
+    "bootstrap": "passed",
+    "toolchain_diagnostics": "passed",
+    "package_inventory": "passed",
+    "documented_paths": "passed",
+    "markdown_links": "passed",
+    "scripts_parse": "passed",
+    "installer_prerequisites": "passed",
+    "installer_prerequisite_self_test": "passed",
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests": "passed",
+    "build": "passed",
+    "dependency_audit": "passed",
+    "security_review": "passed",
+    "structure_review": "passed",
+    "package": "passed",
+    "release_evidence": "passed",
+    "installer_lifecycle": "not_run",
+    "signed_installer": "not_run"
+  },
+  "commands": {
+    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
+    "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev",
+    "run": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
+    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
+    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
+    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
+    "test": "Set-Location .\\src\\OnlyRag.Web; npm run test; Set-Location ..\\..; dotnet test .\\OnlyRag.sln --configuration Release --no-restore",
+    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
+    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
+    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
+  },
+  "environment": {
+    "os_target": "Windows 10 1809+ or Windows 11",
+    "shell": "PowerShell 7",
+    "required_env_vars": [],
+    "env_files": [],
+    "local_diagnostics": [
+      "PowerShell 7.6.1",
+      ".NET SDK 10.0.300",
+      "Node.js v22.22.3",
+      "npm 10.9.8",
+      "Installer blocking prerequisites present",
+      "Ollama endpoint reachable at http://localhost:11434",
+      "LibreOffice detected",
+      "Inno Setup 6.7.2 detected",
+      "signtool.exe not found on PATH",
+      "python command resolves to Python 3.14; py launcher also exposes Python 3.10"
+    ]
+  },
+  "last_completed_work": "Completed final readiness pass: bootstrap, full repository gate with installer, and non-invasive installer release evidence passed; OCR document-action extension handling now matches supported image imports.",
+  "open_questions": [],
+  "handoff_notes": "Bootstrap passed with -NonInteractive -SkipOcr. Full gate with -IncludeInstaller passed on this checkout. Non-invasive installer evidence passed and wrote artifacts\\release-verification\\OnlyRag-release-verification-20260524-103909.json. The installer remains unsigned and lifecycle verification was not run; complete those on a clean Windows verification machine before release."
 }

@@ -103,6 +103,27 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsImport_NormalizesSubmittedFileNamesInPerFileResults()
+    {
+        LocalJobQueueDescriptor queueDescriptor = new("filename-response-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0);
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(queueDescriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        using MultipartFormDataContent content = new();
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("invalid")), "files", @"C:\Users\Example\Unsupported.json");
+
+        using HttpResponseMessage importResponse = await httpClient.PostAsync("/api/documents/import", content);
+        DocumentImportResponse? importPayload = await importResponse.Content.ReadFromJsonAsync<DocumentImportResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, importResponse.StatusCode);
+        Assert.NotNull(importPayload);
+        DocumentImportFileResult result = Assert.Single(importPayload.Results);
+        Assert.False(result.Succeeded);
+        Assert.Equal("Unsupported.json", result.FileName);
+        Assert.DoesNotContain(@"\Users\", result.FileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DocumentsImport_RejectsFileLargerThanConfiguredLimitAndLeavesNoOriginals()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("upload-file-limit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

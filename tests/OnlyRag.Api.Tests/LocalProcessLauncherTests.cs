@@ -38,6 +38,26 @@ public sealed class LocalProcessLauncherTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_CapsCapturedOutput()
+    {
+        LocalProcessLauncher launcher = new();
+        string command = "$text = 'x' * 70000; [Console]::Out.Write($text); [Console]::Error.Write($text)";
+        string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+
+        LocalProcessResult result = await launcher.RunAsync(
+            ResolvePowerShellExecutable(),
+            ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedCommand],
+            workingDirectory: null,
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.StandardOutput.Length <= LocalProcessLauncher.MaxCapturedOutputCharacters + 32);
+        Assert.True(result.StandardError.Length <= LocalProcessLauncher.MaxCapturedOutputCharacters + 32);
+        Assert.Contains("[output truncated]", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("[output truncated]", result.StandardError, StringComparison.Ordinal);
+    }
+
     private static string ResolvePowerShellExecutable()
     {
         return ResolveExecutable("pwsh.exe") ?? ResolveExecutable("powershell.exe") ?? "pwsh";

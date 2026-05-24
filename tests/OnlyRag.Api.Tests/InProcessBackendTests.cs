@@ -172,10 +172,10 @@ public sealed partial class InProcessBackendTests
 
     private static void DeleteDirectoryWithRetry(string path)
     {
-        const int maxAttempts = 10;
-        SqliteConnection.ClearAllPools();
+        const int maxAttempts = 20;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            ReleaseSqliteFileHandles();
             try
             {
                 Directory.Delete(path, recursive: true);
@@ -191,7 +191,20 @@ public sealed partial class InProcessBackendTests
                 SqliteConnection.ClearAllPools();
                 System.Threading.Thread.Sleep(100 * attempt);
             }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException(
+                    $"Could not delete temporary backend storage after {maxAttempts} attempts. Path: {path}",
+                    ex);
+            }
         }
+    }
+
+    private static void ReleaseSqliteFileHandles()
+    {
+        SqliteConnection.ClearAllPools();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
     }
 
     private sealed class FakeProcessLauncher : ILocalProcessLauncher

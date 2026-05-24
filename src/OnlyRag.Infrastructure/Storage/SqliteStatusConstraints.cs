@@ -5,13 +5,15 @@ namespace OnlyRag.Infrastructure.Storage;
 
 internal static class SqliteStatusConstraints
 {
-    public const string JobStatusPredicate = "'Pending', 'Running', 'Pausing', 'Completed', 'Failed', 'Cancelled', 'Paused'";
-    public const string TranslationStatusPredicate = "'Queued', 'Running', 'Completed', 'Failed'";
-    public const string TranslationUnitStatusPredicate = "'Pending', 'Completed', 'Failed', 'Corrected'";
+    private static readonly string[] TranslationStatuses = ["Queued", "Running", "Completed", "Failed"];
+
+    public static readonly string JobStatusPredicate = BuildSqlLiteralList(Enum.GetNames<JobStatus>());
+    public static readonly string TranslationStatusPredicate = BuildSqlLiteralList(TranslationStatuses);
+    public static readonly string TranslationUnitStatusPredicate = BuildSqlLiteralList(["Pending", "Completed", "Failed", "Corrected"]);
 
     public static void ValidateTranslationStatus(string status)
     {
-        if (!IsAllowed(status, ["Queued", "Running", "Completed", "Failed"]))
+        if (!IsAllowed(status, TranslationStatuses))
         {
             throw new ArgumentOutOfRangeException(nameof(status), status, "Translation status is not supported.");
         }
@@ -41,6 +43,11 @@ internal static class SqliteStatusConstraints
         }
 
         return string.Join(", ", statuses.Select(FormatJobStatusLiteral));
+    }
+
+    private static string BuildSqlLiteralList(IEnumerable<string> statuses)
+    {
+        return string.Join(", ", statuses.Select(status => $"'{status}'"));
     }
 
     private static string FormatJobStatusLiteral(JobStatus status)

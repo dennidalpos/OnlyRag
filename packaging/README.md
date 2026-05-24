@@ -11,7 +11,7 @@ Build the installer from PowerShell 7:
 pwsh .\scripts\Build-Installer.ps1
 ```
 
-The script runs the React/Vite build first, publishes the WPF app with `dotnet publish`, validates the publish payload, and then compiles `packaging\OnlyRag.iss` with Inno Setup when `ISCC.exe` is available.
+The script checks .NET SDK and Node/npm prerequisites, runs the React/Vite build, publishes the WPF app with `dotnet publish`, validates the publish payload, and then compiles `packaging\OnlyRag.iss` with Inno Setup when `ISCC.exe` is available. Missing build prerequisites stop packaging with the software name, supported version, reason, install instruction, and verification command before an installer is produced.
 Pass a real code-signing certificate thumbprint to produce a signed release candidate:
 
 ```powershell

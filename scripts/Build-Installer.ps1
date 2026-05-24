@@ -60,10 +60,7 @@ foreach ($directory in @($publishDir, $installerDir)) {
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
 }
 
-$dotnetCommand = Get-Command "dotnet" -ErrorAction SilentlyContinue
-if (-not $dotnetCommand) {
-    throw "dotnet was not found. Install .NET 10 SDK for Windows."
-}
+$dotnetCommand = Assert-OnlyRagDotNetSdk
 
 Write-Host "Building React/Vite UI..." -ForegroundColor Cyan
 Invoke-OnlyRagWebBuild -WebRoot $webRoot
@@ -88,7 +85,12 @@ Test-OnlyRagPublishPayload -Path $publishDir
 
 $iscc = Get-OnlyRagInnoSetupCompiler -RequestedPath $InnoSetupCompiler
 if (-not $iscc) {
-    throw "Inno Setup 6 compiler (ISCC.exe) was not found. dotnet publish completed at '$publishDir', but the installer was not generated."
+    throw (New-OnlyRagPrerequisiteMessage `
+        -Software "Inno Setup compiler (ISCC.exe)" `
+        -MinimumVersion "Inno Setup 6" `
+        -WhyRequired "OnlyRag uses the existing Inno Setup script packaging\OnlyRag.iss to generate the Windows installer" `
+        -Instruction "Install the official Inno Setup 6 package from https://jrsoftware.org/isinfo.php or pass -InnoSetupCompiler with the path to ISCC.exe, then rerun the command" `
+        -Verify "Run ISCC.exe /? or confirm ISCC.exe exists under Program Files\Inno Setup 6")
 }
 
 Write-Host "Compiling Inno Setup installer..." -ForegroundColor Cyan

@@ -1,6 +1,5 @@
 import type { ImportedDocument, OcrLanguage } from "../api";
-
-const DEFAULT_OCR_LANGUAGE = "it";
+import { DEFAULT_OCR_LANGUAGE } from "./DocumentsSection.controllerHelpers";
 
 export const statusLabels: Record<string, string> = {
   Imported: "Importato",
@@ -17,7 +16,7 @@ export function getDocumentStatusClassName(status: string): string {
 
 export function isOcrCandidate(document: ImportedDocument): boolean {
   const ext = document.fileExtension?.toLowerCase() ?? "";
-  return [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"].includes(ext);
+  return [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"].includes(ext);
 }
 
 export function getDefaultOcrLanguage(languages: OcrLanguage[]): string {

@@ -7,10 +7,8 @@ import {
   type OllamaStatusResponse
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
-import {
-  clamp,
-  getMaxDocumentsPanelWidth
-} from "./ChatSection.helpers";
+import { clampNumber } from "../numberUtils";
+import { getMaxDocumentsPanelWidth } from "./ChatSection.helpers";
 import {
   clearChatDraft,
   clearChatSession,
@@ -91,7 +89,7 @@ export function ChatSection({
         maxDocumentsPanelWidth,
         minChatPanelWidth
       );
-      const nextWidth = clamp(
+      const nextWidth = clampNumber(
         event.clientX - layoutRect.left,
         minDocumentsPanelWidth,
         maxAllowedWidth
@@ -290,7 +288,7 @@ export function ChatSection({
       }
 
       const delta = event.key === "ArrowLeft" ? -24 : 24;
-      return clamp(current + delta, minDocumentsPanelWidth, maxAllowedWidth);
+      return clampNumber(current + delta, minDocumentsPanelWidth, maxAllowedWidth);
     });
   }
 

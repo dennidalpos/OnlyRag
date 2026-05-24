@@ -102,14 +102,14 @@ export function loadDocumentsPanelWidth(min: number, max: number): number {
     maxCharacters: 16
   });
   const saved = raw === null ? NaN : Number(raw);
-  return Number.isFinite(saved) ? clamp(saved, min, max) : 220;
+  return Number.isFinite(saved) ? clampNumber(saved, min, max) : 220;
 }
 
 export function saveDocumentsPanelWidth(width: number, min: number, max: number): void {
   writeBoundedStorageItem(
     window.localStorage,
     documentsPanelWidthStorageKey,
-    String(clamp(width, min, max)),
+    String(clampNumber(width, min, max)),
     { maxCharacters: 16 }
   );
 }
@@ -249,8 +249,4 @@ function parseNullableFiniteNumber(value: unknown): number | null | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return clampNumber(value, min, max);
 }

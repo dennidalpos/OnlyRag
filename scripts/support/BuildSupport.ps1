@@ -1,5 +1,7 @@
 #requires -Version 7.0
 
+. (Join-Path $PSScriptRoot "BuildPrerequisites.ps1")
+
 function Invoke-OnlyRagNative {
     param(
         [Parameter(Mandatory)]
@@ -54,10 +56,8 @@ function Invoke-OnlyRagWebBuild {
         [switch]$SkipInstallWhenUpToDate
     )
 
-    $npmCommand = Get-Command "npm" -ErrorAction SilentlyContinue
-    if (-not $npmCommand) {
-        throw "npm was not found. Install Node.js to build src\OnlyRag.Web."
-    }
+    $nodeToolchain = Assert-OnlyRagNodeToolchain
+    $npmCommand = $nodeToolchain.Npm
 
     $npmUpToDate = Test-OnlyRagNpmModulesUpToDate -WebRoot $WebRoot
     if ($SkipInstallWhenUpToDate -and $npmUpToDate) {

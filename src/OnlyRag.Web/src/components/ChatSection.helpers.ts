@@ -1,9 +1,3 @@
-import { clampNumber } from "../numberUtils";
-
-export function clamp(value: number, min: number, max: number): number {
-  return clampNumber(value, min, max);
-}
-
 export function getMaxDocumentsPanelWidth(
   layout: HTMLDivElement | null,
   minDocumentsPanelWidth: number,

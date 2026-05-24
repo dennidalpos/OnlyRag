@@ -117,10 +117,11 @@ public static partial class InProcessBackend
         string ocrLanguage,
         CancellationToken cancellationToken)
     {
+        string resultFileName = NormalizeSubmittedFileNameForResponse(file.FileName);
         if (file.Length <= 0)
         {
             return DocumentImportFileResult.Failed(
-                file.FileName,
+                resultFileName,
                 "Il file e vuoto.",
                 "document_import_empty_file");
         }
@@ -134,22 +135,34 @@ public static partial class InProcessBackend
                 forceOcr,
                 ocrLanguage,
                 cancellationToken);
-            return DocumentImportFileResult.Imported(file.FileName, imported);
+            return DocumentImportFileResult.Imported(resultFileName, imported);
         }
         catch (ArgumentException ex)
         {
-            return DocumentImportFileResult.Failed(file.FileName, ex.Message, "document_import_invalid");
+            return DocumentImportFileResult.Failed(resultFileName, ex.Message, "document_import_invalid");
         }
         catch (DocumentStorageLimitException ex)
         {
-            return DocumentImportFileResult.Failed(file.FileName, ex.Message, "document_storage_limit");
+            return DocumentImportFileResult.Failed(resultFileName, ex.Message, "document_storage_limit");
         }
         catch (InvalidOperationException)
         {
             return DocumentImportFileResult.Failed(
-                file.FileName,
+                resultFileName,
                 "Il file non puo essere salvato nella libreria locale.",
                 "document_import_invalid_path");
+        }
+    }
+
+    private static string NormalizeSubmittedFileNameForResponse(string fileName)
+    {
+        try
+        {
+            return SafeDocumentPath.NormalizeFileName(fileName);
+        }
+        catch (ArgumentException)
+        {
+            return "file";
         }
     }
 }
