@@ -152,7 +152,7 @@ describe("ChatSection", () => {
     expect(window.localStorage.getItem(chatStorageKeys.draft)).toBeNull();
   });
 
-  it("preserves a valid chat-specific model when defaults refresh", async () => {
+  it("preserves a valid chat-specific model on load and applies a changed saved default", async () => {
     window.sessionStorage.setItem(
       "onlyrag.chat.session",
       JSON.stringify({
@@ -164,20 +164,38 @@ describe("ChatSection", () => {
     );
     mockApi([{ path: "/api/documents", response: [] }]);
 
-    render(
+    const { rerender } = render(
       <ChatSection
         models={[
           createModel({ name: "llama3.2:3b", model: "llama3.2:3b" }),
-          createModel({ name: "mistral:7b", model: "mistral:7b" })
+          createModel({ name: "mistral:7b", model: "mistral:7b" }),
+          createModel({ name: "qwen2.5:7b", model: "qwen2.5:7b" })
         ]}
         defaultModel="llama3.2:3b"
-        ollamaStatus={createOllamaStatus({ installedModelCount: 2 })}
+        ollamaStatus={createOllamaStatus({ installedModelCount: 3 })}
         loadError={null}
       />
     );
 
     const select = await screen.findByLabelText("Modello chat");
     expect(select).toHaveValue("mistral:7b");
-    expect(window.sessionStorage.getItem("onlyrag.chat.session")).toContain("mistral:7b");
+
+    rerender(
+      <ChatSection
+        models={[
+          createModel({ name: "llama3.2:3b", model: "llama3.2:3b" }),
+          createModel({ name: "mistral:7b", model: "mistral:7b" }),
+          createModel({ name: "qwen2.5:7b", model: "qwen2.5:7b" })
+        ]}
+        defaultModel="qwen2.5:7b"
+        ollamaStatus={createOllamaStatus({ installedModelCount: 3 })}
+        loadError={null}
+      />
+    );
+
+    expect(select).toHaveValue("qwen2.5:7b");
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem("onlyrag.chat.session")).toContain("qwen2.5:7b")
+    );
   });
 });

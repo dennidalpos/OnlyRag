@@ -13,6 +13,7 @@ export function OcrEngineSettingsPanel() {
   const {
     ocrFormState,
     diagnostics,
+    diagnosticsStatus,
     applyOcrProfile,
     updateOcrSettings,
     saveOcrSettings,
@@ -21,7 +22,8 @@ export function OcrEngineSettingsPanel() {
   } = useSettingsSectionContext();
   const gpuCapability = diagnostics?.ocrGpuCapability ?? null;
   const isGpuUsable = Boolean(gpuCapability?.isUsable);
-  const gpuBlockReason = gpuCapability?.blockReason ?? "Verifica diagnostica OCR GPU non ancora disponibile.";
+  const isDiagnosticsLoading = diagnosticsStatus === "loading";
+  const gpuBlockReason = gpuCapability?.blockReason ?? "GPU OCR non disponibile.";
 
   return (
         <div className="settings-card settings-card--wide">
@@ -205,7 +207,12 @@ export function OcrEngineSettingsPanel() {
               />
               <span>Correzione deformazione documento</span>
             </label>
-            {!isGpuUsable && (
+            {isDiagnosticsLoading && (
+              <div className="panel-note" role="status">
+                <p>Verifica diagnostica OCR GPU in corso.</p>
+              </div>
+            )}
+            {!isDiagnosticsLoading && !isGpuUsable && (
               <div className="panel-note panel-note--warning" role="status">
                 <p>GPU OCR non selezionabile: {gpuBlockReason}</p>
               </div>

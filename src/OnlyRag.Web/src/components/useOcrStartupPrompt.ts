@@ -33,7 +33,7 @@ export function useOcrStartupPrompt() {
         method: "POST",
         body: JSON.stringify({
           confirmed: true,
-          runtimeTarget: analysis.recommendedRuntimeTarget
+          runtimeTarget: "cpu"
         })
       });
       await refresh();

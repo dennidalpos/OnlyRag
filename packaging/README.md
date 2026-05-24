@@ -80,12 +80,12 @@ The setup checks Windows version and WebView2 before copying files. If either bl
 | Ollama | Optional chat, embeddings, translation model features | Manual/user-initiated official Ollama install | Settings dependency status and setup gate |
 | LibreOffice | Optional legacy Office conversion and PDF export fallback | Manual install or configured `soffice.exe` path | Settings converter status and document job component status |
 | Python 3.10 through 3.13 plus PaddleOCR packages | Optional OCR for scanned PDFs/images | Default-selected installer setup task prepares a per-user venv when Python and Internet access are available; Settings/bootstrap can repair it | Installer OCR setup task, Settings > Configura OCR, and OCR availability check |
-| NVIDIA driver plus pinned PaddlePaddle GPU wheel | Optional OCR acceleration | Auto-selected by installer OCR setup task and Settings > Configura OCR for CUDA 12.9, 12.6, or 11.8 when `nvidia-smi` reports a compatible driver | Installer ready memo, OCR provisioning status, and bridge GPU check |
+| NVIDIA driver plus pinned PaddlePaddle GPU wheel | Optional OCR acceleration | User-selected from Settings > Configura OCR NVIDIA for CUDA 12.9, 12.6, or 11.8 when diagnostics detect a compatible local NVIDIA path | Installer ready memo, OCR provisioning status, and bridge GPU check |
 
 External and configurable:
 
 - Ollama is not bundled. Install and configure it separately for model features.
-- OCR/PaddleOCR runtime packages and OCR models are optional and are not bundled in the installer. The supported strategy is a per-user Python virtual environment under `%LOCALAPPDATA%\OnlyRag\ocr-python`, prepared by the default-selected installer OCR setup task, **Configura OCR** in Settings, or the developer bootstrap from pinned `scripts\ocr\requirements.txt` versions and verified against `scripts\ocr\runtime-manifest.json`. GPU OCR uses separate pinned NVIDIA requirement files for CUDA 12.9, CUDA 12.6, or CUDA 11.8 and falls back to CPU when the local driver is not compatible.
+- OCR/PaddleOCR runtime packages and OCR models are optional and are not bundled in the installer. The supported strategy is a per-user Python virtual environment under `%LOCALAPPDATA%\OnlyRag\ocr-python`, prepared by the default-selected installer OCR setup task, **Configura OCR CPU** in Settings, or the developer bootstrap from pinned `scripts\ocr\requirements.txt` versions and verified against `scripts\ocr\runtime-manifest.json`. GPU OCR uses separate pinned NVIDIA requirement files for CUDA 12.9, CUDA 12.6, or CUDA 11.8 and is installed only when the user chooses **Configura OCR NVIDIA** from Settings.
 
 Build-time prerequisites:
 

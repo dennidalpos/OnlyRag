@@ -1,60 +1,59 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "release_signing_blocked_external",
-  "last_updated": "2026-05-24T18:10:20+02:00",
+  "current_phase": "settings_ocr_fix_complete",
+  "last_updated": "2026-05-24T18:51:32+02:00",
   "production_target": true,
-  "active_objective": "All unsigned local checks and installer lifecycle verification are complete; publish only after trusted signing checks pass.",
+  "active_objective": "Settings model propagation, OCR provisioning choice, diagnostics messaging, and compact Settings UI are implemented; signed release verification remains externally blocked.",
   "assumptions": [
     "Local development is Windows/PowerShell-first.",
-    "Generated outputs may remain in ignored paths until a clean handoff is requested.",
-    "Installer lifecycle verification was run on this Windows user profile after deleting OnlyRag local data, not on a freshly provisioned OS image."
+    "Saved default models must apply immediately to active Chat and Translation selections.",
+    "PaddleOCR CPU is the default install target; NVIDIA GPU support requires explicit user choice."
   ],
-  "residual_plan": [
+  "current_tasks": [],
+  "next_tasks": [
     {
-      "priority": 1,
+      "priority": 8,
       "task": "Provide trusted code-signing certificate and Windows SDK signtool.exe, then run signed release verification.",
-      "command": "pwsh .\\scripts\\Sign-Release.ps1; pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned",
       "status": "blocked",
       "blocked_by": "Trusted signing material is not available on this machine."
     },
     {
-      "priority": 2,
+      "priority": 9,
       "task": "Clean generated local outputs before source-only handoff if requested.",
-      "command": "pwsh .\\scripts\\Clean.ps1",
-      "status": "optional",
-      "blocked_by": ""
+      "status": "optional"
+    },
+    {
+      "priority": 10,
+      "task": "Consider splitting the Settings controller state/effect wiring if future Settings work expands it further.",
+      "status": "optional"
     }
   ],
   "blockers": [
     "Trusted Windows code-signing certificate required for signed release verification."
   ],
   "risks": [
-    "Unsigned installer may trigger Windows SmartScreen warnings.",
-    "Public release sign-off may still require repeating lifecycle verification on an independent clean Windows machine after signing.",
-    "Installer OCR preinstall depends on compatible Python 3.10-3.13, network access, and PaddlePaddle wheel availability.",
-    "Large source files remain review-only follow-ups and should not be split during release verification unless a targeted refactor is requested."
+    "OCR provisioning depends on compatible Python 3.10-3.13, network access, and PaddlePaddle wheel availability.",
+    "Unsigned installer may trigger Windows SmartScreen warnings until signed release verification is completed."
   ],
   "oversized_files": [
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 446 lines",
-    "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 396 lines",
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 395 lines",
-    "src\\OnlyRag.Api\\DependencyProvisioningService.Ocr.cs: 384 lines",
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts: 355 lines"
+    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts: 367 lines; above review threshold but below split threshold, left intact to avoid an unrelated controller refactor."
   ],
   "quality_gates": {
-    "gate": "passed",
-    "package": "passed",
-    "release_evidence": "passed",
-    "ocr_provisioning": "passed",
-    "installer_lifecycle": "passed",
-    "signed_installer": "not_run"
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests": "passed",
+    "build": "passed",
+    "security_review": "not_run",
+    "structure_review": "passed"
   },
   "commands": {
     "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "release_evidence": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe",
-    "installer_lifecycle": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle",
+    "web_test_unit": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
+    "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
+    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
+    "dotnet_test": "dotnet test .\\OnlyRag.sln",
     "clean": "pwsh .\\scripts\\Clean.ps1"
   },
   "environment": {
@@ -67,5 +66,5 @@
       "Windows SDK signtool.exe for signing"
     ]
   },
-  "last_completed_work": "Deleted local OnlyRag user data, re-ran the full Release gate, rebuilt the unsigned installer, passed installer lifecycle verification, and removed local OnlyRag user data/install remnants afterward; signed release verification remains blocked on trusted code-signing input."
+  "last_completed_work": "Implemented Settings fixes for saved model propagation, explicit CPU/NVIDIA OCR provisioning, cached/neutral diagnostics messaging, compact cards, and accessible remove-model icon controls; frontend typecheck, lint, format check, unit tests, and build passed."
 }

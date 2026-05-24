@@ -3,6 +3,7 @@ import { useSettingsSectionContext } from "../SettingsSectionContext";
 export function DiagnosticsPanel() {
   const {
     diagnostics,
+    diagnosticsStatus,
     ocrProvisionStatus,
     refreshDiagnostics,
     isBusy,
@@ -19,7 +20,12 @@ export function DiagnosticsPanel() {
     ? "Configurazione OCR..."
     : canRepairOcrRuntime
       ? "Ripara OCR"
-      : "Configura OCR";
+      : "Configura OCR CPU";
+  const canOfferNvidiaOcrProvision = Boolean(
+    diagnostics?.ocrGpuCapability.nvidiaName
+    || diagnostics?.ocrGpuCapability.driverVersion
+    || diagnostics?.systemTelemetry.gpu
+  );
 
   return (
         <div className="settings-card">
@@ -84,6 +90,10 @@ export function DiagnosticsPanel() {
                   </div>
                 )}
               </>
+            ) : diagnosticsStatus === "loading" ? (
+              <div className="panel-note" role="status">
+                <p>Lettura diagnostica in corso.</p>
+              </div>
             ) : (
               <div className="panel-note">
                 <p>Dati diagnostici non disponibili.</p>
@@ -104,11 +114,21 @@ export function DiagnosticsPanel() {
               <button
                 type="button"
                 className="button-secondary"
-                onClick={() => void configureOcrRuntime()}
+                onClick={() => void configureOcrRuntime("cpu")}
                 disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
               >
                 {ocrConfigureButtonLabel}
               </button>
+              {canOfferNvidiaOcrProvision && (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => void configureOcrRuntime("nvidia")}
+                  disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
+                >
+                  Configura OCR NVIDIA
+                </button>
+              )}
               {ocrProvisionStatus?.isRunning && (
                 <button
                   type="button"

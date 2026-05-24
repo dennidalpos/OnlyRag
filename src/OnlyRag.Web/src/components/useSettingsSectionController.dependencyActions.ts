@@ -38,6 +38,7 @@ export type SettingsSectionDependencyActionParams = {
   setOcrLanguages: Dispatch<SetStateAction<OcrLanguage[]>>;
   setOfficeStatus: Dispatch<SetStateAction<OfficeConverterStatusResponse | null>>;
   setDiagnostics: Dispatch<SetStateAction<DiagnosticsResponse | null>>;
+  setDiagnosticsStatus: Dispatch<SetStateAction<"loading" | "ready" | "unavailable">>;
   setOllamaInstallStatus: Dispatch<SetStateAction<OllamaInstallStatus | null>>;
   setOcrProvisionStatus: Dispatch<SetStateAction<OcrProvisionStatus | null>>;
   setInfoMessage: Dispatch<SetStateAction<string | null>>;
@@ -60,6 +61,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     setOcrLanguages,
     setOfficeStatus,
     setDiagnostics,
+    setDiagnosticsStatus,
     setOllamaInstallStatus,
     setOcrProvisionStatus,
     setInfoMessage,
@@ -140,10 +142,14 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
   }
 
   async function refreshDiagnostics() {
+    setDiagnosticsStatus((current) => current === "ready" ? current : "loading");
     try {
       const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
       setDiagnostics(data);
+      setDiagnosticsStatus("ready");
     } catch {
+      setDiagnostics(null);
+      setDiagnosticsStatus("unavailable");
       // Diagnostics are non-critical; silence the error to avoid overwriting other messages.
     }
   }
@@ -198,13 +204,13 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     }
   }
 
-  async function configureOcrRuntime() {
+  async function configureOcrRuntime(runtimeTarget: OcrProvisionRequest["runtimeTarget"] = "cpu") {
     setIsBusy(true);
     setErrorMessage(null);
     setInfoMessage(null);
 
     try {
-      const request: OcrProvisionRequest = { confirmed: true, runtimeTarget: "auto" };
+      const request: OcrProvisionRequest = { confirmed: true, runtimeTarget };
       const response = await apiRequest<DependencyActionResponse>("/api/dependencies/ocr/provision", {
         method: "POST",
         body: JSON.stringify(request)

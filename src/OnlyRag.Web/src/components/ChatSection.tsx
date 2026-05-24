@@ -40,6 +40,7 @@ export function ChatSection({
   const minChatPanelWidth = 360;
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatLayoutRef = useRef<HTMLDivElement | null>(null);
+  const previousDefaultModelRef = useRef<string | null>(defaultModel);
   const [selectedModel, setSelectedModel] = useState(() => loadChatSession()?.selectedModel ?? "");
   const [documents, setDocuments] = useState<ImportedDocument[]>([]);
 
@@ -119,6 +120,17 @@ export function ChatSection({
     }
 
     setSelectedModel((current) => {
+      const previousDefaultModel = previousDefaultModelRef.current;
+      previousDefaultModelRef.current = defaultModel;
+
+      if (
+        defaultModel
+        && modelNames.includes(defaultModel)
+        && defaultModel !== previousDefaultModel
+      ) {
+        return defaultModel;
+      }
+
       if (current && modelNames.includes(current)) {
         return current;
       }

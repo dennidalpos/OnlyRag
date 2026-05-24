@@ -44,6 +44,7 @@ export type SettingsSectionProps = {
   settings: OllamaSettings | null;
   status: OllamaStatusResponse | null;
   models: OllamaModel[];
+  initialDiagnostics?: DiagnosticsResponse | null;
   loadError: string | null;
   onDataChanged: () => Promise<void>;
 };
@@ -52,6 +53,7 @@ export function useSettingsSectionController({
   settings,
   status,
   models,
+  initialDiagnostics = null,
   loadError,
   onDataChanged
 }: SettingsSectionProps) {
@@ -71,7 +73,9 @@ export function useSettingsSectionController({
   const [savedOcrFormState, setSavedOcrFormState] = useState<OcrSettings>(emptyOcrSettings);
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>([]);
   const [officeStatus, setOfficeStatus] = useState<OfficeConverterStatusResponse | null>(null);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(initialDiagnostics);
+  const [diagnosticsStatus, setDiagnosticsStatus] =
+    useState<"loading" | "ready" | "unavailable">(initialDiagnostics ? "ready" : "loading");
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ocrProvisionStatus, setOcrProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
@@ -102,6 +106,13 @@ export function useSettingsSectionController({
       }));
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (initialDiagnostics) {
+      setDiagnostics(initialDiagnostics);
+      setDiagnosticsStatus("ready");
+    }
+  }, [initialDiagnostics]);
 
   useEffect(() => {
     void actions.refreshOfficeConverter();
@@ -250,6 +261,7 @@ export function useSettingsSectionController({
     setOcrLanguages,
     setOfficeStatus,
     setDiagnostics,
+    setDiagnosticsStatus,
     setOllamaInstallStatus,
     setOcrProvisionStatus,
     setModelToInstall,
@@ -319,6 +331,7 @@ export function useSettingsSectionController({
     setModelToInstall,
     officeStatus,
     diagnostics,
+    diagnosticsStatus,
     ollamaInstallStatus,
     ocrProvisionStatus,
     ocrLanguages,

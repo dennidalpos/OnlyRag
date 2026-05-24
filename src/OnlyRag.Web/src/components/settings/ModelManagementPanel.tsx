@@ -63,11 +63,15 @@ export function ModelManagementPanel() {
                   <div className="model-row__actions">
                     <button
                       type="button"
-                      className="button-danger model-row__remove"
+                      className="button-danger model-row__remove icon-button"
                       onClick={() => void removeModel(model.name)}
                       disabled={isBusy}
+                      aria-label={`Rimuovi modello ${model.name}`}
+                      title={`Rimuovi ${model.name}`}
                     >
-                      Rimuovi
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM7 9h2l1 11h4l1-11h2l-1 13H8L7 9Z" />
+                      </svg>
                     </button>
                   </div>
                 </div>

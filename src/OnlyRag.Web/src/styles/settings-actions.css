@@ -46,8 +46,8 @@
 .settings-actions button,
 .model-row button {
   flex: 0 1 auto;
-  min-height: 40px;
-  padding: 9px 14px;
+  min-height: 38px;
+  padding: 8px 12px;
   border: 1px solid #2d6f8f;
   border-radius: 8px;
   background: #2d6f8f;
@@ -131,7 +131,7 @@
 .panel-note {
   display: grid;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #f8fafc;
@@ -150,15 +150,16 @@
 
 .model-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .model-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  padding: 14px 16px;
+  align-items: center;
+  padding: 10px 12px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #f8fafc;
@@ -172,13 +173,26 @@
 
 .model-row__actions {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .model-row__remove {
-  width: auto;
-  min-width: 92px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
   justify-self: start;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+}
+
+.icon-button svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
 }
 
 .model-row strong {

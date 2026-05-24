@@ -287,10 +287,12 @@ export default function App() {
               settings={ollamaSettings}
               status={ollamaStatus}
               models={ollamaModels}
+              initialDiagnostics={diagnostics}
               loadError={ollamaLoadError}
               onDataChanged={async () => {
                 await refreshBackendStatus();
                 await refreshOllamaData();
+                await refreshDiagnostics().catch(() => {});
               }}
             />
           )}

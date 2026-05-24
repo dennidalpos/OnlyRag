@@ -49,13 +49,13 @@ Optional dependencies are configured from **Settings** in the desktop app:
   3.13 and Internet access are available, setup creates or updates
   `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv` before first launch and installs the pinned
   PaddleOCR requirements shipped with the app. The same provisioning remains available through
-  **Configura OCR** for repair/retry. The default `auto` mode selects NVIDIA GPU packages for
-  CUDA 12.9, 12.6, or 11.8 when `nvidia-smi` reports a compatible Windows driver, otherwise it
-  installs the CPU runtime and reports the fallback reason in Diagnostics. GPU selection is blocked
-  until the local PaddleOCR check proves CUDA support with a visible CUDA device. While UI
-  provisioning is running, **Annulla OCR** requests cancellation and the backend stops the active
-  child process tree. UI provisioning is also bounded to 45 minutes, after which OnlyRag records a
-  recoverable timeout status and the user can retry.
+  **Configura OCR CPU** for repair/retry. CPU is the default provisioning target. Settings offers
+  **Configura OCR NVIDIA** only after diagnostics detect a local NVIDIA path, and the user must
+  choose it explicitly before OnlyRag installs CUDA-specific PaddlePaddle packages for CUDA 12.9,
+  12.6, or 11.8. GPU selection remains blocked until the local PaddleOCR check proves CUDA support
+  with a visible CUDA device. While UI provisioning is running, **Annulla OCR** requests
+  cancellation and the backend stops the active child process tree. UI provisioning is also bounded
+  to 45 minutes, after which OnlyRag records a recoverable timeout status and the user can retry.
 
 For Ollama endpoints reachable from another trusted LAN machine, configure Ollama network access
 with `OLLAMA_HOST` in the Ollama environment/settings, then restart Ollama and set the endpoint in
