@@ -90,6 +90,30 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public async Task OllamaModels_UnexpectedResponse_WritesDiagnosticLog()
+    {
+        await using FakeOllamaServer ollama = await FakeOllamaServer.StartWithTagsErrorAsync(
+            HttpStatusCode.InternalServerError,
+            "server-side model registry failure");
+        using TempDiagDescriptor temp = TempDiagDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        await httpClient.PutAsJsonAsync(
+            "/api/settings/ollama",
+            new OllamaSettings(ollama.BaseUrl, null, null, null, 5, 1));
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/api/ollama/models");
+
+        string logPath = Path.Combine(temp.Descriptor.StoragePaths.LogsDirectory, "backend.log");
+        string logContent = File.ReadAllText(logPath);
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Contains("Ollama API unexpected response during /api/ollama/models.", logContent, StringComparison.Ordinal);
+        Assert.Contains("OllamaApiException", logContent, StringComparison.Ordinal);
+        Assert.Contains("Ollama ha restituito lo stato HTTP 500.", logContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BackendLog_WritesToLogsDirectory()
     {
         string root = Path.Combine(Path.GetTempPath(), "OnlyRag.DiagTests", Guid.NewGuid().ToString("N"));

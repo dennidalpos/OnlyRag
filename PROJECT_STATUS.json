@@ -2,7 +2,7 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "final_readiness",
-  "last_updated": "2026-05-24T10:41:59+02:00",
+  "last_updated": "2026-05-24T12:44:31+02:00",
   "production_target": true,
   "summary": "Windows-first local document RAG desktop app with WPF/WebView2 shell, in-process .NET backend, React/Vite frontend, SQLite/sqlite-vec storage, Ollama integration, optional LibreOffice conversion, optional PaddleOCR runtime, and Inno Setup packaging.",
   "active_objective": "Maintain final handoff readiness for the current Windows setup, verification, build, installer package, and release-evidence workflow.",
@@ -117,7 +117,7 @@
       "python command resolves to Python 3.14; py launcher also exposes Python 3.10"
     ]
   },
-  "last_completed_work": "Completed final readiness pass: bootstrap, full repository gate with installer, and non-invasive installer release evidence passed; OCR document-action extension handling now matches supported image imports.",
+  "last_completed_work": "Serialized Ollama generation calls so chat requests wait behind in-flight translation/embedding work instead of competing with the same local model endpoint.",
   "open_questions": [],
   "handoff_notes": "Bootstrap passed with -NonInteractive -SkipOcr. Full gate with -IncludeInstaller passed on this checkout. Non-invasive installer evidence passed and wrote artifacts\\release-verification\\OnlyRag-release-verification-20260524-103909.json. The installer remains unsigned and lifecycle verification was not run; complete those on a clean Windows verification machine before release."
 }

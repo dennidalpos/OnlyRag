@@ -72,6 +72,23 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
         return new FakeOllamaServer(app, ResolveBaseUrl(app), deletedModels, shownModels);
     }
 
+    public static async Task<FakeOllamaServer> StartWithTagsErrorAsync(HttpStatusCode statusCode, string error)
+    {
+        List<string> deletedModels = [];
+        List<string> shownModels = [];
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
+        {
+            Args = []
+        });
+        builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(IPAddress.Loopback, 0));
+        WebApplication app = builder.Build();
+
+        app.MapGet("/api/tags", () => Results.Json(new { error }, statusCode: (int)statusCode, options: JsonOptions));
+
+        await app.StartAsync();
+        return new FakeOllamaServer(app, ResolveBaseUrl(app), deletedModels, shownModels);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await app.DisposeAsync();

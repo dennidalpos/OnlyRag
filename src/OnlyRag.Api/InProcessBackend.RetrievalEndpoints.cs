@@ -49,7 +49,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/chat");
             }
         });
     }

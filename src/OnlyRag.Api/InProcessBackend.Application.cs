@@ -74,6 +74,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOfficeConversionService, LibreOfficeConversionService>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
+        builder.Services.AddSingleton<OllamaGenerationCoordinator>();
         builder.Services.AddSingleton<DependencyProvisioningService>();
         builder.Services.AddSingleton<OcrStartupAnalysisService>();
         builder.Services.AddSingleton<OcrGpuCapabilityService>();

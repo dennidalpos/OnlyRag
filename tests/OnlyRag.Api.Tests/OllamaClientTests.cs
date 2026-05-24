@@ -232,6 +232,79 @@ public sealed class OllamaClientTests
     }
 
     [Fact]
+    public async Task GenerateChatAsync_SerializesConcurrentGenerationRequests()
+    {
+        TaskCompletionSource firstEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource secondEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        int activeRequests = 0;
+        int maxActiveRequests = 0;
+        StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
+        {
+            int call = Interlocked.Increment(ref calls);
+            int active = Interlocked.Increment(ref activeRequests);
+            UpdateMaxActiveRequests(ref maxActiveRequests, active);
+
+            if (call == 1)
+            {
+                firstEntered.SetResult();
+                await releaseFirst.Task.WaitAsync(cancellationToken);
+            }
+            else
+            {
+                secondEntered.SetResult();
+            }
+
+            Interlocked.Decrement(ref activeRequests);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    done = true,
+                    message = new
+                    {
+                        role = "assistant",
+                        content = $"risposta {call}"
+                    }
+                })
+            };
+        });
+        OllamaClient client = CreateClient(handler);
+
+        Task<string> first = client.GenerateChatAsync(
+            "gemma3:4b",
+            [new OllamaChatMessage("user", "prima")]);
+        await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Task<string> second = client.GenerateChatAsync(
+            "gemma3:4b",
+            [new OllamaChatMessage("user", "seconda")]);
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        Assert.False(secondEntered.Task.IsCompleted);
+
+        releaseFirst.SetResult();
+        await Task.WhenAll(first, second);
+
+        Assert.True(secondEntered.Task.IsCompleted);
+        Assert.Equal(1, maxActiveRequests);
+    }
+
+    private static void UpdateMaxActiveRequests(ref int maxActiveRequests, int active)
+    {
+        int current;
+        do
+        {
+            current = Volatile.Read(ref maxActiveRequests);
+            if (active <= current)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref maxActiveRequests, active, current) != current);
+    }
+
+    [Fact]
     public async Task GenerateEmbeddingsAsync_SendsChunkBatchAndReturnsVectors()
     {
         StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
@@ -284,7 +357,8 @@ public sealed class OllamaClientTests
                 null,
                 null,
                 60,
-                1)));
+                1)),
+            new OllamaGenerationCoordinator());
     }
 
     private sealed record PullRequestBody(string Model, bool Stream);

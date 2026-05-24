@@ -25,7 +25,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/settings/ollama");
             }
         });
 
@@ -45,7 +45,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/settings/performance");
             }
         });
 
@@ -178,7 +178,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models");
             }
         });
 
@@ -195,7 +195,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models/pull");
             }
         });
 
@@ -214,7 +214,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models/{name}");
             }
         });
 
@@ -233,7 +233,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models delete");
             }
         });
 
@@ -249,7 +249,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models/{name}/details");
             }
         });
 
@@ -265,7 +265,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/ollama/models/details");
             }
         });
     }

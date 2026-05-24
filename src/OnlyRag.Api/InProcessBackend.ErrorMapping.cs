@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
@@ -25,8 +26,20 @@ public static partial class InProcessBackend
         }
     }
 
-    private static IResult MapOllamaException(OllamaApiException exception)
+    private static IResult MapOllamaException(
+        OllamaApiException exception,
+        IServiceProvider? services = null,
+        string? operation = null)
     {
+        if (exception.Kind == OllamaErrorKind.UnexpectedResponse && services is not null)
+        {
+            InProcessBackendDescriptor descriptor = services.GetRequiredService<InProcessBackendDescriptor>();
+            string context = string.IsNullOrWhiteSpace(operation)
+                ? "Ollama API unexpected response."
+                : $"Ollama API unexpected response during {operation}.";
+            BackendLog.WriteException(descriptor.StoragePaths, null, context, exception);
+        }
+
         return exception.Kind switch
         {
             OllamaErrorKind.InvalidUrl => CreateProblem(

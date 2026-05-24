@@ -14,11 +14,16 @@ internal sealed partial class OllamaClient : IOllamaClient
 
     private readonly HttpClient httpClient;
     private readonly IOllamaSettingsService settingsService;
+    private readonly OllamaGenerationCoordinator generationCoordinator;
 
-    public OllamaClient(HttpClient httpClient, IOllamaSettingsService settingsService)
+    public OllamaClient(
+        HttpClient httpClient,
+        IOllamaSettingsService settingsService,
+        OllamaGenerationCoordinator generationCoordinator)
     {
         this.httpClient = httpClient;
         this.settingsService = settingsService;
+        this.generationCoordinator = generationCoordinator;
     }
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -85,23 +90,25 @@ internal sealed partial class OllamaClient : IOllamaClient
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
 
-        OllamaChatResponse response = await SendAsync<OllamaChatResponse>(
-            HttpMethod.Post,
-            context,
-            "api/chat",
-            new
-            {
-                model = normalizedModelName,
-                stream = false,
-                messages = new[]
+        OllamaChatResponse response = await generationCoordinator.RunAsync(
+            ct => SendAsync<OllamaChatResponse>(
+                HttpMethod.Post,
+                context,
+                "api/chat",
+                new
                 {
-                    new
+                    model = normalizedModelName,
+                    stream = false,
+                    messages = new[]
                     {
-                        role = "user",
-                        content = "ping"
+                        new
+                        {
+                            role = "user",
+                            content = "ping"
+                        }
                     }
-                }
-            },
+                },
+                ct),
             cancellationToken);
 
         if (!response.Done)
@@ -156,11 +163,13 @@ internal sealed partial class OllamaClient : IOllamaClient
                     content = message.Content
                 })
             };
-        OllamaChatResponse response = await SendAsync<OllamaChatResponse>(
-            HttpMethod.Post,
-            context,
-            "api/chat",
-            requestBody,
+        OllamaChatResponse response = await generationCoordinator.RunAsync(
+            ct => SendAsync<OllamaChatResponse>(
+                HttpMethod.Post,
+                context,
+                "api/chat",
+                requestBody,
+                ct),
             cancellationToken);
 
         string content = response.Message?.Content?.Trim() ?? string.Empty;
@@ -246,11 +255,13 @@ internal sealed partial class OllamaClient : IOllamaClient
             ? new { model = normalizedModelName, input = inputPayload, options = new { num_ctx = numCtx.Value } }
             : (object)new { model = normalizedModelName, input = inputPayload };
 
-        EmbeddingResponse response = await SendAsync<EmbeddingResponse>(
-            HttpMethod.Post,
-            context,
-            "api/embed",
-            requestBody,
+        EmbeddingResponse response = await generationCoordinator.RunAsync(
+            ct => SendAsync<EmbeddingResponse>(
+                HttpMethod.Post,
+                context,
+                "api/embed",
+                requestBody,
+                ct),
             cancellationToken);
 
         if (response.Embeddings.Count != inputs.Count)

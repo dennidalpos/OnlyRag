@@ -164,7 +164,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/documents/{id}/embed settings");
             }
 
             if (document.ChunkCount == 0)
@@ -192,7 +192,7 @@ public static partial class InProcessBackend
             }
             catch (OllamaApiException ex)
             {
-                return MapOllamaException(ex);
+                return MapOllamaException(ex, app.Services, "/api/documents/{id}/embed model check");
             }
 
             string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DocumentEmbeddingJobPayload(id, model));
