@@ -23,7 +23,7 @@
           <mxGeometry height="420" width="320" x="1210" y="120" as="geometry" />
         </mxCell>
         <mxCell id="c-external" parent="1" style="swimlane;html=1;startSize=28;rounded=0;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" value="External/local tools" vertex="1">
-          <mxGeometry height="400" width="320" x="1210" y="580" as="geometry" />
+          <mxGeometry height="500" width="320" x="1210" y="580" as="geometry" />
         </mxCell>
         <mxCell id="wpf-app" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="OnlyRag.App&lt;br&gt;WPF startup and shutdown" vertex="1">
           <mxGeometry height="70" width="260" x="80" y="170" as="geometry" />
@@ -70,14 +70,17 @@
         <mxCell id="ollama" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Ollama HTTP API&lt;br&gt;models, chat, embeddings, translation" vertex="1">
           <mxGeometry height="60" width="250" x="1245" y="630" as="geometry" />
         </mxCell>
-        <mxCell id="office" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="LibreOffice soffice.exe&lt;br&gt;legacy Office conversion and PDF export" vertex="1">
+        <mxCell id="qdrant-runtime" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Bundled Qdrant runtime&lt;br&gt;local vector collections and points" vertex="1">
           <mxGeometry height="60" width="250" x="1245" y="710" as="geometry" />
         </mxCell>
+        <mxCell id="office" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="LibreOffice soffice.exe&lt;br&gt;legacy Office conversion and PDF export" vertex="1">
+          <mxGeometry height="60" width="250" x="1245" y="790" as="geometry" />
+        </mxCell>
         <mxCell id="ocr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Python + pip + PaddleOCR bridge&lt;br&gt;OCR provisioning and runtime&lt;br&gt;cancel/timeout stops process tree" vertex="1">
-          <mxGeometry height="85" width="250" x="1245" y="790" as="geometry" />
+          <mxGeometry height="85" width="250" x="1245" y="870" as="geometry" />
         </mxCell>
         <mxCell id="browser-download" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Default browser&lt;br&gt;official Ollama/LibreOffice downloads" vertex="1">
-          <mxGeometry height="60" width="250" x="1245" y="900" as="geometry" />
+          <mxGeometry height="60" width="250" x="1245" y="990" as="geometry" />
         </mxCell>
         <mxCell id="e1" edge="1" parent="1" source="wpf-app" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" target="backend-start">
           <mxGeometry relative="1" as="geometry" />
@@ -121,6 +124,9 @@
         <mxCell id="e14" edge="1" parent="1" source="services" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" target="ollama" value="HTTP model calls">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
+        <mxCell id="e18" edge="1" parent="1" source="infra" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" target="qdrant-runtime" value="vector upsert/search">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="e15" edge="1" parent="1" source="infra" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" target="office" value="process launch">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
@@ -147,8 +153,8 @@
         <mxCell id="start" value="User starts OnlyRag" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="140" width="170" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="startup" value="WPF startup&lt;br&gt;start backend, prepare LocalAppData,&lt;br&gt;migrate SQLite, recover Running jobs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="300" y="125" width="260" height="90" as="geometry" />
+        <mxCell id="startup" value="WPF startup&lt;br&gt;start backend, prepare LocalAppData,&lt;br&gt;migrate SQLite, recover Running jobs,&lt;br&gt;prepare bundled Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="115" width="260" height="110" as="geometry" />
         </mxCell>
         <mxCell id="ui-load" value="WebView2 loads React UI&lt;br&gt;dev server in Debug or static wwwroot&lt;br&gt;injects backend bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="620" y="125" width="260" height="90" as="geometry" />
@@ -159,8 +165,8 @@
         <mxCell id="main-sections" value="User works in sections&lt;br&gt;Documents, Chat, Jobs,&lt;br&gt;Translation, Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="1250" y="130" width="230" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="settings-dependencies" value="Settings dependency actions&lt;br&gt;open official download pages&lt;br&gt;Configura OCR runs Python/pip&lt;br&gt;cancel or 45 min timeout stops process tree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="120" width="240" height="110" as="geometry" />
+        <mxCell id="settings-dependencies" value="Settings dependency actions&lt;br&gt;show Ollama, Qdrant, OCR, Office status&lt;br&gt;open official download pages&lt;br&gt;Configura OCR runs Python/pip&lt;br&gt;cancel or 45 min timeout stops process tree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="110" width="240" height="130" as="geometry" />
         </mxCell>
         <mxCell id="import-start" value="Import documents&lt;br&gt;POST /api/documents/import" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="330" width="240" height="70" as="geometry" />
@@ -179,6 +185,9 @@
         </mxCell>
         <mxCell id="embedding" value="If embedding model exists&lt;br&gt;enqueue document-embedding&lt;br&gt;Ollama embed chunks, upsert Qdrant points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1340" y="445" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="qdrant-flow" value="Qdrant vector store&lt;br&gt;document-scoped points&lt;br&gt;used by hybrid retrieval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="450" width="150" height="90" as="geometry" />
         </mxCell>
         <mxCell id="chat-start" value="Ask a question&lt;br&gt;POST /api/chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="640" width="240" height="70" as="geometry" />
@@ -255,6 +264,9 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pe10" value="optional" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="chunks" target="embedding">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe10b" value="upsert/search" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="embedding" target="qdrant-flow">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pe11" value="Chat" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="main-sections" target="chat-start">

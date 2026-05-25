@@ -2,21 +2,13 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "release-residuals",
-  "last_updated": "2026-05-25T11:58:05+02:00",
+  "last_updated": "2026-05-25T12:31:00+02:00",
   "production_target": true,
   "active_objective": "Chiudere i residui bloccanti e verificare il candidato Windows prima della pubblicazione.",
   "execution_plan": [
     {
       "priority": "P1",
       "order": 1,
-      "task": "Eseguire gate release completo con installer.",
-      "command": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
-      "residual": "Serve conferma completa di restore, audit, test, build e packaging installer sullo stato corrente.",
-      "status": "pending"
-    },
-    {
-      "priority": "P1",
-      "order": 2,
       "task": "Firmare il candidato installer con certificato code-signing attendibile.",
       "command": "pwsh .\\scripts\\Sign-Release.ps1",
       "residual": "Il candidato installer non firmato non e pronto per distribuzione.",
@@ -24,7 +16,7 @@
     },
     {
       "priority": "P1",
-      "order": 3,
+      "order": 2,
       "task": "Eseguire lifecycle reale install/launch/uninstall su profilo o macchina Windows puliti.",
       "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
       "residual": "Il profilo locale non e pulito; lifecycle release non ancora verificato in ambiente rappresentativo.",
@@ -32,7 +24,7 @@
     },
     {
       "priority": "P2",
-      "order": 4,
+      "order": 3,
       "task": "Verificare errori ACL reali sui percorsi runtime in sandbox o profilo dedicato.",
       "command": "",
       "residual": "I test coprono path bloccato da file, ma non una simulazione ACL Windows reale.",
@@ -40,7 +32,7 @@
     },
     {
       "priority": "P2",
-      "order": 5,
+      "order": 4,
       "task": "Valutare hash-lock dei requirements OCR Python senza rompere il provisioning multi-runtime.",
       "command": "",
       "residual": "I requirements OCR sono version-pinned ma non hash-locked.",
@@ -48,7 +40,7 @@
     },
     {
       "priority": "P3",
-      "order": 6,
+      "order": 5,
       "task": "Pianificare rebuild Qdrant per documenti migrati da storage vettoriale legacy.",
       "command": "",
       "residual": "Dopo upgrade, documenti migrati da backend vettoriale legacy richiedono indice Qdrant ricostruito.",
@@ -56,11 +48,14 @@
     }
   ],
   "quality_gates": {
-    "release_gate": "not_run",
+    "script_static_analysis": "passed",
+    "release_gate": "passed",
+    "installer_evidence": "passed",
     "install_lifecycle": "not_run"
   },
   "environment": {
     "os_target": "Windows",
     "shell": "PowerShell"
-  }
+  },
+  "last_completed_work": "Aggiornato docs\\APP_FLOW.drawio per rappresentare Qdrant come runtime/vector store esplicito nei flussi runtime e prodotto."
 }

@@ -146,7 +146,8 @@ $explicitGeneratedPaths = @(
     "coverage",
     "playwright-report",
     "test-results",
-    "output"
+    "output",
+    "packaging\qdrant\payload"
 )
 
 foreach ($relativePath in $explicitGeneratedPaths) {
