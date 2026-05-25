@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -49,6 +50,7 @@ public static partial class InProcessBackend
             Uri baseUri = ResolveBaseUri(app);
             runtimeState.BaseUri = baseUri;
             BackendLog.Write(descriptor.StoragePaths, $"In-process backend listening on {baseUri}.");
+            await EnsureQdrantLocalRuntimeAsync(app, descriptor, cancellationToken);
 
             return new InProcessBackendHandle(app, baseUri, descriptor, sessionToken);
         }
@@ -73,6 +75,30 @@ public static partial class InProcessBackend
                 $"Percorso: {dataRoot}. " +
                 "Verifica che il percorso non sia un file e che l'utente corrente abbia permessi di lettura e scrittura.",
                 ex);
+        }
+    }
+
+    private static async Task EnsureQdrantLocalRuntimeAsync(
+        WebApplication app,
+        InProcessBackendDescriptor descriptor,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            QdrantStatusResponse status = await app.Services
+                .GetRequiredService<QdrantLocalRuntimeService>()
+                .EnsureLocalServerAsync(
+                    app.Services.GetRequiredService<IQdrantVectorStore>(),
+                    cancellationToken);
+
+            if (!status.IsReachable)
+            {
+                BackendLog.Write(descriptor.StoragePaths, $"Qdrant local runtime unavailable: {status.Error ?? status.Warning ?? status.Status}");
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or TimeoutException or Grpc.Core.RpcException)
+        {
+            BackendLog.WriteException(descriptor.StoragePaths, null, "Qdrant local runtime startup failed.", ex);
         }
     }
 }

@@ -114,7 +114,7 @@ public static partial class InProcessBackend
             }
 
             OcrEngineAvailability ocrAvailability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
-            QdrantStatusResponse qdrantStatus = await qdrantRuntime.GetStatusAsync(qdrantVectorStore, cancellationToken);
+            QdrantStatusResponse qdrantStatus = await qdrantRuntime.EnsureLocalServerAsync(qdrantVectorStore, cancellationToken);
             OcrGpuCapabilityResponse gpuCapability = await ocrGpuCapability.CheckAsync(ocrEngine, cancellationToken);
             SystemTelemetryResponse telemetry = await systemTelemetry.CaptureAsync(cancellationToken);
 

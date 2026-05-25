@@ -307,7 +307,7 @@ export default function App() {
         diagnostics={diagnostics}
       />
       <main className="workspace">
-        <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} />
+        <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} diagnostics={diagnostics} />
         <section className={`workspace-content workspace-content--${activeSection}`} aria-label={sectionLabels[activeSection]}>
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">

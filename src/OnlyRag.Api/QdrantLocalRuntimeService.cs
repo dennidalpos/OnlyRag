@@ -8,6 +8,8 @@ namespace OnlyRag.Api;
 internal sealed class QdrantLocalRuntimeService
 {
     private const string QdrantExeName = "qdrant.exe";
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
 
@@ -58,6 +60,90 @@ internal sealed class QdrantLocalRuntimeService
         CancellationToken cancellationToken = default)
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
+        QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
+        if (currentStatus.IsReachable)
+        {
+            return currentStatus;
+        }
+
+        int? existingPid = ReadPid();
+        if (existingPid is not null && IsProcessRunning(existingPid.Value))
+        {
+            return await WaitForAvailabilityAsync(vectorStore, existingPid.Value, StartupTimeout, cancellationToken);
+        }
+
+        if (existingPid is not null)
+        {
+            DeletePidFile();
+        }
+
+        await StartLocalProcessAsync(settings, cancellationToken);
+        int? startedPid = ReadPid();
+        return await WaitForAvailabilityAsync(vectorStore, startedPid, StartupTimeout, cancellationToken);
+    }
+
+    public async Task<QdrantStatusResponse> EnsureLocalServerAsync(
+        IQdrantVectorStore vectorStore,
+        CancellationToken cancellationToken = default)
+    {
+        QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
+        if (!settings.UseLocalBundledServer)
+        {
+            return await GetStatusAsync(vectorStore, cancellationToken);
+        }
+
+        string? binary = ResolveBinaryPath();
+        if (binary is null)
+        {
+            Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
+            return CreateUnavailableStatus(
+                settings,
+                endpoint,
+                "qdrant.exe non trovato nel payload applicativo. Eseguire il packaging Qdrant prima dell'avvio locale.");
+        }
+
+        QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
+        if (currentStatus.IsReachable)
+        {
+            return currentStatus;
+        }
+
+        try
+        {
+            return await StartAsync(vectorStore, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            QdrantStatusResponse status = await GetStatusAsync(vectorStore, cancellationToken);
+            return status with { Error = ex.Message };
+        }
+    }
+
+    private QdrantStatusResponse CreateUnavailableStatus(
+        QdrantSettings settings,
+        Uri endpoint,
+        string error)
+    {
+        return new QdrantStatusResponse(
+            "Offline",
+            false,
+            settings.GrpcEndpoint,
+            QdrantSettingsStore.IsLoopback(endpoint),
+            endpoint.Scheme == Uri.UriSchemeHttps,
+            !string.IsNullOrWhiteSpace(settings.ApiKey),
+            Version: null,
+            ResolveBinaryPath(),
+            ResolveConfigPath(),
+            ResolveStorageDirectory(),
+            ReadPid(),
+            BuildWarning(settings, endpoint),
+            error);
+    }
+
+    private async Task StartLocalProcessAsync(
+        QdrantSettings settings,
+        CancellationToken cancellationToken)
+    {
         string? binary = ResolveBinaryPath();
         if (binary is null)
         {
@@ -73,9 +159,7 @@ internal sealed class QdrantLocalRuntimeService
             FileName = binary,
             WorkingDirectory = Path.GetDirectoryName(binary) ?? AppContext.BaseDirectory,
             UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            CreateNoWindow = true
         };
         startInfo.ArgumentList.Add("--config-path");
         startInfo.ArgumentList.Add(ResolveConfigPath());
@@ -87,7 +171,6 @@ internal sealed class QdrantLocalRuntimeService
         }
 
         await File.WriteAllTextAsync(ResolvePidPath(), process.Id.ToString(), cancellationToken);
-        return await GetStatusAsync(vectorStore, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
@@ -109,10 +192,48 @@ internal sealed class QdrantLocalRuntimeService
         }
         finally
         {
-            File.Delete(ResolvePidPath());
+            DeletePidFile();
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task<QdrantStatusResponse> WaitForAvailabilityAsync(
+        IQdrantVectorStore vectorStore,
+        int? pid,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        QdrantStatusResponse lastStatus = await GetStatusAsync(vectorStore, cancellationToken);
+        while (!lastStatus.IsReachable && stopwatch.Elapsed < timeout)
+        {
+            if (pid is not null && !IsProcessRunning(pid.Value))
+            {
+                DeletePidFile();
+                return await GetStatusAsync(vectorStore, cancellationToken);
+            }
+
+            await Task.Delay(StartupPollInterval, cancellationToken);
+            lastStatus = await GetStatusAsync(vectorStore, cancellationToken);
+        }
+
+        return lastStatus.IsReachable
+            ? lastStatus
+            : lastStatus with { Error = lastStatus.Error ?? "Qdrant locale avviato ma non ancora raggiungibile sulla porta gRPC configurata." };
+    }
+
+    private static bool IsProcessRunning(int pid)
+    {
+        try
+        {
+            using Process process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static string? BuildWarning(QdrantSettings settings, Uri endpoint)
@@ -187,6 +308,15 @@ internal sealed class QdrantLocalRuntimeService
 
         string content = File.ReadAllText(pidPath);
         return int.TryParse(content, out int pid) ? pid : null;
+    }
+
+    private void DeletePidFile()
+    {
+        string pidPath = ResolvePidPath();
+        if (File.Exists(pidPath))
+        {
+            File.Delete(pidPath);
+        }
     }
 
     private static string ToYamlPath(string path)

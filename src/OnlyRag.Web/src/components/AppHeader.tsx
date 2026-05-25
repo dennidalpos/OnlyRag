@@ -1,4 +1,5 @@
 import type { BackendStatus } from "../App";
+import type { DiagnosticsResponse } from "../api";
 import { formatTime } from "../pollingStatus";
 
 type StatusBadge = {
@@ -10,16 +11,22 @@ type StatusBadge = {
 type AppHeaderProps = {
   currentSection: string;
   backendStatus: BackendStatus;
+  diagnostics: DiagnosticsResponse | null;
 };
 
-export function AppHeader({ currentSection, backendStatus }: AppHeaderProps) {
+export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHeaderProps) {
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
   const statusBadges: StatusBadge[] = [
     { label: "Backend", value: backendStatus.backendValue, tone: backendStatus.backendTone },
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
-    ...(activeJobs > 0
-      ? [{ label: "Operazioni", value: `${activeJobs} in corso`, tone: backendStatus.jobsTone }]
-      : [])
+    buildQdrantBadge(diagnostics, backendStatus.backendTone),
+    buildOcrBadge(diagnostics, backendStatus.backendTone),
+    buildOcrGpuBadge(diagnostics, backendStatus.backendTone),
+    {
+      label: "Operazioni",
+      value: formatJobsValue(backendStatus.jobsValue, activeJobs),
+      tone: activeJobs > 0 ? backendStatus.jobsTone : "neutral"
+    }
   ];
 
   return (
@@ -41,4 +48,69 @@ export function AppHeader({ currentSection, backendStatus }: AppHeaderProps) {
       </div>
     </header>
   );
+}
+
+function buildQdrantBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics) {
+    return {
+      label: "Qdrant",
+      value: backendTone === "offline" ? "Offline" : "In lettura",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  return {
+    label: "Qdrant",
+    value: diagnostics.qdrant.status,
+    tone: diagnostics.qdrant.isReachable ? "online" : "offline"
+  };
+}
+
+function buildOcrBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics) {
+    return {
+      label: "OCR",
+      value: backendTone === "offline" ? "Offline" : "In lettura",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  return {
+    label: "OCR",
+    value: diagnostics.ocrStatus,
+    tone: diagnostics.ocrIsConfigured ? "online" : "offline"
+  };
+}
+
+function buildOcrGpuBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics) {
+    return {
+      label: "OCR GPU",
+      value: backendTone === "offline" ? "Offline" : "In lettura",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  return {
+    label: "OCR GPU",
+    value: diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile",
+    tone: diagnostics.ocrGpuCapability.isUsable ? "online" : "neutral"
+  };
+}
+
+function formatJobsValue(jobsValue: string, activeJobs: number): string {
+  if (jobsValue === "Disabled") {
+    return "Disattivate";
+  }
+
+  return activeJobs > 0 ? `${activeJobs} in corso` : "Nessuna";
 }

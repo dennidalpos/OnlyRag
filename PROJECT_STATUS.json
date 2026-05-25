@@ -1,76 +1,35 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T12:46:06+02:00",
-  "active_objective": "Rendere il setup installer autosufficiente: ogni dipendenza runtime deve essere inclusa nel payload, installata dal setup, oppure dichiarata opzionale con fallback verificato.",
+  "last_updated": "2026-05-25T12:59:50+02:00",
+  "active_objective": "Ripristinare l'avvio del runtime Qdrant locale bundled e mostrare in topbar lo stato dei moduli principali.",
   "assumptions": [
-    "Windows 10 1809+ o Windows 11 resta un prerequisito di sistema non installabile dal setup."
+    "Qdrant locale deve essere avviato automaticamente quando useLocalBundledServer e attivo e il payload qdrant.exe e presente.",
+    "OCR GPU resta opzionale: in topbar lo stato non disponibile e neutro, non errore bloccante."
   ],
   "execution_plan": [
     {
       "priority": "P1",
       "order": 1,
-      "task": "Definire la matrice dipendenze installer con classificazione required, setup-provisioned, self-contained oppure optional.",
-      "residual": "WebView2, Python OCR, Ollama e LibreOffice non sono ancora tracciati in una matrice unica con decisione esplicita di packaging/provisioning/fallback.",
-      "command": ""
-    },
-    {
-      "priority": "P1",
-      "order": 2,
-      "task": "Aggiornare il setup per installare o includere ogni dipendenza runtime required non gia self-contained.",
-      "residual": "WebView2 e attualmente solo rilevato e bloccante: il setup mostra istruzioni manuali invece di includere o avviare un installer verificato.",
-      "command": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release"
-    },
-    {
-      "priority": "P1",
-      "order": 3,
-      "task": "Rendere esplicito il trattamento setup delle dipendenze feature: OCR Python/packages, Ollama e LibreOffice.",
-      "residual": "OCR viene preparato solo se Python e rete sono disponibili; Ollama e LibreOffice restano esterni/manuali. Va deciso se installarli dal setup o mantenere feature opzionali con fallback testato.",
-      "command": ""
-    },
-    {
-      "priority": "P1",
-      "order": 4,
-      "task": "Aggiungere verifiche installer per copertura dipendenze, includendo payload self-contained e componenti installati durante setup.",
-      "residual": "La verifica lifecycle controlla file installati e avvio, ma non dimostra ancora che tutte le dipendenze required siano incluse o installate automaticamente su macchina pulita.",
-      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
-    },
-    {
-      "priority": "P1",
-      "order": 5,
-      "task": "Firmare il candidato installer e rieseguire lifecycle completo su profilo o macchina Windows puliti.",
-      "residual": "Il lifecycle locale non firmato passa; manca verifica release con firma valida e ambiente rappresentativo.",
-      "command": "pwsh .\\scripts\\Sign-Release.ps1; pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
-    },
-    {
-      "priority": "P2",
-      "order": 6,
-      "task": "Verificare errori ACL reali sui percorsi runtime in sandbox o profilo dedicato.",
-      "residual": "I test coprono path bloccato da file, ma non una simulazione ACL Windows reale.",
-      "command": ""
-    },
-    {
-      "priority": "P2",
-      "order": 7,
-      "task": "Valutare hash-lock dei requirements OCR Python senza rompere il provisioning multi-runtime.",
-      "residual": "I requirements OCR sono version-pinned ma non hash-locked.",
-      "command": ""
-    },
-    {
-      "priority": "P3",
-      "order": 8,
-      "task": "Pianificare rebuild Qdrant per documenti migrati da storage vettoriale legacy.",
-      "residual": "Dopo upgrade, documenti migrati da backend vettoriale legacy richiedono indice Qdrant ricostruito.",
+      "task": "Verificare in app installata che qdrant.exe sia incluso nel payload e che il badge Qdrant passi Online dopo il riavvio.",
+      "residual": "I test coprono il comportamento backend/frontend, ma non avviano un qdrant.exe reale in questa sessione.",
       "command": ""
     }
   ],
   "quality_gates": {
-    "installer_dependency_coverage": "not_run",
-    "signed_install_lifecycle": "not_run",
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "api_tests": "passed",
+    "web_unit_tests": "passed",
+    "web_build": "passed",
     "structure_review": "passed"
   },
   "environment": {
     "os_target": "Windows",
     "shell": "PowerShell"
-  }
+  },
+  "last_completed_work": "Aggiunto auto-start/wait per Qdrant bundled e badge topbar per Backend, Ollama, Qdrant, OCR, OCR GPU e Operazioni.",
+  "open_questions": [],
+  "handoff_notes": "Riavviare l'app desktop per far partire il nuovo ensure del runtime Qdrant locale; se resta Offline controllare che packaging/qdrant/payload/qdrant.exe sia incluso nell'output installato."
 }

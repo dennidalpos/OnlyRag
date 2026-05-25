@@ -16,6 +16,87 @@ afterEach(() => {
 });
 
 describe("App initial setup", () => {
+  it("shows module status badges from diagnostics in the topbar", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      { path: "/api/settings/ollama", response: createOllamaSettings() },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      {
+        path: "/api/diagnostics",
+        response: createDiagnostics({
+          qdrant: {
+            status: "Offline",
+            isReachable: false,
+            grpcEndpoint: "http://127.0.0.1:6334",
+            isLoopback: true,
+            isTls: false,
+            hasApiKey: false,
+            version: null,
+            binaryPath: "C:\\OnlyRag\\qdrant\\qdrant.exe",
+            configPath: "C:\\OnlyRag\\qdrant\\config\\qdrant.yaml",
+            storageDirectory: "C:\\OnlyRag\\qdrant\\storage",
+            processId: null,
+            warning: null,
+            error: "Connessione rifiutata."
+          },
+          ocrStatus: "Disponibile",
+          ocrIsConfigured: true
+        })
+      },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    const status = await screen.findByLabelText("Stato applicazione");
+    await waitFor(() => {
+      expect(status).toHaveTextContent("Backend");
+      expect(status).toHaveTextContent("Ollama");
+      expect(status).toHaveTextContent("Qdrant");
+      expect(status).toHaveTextContent("Offline");
+      expect(status).toHaveTextContent("OCR");
+      expect(status).toHaveTextContent("Disponibile");
+      expect(status).toHaveTextContent("OCR GPU");
+      expect(status).toHaveTextContent("Non disponibile");
+      expect(status).toHaveTextContent("Operazioni");
+      expect(status).toHaveTextContent("Nessuna");
+    });
+  });
+
   it("shows OCR setup in the startup wizard and starts confirmed provisioning", async () => {
     const api = mockApi([
       { path: "/api/app/status", response: createAppStatus() },
