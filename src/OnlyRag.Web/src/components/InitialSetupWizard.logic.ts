@@ -156,6 +156,8 @@ function detectOllamaIssues(
   ollamaSettings: OllamaSettings | null,
   ollamaModels: OllamaModel[]
 ): SetupIssue[] {
+  const missingModelIssues = detectMissingRequiredModelIssues(ollamaSettings);
+
   if (ollamaInstallStatus && !ollamaInstallStatus.cliInstalled) {
     return [{
       key: "ollama",
@@ -165,7 +167,7 @@ function detectOllamaIssues(
       actionLabel: "Apri download Ollama",
       installCommand: ollamaInstallStatus.installCommand,
       networkAccessHint: ollamaInstallStatus.networkAccessHint
-    }];
+    }, ...missingModelIssues];
   }
 
   if (!ollamaStatus || !ollamaStatus.isReachable) {
@@ -174,8 +176,29 @@ function detectOllamaIssues(
       title: "Ollama non raggiungibile",
       detail: "Avvia Ollama e verifica l'indirizzo nelle Impostazioni.",
       networkAccessHint: ollamaInstallStatus?.networkAccessHint ?? null
-    }];
+    }, ...missingModelIssues];
   }
+
+  const modelIssues = [
+    detectRequiredModelIssue({
+      key: "chat-model",
+      modelName: ollamaSettings?.defaultChatModel,
+      missingTitle: "Modello chat non configurato",
+      missingDetail: "Seleziona un modello da usare per la chat nelle Impostazioni."
+    }),
+    detectRequiredModelIssue({
+      key: "embedding-model",
+      modelName: ollamaSettings?.defaultEmbeddingModel,
+      missingTitle: "Modello embedding non configurato",
+      missingDetail: "Seleziona un modello da usare per l'indicizzazione dei documenti nelle Impostazioni."
+    }),
+    detectRequiredModelIssue({
+      key: "translation-model",
+      modelName: ollamaSettings?.defaultTranslationModel,
+      missingTitle: "Modello traduzione non configurato",
+      missingDetail: "Seleziona un modello da usare per la traduzione dei documenti nelle Impostazioni."
+    })
+  ].filter((issue): issue is SetupIssue => issue !== null);
 
   if (ollamaModels.length === 0) {
     return [{
@@ -183,54 +206,69 @@ function detectOllamaIssues(
       title: "Nessun modello installato",
       detail:
         "Installa almeno un modello chat e un modello embedding in Ollama, poi selezionali nelle Impostazioni."
-    }];
+    }, ...modelIssues];
   }
 
-  const modelNames = new Set(ollamaModels.map((model) => model.name));
+  return modelIssues;
+}
+
+function detectMissingRequiredModelIssues(ollamaSettings: OllamaSettings | null): SetupIssue[] {
   return [
-    detectRequiredModelIssue({
+    detectMissingRequiredModelIssue({
       key: "chat-model",
       modelName: ollamaSettings?.defaultChatModel,
-      modelNames,
       missingTitle: "Modello chat non configurato",
-      missingDetail: "Seleziona un modello da usare per la chat nelle Impostazioni.",
-      unavailableTitlePrefix: "Modello chat non disponibile"
+      missingDetail: "Seleziona un modello da usare per la chat nelle Impostazioni."
     }),
-    detectRequiredModelIssue({
+    detectMissingRequiredModelIssue({
       key: "embedding-model",
       modelName: ollamaSettings?.defaultEmbeddingModel,
-      modelNames,
       missingTitle: "Modello embedding non configurato",
-      missingDetail: "Seleziona un modello da usare per l'indicizzazione dei documenti nelle Impostazioni.",
-      unavailableTitlePrefix: "Modello embedding non disponibile"
+      missingDetail: "Seleziona un modello da usare per l'indicizzazione dei documenti nelle Impostazioni."
     }),
-    detectRequiredModelIssue({
+    detectMissingRequiredModelIssue({
       key: "translation-model",
       modelName: ollamaSettings?.defaultTranslationModel,
-      modelNames,
       missingTitle: "Modello traduzione non configurato",
-      missingDetail: "Seleziona un modello da usare per la traduzione dei documenti nelle Impostazioni.",
-      unavailableTitlePrefix: "Modello traduzione non disponibile"
+      missingDetail: "Seleziona un modello da usare per la traduzione dei documenti nelle Impostazioni."
     })
   ].filter((issue): issue is SetupIssue => issue !== null);
+}
+
+function detectMissingRequiredModelIssue({
+  key,
+  modelName,
+  missingTitle,
+  missingDetail
+}: {
+  key: string;
+  modelName: string | null | undefined;
+  missingTitle: string;
+  missingDetail: string;
+}): SetupIssue | null {
+  if (!isPlaceholderModelValue(modelName)) {
+    return null;
+  }
+
+  return {
+    key,
+    title: missingTitle,
+    detail: missingDetail
+  };
 }
 
 function detectRequiredModelIssue({
   key,
   modelName,
-  modelNames,
   missingTitle,
-  missingDetail,
-  unavailableTitlePrefix
+  missingDetail
 }: {
   key: string;
   modelName: string | null | undefined;
-  modelNames: Set<string>;
   missingTitle: string;
   missingDetail: string;
-  unavailableTitlePrefix: string;
 }): SetupIssue | null {
-  if (!modelName) {
+  if (isPlaceholderModelValue(modelName)) {
     return {
       key,
       title: missingTitle,
@@ -238,13 +276,11 @@ function detectRequiredModelIssue({
     };
   }
 
-  if (!modelNames.has(modelName)) {
-    return {
-      key,
-      title: `${unavailableTitlePrefix}: ${modelName}`,
-      detail: "Installa il modello configurato oppure seleziona un modello diverso nelle Impostazioni."
-    };
-  }
-
   return null;
+}
+
+function isPlaceholderModelValue(value: string | null | undefined): boolean {
+  const normalized = value?.trim() ?? "";
+  return normalized.length === 0
+    || normalized === "Nessun modello selezionato";
 }

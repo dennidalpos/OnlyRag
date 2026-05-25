@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe("App initial setup residual checks", () => {
-  it("checks chat, embedding, and translation defaults independently on startup", async () => {
+  it("treats non-placeholder default model values as configured on startup", async () => {
     mockApi([
       { path: "/api/app/status", response: createAppStatus() },
       {
@@ -70,8 +70,191 @@ describe("App initial setup residual checks", () => {
     render(<App />);
 
     expect(await screen.findByText("Modello chat non configurato")).toBeInTheDocument();
-    expect(screen.getByText("Modello embedding non disponibile: missing-embed:latest")).toBeInTheDocument();
-    expect(screen.getByText("Modello traduzione non disponibile: missing-translate:latest")).toBeInTheDocument();
+    expect(screen.queryByText("Modello embedding non configurato")).not.toBeInTheDocument();
+    expect(screen.queryByText("Modello traduzione non configurato")).not.toBeInTheDocument();
+    expect(screen.queryByText("Modello embedding non disponibile: missing-embed:latest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Modello traduzione non disponibile: missing-translate:latest")).not.toBeInTheDocument();
+  });
+
+  it("treats placeholder model values as not configured on startup", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      {
+        path: "/api/settings/ollama",
+        response: createOllamaSettings({
+          defaultChatModel: "Nessun modello selezionato",
+          defaultEmbeddingModel: "Nessun modello selezionato",
+          defaultTranslationModel: "Nessun modello selezionato"
+        })
+      },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello embedding non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
+  });
+
+  it("checks missing default models on startup even when no Ollama models are installed", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      {
+        path: "/api/settings/ollama",
+        response: createOllamaSettings({
+          defaultChatModel: null,
+          defaultEmbeddingModel: null,
+          defaultTranslationModel: null
+        })
+      },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 0 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: [] } },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByText("Nessun modello installato")).toBeInTheDocument();
+    expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello embedding non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
+  });
+
+  it("keeps missing default model checks visible when Ollama is unavailable on startup", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      {
+        path: "/api/settings/ollama",
+        response: createOllamaSettings({
+          defaultChatModel: null,
+          defaultEmbeddingModel: null,
+          defaultTranslationModel: null
+        })
+      },
+      {
+        path: "/api/ollama/status",
+        response: createOllamaStatus({
+          state: "Unavailable",
+          isReachable: false,
+          installedModelCount: 0,
+          message: "Ollama non raggiungibile.",
+          suggestion: "Avvia Ollama."
+        })
+      },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByText("Ollama non raggiungibile")).toBeInTheDocument();
+    expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello embedding non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
   });
 
   it("auto-enables OCR GPU after startup wizard provisioning completes", async () => {
