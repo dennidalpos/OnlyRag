@@ -132,7 +132,8 @@ describe("App initial setup", () => {
     render(<App />);
 
     expect(await screen.findByText("Runtime OCR da riparare")).toBeInTheDocument();
-    expect(screen.getByText(/Runtime OCR locale incompleto o danneggiato/)).toBeInTheDocument();
+    expect(screen.getByText(/Premi Ripara OCR per reinstallare PaddleOCR/)).toBeInTheDocument();
+    expect(screen.queryByText("unknown")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ripara OCR" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Ripara OCR" }));

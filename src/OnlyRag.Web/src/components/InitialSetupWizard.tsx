@@ -202,8 +202,8 @@ function detectSetupIssues(
     issues.push({
       key: "ocr",
       title: "Runtime OCR da riparare",
-      detail: ocrProvisionStatus.message,
-      badge: ocrProvisionStatus.resolvedRuntime,
+      detail: formatRepairableOcrRuntimeDetail(ocrProvisionStatus.message),
+      badge: getKnownRuntimeBadge(ocrProvisionStatus.resolvedRuntime),
       action: "configure-ocr",
       actionLabel: "Ripara OCR"
     });
@@ -248,6 +248,22 @@ function isFailedOcrProvisionStatus(status: OcrProvisionStatus): boolean {
 
 function isRepairableOcrRuntimeStatus(status: OcrProvisionStatus): boolean {
   return status.message.startsWith("Runtime OCR locale incompleto o danneggiato.");
+}
+
+function getKnownRuntimeBadge(value: string | null | undefined): string | undefined {
+  if (!value || value === "unknown") {
+    return undefined;
+  }
+
+  return value;
+}
+
+function formatRepairableOcrRuntimeDetail(message: string): string {
+  if (!message.startsWith("Runtime OCR locale incompleto o danneggiato.")) {
+    return message;
+  }
+
+  return "Runtime OCR locale incompleto o danneggiato. Premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.";
 }
 
 function formatSetupTime(value: Date | null): string {
