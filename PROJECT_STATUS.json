@@ -1,9 +1,9 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "post-implementation-validation",
-  "last_updated": "2026-05-25T09:50:00+02:00",
-  "active_objective": "Chiudere la validazione residua del supporto OCR GPU manifest-driven prima della release.",
+  "current_phase": "external-release-validation",
+  "last_updated": "2026-05-25T10:08:00+02:00",
+  "active_objective": "Chiudere le verifiche esterne non eseguibili dalla macchina locale prima della release.",
   "assumptions": [
     "Windows desktop resta il target primario.",
     "OCR CPU resta fallback obbligatorio.",
@@ -12,39 +12,42 @@
   "current_tasks": [
     {
       "priority": 1,
-      "task": "Eseguire build/package installer completo e verifica release per confermare che manifest, requirements CUDA 13.0/12.9/12.6/11.8 e script OCR siano inclusi nel publish finale."
+      "task": "Eseguire il workflow OCR runtime catalog in CI su Python 3.10, 3.11, 3.12 e 3.13; la verifica locale ha confermato sorgenti raggiungibili e manifest coperto, ma i dry-run pip restano da CI perche il Python locale e 3.14.5."
     },
     {
       "priority": 2,
-      "task": "Eseguire il workflow OCR runtime catalog in CI su Python 3.10, 3.11, 3.12 e 3.13 per validare i dry-run pip non verificabili localmente con Python 3.14."
-    },
-    {
-      "priority": 3,
       "task": "Validare manualmente su Windows: senza NVIDIA, NVIDIA compatibile, driver NVIDIA vecchio, venv OCR danneggiata, rete assente durante setup."
     },
     {
-      "priority": 4,
-      "task": "Monitorare fonti PaddlePaddle per supporto stabile NVIDIA RTX serie 50 Windows e aggiornare manifest solo dopo verifica ufficiale."
-    },
-    {
-      "priority": 5,
-      "task": "Valutare split di src/OnlyRag.Web/src/components/InitialSetupWizard.tsx, che resta sopra la soglia di review."
+      "priority": 3,
+      "task": "Monitorare fonti PaddlePaddle per supporto stabile NVIDIA RTX serie 50 Windows e aggiornare manifest solo dopo verifica ufficiale; al 2026-05-25 la documentazione ufficiale Windows PIP elenca CUDA 11.8/12.6/12.9/13.0 e capability > 7.5, ma non una garanzia specifica RTX serie 50 Windows."
     }
   ],
-  "blockers": [],
+  "blockers": [
+    "GitHub CLI non installata localmente: impossibile avviare o leggere da questa macchina il workflow_dispatch OCR Runtime Catalog.",
+    "La matrice manuale richiede macchine/stati dedicati: senza NVIDIA, NVIDIA compatibile, driver NVIDIA vecchio, venv OCR danneggiata, rete assente durante setup.",
+    "La verifica release completa con install/upgrade/uninstall e firma richiede una macchina Windows pulita e, per release firmata, un certificato di code signing."
+  ],
   "risks": [
     "La disponibilita delle wheel PaddlePaddle Windows GPU puo cambiare rispetto al manifest pinning.",
-    "La verifica catalogo locale ha saltato i dry-run pip perche il Python disponibile e 3.14.5, fuori range supportato."
+    "La verifica catalogo locale ha saltato i dry-run pip perche il Python disponibile e 3.14.5, fuori range supportato.",
+    "La run release locale ha prodotto installer non firmato e non ha eseguito install lifecycle."
   ],
   "quality_gates": {
     "format": "passed",
     "lint": "passed",
     "typecheck": "passed",
     "tests": "passed",
-    "build": "not_run",
-    "package": "not_run",
-    "manual_windows_matrix": "not_run",
-    "security_review": "not_run"
+    "build": "passed",
+    "package": "passed",
+    "installer_release_evidence": "passed_with_warnings_not_signed_lifecycle_skipped",
+    "ocr_runtime_manifest": "passed",
+    "ocr_runtime_catalog_local": "passed_sources_reachable_pip_dry_runs_skipped_python_3_14_5",
+    "ocr_runtime_catalog_ci": "blocked_gh_cli_missing",
+    "local_ocr_cpu_check": "passed",
+    "local_ocr_gpu_check": "passed",
+    "manual_windows_matrix": "blocked_external_matrix_required",
+    "dependency_security_audits": "passed"
   },
-  "last_completed_work": ""
+  "last_completed_work": "Refactor InitialSetupWizard.tsx split completato; gate Release con IncludeInstaller passato; installer generato in artifacts/installer/OnlyRag-Setup-0.1.0-win-x64.exe; evidence non invasiva generata in artifacts/release-verification/OnlyRag-release-verification-20260525-100535.json; catalogo OCR locale generato in artifacts/ocr-runtime-catalog/ocr-runtime-catalog-local.json."
 }
