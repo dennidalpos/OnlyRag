@@ -1,7 +1,7 @@
 {
   "name": "OnlyRag",
   "short_name": "OnlyRag",
-  "description": "Local-first document RAG for Windows.",
+  "description": "RAG documentale locale per Windows.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f3f6f8",

@@ -18,11 +18,13 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         int limit,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query) || documentIds.Count == 0 || limit <= 0 || !ExtractTerms(query).Any())
+        string[] terms = ExtractTerms(query).ToArray();
+        if (string.IsNullOrWhiteSpace(query) || documentIds.Count == 0 || limit <= 0 || terms.Length == 0)
         {
             return new KeywordSearchResponse([], "none");
         }
 
+        string ftsQuery = BuildFtsQuery(terms);
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         if (await TableExistsAsync(connection, "chunks_fts", cancellationToken))
         {
@@ -31,7 +33,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             {
                 IReadOnlyList<KeywordSearchResult> ftsResults = await SearchFtsAsync(
                     connection,
-                    query,
+                    ftsQuery,
                     documentIds,
                     limit,
                     cancellationToken);
@@ -41,7 +43,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             {
                 IReadOnlyList<KeywordSearchResult> fallbackResults = await SearchFtsWithoutRankAsync(
                     connection,
-                    query,
+                    ftsQuery,
                     documentIds,
                     limit,
                     cancellationToken);
@@ -54,7 +56,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
 
     private static async Task<IReadOnlyList<KeywordSearchResult>> SearchFtsAsync(
         SqliteConnection connection,
-        string query,
+        string ftsQuery,
         IReadOnlyCollection<long> documentIds,
         int limit,
         CancellationToken cancellationToken)
@@ -75,7 +77,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             ORDER BY fts.rank ASC, c.id ASC
             LIMIT $limit;
             """;
-        command.AddParameter("$query", BuildFtsQuery(query));
+        command.AddParameter("$query", ftsQuery);
         command.AddParameter("$limit", Math.Max(1, limit));
 
         return await ReadRankedResultsAsync(command, limit, cancellationToken);
@@ -83,7 +85,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
 
     private static async Task<IReadOnlyList<KeywordSearchResult>> SearchFtsWithoutRankAsync(
         SqliteConnection connection,
-        string query,
+        string ftsQuery,
         IReadOnlyCollection<long> documentIds,
         int limit,
         CancellationToken cancellationToken)
@@ -104,7 +106,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             ORDER BY c.id ASC
             LIMIT $limit;
             """;
-        command.AddParameter("$query", BuildFtsQuery(query));
+        command.AddParameter("$query", ftsQuery);
         command.AddParameter("$limit", Math.Max(1, limit));
 
         List<KeywordSearchResult> results = [];
@@ -180,12 +182,9 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             && sql.Contains(expectedText, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildFtsQuery(string query)
+    private static string BuildFtsQuery(IEnumerable<string> terms)
     {
-        string[] terms = ExtractTerms(query).ToArray();
-        return terms.Length == 0
-            ? "\"\""
-            : string.Join(" OR ", terms.Select(term => $"\"{term.Replace("\"", "\"\"", StringComparison.Ordinal)}\""));
+        return string.Join(" OR ", terms.Select(term => $"\"{term.Replace("\"", "\"\"", StringComparison.Ordinal)}\""));
     }
 
     private static IEnumerable<string> ExtractTerms(string query)

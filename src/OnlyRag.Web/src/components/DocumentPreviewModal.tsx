@@ -175,7 +175,7 @@ function PageContent({ page }: { page: DocumentPageInfo }) {
       </div>
 
       {page.ocrError && (
-        <div className="job-error-message" style={{ marginBottom: "10px" }}>
+        <div className="job-error-message" role="alert" style={{ marginBottom: "10px" }}>
           Errore OCR pagina: {page.ocrError}
         </div>
       )}

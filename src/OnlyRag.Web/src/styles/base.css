@@ -356,6 +356,14 @@ h2 {
   gap: 6px;
 }
 
+.status-row__states {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: inherit;
+  gap: 6px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

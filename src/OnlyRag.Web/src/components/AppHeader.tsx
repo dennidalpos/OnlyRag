@@ -39,13 +39,15 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
   return (
     <header className="app-header">
       <h1 title={currentSection}>{currentSection}</h1>
-      <div className="status-row" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
-        {statusBadges.map((badge) => (
-          <span className={`status-badge status-badge--${badge.tone}`} key={badge.label} title={`${badge.label} ${badge.value}`}>
-            <span>{badge.label}</span>
-            <strong>{badge.value}</strong>
-          </span>
-        ))}
+      <div className="status-row">
+        <div className="status-row__states" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
+          {statusBadges.map((badge) => (
+            <span className={`status-badge status-badge--${badge.tone}`} key={badge.label} title={`${badge.label} ${badge.value}`}>
+              <span>{badge.label}</span>
+              <strong>{badge.value}</strong>
+            </span>
+          ))}
+        </div>
         <span className="status-badge status-badge--neutral" title={`Ora corrente ${formatTime(currentTime.toISOString())}`}>
           <span>Ora</span>
           <strong>{formatTime(currentTime.toISOString())}</strong>

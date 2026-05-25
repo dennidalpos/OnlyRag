@@ -41,20 +41,7 @@ public sealed partial class DocumentIngestionService
             throw new FileNotFoundException("File originale documento non trovato.", document.OriginalPath);
         }
 
-        PdfDocument pdf;
-        try
-        {
-            pdf = PdfDocument.Open(document.OriginalPath);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException(
-                $"Impossibile aprire il file PDF. Il file potrebbe essere cifrato, danneggiato o in un formato non supportato. Dettaglio: {ex.Message}", ex);
-        }
-
-        using (pdf)
-        {
-
+        using PdfDocument pdf = OpenPdf(document.OriginalPath);
         int totalPages = pdf.NumberOfPages;
         int nextPage = Math.Max(1, checkpoint.NextBlock);
         int nextChunkOrdinal = Math.Max(0, checkpoint.NextChunkOrdinal);
@@ -112,8 +99,19 @@ public sealed partial class DocumentIngestionService
         }
 
         return new DocumentIngestionResult(totalPages, chunkCount);
+    }
 
-        } // end using (pdf)
+    private static PdfDocument OpenPdf(string originalPath)
+    {
+        try
+        {
+            return PdfDocument.Open(originalPath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException(
+                $"Impossibile aprire il file PDF. Il file potrebbe essere cifrato, danneggiato o in un formato non supportato. Dettaglio: {ex.Message}", ex);
+        }
     }
 
     private async Task<DocumentIngestionResult> IngestImageAsync(

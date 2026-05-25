@@ -1,25 +1,27 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T19:27:24+02:00",
-  "active_objective": "Validazione finale delle correzioni documenti/chat, OCR, UI e metriche.",
+  "last_updated": "2026-05-25T20:08:21+02:00",
+  "active_objective": "Miglioramento P3 di architettura e leggibilita preservando comportamento esterno.",
   "current_tasks": [],
   "next_tasks": [
-    "1. Eseguire scripts\\Invoke-Gate.ps1 -Configuration Release -ContinueOnError.",
-    "2. Correggere eventuali failure del gate Release.",
-    "3. Ripetere i check falliti fino a stato passed."
+    "Valutare una costante condivisa per le estensioni documento tra import e dispatcher ingestion solo se serve eliminare divergenze future.",
+    "Valutare estrazione locale dei progress/checkpoint ripetuti in ingestion testo/PDF/Office se cresce altra duplicazione.",
+    "Eseguire scripts\\Invoke-Gate.ps1 -Configuration Release se serve parita completa con audit npm/NuGet e frontend."
   ],
   "blockers": [],
   "risks": [
-    "Il gate Release completo non è ancora stato eseguito dopo le correzioni."
+    "Il gate Release completo non e stato rieseguito in questo prompt.",
+    "Il working tree conteneva modifiche preesistenti su frontend, tracker e un test API; non sono state sovrascritte."
   ],
   "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
+    "format": "not_run",
+    "lint": "not_run",
+    "typecheck": "not_run",
     "tests": "passed",
     "build": "passed",
     "release_gate": "not_run"
   },
-  "handoff_notes": "Residuo prioritario: eseguire il gate Release completo."
+  "last_completed_work": "Applicati tre refactor piccoli in Infrastructure: costanti import documenti, apertura PDF separata e query FTS calcolata una sola volta.",
+  "handoff_notes": "API pubbliche, DTO, schema dati e configurazione invariati; verificati test Infrastructure/API e build Release della solution."
 }

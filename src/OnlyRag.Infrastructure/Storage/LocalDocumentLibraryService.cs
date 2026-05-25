@@ -10,6 +10,34 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
 {
     public const string DocumentIngestionJobType = "document-ingestion";
 
+    private const string DuplicateImportMessage = "Documento gia presente. Import annullato senza copiare un duplicato.";
+    private const string ImportedAndQueuedMessage = "Documento importato e messo in coda.";
+    private const string SupportedFormatsDescription =
+        "TXT, MD, MARKDOWN, CSV, PDF, PNG, JPG, JPEG, BMP, GIF, TIFF, WEBP, DOCX, XLSX, PPTX, DOC, XLS, PPT";
+
+    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.Ordinal)
+    {
+        ".txt",
+        ".md",
+        ".markdown",
+        ".csv",
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tif",
+        ".tiff",
+        ".bmp",
+        ".gif",
+        ".webp",
+        ".docx",
+        ".xlsx",
+        ".pptx",
+        ".doc",
+        ".xls",
+        ".ppt"
+    };
+
     private readonly LocalSqliteStoreDescriptor descriptor;
     private readonly IDocumentRepository documents;
     private readonly ILocalJobQueue jobQueue;
@@ -53,7 +81,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
         if (!IsIngestionSupported(fileExtension))
         {
             throw new ArgumentException(
-                $"Il formato '{fileExtension}' non e supportato. Formati accettati: TXT, MD, MARKDOWN, CSV, PDF, PNG, JPG, JPEG, BMP, GIF, TIFF, WEBP, DOCX, XLSX, PPTX, DOC, XLS, PPT.",
+                $"Il formato '{fileExtension}' non e supportato. Formati accettati: {SupportedFormatsDescription}.",
                 nameof(fileName));
         }
 
@@ -84,7 +112,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
             return new DocumentImportResult(
                 existing,
                 Deduplicated: true,
-                "Documento gia presente. Import annullato senza copiare un duplicato.");
+                DuplicateImportMessage);
         }
 
         string finalPath = SafeDocumentPath.ResolveWithinRoot(
@@ -127,13 +155,13 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
             return new DocumentImportResult(
                 duplicate,
                 Deduplicated: true,
-                "Documento gia presente. Import annullato senza copiare un duplicato.");
+                DuplicateImportMessage);
         }
 
         try
         {
             ImportedDocument queued = await QueueDocumentAsync(created, forceOcr, ocrLanguage, cancellationToken);
-            return new DocumentImportResult(queued, Deduplicated: false, "Documento importato e messo in coda.");
+            return new DocumentImportResult(queued, Deduplicated: false, ImportedAndQueuedMessage);
         }
         catch
         {
@@ -251,12 +279,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
 
     private static bool IsIngestionSupported(string normalizedExtension)
     {
-        return normalizedExtension is
-            ".txt" or ".md" or ".markdown" or ".csv" or
-            ".pdf" or
-            ".png" or ".jpg" or ".jpeg" or ".tif" or ".tiff" or ".bmp" or ".gif" or ".webp" or
-            ".docx" or ".xlsx" or ".pptx" or
-            ".doc" or ".xls" or ".ppt";
+        return SupportedExtensions.Contains(normalizedExtension);
     }
 
     private static void MoveIntoOriginals(string temporaryPath, string finalPath)

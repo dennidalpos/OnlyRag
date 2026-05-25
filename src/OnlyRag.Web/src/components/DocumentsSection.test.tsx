@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DocumentsSection } from "./DocumentsSection";
-import { ActionButton, isOcrCandidate } from "./DocumentsSection.helpers";
+import { ActionButton, DocumentDetailCard, isOcrCandidate } from "./DocumentsSection.helpers";
 import { mockApi } from "../test/apiMock";
 import {
   createDocument,
@@ -321,6 +321,27 @@ describe("DocumentsSection", () => {
     expect(screen.getByRole("button", { name: "Ricostruisci indice" })).toHaveAccessibleDescription(
       "Ricrea testo, chunk e indice del documento."
     );
+  });
+
+  it("announces persisted document detail errors", () => {
+    render(
+      <DocumentDetailCard
+        document={createDocument({ lastError: "OCR non completato sulla pagina 2." })}
+        pipelineStatus={null}
+        embeddingStatus={null}
+        ocrStatus={null}
+        activeJob={null}
+        isBusy={false}
+        canPreview={false}
+        onReindex={vi.fn()}
+        onEmbed={vi.fn()}
+        onOcr={vi.fn()}
+        onDelete={vi.fn()}
+        onPreview={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("OCR non completato sulla pagina 2.");
   });
 
   it("matches supported image extensions for document OCR actions", () => {

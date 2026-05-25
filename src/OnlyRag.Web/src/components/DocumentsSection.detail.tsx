@@ -95,12 +95,12 @@ export function DocumentDetailCard({
             <strong>{activeJob.progressPercent}%</strong>
           </div>
           <ProgressBar label={`Avanzamento ${activeJob.progressPercent}%`} value={activeJob.progressPercent} />
-          {activeJob.error && <div className="job-error-message">{activeJob.error}</div>}
+          {activeJob.error && <div className="job-error-message" role="alert">{activeJob.error}</div>}
         </div>
       )}
 
       {document.lastError && !isJobActive && (
-        <div className="job-error-message">{document.lastError}</div>
+        <div className="job-error-message" role="alert">{document.lastError}</div>
       )}
 
       <details className="document-meta-details">

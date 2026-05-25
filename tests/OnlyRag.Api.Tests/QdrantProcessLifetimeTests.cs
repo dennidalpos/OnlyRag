@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using OnlyRag.Api;
 
@@ -46,8 +47,9 @@ public sealed class QdrantProcessLifetimeTests
 
         using Process sleeper = StartSleepProcess();
         await using QdrantProcessSupervisor supervisor = new();
+        string sleeperPath = await WaitForMainModulePathAsync(sleeper);
 
-        Assert.True(supervisor.TryAdoptProcess(sleeper.Id, ResolveWindowsPowerShellPath()));
+        Assert.True(supervisor.TryAdoptProcess(sleeper.Id, sleeperPath));
 
         await supervisor.DisposeAsync();
 
@@ -82,5 +84,30 @@ public sealed class QdrantProcessLifetimeTests
                 "Start-Sleep -Seconds 30"
             }
         }) ?? throw new InvalidOperationException("PowerShell sleep process was not started.");
+    }
+
+    private static async Task<string> WaitForMainModulePathAsync(Process process)
+    {
+        TimeSpan timeout = TimeSpan.FromSeconds(5);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        while (stopwatch.Elapsed < timeout)
+        {
+            try
+            {
+                string? modulePath = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(modulePath))
+                {
+                    return modulePath;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new InvalidOperationException("PowerShell sleep process executable path was not available.");
     }
 }
