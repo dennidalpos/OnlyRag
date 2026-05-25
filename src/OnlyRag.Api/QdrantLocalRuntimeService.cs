@@ -5,13 +5,14 @@ using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Api;
 
-internal sealed class QdrantLocalRuntimeService
+internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
 {
     private const string QdrantExeName = "qdrant.exe";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
+    private readonly QdrantProcessSupervisor processSupervisor = new();
 
     public QdrantLocalRuntimeService(
         InProcessBackendDescriptor descriptor,
@@ -63,12 +64,14 @@ internal sealed class QdrantLocalRuntimeService
         QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
         if (currentStatus.IsReachable)
         {
+            TryAdoptPersistedProcess();
             return currentStatus;
         }
 
         int? existingPid = ReadPid();
-        if (existingPid is not null && IsProcessRunning(existingPid.Value))
+        if (existingPid is not null && processSupervisor.IsOwnedProcess(existingPid.Value, ResolveBinaryPath()))
         {
+            processSupervisor.TryAdoptProcess(existingPid.Value, ResolveBinaryPath());
             return await WaitForAvailabilityAsync(vectorStore, existingPid.Value, StartupTimeout, cancellationToken);
         }
 
@@ -105,6 +108,7 @@ internal sealed class QdrantLocalRuntimeService
         QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
         if (currentStatus.IsReachable)
         {
+            TryAdoptPersistedProcess();
             return currentStatus;
         }
 
@@ -164,38 +168,48 @@ internal sealed class QdrantLocalRuntimeService
         startInfo.ArgumentList.Add("--config-path");
         startInfo.ArgumentList.Add(ResolveConfigPath());
 
-        Process process = new() { StartInfo = startInfo };
-        if (!process.Start())
-        {
-            throw new InvalidOperationException("Qdrant non ha accettato la richiesta di avvio.");
-        }
-
-        await File.WriteAllTextAsync(ResolvePidPath(), process.Id.ToString(), cancellationToken);
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        int? pid = ReadPid();
-        if (pid is null)
-        {
-            return Task.CompletedTask;
-        }
-
+        Process process = new() { StartInfo = startInfo, EnableRaisingEvents = true };
+        bool attached = false;
         try
         {
-            using Process process = Process.GetProcessById(pid.Value);
-            process.Kill(entireProcessTree: true);
-            process.WaitForExit(5000);
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("Qdrant non ha accettato la richiesta di avvio.");
+            }
+
+            processSupervisor.AttachStartedProcess(process);
+            attached = true;
+
+            await File.WriteAllTextAsync(ResolvePidPath(), process.Id.ToString(), cancellationToken);
         }
-        catch (ArgumentException)
+        catch
         {
+            if (attached)
+            {
+                processSupervisor.DetachStartedProcess(process);
+            }
+
+            QdrantProcessSupervisor.KillAndDisposeProcess(process);
+            throw;
+        }
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await processSupervisor.StopAsync(ReadPid(), ResolveBinaryPath(), cancellationToken);
         }
         finally
         {
             DeletePidFile();
         }
+    }
 
-        return Task.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync();
+        await processSupervisor.DisposeAsync();
     }
 
     private async Task<QdrantStatusResponse> WaitForAvailabilityAsync(
@@ -208,7 +222,7 @@ internal sealed class QdrantLocalRuntimeService
         QdrantStatusResponse lastStatus = await GetStatusAsync(vectorStore, cancellationToken);
         while (!lastStatus.IsReachable && stopwatch.Elapsed < timeout)
         {
-            if (pid is not null && !IsProcessRunning(pid.Value))
+            if (pid is not null && !processSupervisor.IsOwnedProcess(pid.Value, ResolveBinaryPath()))
             {
                 DeletePidFile();
                 return await GetStatusAsync(vectorStore, cancellationToken);
@@ -223,16 +237,12 @@ internal sealed class QdrantLocalRuntimeService
             : lastStatus with { Error = lastStatus.Error ?? "Qdrant locale avviato ma non ancora raggiungibile sulla porta gRPC configurata." };
     }
 
-    private static bool IsProcessRunning(int pid)
+    private void TryAdoptPersistedProcess()
     {
-        try
+        int? pid = ReadPid();
+        if (pid is not null)
         {
-            using Process process = Process.GetProcessById(pid);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            return false;
+            processSupervisor.TryAdoptProcess(pid.Value, ResolveBinaryPath());
         }
     }
 

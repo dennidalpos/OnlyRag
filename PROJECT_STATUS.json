@@ -1,47 +1,53 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T14:45:55+02:00",
-  "active_objective": "Validare nell'app aggiornata il fix OCR Unicode e chiudere le verifiche runtime residue.",
-  "assumptions": [
-    "Il fix OCR richiede una build/installazione che distribuisca la versione aggiornata di scripts/ocr/paddle_ocr_bridge.py.",
-    "Il PDF TrackWise puo riprendere dal checkpoint di importazione alla pagina 247."
-  ],
+  "last_updated": "2026-05-25T15:25:00+02:00",
+  "active_objective": "Chiudere le verifiche residue sull'installer aggiornato, sul lifecycle Qdrant installato e sull'import TrackWise.",
   "execution_plan": [
     {
       "priority": "P1",
       "order": 1,
-      "task": "Rigenerare o reinstallare l'app con il bridge OCR aggiornato.",
-      "residual": "L'app installata usa ancora la copia distribuita precedente del bridge OCR.",
-      "command": "pwsh .\\scripts\\Build-App.ps1 -Configuration Debug"
+      "task": "Chiudere eventuali istanze OnlyRag/Qdrant dell'installazione utente e validare installazione, primo avvio, payload Qdrant/OCR e uninstall.",
+      "residual": "La verifica lifecycle installata non e stata eseguita perche puo chiudere e disinstallare l'app utente.",
+      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
     },
     {
       "priority": "P1",
       "order": 2,
-      "task": "Riprendere l'importazione del PDF TrackWise e verificare che superi la pagina 247.",
-      "residual": "La pagina 247 passa nel bridge repo, ma manca la conferma end-to-end nell'app aggiornata.",
+      "task": "Installare di nuovo l'installer aggiornato se il lifecycle test ha lasciato l'app disinstallata.",
+      "residual": "TrackWise deve essere verificato contro l'app aggiornata installata, non solo contro build o repository.",
+      "command": ".\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe"
+    },
+    {
+      "priority": "P1",
+      "order": 3,
+      "task": "Verificare Qdrant reale dall'app installata aggiornata: avvio locale, chiusura normale e chiusura forzata dell'app senza qdrant.exe residuo.",
+      "residual": "Il fix e coperto da test e build, ma manca conferma manuale sul payload installato.",
+      "command": "Get-Process qdrant -ErrorAction SilentlyContinue"
+    },
+    {
+      "priority": "P1",
+      "order": 4,
+      "task": "Riprendere importazione PDF TrackWise e confermare superamento pagina 247 nell'app aggiornata.",
+      "residual": "Il PDF e lo stato di importazione sono locali all'ambiente utente.",
       "command": ""
     },
     {
       "priority": "P2",
-      "order": 3,
-      "task": "Verificare Qdrant locale nell'app installata aggiornata.",
-      "residual": "Il comportamento e coperto da test, ma non ancora verificato contro qdrant.exe reale nel payload installato.",
+      "order": 5,
+      "task": "Firmare o marcare esplicitamente come unsigned l'installer prima di distribuirlo.",
+      "residual": "L'installer generato e valido ma non firmato.",
       "command": ""
-    },
-    {
-      "priority": "P3",
-      "order": 4,
-      "task": "Aggiungere una verifica installer/lifecycle per Qdrant locale post-installazione.",
-      "residual": "La suite automatica non esercita ancora il binario Qdrant reale dal pacchetto installato.",
-      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
     }
   ],
+  "blockers": [
+    "Le verifiche installate possono chiudere o disinstallare l'app utente.",
+    "La verifica TrackWise richiede PDF e stato locale non presenti nel repository."
+  ],
   "quality_gates": {
-    "api_ocr_tests": "passed",
-    "infrastructure_ocr_tests": "passed",
-    "python_compile": "passed",
-    "structure_review": "passed",
-    "full_gate": "not_run"
+    "installer_lifecycle": "not_run",
+    "installed_qdrant_lifecycle": "not_run",
+    "trackwise_runtime": "not_run",
+    "installer_signing": "not_run"
   }
 }
