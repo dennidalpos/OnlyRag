@@ -11,7 +11,8 @@ OnlyRag uses Inno Setup 6 to package the self-contained Windows desktop app.
   output required before desktop packaging.
 - [`qdrant/manifest.json`](qdrant/manifest.json): bundled Qdrant runtime metadata.
 - [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): bundled Qdrant executable, prepared
-  by [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1).
+  by [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1). The installer build
+  script runs this automatically when the payload is missing.
 - [`../assets/brand/setup`](../assets/brand/setup): installer wizard images.
 
 ## Build
@@ -22,8 +23,9 @@ Unsigned installer:
 pwsh .\scripts\Build-Installer.ps1 -Configuration Release
 ```
 
-The script builds the React/Vite UI, publishes the WPF app self-contained for `win-x64`, verifies
-the publish payload, and compiles `packaging\OnlyRag.iss` with Inno Setup. Default outputs:
+The script builds the React/Vite UI, prepares the Qdrant payload when needed, publishes the WPF app
+self-contained for `win-x64`, verifies the publish payload, and compiles `packaging\OnlyRag.iss`
+with Inno Setup. Default outputs:
 
 - `artifacts\publish\OnlyRag\win-x64`
 - `artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe`

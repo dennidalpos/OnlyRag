@@ -1,61 +1,76 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "release-residuals",
-  "last_updated": "2026-05-25T12:31:00+02:00",
-  "production_target": true,
-  "active_objective": "Chiudere i residui bloccanti e verificare il candidato Windows prima della pubblicazione.",
+  "last_updated": "2026-05-25T12:46:06+02:00",
+  "active_objective": "Rendere il setup installer autosufficiente: ogni dipendenza runtime deve essere inclusa nel payload, installata dal setup, oppure dichiarata opzionale con fallback verificato.",
+  "assumptions": [
+    "Windows 10 1809+ o Windows 11 resta un prerequisito di sistema non installabile dal setup."
+  ],
   "execution_plan": [
     {
       "priority": "P1",
       "order": 1,
-      "task": "Firmare il candidato installer con certificato code-signing attendibile.",
-      "command": "pwsh .\\scripts\\Sign-Release.ps1",
-      "residual": "Il candidato installer non firmato non e pronto per distribuzione.",
-      "status": "pending"
+      "task": "Definire la matrice dipendenze installer con classificazione required, setup-provisioned, self-contained oppure optional.",
+      "residual": "WebView2, Python OCR, Ollama e LibreOffice non sono ancora tracciati in una matrice unica con decisione esplicita di packaging/provisioning/fallback.",
+      "command": ""
     },
     {
       "priority": "P1",
       "order": 2,
-      "task": "Eseguire lifecycle reale install/launch/uninstall su profilo o macchina Windows puliti.",
-      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
-      "residual": "Il profilo locale non e pulito; lifecycle release non ancora verificato in ambiente rappresentativo.",
-      "status": "pending"
+      "task": "Aggiornare il setup per installare o includere ogni dipendenza runtime required non gia self-contained.",
+      "residual": "WebView2 e attualmente solo rilevato e bloccante: il setup mostra istruzioni manuali invece di includere o avviare un installer verificato.",
+      "command": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release"
     },
     {
-      "priority": "P2",
+      "priority": "P1",
       "order": 3,
-      "task": "Verificare errori ACL reali sui percorsi runtime in sandbox o profilo dedicato.",
-      "command": "",
-      "residual": "I test coprono path bloccato da file, ma non una simulazione ACL Windows reale.",
-      "status": "pending"
+      "task": "Rendere esplicito il trattamento setup delle dipendenze feature: OCR Python/packages, Ollama e LibreOffice.",
+      "residual": "OCR viene preparato solo se Python e rete sono disponibili; Ollama e LibreOffice restano esterni/manuali. Va deciso se installarli dal setup o mantenere feature opzionali con fallback testato.",
+      "command": ""
+    },
+    {
+      "priority": "P1",
+      "order": 4,
+      "task": "Aggiungere verifiche installer per copertura dipendenze, includendo payload self-contained e componenti installati durante setup.",
+      "residual": "La verifica lifecycle controlla file installati e avvio, ma non dimostra ancora che tutte le dipendenze required siano incluse o installate automaticamente su macchina pulita.",
+      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
+    },
+    {
+      "priority": "P1",
+      "order": 5,
+      "task": "Firmare il candidato installer e rieseguire lifecycle completo su profilo o macchina Windows puliti.",
+      "residual": "Il lifecycle locale non firmato passa; manca verifica release con firma valida e ambiente rappresentativo.",
+      "command": "pwsh .\\scripts\\Sign-Release.ps1; pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
     },
     {
       "priority": "P2",
-      "order": 4,
+      "order": 6,
+      "task": "Verificare errori ACL reali sui percorsi runtime in sandbox o profilo dedicato.",
+      "residual": "I test coprono path bloccato da file, ma non una simulazione ACL Windows reale.",
+      "command": ""
+    },
+    {
+      "priority": "P2",
+      "order": 7,
       "task": "Valutare hash-lock dei requirements OCR Python senza rompere il provisioning multi-runtime.",
-      "command": "",
       "residual": "I requirements OCR sono version-pinned ma non hash-locked.",
-      "status": "pending"
+      "command": ""
     },
     {
       "priority": "P3",
-      "order": 5,
+      "order": 8,
       "task": "Pianificare rebuild Qdrant per documenti migrati da storage vettoriale legacy.",
-      "command": "",
       "residual": "Dopo upgrade, documenti migrati da backend vettoriale legacy richiedono indice Qdrant ricostruito.",
-      "status": "pending"
+      "command": ""
     }
   ],
   "quality_gates": {
-    "script_static_analysis": "passed",
-    "release_gate": "passed",
-    "installer_evidence": "passed",
-    "install_lifecycle": "not_run"
+    "installer_dependency_coverage": "not_run",
+    "signed_install_lifecycle": "not_run",
+    "structure_review": "passed"
   },
   "environment": {
     "os_target": "Windows",
     "shell": "PowerShell"
-  },
-  "last_completed_work": "Aggiornato docs\\APP_FLOW.drawio per rappresentare Qdrant come runtime/vector store esplicito nei flussi runtime e prodotto."
+  }
 }

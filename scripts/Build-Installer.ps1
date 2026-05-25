@@ -33,6 +33,8 @@ $wizardImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-imag
 $wizardSmallImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp"
 $webRoot = Join-Path $repoRoot "src\OnlyRag.Web"
 $innoScript = Join-Path $repoRoot "packaging\OnlyRag.iss"
+$downloadQdrantScript = Join-Path $PSScriptRoot "Download-Qdrant.ps1"
+$qdrantExe = Join-Path $repoRoot "packaging\qdrant\payload\qdrant.exe"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot "artifacts"
@@ -64,6 +66,10 @@ $dotnetCommand = Assert-OnlyRagDotNetSdk
 
 Write-Host "Building React/Vite UI..." -ForegroundColor Cyan
 Invoke-OnlyRagWebBuild -WebRoot $webRoot
+
+if (-not (Test-Path -LiteralPath $qdrantExe -PathType Leaf)) {
+    & $downloadQdrantScript
+}
 
 Write-Host "Publishing OnlyRag WPF app..." -ForegroundColor Cyan
 Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot -Arguments @(
