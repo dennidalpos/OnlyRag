@@ -1,183 +1,206 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "dependency_supply_chain_review",
-  "last_updated": "2026-05-25T23:24:58+02:00",
+  "current_phase": "production_test_quality_gate_review",
+  "last_updated": "2026-05-25T23:35:43+02:00",
   "production_target": true,
-  "summary": "Windows + PowerShell production-readiness review focused on package managers, lockfiles, runtime/dev dependencies, supply-chain verification, package scripts, version consistency, and dependency auditability.",
-  "active_objective": "Make dependency and supply-chain state production-ready without installing, updating, removing, or changing packages.",
+  "summary": "Windows + PowerShell production-readiness tracker focused on test coverage, verification commands, quality gates, security checks, build checks, release checks, and manual verification requirements for a new production project with no legacy/workaround tolerance.",
+  "active_objective": "Make verification evidence sufficient before treating the repository as production-ready.",
   "assumptions": [
-    "Target runtime is Windows 10 1809+ or Windows 11 with PowerShell 7.",
-    "Frontend package manager is npm because src\\OnlyRag.Web contains package.json and package-lock.json and no pnpm, Yarn, or Bun lockfiles.",
-    ".NET dependencies are resolved by SDK-style csproj PackageReference entries; no NuGet lockfile or central package management file is present.",
-    "OCR runtime package sets are controlled by scripts\\ocr\\requirements*.txt and scripts\\ocr\\runtime-manifest.json.",
-    "Bundled Qdrant runtime is controlled by packaging\\qdrant\\manifest.json."
+    "Local development and release verification target Windows with PowerShell 7.",
+    "Canonical readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
+    "Installer/package readiness additionally requires installer-inclusive gate and signed installer lifecycle evidence on a clean Windows profile.",
+    "No source, test, script, documentation, dependency, or configuration files may be changed during this review."
   ],
-  "current_tasks": [
-    "Enable NuGet dependency lockfiles for the solution so production restores are deterministic and reviewable.",
-    "Run NuGet vulnerability audit after a controlled restore: dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive.",
-    "Pin the npm CLI version used for production builds by adding an explicit package manager policy in the appropriate project metadata or tooling.",
-    "Audit all npm runtime and dev dependencies from package-lock.json before release, including install-script packages esbuild, fsevents, and Playwright transitive fsevents.",
-    "Add a Python OCR supply-chain verification policy for scripts\\ocr\\requirements*.txt because packages are version-pinned but not hash-pinned.",
-    "Verify OCR package availability from the declared indexes for each supported Python version before release.",
-    "Prepare and verify the Qdrant payload from packaging\\qdrant\\manifest.json before packaging; the local payload is currently absent.",
-    "Document and enforce allowed package sources for npm, NuGet, Python OCR indexes, and Qdrant downloads in the release gate."
+  "decisions": [
+    "Do not run commands that restore dependencies, install packages, build outputs, start Playwright servers, download Qdrant payloads, or otherwise create generated artifacts during this tracker-only review.",
+    "Mark only commands executed in this session with exit code 0 as passed."
   ],
-  "next_tasks": [
-    "Run the canonical gate after dependency lock and source policy work is complete: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
-    "Run installer-inclusive verification after Qdrant payload preparation: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller.",
-    "Review CI tool setup for exact SDK/package-manager alignment with local production builds.",
-    "Generate a release dependency inventory for .NET packages, npm packages, Python OCR packages, and bundled Qdrant."
-  ],
-  "blockers": [
-    "NuGet vulnerability status is not verifiable from the current clean workspace without restore assets or NuGet lockfiles; dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore fails because project.assets.json files are absent.",
-    "NuGet restore is not locked, so production restore can change transitive package resolution.",
-    "Qdrant production payload is absent under packaging\\qdrant\\payload, so packaging depends on fetching the manifest-pinned external asset before release."
-  ],
-  "risks": [
-    "package.json does not declare a packageManager field, so npm version selection relies on the developer or CI environment even though package-lock.json is present.",
-    "package-lock.json uses lockfileVersion 3 with 292 package entries; npm audit currently reports no vulnerabilities, but install-script packages need explicit release review.",
-    "Runtime npm dependencies use semver ranges in package.json while package-lock.json pins resolved versions; production installs must use npm ci only.",
-    ".NET PackageReference versions are direct and exact, but transitive dependency resolution is not committed without packages.lock.json.",
-    "Python OCR requirements pin versions but do not pin hashes and use an extra PaddlePaddle package index for GPU runtimes.",
-    "Qdrant download is constrained to GitHub/raw.githubusercontent.com HTTPS URLs and SHA256-checked by script, but build/package steps still depend on external availability when payload is missing.",
-    "CI uses actions/setup-node with node-version lts/* while package.json accepts ^20.19.0 || >=22.12.0; exact production Node major should be fixed for release reproducibility.",
-    "CI uses actions/setup-dotnet 10.0.x while global.json pins 10.0.300 with latestFeature roll-forward; release builds should use a documented exact SDK acquisition path."
-  ],
-  "package_managers": {
-    "javascript": {
-      "manager": "npm",
-      "manifest": "src\\OnlyRag.Web\\package.json",
-      "lockfile": "src\\OnlyRag.Web\\package-lock.json",
-      "lockfile_version": 3,
-      "package_count": 292,
-      "mixing_risk": "No pnpm, Yarn, or Bun lockfiles found."
-    },
+  "test_frameworks": {
     "dotnet": {
-      "manager": "NuGet via SDK-style PackageReference",
-      "solution": "OnlyRag.sln",
-      "sdk": "global.json pins 10.0.300 with latestFeature roll-forward",
-      "lockfile": "",
-      "central_package_management": ""
-    },
-    "python_ocr": {
-      "manager": "pip requirements files",
-      "manifest": "scripts\\ocr\\runtime-manifest.json",
-      "requirements": [
-        "scripts\\ocr\\requirements.txt",
-        "scripts\\ocr\\requirements-common.txt",
-        "scripts\\ocr\\requirements-cpu.txt",
-        "scripts\\ocr\\requirements-nvidia-cu118.txt",
-        "scripts\\ocr\\requirements-nvidia-cu126.txt",
-        "scripts\\ocr\\requirements-nvidia-cu129.txt",
-        "scripts\\ocr\\requirements-nvidia-cu130.txt"
+      "framework": "xUnit",
+      "projects": [
+        "tests\\OnlyRag.Core.Tests\\OnlyRag.Core.Tests.csproj",
+        "tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj",
+        "tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj"
       ],
-      "lockfile": ""
+      "static_test_count": 246,
+      "notes": "Static count from [Fact]/[Theory]: Api 148, Infrastructure 91, Core 7."
     },
-    "bundled_native_runtime": {
-      "name": "Qdrant",
-      "manifest": "packaging\\qdrant\\manifest.json",
-      "version": "1.17.1",
-      "hash_pinned": true,
-      "payload_present": false
+    "frontend_unit": {
+      "framework": "Vitest + Testing Library + jsdom",
+      "command": "npm run test:unit",
+      "static_test_count": 65,
+      "notes": "Static count from test()/it() in src\\OnlyRag.Web\\src test files."
+    },
+    "frontend_e2e": {
+      "framework": "Playwright",
+      "command": "npm run test:e2e",
+      "static_test_count": 2,
+      "notes": "Playwright starts Vite and tests\\OnlyRag.PlaywrightBackendHost; not run in this session because it starts local servers and requires installed web dependencies."
     }
   },
-  "runtime_dependencies": [
-    "React 19.2.6",
-    "react-dom 19.2.6",
-    "Microsoft.Web.WebView2 1.0.3967.48",
-    "Microsoft.Data.Sqlite 10.0.8",
-    "DocumentFormat.OpenXml 3.5.1",
-    "PdfPig 0.1.14",
-    "Qdrant.Client 1.18.1",
-    "Microsoft.AspNetCore.App framework reference",
-    "Qdrant 1.17.1 native Windows payload from packaging manifest",
-    "PaddleOCR 3.5.0 and selected PaddlePaddle runtime for OCR provisioning"
-  ],
-  "development_dependencies": [
-    ".NET SDK 10.0.300",
-    "PowerShell 7",
-    "Node.js ^20.19.0 || >=22.12.0 with npm",
-    "@eslint/js 10.0.1",
-    "@playwright/test 1.60.0",
-    "@testing-library packages",
-    "@vitejs/plugin-react 5.0.0",
-    "axe-core 4.11.4",
-    "eslint 10.4.0",
-    "jsdom 29.1.1",
-    "prettier 3.8.3",
-    "typescript 5.9.0",
-    "typescript-eslint 8.59.4",
-    "vite 7.3.3",
-    "vitest 4.1.7",
-    "coverlet.collector 10.0.0",
-    "Microsoft.NET.Test.Sdk 18.4.0",
-    "xunit 2.9.3",
-    "xunit.runner.visualstudio 3.1.5"
-  ],
-  "suspicious_or_sensitive_packages_to_review": [
-    "npm install script: node_modules/esbuild@0.27.7",
-    "npm install script: node_modules/fsevents@2.3.3",
-    "npm install script: node_modules/playwright/node_modules/fsevents@2.3.2",
-    "Python OCR GPU packages from PaddlePaddle extra indexes",
-    "nvidia-cudnn-cu12 9.9.0.52 in requirements-nvidia-cu129.txt",
-    "Bundled native qdrant.exe downloaded from GitHub release asset"
-  ],
-  "version_inconsistencies_to_resolve": [
-    "CI Node selection uses lts/* while package.json allows ^20.19.0 || >=22.12.0; choose and enforce the production Node major/version.",
-    "CI .NET selection uses 10.0.x while global.json pins 10.0.300 with roll-forward; document whether release builds must use exactly 10.0.300 or feature roll-forward.",
-    "package.json uses semver ranges; production must rely on package-lock.json and npm ci."
+  "available_quality_commands": {
+    "canonical_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "installer_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
+    "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
+    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
+    "web_format_check": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
+    "web_unit_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
+    "web_e2e_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:e2e",
+    "web_all_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test",
+    "dotnet_tests": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "npm_production_audit": "Set-Location .\\src\\OnlyRag.Web; npm audit --omit=dev --audit-level=moderate",
+    "nuget_vulnerability_audit": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive",
+    "installer_prerequisite_selftest": "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1 -SelfTest",
+    "ocr_manifest_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
+    "ocr_catalog_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeCatalog.ps1 -OutputPath .\\artifacts\\ocr-runtime-catalog\\ocr-runtime-catalog.json",
+    "web_build": "pwsh .\\scripts\\Build-Web.ps1",
+    "app_build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
+    "installer_build": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
+    "installer_release_evidence": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
+  },
+  "commands_run": [
+    {
+      "command": "git status --short",
+      "result": "passed",
+      "note": "Only PROJECT_STATUS.json was modified before this review."
+    },
+    {
+      "command": "dotnet --version",
+      "result": "passed",
+      "note": "10.0.300"
+    },
+    {
+      "command": "node --version; npm --version; pwsh --version",
+      "result": "passed",
+      "note": "Node v22.22.3, npm 10.9.8, PowerShell 7.6.2."
+    },
+    {
+      "command": "Test-Path src\\OnlyRag.Web\\node_modules; Test-Path src\\OnlyRag.Web\\dist; Test-Path packaging\\qdrant\\payload\\qdrant.exe",
+      "result": "passed",
+      "note": "All returned False; local dependencies/build outputs/Qdrant payload are absent."
+    },
+    {
+      "command": "npm audit --omit=dev --audit-level=moderate",
+      "working_directory": "src\\OnlyRag.Web",
+      "result": "passed",
+      "note": "found 0 vulnerabilities."
+    },
+    {
+      "command": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore",
+      "result": "failed",
+      "note": "Failed because project.assets.json files are absent; restore is required before NuGet vulnerability status can be verified."
+    },
+    {
+      "command": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
+      "result": "passed",
+      "note": "OCR runtime manifest validation passed for 5 targets."
+    },
+    {
+      "command": "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1 -SelfTest",
+      "result": "passed",
+      "note": "Installer prerequisite self-test passed."
+    },
+    {
+      "command": "Static test discovery with rg and Select-String",
+      "result": "passed",
+      "note": "Detected xUnit, Vitest, and Playwright suites and counted test declarations without executing tests."
+    }
   ],
   "quality_gates": {
-    "npm_audit_production": "passed",
-    "npm_audit_all": "passed",
-    "nuget_vulnerability_audit": "not_run",
-    "ocr_manifest": "passed",
-    "qdrant_payload_verification": "failed",
-    "package_manager_mixing_review": "passed",
-    "lockfile_review": "failed",
-    "dependency_inventory_review": "passed",
-    "supply_chain_review": "failed",
+    "canonical_gate": "not_run",
     "format": "not_run",
     "lint": "not_run",
     "typecheck": "not_run",
-    "tests": "not_run",
-    "build": "not_run"
+    "frontend_unit_tests": "not_run",
+    "frontend_e2e_tests": "not_run",
+    "dotnet_tests": "not_run",
+    "build": "not_run",
+    "installer_build": "not_run",
+    "installer_lifecycle": "not_run",
+    "npm_production_audit": "passed",
+    "nuget_vulnerability_audit": "failed",
+    "ocr_manifest": "passed",
+    "ocr_catalog": "not_run",
+    "installer_prerequisite_selftest": "passed",
+    "coverage": "not_available",
+    "security_review": "unknown",
+    "manual_release_verification": "not_run",
+    "structure_review": "unknown"
   },
-  "verification_notes": [
-    "git status --short was clean before analysis.",
-    "Only npm package files were found for the frontend: src\\OnlyRag.Web\\package.json and src\\OnlyRag.Web\\package-lock.json.",
-    "No pnpm-lock.yaml, yarn.lock, bun.lock, .npmrc, NuGet.config, Directory.Packages.props, packages.lock.json, pyproject.toml, poetry.lock, Pipfile, or uv.lock were found.",
-    "npm audit --omit=dev --audit-level=moderate reported 0 vulnerabilities.",
-    "npm audit --audit-level=moderate reported 0 vulnerabilities.",
-    "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore failed because restore assets were absent; no restore was run.",
-    "scripts\\ocr\\Test-OcrRuntimeManifest.ps1 passed for 5 targets.",
-    "Local tools detected: dotnet 10.0.300, node v22.22.3, npm 10.9.8, PowerShell 7.6.2.",
-    "Qdrant payload and payload manifest are currently absent under packaging\\qdrant\\payload."
+  "current_tasks": [
+    "Run pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 or an equivalent approved setup path to restore npm and NuGet dependencies before claiming test/build readiness.",
+    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release and record each gate result: preflight, restore, audits, typecheck, lint, format, web tests, .NET tests, installer prerequisite self-test, OCR manifest, web build, and .NET build.",
+    "Run dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive after restore; current no-restore audit fails because assets are absent.",
+    "Run Set-Location .\\src\\OnlyRag.Web; npm run typecheck after npm dependencies are installed.",
+    "Run Set-Location .\\src\\OnlyRag.Web; npm run lint after npm dependencies are installed.",
+    "Run Set-Location .\\src\\OnlyRag.Web; npm run format:check after npm dependencies are installed.",
+    "Run Set-Location .\\src\\OnlyRag.Web; npm run test:unit after npm dependencies are installed.",
+    "Run Set-Location .\\src\\OnlyRag.Web; npm run test:e2e on Windows with Microsoft Edge available; confirm backend host and Vite startup succeed.",
+    "Run dotnet test .\\OnlyRag.sln --configuration Release after restore and record failing tests, if any.",
+    "Define and enforce coverage expectations for critical backend, storage, job, OCR, retrieval, translation, and frontend workflow code.",
+    "Add a contract drift gate between src\\OnlyRag.Core DTOs/enums and src\\OnlyRag.Web\\src\\apiTypes before release.",
+    "Run installer-inclusive verification with a signed installer and clean Windows lifecycle evidence before release."
   ],
-  "commands": {
-    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "npm_install_locked": "Set-Location .\\src\\OnlyRag.Web; npm ci",
-    "dotnet_restore": "dotnet restore .\\OnlyRag.sln",
-    "ocr_runtime_install": "pwsh .\\scripts\\ocr\\install_ocr_runtime.ps1",
-    "qdrant_prepare": "pwsh .\\scripts\\Download-Qdrant.ps1",
-    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "dependency_audit_npm_production": "Set-Location .\\src\\OnlyRag.Web; npm audit --omit=dev --audit-level=moderate",
-    "dependency_audit_npm_all": "Set-Location .\\src\\OnlyRag.Web; npm audit --audit-level=moderate",
-    "dependency_audit_nuget": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive",
-    "ocr_manifest_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
-    "ocr_catalog_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeCatalog.ps1 -OutputPath .\\artifacts\\ocr-runtime-catalog\\ocr-runtime-catalog.json",
-    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
-    "web_build": "pwsh .\\scripts\\Build-Web.ps1",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "release_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller"
-  },
+  "next_tasks": [
+    "Add or configure a coverage command and threshold for .NET and frontend tests; coverlet is referenced but no enforced coverage gate was found.",
+    "Add architecture/dependency tests that validate project layering and prevent unintended Api/Infrastructure/Core coupling changes.",
+    "Add or enforce API contract tests that compare Minimal API responses and TypeScript API types for all endpoints.",
+    "Add explicit accessibility checks if axe-core is intended to be part of the quality gate; no enforced a11y gate was found.",
+    "Add OCR catalog drift verification to scheduled or release checks when network access is acceptable.",
+    "Add manual release verification checklist evidence for signed installer install, launch, data reset, uninstall, WebView2 prerequisite handling, and clean user profile behavior."
+  ],
+  "blockers": [
+    "Production readiness cannot be claimed because canonical gate was not run in this session.",
+    "node_modules is absent, so frontend typecheck, lint, format, unit tests, e2e tests, and web build were not run.",
+    "NuGet restore assets are absent, so NuGet transitive vulnerability audit failed with --no-restore.",
+    "src\\OnlyRag.Web\\dist is absent, so app build with -SkipWebBuild cannot prove packaged web assets are present.",
+    "packaging\\qdrant\\payload\\qdrant.exe is absent, so installer/app packaging would need Qdrant download before release.",
+    "No enforced coverage threshold or coverage report command was found.",
+    "No signed installer lifecycle verification was run on a clean Windows profile."
+  ],
+  "risks": [
+    "The gate restores dependencies and builds outputs; without a recorded successful run, current checkout quality is unproven.",
+    "Playwright e2e coverage is shallow by static count and starts a temporary backend host; failures may hide until full Windows browser verification.",
+    "Large test files and broad integration tests may make failures hard to isolate unless smaller focused tests are added around critical workflows.",
+    "Manual frontend API type duplication can pass TypeScript while still drifting from backend contracts.",
+    "Coverage tooling exists for .NET through coverlet.collector but no threshold prevents critical untested code from shipping.",
+    "npm audit production passed, but full dependency/security readiness also depends on NuGet audit, OCR package policy, Qdrant payload verification, and installer evidence.",
+    "Release readiness depends on clean-machine manual checks that cannot be inferred from unit/integration tests."
+  ],
+  "critical_coverage_gaps": [
+    "No enforced coverage threshold for .NET services, storage, API endpoints, or frontend workflows.",
+    "No generated-contract or drift-check gate for C# Core DTOs versus TypeScript API types.",
+    "No explicit architecture/layering test gate.",
+    "No recorded full repository gate result in the current workspace state.",
+    "No recorded installer lifecycle run with signed installer on a clean Windows profile.",
+    "No recorded Qdrant payload verification in the current workspace because payload is absent.",
+    "No OCR catalog drift check was run; manifest structure was validated only.",
+    "No explicit accessibility gate was found despite axe-core being installed as a dev dependency."
+  ],
+  "manual_verification_required": [
+    "Fresh Windows checkout setup with PowerShell 7, .NET 10 SDK, Node/npm, and WebView2 Runtime.",
+    "Run desktop app from Debug and verify WebView2 loads bundled web UI after Build-Web.",
+    "Run full repository gate in Release.",
+    "Run installer-inclusive gate with Inno Setup installed.",
+    "Build and sign installer, then run Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle on a clean Windows user profile.",
+    "Verify Ollama local/trusted LAN behavior, Qdrant local runtime startup, document import/index/search/chat, OCR provisioning, LibreOffice conversion, translation export, shutdown cancellation, and reset-on-next-startup behavior.",
+    "Inspect generated logs from app, OCR provisioning, Qdrant, installer, and release verification for sensitive data."
+  ],
   "environment": {
     "os_target": "Windows 10 1809+ or Windows 11",
     "shell": "PowerShell 7",
+    "observed_tools": [
+      "dotnet 10.0.300",
+      "node v22.22.3",
+      "npm 10.9.8",
+      "PowerShell 7.6.2"
+    ],
     "required_env_vars": [],
     "env_files": []
   },
+  "last_completed_work": "Updated current test and quality-gate tracker from static discovery and safe checks only.",
   "open_questions": [],
-  "handoff_notes": "Keep this tracker limited to current dependency and supply-chain production tasks. Do not add historical completion notes."
+  "handoff_notes": "Keep this tracker limited to current verification readiness. Do not store history, transcripts, secrets, or completed task logs."
 }
