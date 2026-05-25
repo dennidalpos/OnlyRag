@@ -31,7 +31,7 @@ internal sealed class QdrantProcessSupervisor : IAsyncDisposable
 
         try
         {
-            AttachStartedProcess(process);
+            AttachProcess(process, requireWindowsJob: false);
             return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
@@ -43,10 +43,21 @@ internal sealed class QdrantProcessSupervisor : IAsyncDisposable
 
     public void AttachStartedProcess(Process process)
     {
+        AttachProcess(process, requireWindowsJob: true);
+    }
+
+    private void AttachProcess(Process process, bool requireWindowsJob)
+    {
         if (OperatingSystem.IsWindows())
         {
-            processJob ??= WindowsKillOnCloseProcessJob.Create();
-            processJob.Assign(process);
+            try
+            {
+                processJob ??= WindowsKillOnCloseProcessJob.Create();
+                processJob.Assign(process);
+            }
+            catch (Win32Exception) when (!requireWindowsJob)
+            {
+            }
         }
 
         lock (processLock)

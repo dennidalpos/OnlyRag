@@ -1,27 +1,20 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T20:08:21+02:00",
-  "active_objective": "Miglioramento P3 di architettura e leggibilita preservando comportamento esterno.",
+  "last_updated": "2026-05-25T21:12:27+02:00",
+  "active_objective": "Stabilizzare la gestione dei processi Qdrant adottati su Windows.",
   "current_tasks": [],
-  "next_tasks": [
-    "Valutare una costante condivisa per le estensioni documento tra import e dispatcher ingestion solo se serve eliminare divergenze future.",
-    "Valutare estrazione locale dei progress/checkpoint ripetuti in ingestion testo/PDF/Office se cresce altra duplicazione.",
-    "Eseguire scripts\\Invoke-Gate.ps1 -Configuration Release se serve parita completa con audit npm/NuGet e frontend."
-  ],
+  "next_tasks": [],
   "blockers": [],
-  "risks": [
-    "Il gate Release completo non e stato rieseguito in questo prompt.",
-    "Il working tree conteneva modifiche preesistenti su frontend, tracker e un test API; non sono state sovrascritte."
-  ],
+  "risks": [],
   "quality_gates": {
-    "format": "not_run",
-    "lint": "not_run",
-    "typecheck": "not_run",
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
     "tests": "passed",
     "build": "passed",
-    "release_gate": "not_run"
+    "release_gate": "passed"
   },
-  "last_completed_work": "Applicati tre refactor piccoli in Infrastructure: costanti import documenti, apertura PDF separata e query FTS calcolata una sola volta.",
-  "handoff_notes": "API pubbliche, DTO, schema dati e configurazione invariati; verificati test Infrastructure/API e build Release della solution."
+  "last_completed_work": "Resa robusta l'adozione dei processi Qdrant gia esistenti quando l'associazione al Windows Job non e disponibile.",
+  "handoff_notes": "Verificato gate Release completo con pwsh; API pubbliche, DTO, schema dati e configurazione invariati."
 }
