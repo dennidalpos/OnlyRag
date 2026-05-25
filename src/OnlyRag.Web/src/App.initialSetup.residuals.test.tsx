@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { OcrSettings } from "./api";
@@ -8,7 +8,8 @@ import {
   createModel,
   createOllamaInstallStatus,
   createOllamaSettings,
-  createOllamaStatus
+  createOllamaStatus,
+  createPerformanceSettings
 } from "./test/fixtures";
 
 afterEach(() => {
@@ -191,6 +192,126 @@ describe("App initial setup residual checks", () => {
     await flushPromises();
 
     expect(api.calls.some((call) => call.path === "/api/settings/ocr/auto-enable-gpu")).toBe(true);
+  });
+
+  it("rechecks models and OCR when leaving settings", async () => {
+    let needsSetup = false;
+    let startupChecks = 0;
+
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      {
+        path: "/api/settings/ollama",
+        handler: () => ({
+          body: createOllamaSettings({
+            defaultChatModel: needsSetup ? null : "llama3.2:3b"
+          })
+        })
+      },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      { path: "/api/ollama/models", response: { models: createRequiredModels() } },
+      { path: "/api/documents", response: [] },
+      {
+        path: "/api/diagnostics",
+        handler: () => ({
+          body: needsSetup
+            ? createDiagnostics({ ocrIsConfigured: false, ocrStatus: "Non configurato" })
+            : createDiagnostics()
+        })
+      },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        handler: () => {
+          startupChecks += 1;
+          return {
+            body: {
+              shouldPrompt: needsSetup,
+              isWindowsSupported: true,
+              hasMinimumDiskSpace: true,
+              availableDiskBytes: 240 * 1024 * 1024 * 1024,
+              requiredDiskBytes: 2 * 1024 * 1024 * 1024,
+              hasCompatiblePython: true,
+              isOcrConfigured: !needsSetup,
+              isNvidiaRuntimeAvailable: false,
+              isGpuUsable: false,
+              recommendedRuntimeTarget: "cpu",
+              title: needsSetup ? "OCR CPU da installare" : "",
+              message: needsSetup ? "Prepara il runtime OCR locale." : "",
+              findings: []
+            }
+          };
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        handler: () => ({
+          body: needsSetup
+            ? {
+                isConfigured: false,
+                isRunning: false,
+                message: "OCR non configurato.",
+                lastError: null,
+                runtimeTarget: "auto",
+                resolvedRuntime: "cpu",
+                runtimeDetail: null,
+                startedAtUtc: null,
+                updatedAtUtc: "2026-05-24T14:10:00Z"
+              }
+            : {
+                isConfigured: true,
+                isRunning: false,
+                message: "OCR configurato.",
+                lastError: null,
+                runtimeTarget: "auto",
+                resolvedRuntime: "cpu",
+                runtimeDetail: null,
+                startedAtUtc: null,
+                updatedAtUtc: "2026-05-24T14:00:00Z"
+              }
+        })
+      },
+      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      {
+        path: "/api/office-converter/status",
+        response: {
+          state: "Missing",
+          isAvailable: false,
+          executablePath: null,
+          message: "LibreOffice non installato.",
+          suggestion: null,
+          conversionTimeoutSeconds: 120
+        }
+      },
+      { path: "/api/settings/performance", response: createPerformanceSettings() },
+      { path: "/api/settings/ingestion", response: { chunkSizeTokens: 800, overlapTokens: 120 } },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
+      { path: "/api/settings/ocr", response: createOcrSettings() },
+      { path: "/api/ocr/languages", response: [] },
+      {
+        path: /\/api\/ollama\/models\/details\?name=.*/,
+        response: { name: "llama3.2:3b", numCtx: 8192 }
+      }
+    ]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(startupChecks).toBe(1);
+    });
+    expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+    await screen.findByRole("heading", { name: "Impostazioni", level: 2 });
+    needsSetup = true;
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+
+    expect(await screen.findByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("OCR CPU da installare")).toBeInTheDocument();
+    expect(startupChecks).toBeGreaterThanOrEqual(2);
   });
 });
 

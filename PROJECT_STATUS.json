@@ -1,20 +1,20 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T21:12:27+02:00",
-  "active_objective": "Stabilizzare la gestione dei processi Qdrant adottati su Windows.",
+  "last_updated": "2026-05-25T21:38:30+02:00",
+  "active_objective": "Correggere il rilevamento OCR post-installazione e il ricontrollo del wizard iniziale dopo Impostazioni.",
   "current_tasks": [],
   "next_tasks": [],
   "blockers": [],
   "risks": [],
   "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
+    "format": "not_run",
+    "lint": "not_run",
+    "typecheck": "not_run",
     "tests": "passed",
-    "build": "passed",
-    "release_gate": "passed"
+    "build": "not_run",
+    "release_gate": "not_run"
   },
-  "last_completed_work": "Resa robusta l'adozione dei processi Qdrant gia esistenti quando l'associazione al Windows Job non e disponibile.",
-  "handoff_notes": "Verificato gate Release completo con pwsh; API pubbliche, DTO, schema dati e configurazione invariati."
+  "last_completed_work": "OCR engine risolve dinamicamente il Python runtime e App riesegue i controlli iniziali uscendo da Impostazioni.",
+  "handoff_notes": "Verificati test mirati API, Infrastructure e Web unit; API pubbliche e schema dati invariati."
 }

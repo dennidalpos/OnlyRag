@@ -23,6 +23,25 @@ public sealed class PaddleOcrEngineProcessTests
     }
 
     [Fact]
+    public async Task CheckAvailabilityResolvesPythonPathForEachAttempt()
+    {
+        using TempBridge bridge = TempBridge.Create(
+            """
+            [Console]::Out.Write('{"available":true,"engineVersion":"test-ocr","message":"ok"}')
+            """);
+        string pythonPath = Path.Combine(bridge.Root, "missing-python.exe");
+        PaddleOcrEngine engine = bridge.CreateEngine(() => pythonPath);
+
+        OcrEngineAvailability firstAvailability = await engine.CheckAvailabilityAsync();
+        pythonPath = "pwsh";
+        OcrEngineAvailability secondAvailability = await engine.CheckAvailabilityAsync();
+
+        Assert.False(firstAvailability.IsConfigured);
+        Assert.True(secondAvailability.IsConfigured);
+        Assert.Equal("test-ocr", secondAvailability.EngineVersion);
+    }
+
+    [Fact]
     public async Task CheckAvailabilityTimesOutHungBridge()
     {
         using TempBridge bridge = TempBridge.Create(
@@ -183,6 +202,16 @@ public sealed class PaddleOcrEngineProcessTests
         {
             return new PaddleOcrEngine(
                 "pwsh",
+                ScriptPath,
+                Timeout,
+                Timeout,
+                Timeout);
+        }
+
+        public PaddleOcrEngine CreateEngine(Func<string> pythonPathResolver)
+        {
+            return new PaddleOcrEngine(
+                pythonPathResolver,
                 ScriptPath,
                 Timeout,
                 Timeout,

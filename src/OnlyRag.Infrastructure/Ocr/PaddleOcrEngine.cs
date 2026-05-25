@@ -13,14 +13,14 @@ public sealed class PaddleOcrEngine : IOcrEngine
     private static readonly TimeSpan RecognizeTimeout = TimeSpan.FromMinutes(3);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly string pythonPath;
+    private readonly Func<string> pythonPathResolver;
     private readonly string bridgePath;
     private readonly TimeSpan checkTimeout;
     private readonly TimeSpan prepareTimeout;
     private readonly TimeSpan recognizeTimeout;
 
     public PaddleOcrEngine()
-        : this(ResolvePythonPath(), ResolveBridgePath(), CheckTimeout, PrepareTimeout, RecognizeTimeout)
+        : this(ResolvePythonPath, ResolveBridgePath(), CheckTimeout, PrepareTimeout, RecognizeTimeout)
     {
     }
 
@@ -30,11 +30,21 @@ public sealed class PaddleOcrEngine : IOcrEngine
         TimeSpan checkTimeout,
         TimeSpan prepareTimeout,
         TimeSpan recognizeTimeout)
+        : this(() => pythonPath, bridgePath, checkTimeout, prepareTimeout, recognizeTimeout)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pythonPath);
+    }
+
+    internal PaddleOcrEngine(
+        Func<string> pythonPathResolver,
+        string bridgePath,
+        TimeSpan checkTimeout,
+        TimeSpan prepareTimeout,
+        TimeSpan recognizeTimeout)
+    {
+        ArgumentNullException.ThrowIfNull(pythonPathResolver);
         ArgumentException.ThrowIfNullOrWhiteSpace(bridgePath);
 
-        this.pythonPath = pythonPath;
+        this.pythonPathResolver = pythonPathResolver;
         this.bridgePath = bridgePath;
         this.checkTimeout = ValidateTimeout(checkTimeout, nameof(checkTimeout));
         this.prepareTimeout = ValidateTimeout(prepareTimeout, nameof(prepareTimeout));
@@ -172,7 +182,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
     {
         ProcessStartInfo startInfo = new()
         {
-            FileName = pythonPath,
+            FileName = ResolvePythonExecutablePath(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -375,6 +385,14 @@ public sealed class PaddleOcrEngine : IOcrEngine
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string venvPython = Path.Combine(localAppData, "OnlyRag", "ocr-python", ".venv", "Scripts", "python.exe");
         return File.Exists(venvPython) ? venvPython : "python";
+    }
+
+    private string ResolvePythonExecutablePath()
+    {
+        string path = pythonPathResolver();
+        return string.IsNullOrWhiteSpace(path)
+            ? "python"
+            : path;
     }
 
     private static string ResolveBridgePath()

@@ -297,7 +297,7 @@ export default function App() {
   const previousSectionRef = useRef<SectionId>(activeSection);
   useEffect(() => {
     if (previousSectionRef.current === "settings" && activeSection !== "settings") {
-      void refreshOllamaData();
+      void runInitialSetupChecks();
     }
     previousSectionRef.current = activeSection;
   }, [activeSection]);
