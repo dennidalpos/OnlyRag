@@ -21,7 +21,7 @@ describe("AppHeader", () => {
     expect(status).toHaveTextContent("Operazioni");
     expect(status).not.toHaveTextContent("Ora");
     expect(screen.getByTitle(/Ora corrente/)).toBeInTheDocument();
-    expect(container.querySelector(".status-row")).toHaveTextContent(/Operazioni.*Ora/);
+    expect(container.querySelector(".status-row__operations")).toHaveTextContent(/Operazioni.*Ora/);
   });
 });
 

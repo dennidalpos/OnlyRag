@@ -7,7 +7,7 @@
         <mxCell id="title" parent="1" style="text;html=1;fontSize=24;fontStyle=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=0;" value="OnlyRag runtime architecture" vertex="1">
           <mxGeometry height="40" width="420" x="40" y="30" as="geometry" />
         </mxCell>
-        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontColor=#666666;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=0;" value="Windows WPF shell, WebView2 React UI, in-process ASP.NET Core backend, local SQLite storage, and local/LAN model tools." vertex="1">
+        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontColor=#666666;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=0;" value="Windows WPF shell, WebView2 React UI, in-process ASP.NET Core backend, persistent local jobs, SQLite, Qdrant, Ollama, OCR, and Office tools." vertex="1">
           <mxGeometry height="30" width="920" x="40" y="70" as="geometry" />
         </mxCell>
         <mxCell id="c-desktop" parent="1" style="swimlane;html=1;startSize=28;rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" value="Desktop host" vertex="1">
@@ -28,7 +28,7 @@
         <mxCell id="wpf-app" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="OnlyRag.App&lt;br&gt;WPF startup and shutdown" vertex="1">
           <mxGeometry height="70" width="260" x="80" y="170" as="geometry" />
         </mxCell>
-        <mxCell id="backend-start" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="Start InProcessBackend&lt;br&gt;dynamic loopback port" vertex="1">
+        <mxCell id="backend-start" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="Start InProcessBackend&lt;br&gt;dynamic loopback port&lt;br&gt;prepare LocalAppData and storage" vertex="1">
           <mxGeometry height="70" width="260" x="80" y="270" as="geometry" />
         </mxCell>
         <mxCell id="webview" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="MainWindow + WebView2&lt;br&gt;checks Windows and WebView2" vertex="1">
@@ -46,16 +46,16 @@
         <mxCell id="minimal-api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="ASP.NET Core Minimal API&lt;br&gt;CORS for WebView origins&lt;br&gt;session-token auth for /api/*" vertex="1">
           <mxGeometry height="80" width="300" x="830" y="170" as="geometry" />
         </mxCell>
-        <mxCell id="endpoints" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Endpoint groups&lt;br&gt;app, documents, jobs, retrieval/chat,&lt;br&gt;settings, dependencies, translations" vertex="1">
+        <mxCell id="endpoints" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Endpoint groups&lt;br&gt;app/diagnostics, documents, jobs,&lt;br&gt;retrieval/chat, settings, dependencies,&lt;br&gt;models, Qdrant, translations" vertex="1">
           <mxGeometry height="80" width="300" x="830" y="285" as="geometry" />
         </mxCell>
-        <mxCell id="services" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Application services&lt;br&gt;ChatService, DocumentLibraryService,&lt;br&gt;HybridRetrievalService, TranslationExportService" vertex="1">
+        <mxCell id="services" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Application services&lt;br&gt;ChatService, DocumentLibraryService,&lt;br&gt;HybridRetrievalService, TranslationExportService,&lt;br&gt;dependency provisioning, telemetry" vertex="1">
           <mxGeometry height="90" width="300" x="830" y="400" as="geometry" />
         </mxCell>
-        <mxCell id="job-system" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Persistent local jobs&lt;br&gt;SqliteLocalJobQueue + LocalJobWorkerService&lt;br&gt;ingestion, embedding, translation" vertex="1">
+        <mxCell id="job-system" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Persistent local jobs&lt;br&gt;SqliteLocalJobQueue + LocalJobWorkerService&lt;br&gt;ingestion, embedding, translation&lt;br&gt;pause, resume, cancel, retry, checkpoints" vertex="1">
           <mxGeometry height="90" width="300" x="830" y="530" as="geometry" />
         </mxCell>
-        <mxCell id="infra" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Infrastructure adapters&lt;br&gt;SQLite repositories, ingestion, OCR cache,&lt;br&gt;Qdrant vector search, process launcher" vertex="1">
+        <mxCell id="infra" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Infrastructure adapters&lt;br&gt;SQLite repositories, storage guard,&lt;br&gt;ingestion, OCR/cache, Office conversion,&lt;br&gt;Qdrant vector store, process launcher" vertex="1">
           <mxGeometry height="90" width="300" x="830" y="660" as="geometry" />
         </mxCell>
         <mxCell id="db-main" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;" value="%LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db&lt;br&gt;documents, pages, chunks, vector index status,&lt;br&gt;settings, OCR cache, chat, translations" vertex="1">
@@ -70,7 +70,7 @@
         <mxCell id="ollama" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Ollama HTTP API&lt;br&gt;models, chat, embeddings, translation" vertex="1">
           <mxGeometry height="60" width="250" x="1245" y="630" as="geometry" />
         </mxCell>
-        <mxCell id="qdrant-runtime" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Bundled Qdrant runtime&lt;br&gt;local vector collections and points" vertex="1">
+        <mxCell id="qdrant-runtime" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="Qdrant vector backend&lt;br&gt;bundled local runtime or trusted endpoint&lt;br&gt;collections by model/vector shape" vertex="1">
           <mxGeometry height="60" width="250" x="1245" y="710" as="geometry" />
         </mxCell>
         <mxCell id="office" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;" value="LibreOffice soffice.exe&lt;br&gt;legacy Office conversion and PDF export" vertex="1">
@@ -147,55 +147,58 @@
         <mxCell id="ptitle" value="OnlyRag product flow" style="text;html=1;fontSize=24;fontStyle=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
           <mxGeometry x="40" y="30" width="380" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="psubtitle" value="Main startup, dependency setup, document ingestion, RAG chat, translation, and controlled shutdown flows." style="text;html=1;fontSize=12;fontColor=#666666;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="psubtitle" value="Main startup, setup/diagnostics, document ingestion, OCR, embeddings, RAG chat/search, translation, job controls, exports, reset, and shutdown flows." style="text;html=1;fontSize=12;fontColor=#666666;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=0;" vertex="1" parent="1">
           <mxGeometry x="40" y="70" width="880" height="30" as="geometry" />
         </mxCell>
         <mxCell id="start" value="User starts OnlyRag" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="140" width="170" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="startup" value="WPF startup&lt;br&gt;start backend, prepare LocalAppData,&lt;br&gt;migrate SQLite, recover Running jobs,&lt;br&gt;prepare bundled Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="startup" value="WPF startup&lt;br&gt;check Windows/WebView2&lt;br&gt;start backend, prepare LocalAppData,&lt;br&gt;migrate SQLite, recover Running jobs,&lt;br&gt;prepare bundled Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="300" y="115" width="260" height="110" as="geometry" />
         </mxCell>
         <mxCell id="ui-load" value="WebView2 loads React UI&lt;br&gt;dev server in Debug or static wwwroot&lt;br&gt;injects backend bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="620" y="125" width="260" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="initial-status" value="Initial polling&lt;br&gt;/api/app/status&lt;br&gt;/api/settings/ollama&lt;br&gt;/api/ollama/status&lt;br&gt;/api/dependencies/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="initial-status" value="Initial polling&lt;br&gt;/api/app/status, /api/diagnostics&lt;br&gt;/api/settings/*, /api/ollama/status&lt;br&gt;/api/qdrant/status, /api/dependencies/*&lt;br&gt;/api/ocr/languages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="940" y="125" width="250" height="100" as="geometry" />
         </mxCell>
         <mxCell id="main-sections" value="User works in sections&lt;br&gt;Documents, Chat, Jobs,&lt;br&gt;Translation, Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="1250" y="130" width="230" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="settings-dependencies" value="Settings dependency actions&lt;br&gt;show Ollama, Qdrant, OCR, Office status&lt;br&gt;open official download pages&lt;br&gt;Configura OCR runs Python/pip&lt;br&gt;cancel or 45 min timeout stops process tree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="settings-dependencies" value="Settings and dependency actions&lt;br&gt;Ollama endpoint/models, Qdrant trust/TLS,&lt;br&gt;OCR CPU/GPU provisioning, Office conversion,&lt;br&gt;ingestion/performance, reset defaults/data&lt;br&gt;official downloads only for external tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="1530" y="110" width="240" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="import-start" value="Import documents&lt;br&gt;POST /api/documents/import" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="jobs-controls" value="Jobs view&lt;br&gt;poll /api/jobs&lt;br&gt;pause, resume, cancel, delete completed&lt;br&gt;header badge shows active local work" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="265" width="240" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="import-start" value="Import documents&lt;br&gt;POST /api/documents/import&lt;br&gt;OCR policy + unified language list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="330" width="240" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="import-save" value="Validate upload&lt;br&gt;copy original, SHA-256,&lt;br&gt;deduplicate, create document row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="import-save" value="Validate upload&lt;br&gt;file count/size/quota/storage guard&lt;br&gt;copy original, SHA-256,&lt;br&gt;deduplicate, create document row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="370" y="320" width="250" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="job-ingestion" value="Enqueue document-ingestion&lt;br&gt;worker leases Pending job" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="job-ingestion" value="Enqueue document-ingestion&lt;br&gt;worker leases Pending job&lt;br&gt;checkpoint progress" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="690" y="325" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="ingestion" value="Extract content&lt;br&gt;TXT/MD/CSV, OpenXML, PDF,&lt;br&gt;optional LibreOffice, optional OCR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="ingestion" value="Extract content&lt;br&gt;TXT/MD/CSV, OpenXML, PDF/images,&lt;br&gt;optional LibreOffice, optional OCR&lt;br&gt;OCR cache + retry/timeout policy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1010" y="320" width="260" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="chunks" value="Persist pages and chunks&lt;br&gt;update document pipeline status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="chunks" value="Persist pages and chunks&lt;br&gt;pipeline/preview/OCR status updated&lt;br&gt;SQLite remains source of truth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1340" y="325" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="embedding" value="If embedding model exists&lt;br&gt;enqueue document-embedding&lt;br&gt;Ollama embed chunks, upsert Qdrant points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="embedding" value="If embedding model exists&lt;br&gt;enqueue document-embedding&lt;br&gt;Ollama embeds chunks&lt;br&gt;upsert Qdrant points and index metadata" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1340" y="445" width="250" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="qdrant-flow" value="Qdrant vector store&lt;br&gt;document-scoped points&lt;br&gt;used by hybrid retrieval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="qdrant-flow" value="Qdrant vector store&lt;br&gt;document-scoped points&lt;br&gt;local bundled or trusted remote&lt;br&gt;used by hybrid retrieval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="1620" y="450" width="150" height="90" as="geometry" />
         </mxCell>
         <mxCell id="chat-start" value="Ask a question&lt;br&gt;POST /api/chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="640" width="240" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="chat-choice" value="useDocuments + selectedDocumentIds?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="chat-choice" value="Document chat requested and documents selected?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="405" y="620" width="180" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="retrieval" value="Hybrid retrieval&lt;br&gt;keyword FTS + query embedding + vector search&lt;br&gt;merge and budget snippets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="retrieval" value="Hybrid retrieval&lt;br&gt;SQLite FTS keyword + Ollama query embedding&lt;br&gt;+ Qdrant vector search&lt;br&gt;merge, rerank, budget snippets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="690" y="625" width="270" height="90" as="geometry" />
         </mxCell>
         <mxCell id="prompt" value="Build prompt&lt;br&gt;inject retrieved snippets only&lt;br&gt;never full source documents" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
@@ -204,19 +207,19 @@
         <mxCell id="ollama-chat" value="Ollama chat&lt;br&gt;answer generated locally or trusted LAN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="1340" y="625" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="chat-save" value="Persist chat turn&lt;br&gt;return answer, sources, notices" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="chat-save" value="Persist chat turn&lt;br&gt;return answer, sources, notices&lt;br&gt;surface Qdrant/Ollama errors as user text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
           <mxGeometry x="1340" y="745" width="250" height="80" as="geometry" />
         </mxCell>
         <mxCell id="translation-start" value="Create translation&lt;br&gt;POST /api/translations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="910" width="240" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="translation-prepare" value="Verify indexed document&lt;br&gt;create translation + page-based units" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="translation-prepare" value="Verify indexed document/model&lt;br&gt;create translation + page-based units" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="370" y="905" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="translation-job" value="Enqueue document-translation&lt;br&gt;worker processes pending units" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="translation-job" value="Enqueue document-translation&lt;br&gt;worker processes pending units&lt;br&gt;checkpoint each translated page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="690" y="905" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="translation-ollama" value="Ollama translation&lt;br&gt;validate output, checkpoint each unit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="translation-ollama" value="Ollama translation&lt;br&gt;prompt builder + output validator&lt;br&gt;model/num_ctx settings apply" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="1010" y="905" width="260" height="80" as="geometry" />
         </mxCell>
         <mxCell id="translation-edit" value="Review/correct units&lt;br&gt;GET compare, PUT unit correction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
@@ -225,7 +228,7 @@
         <mxCell id="translation-export" value="Export translated document&lt;br&gt;TXT, Markdown, HTML, DOCX, PDF&lt;br&gt;PDF uses LibreOffice conversion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
           <mxGeometry x="1340" y="1025" width="250" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="shutdown" value="Controlled shutdown&lt;br&gt;UI reports unsaved work&lt;br&gt;backend cancels Pending/Running/Paused jobs&lt;br&gt;dispose in-process backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="shutdown" value="Controlled shutdown&lt;br&gt;UI reports unsaved work&lt;br&gt;backend prepares shutdown&lt;br&gt;cancels Pending/Running/Paused jobs&lt;br&gt;stops Qdrant/processes and disposes backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="1150" width="360" height="100" as="geometry" />
         </mxCell>
         <mxCell id="pe1" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="start" target="startup">
@@ -241,6 +244,9 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pe4b" value="Settings" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="main-sections" target="settings-dependencies">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe4c" value="Jobs" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="main-sections" target="jobs-controls">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pe5" value="Documents" style="endArrow=block;html=1;rounded=0;strokeColor=#444444;" edge="1" parent="1" source="main-sections" target="import-start">

@@ -140,18 +140,6 @@ export function OcrLanguageSelect({
   value: string;
   onChange: (language: string) => void;
 }) {
-  const grouped = languages.reduce<Record<string, OcrLanguage[]>>((groups, language) => {
-    const group = language.scriptGroup || "Avanzate";
-    groups[group] = [...(groups[group] ?? []), language];
-    return groups;
-  }, {});
-
-  const groupNames = Object.keys(grouped).sort((left, right) => {
-    if (left === "Principali") return -1;
-    if (right === "Principali") return 1;
-    return left.localeCompare(right);
-  });
-
   return (
     <label className="field-group" htmlFor="ocr-language">
       <span>Lingua del documento</span>
@@ -160,18 +148,14 @@ export function OcrLanguageSelect({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        {groupNames.map((groupName) => (
-          <optgroup key={groupName} label={groupName}>
-            {grouped[groupName]
-              .slice()
-              .sort((left, right) => left.label.localeCompare(right.label))
-              .map((language) => (
-                <option key={language.code} value={language.code}>
-                  {language.label} ({language.code})
-                </option>
-              ))}
-          </optgroup>
-        ))}
+        {languages
+          .slice()
+          .sort((left, right) => left.label.localeCompare(right.label))
+          .map((language) => (
+            <option key={language.code} value={language.code}>
+              {language.label} ({language.code})
+            </option>
+          ))}
       </select>
     </label>
   );

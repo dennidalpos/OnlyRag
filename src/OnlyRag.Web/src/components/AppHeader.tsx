@@ -18,17 +18,17 @@ type AppHeaderProps = {
 export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHeaderProps) {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
+  const jobsBadge: StatusBadge = {
+    label: "Operazioni",
+    value: formatJobsValue(backendStatus.jobsValue, activeJobs),
+    tone: activeJobs > 0 ? backendStatus.jobsTone : "neutral"
+  };
   const statusBadges: StatusBadge[] = [
     { label: "Backend", value: backendStatus.backendValue, tone: backendStatus.backendTone },
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
     buildQdrantBadge(diagnostics, backendStatus.backendTone),
     buildOcrBadge(diagnostics, backendStatus.backendTone),
-    buildOcrGpuBadge(diagnostics, backendStatus.backendTone),
-    {
-      label: "Operazioni",
-      value: formatJobsValue(backendStatus.jobsValue, activeJobs),
-      tone: activeJobs > 0 ? backendStatus.jobsTone : "neutral"
-    }
+    buildOcrGpuBadge(diagnostics, backendStatus.backendTone)
   ];
 
   useEffect(() => {
@@ -42,21 +42,31 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
       <div className="status-row">
         <div className="status-row__states" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
           {statusBadges.map((badge) => (
-            <span className={`status-badge status-badge--${badge.tone}`} key={badge.label} title={`${badge.label} ${badge.value}`}>
-              <span>{badge.label}</span>
-              <strong>{badge.value}</strong>
-            </span>
+            <StatusBadgeView badge={badge} key={badge.label} />
           ))}
+          <span className="sr-only">{jobsBadge.label} {jobsBadge.value}</span>
         </div>
-        <span
-          className="status-badge status-badge--neutral status-row__clock"
-          title={`Ora corrente ${formatTime(currentTime.toISOString())}`}
-        >
-          <span>Ora</span>
-          <strong>{formatTime(currentTime.toISOString())}</strong>
-        </span>
+        <div className="status-row__operations">
+          <StatusBadgeView badge={jobsBadge} />
+          <span
+            className="status-badge status-badge--neutral status-row__clock"
+            title={`Ora corrente ${formatTime(currentTime.toISOString())}`}
+          >
+            <span>Ora</span>
+            <strong>{formatTime(currentTime.toISOString())}</strong>
+          </span>
+        </div>
       </div>
     </header>
+  );
+}
+
+function StatusBadgeView({ badge }: { badge: StatusBadge }) {
+  return (
+    <span className={`status-badge status-badge--${badge.tone}`} title={`${badge.label} ${badge.value}`}>
+      <span>{badge.label}</span>
+      <strong>{badge.value}</strong>
+    </span>
   );
 }
 

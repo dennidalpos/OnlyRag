@@ -370,6 +370,13 @@ h2 {
   flex: 0 0 auto;
 }
 
+.status-row__operations {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

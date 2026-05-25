@@ -1,31 +1,30 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T22:50:00+02:00",
-  "active_objective": "Chiudere la pulizia UI impostazioni/header con verifica visiva finale e preparazione al commit.",
+  "last_updated": "2026-05-25T22:57:13+02:00",
+  "active_objective": "Aggiornare lo schema di flusso applicativo Draw.io e il fallback Markdown.",
   "current_tasks": [],
   "next_tasks": [
-    "1. Verificare visivamente header e impostazioni su viewport desktop e stretto.",
-    "2. Eseguire eventuale e2e web se serve coprire il layout nel browser reale.",
-    "3. Revisionare diff finale e preparare commit quando richiesto."
+    "1. Revisionare visivamente docs\\APP_FLOW.drawio in draw.io se serve una verifica grafica manuale.",
+    "2. Preparare commit quando richiesto."
   ],
   "blockers": [],
-  "risks": [
-    "La verifica visiva manuale/browser non e' ancora stata eseguita dopo le modifiche CSS."
-  ],
+  "risks": [],
   "quality_gates": {
     "format": "passed",
     "lint": "passed",
     "typecheck": "passed",
     "unit_tests": "passed",
-    "build": "passed",
+    "build": "not_run",
     "e2e": "not_run",
-    "visual_review": "not_run"
+    "visual_review": "not_run",
+    "drawio_xml": "passed"
   },
   "commands": {
     "dev": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
     "web_check": "cd .\\src\\OnlyRag.Web; npm run format:check; npm run lint; npm run typecheck; npm run test:unit; npm run build",
     "web_e2e": "cd .\\src\\OnlyRag.Web; npm run test:e2e"
   },
-  "handoff_notes": "Storico rimosso. Tracker limitato al residuo operativo corrente."
+  "last_completed_work": "Aggiornato docs\\APP_FLOW.drawio e docs\\APP_FLOW.md con startup, setup, import, OCR, embedding, RAG, traduzione, job controls e shutdown.",
+  "handoff_notes": "Tracker limitato al residuo operativo corrente; restano aperte anche le modifiche UI precedenti non committate."
 }

@@ -147,6 +147,8 @@ describe("DocumentsSection", () => {
     const dialog = await screen.findByRole("dialog", { name: "Scegli modalità OCR" });
     expect(within(dialog).getByRole("option", { name: "Italiano (it)" })).toBeInTheDocument();
     expect(within(dialog).getByRole("option", { name: "Curdo (ku)" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("group", { name: "Principali" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("group", { name: "Avanzate" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("option", { name: "it - Italiano" })).not.toBeInTheDocument();
   });
 
