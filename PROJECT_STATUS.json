@@ -1,8 +1,8 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T21:59:30+02:00",
-  "active_objective": "Applicare il controllo placeholder per i modelli predefiniti nel wizard iniziale.",
+  "last_updated": "2026-05-25T22:17:00+02:00",
+  "active_objective": "Far aprire il wizard modelli appena le impostazioni Ollama sono disponibili all'avvio.",
   "current_tasks": [],
   "next_tasks": [],
   "blockers": [],
@@ -15,6 +15,6 @@
     "build": "not_run",
     "release_gate": "not_run"
   },
-  "last_completed_work": "Il wizard considera configurato ogni modello predefinito diverso dal placeholder e segnala solo i ruoli ancora non scelti.",
+  "last_completed_work": "Il wizard iniziale puo comparire per modelli placeholder anche se il listing dei modelli Ollama non e ancora completato.",
   "handoff_notes": "Verificati test unit web; API pubbliche e schema dati invariati."
 }

@@ -133,6 +133,67 @@ describe("App initial setup residual checks", () => {
     expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
   });
 
+  it("opens the wizard for missing default models before model listing completes", async () => {
+    mockApi([
+      { path: "/api/app/status", response: createAppStatus() },
+      {
+        path: "/api/settings/ollama",
+        response: createOllamaSettings({
+          defaultChatModel: null,
+          defaultEmbeddingModel: null,
+          defaultTranslationModel: null
+        })
+      },
+      { path: "/api/ollama/status", response: createOllamaStatus({ installedModelCount: 2 }) },
+      { path: "/api/dependencies/ollama", response: createOllamaInstallStatus() },
+      {
+        path: "/api/ollama/models",
+        handler: () => new Promise(() => {})
+      },
+      { path: "/api/documents", response: [] },
+      { path: "/api/diagnostics", response: createDiagnostics() },
+      {
+        path: "/api/dependencies/ocr/startup-analysis",
+        response: {
+          shouldPrompt: false,
+          isWindowsSupported: true,
+          hasMinimumDiskSpace: true,
+          availableDiskBytes: 240 * 1024 * 1024 * 1024,
+          requiredDiskBytes: 3 * 1024 * 1024 * 1024,
+          hasCompatiblePython: true,
+          isOcrConfigured: true,
+          isNvidiaRuntimeAvailable: false,
+          isGpuUsable: false,
+          recommendedRuntimeTarget: "auto",
+          title: "",
+          message: "",
+          findings: []
+        }
+      },
+      {
+        path: "/api/dependencies/ocr",
+        response: {
+          isConfigured: true,
+          isRunning: false,
+          message: "OCR configurato.",
+          lastError: null,
+          runtimeTarget: "auto",
+          resolvedRuntime: "cpu",
+          runtimeDetail: null,
+          startedAtUtc: null,
+          updatedAtUtc: "2026-05-24T14:00:00Z"
+        }
+      }
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByRole("dialog", { name: "Configurazione iniziale richiesta" })).toBeInTheDocument();
+    expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello embedding non configurato")).toBeInTheDocument();
+    expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
+  });
+
   it("checks missing default models on startup even when no Ollama models are installed", async () => {
     mockApi([
       { path: "/api/app/status", response: createAppStatus() },

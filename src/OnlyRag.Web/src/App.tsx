@@ -86,6 +86,7 @@ export default function App() {
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [ollamaSettingsChecked, setOllamaSettingsChecked] = useState(false);
   const initialSetupCheckInProgressRef = useRef(false);
   const ocrStartupPrompt = useOcrStartupPrompt();
 
@@ -127,6 +128,7 @@ export default function App() {
         .catch(() => null);
 
       setOllamaSettings(settings);
+      setOllamaSettingsChecked(true);
       setOllamaStatus(status);
       setOllamaInstallStatus(dependencyStatus);
       setBackendStatus((current) => ({
@@ -145,6 +147,7 @@ export default function App() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossibile leggere lo stato di Ollama.";
+      setOllamaSettingsChecked(true);
       setOllamaStatus(null);
       setOllamaInstallStatus(null);
       setOllamaModels([]);
@@ -360,7 +363,7 @@ export default function App() {
           )}
         </section>
       </main>
-      {initialCheckDone && activeSection !== "settings" && (
+      {(initialCheckDone || ollamaSettingsChecked) && activeSection !== "settings" && (
         <InitialSetupWizard
           ollamaStatus={ollamaStatus}
           ollamaInstallStatus={ollamaInstallStatus}
