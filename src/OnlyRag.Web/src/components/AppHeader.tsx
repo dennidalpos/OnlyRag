@@ -48,7 +48,10 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
             </span>
           ))}
         </div>
-        <span className="status-badge status-badge--neutral" title={`Ora corrente ${formatTime(currentTime.toISOString())}`}>
+        <span
+          className="status-badge status-badge--neutral status-row__clock"
+          title={`Ora corrente ${formatTime(currentTime.toISOString())}`}
+        >
           <span>Ora</span>
           <strong>{formatTime(currentTime.toISOString())}</strong>
         </span>

@@ -2,7 +2,7 @@
 .settings-card {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   padding: 12px;
   border: 2px solid #cbd8e4;
   border-radius: 8px;
@@ -18,7 +18,7 @@
 .settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .settings-layout {
@@ -41,7 +41,7 @@
 .settings-section {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .settings-section > h3 {
@@ -54,7 +54,7 @@
 .settings-section__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
-  gap: 10px;
+  gap: 9px;
   align-items: start;
 }
 
@@ -86,13 +86,13 @@
 
 .settings-form {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .field-group {

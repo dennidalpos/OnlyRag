@@ -14,6 +14,7 @@ export {
   OcrFieldLabel,
   OcrRangeField,
   OcrSelectField,
+  SettingsFieldLabel,
   SettingsRangeField
 } from "./SettingsSection.fields";
 export {

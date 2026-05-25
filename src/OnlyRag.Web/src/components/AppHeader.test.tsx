@@ -6,7 +6,7 @@ import { AppHeader } from "./AppHeader";
 
 describe("AppHeader", () => {
   it("keeps the updating clock outside the application status live region", () => {
-    render(
+    const { container } = render(
       <AppHeader
         currentSection="Chat"
         backendStatus={createBackendStatus()}
@@ -21,6 +21,7 @@ describe("AppHeader", () => {
     expect(status).toHaveTextContent("Operazioni");
     expect(status).not.toHaveTextContent("Ora");
     expect(screen.getByTitle(/Ora corrente/)).toBeInTheDocument();
+    expect(container.querySelector(".status-row")).toHaveTextContent(/Operazioni.*Ora/);
   });
 });
 

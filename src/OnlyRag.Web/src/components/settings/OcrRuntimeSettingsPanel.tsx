@@ -14,14 +14,18 @@ export function OcrRuntimeSettingsPanel() {
         <div className="settings-card">
           <div className="settings-card__header">
             <h3>OCR runtime</h3>
+            <span
+              className="status-chip status-chip--muted"
+              title="La lingua documento si sceglie durante import, reindicizzazione o OCR e viene riproposta alla prossima operazione."
+            >
+              Lingua per operazione
+            </span>
           </div>
           <div className="settings-form">
-            <div className="panel-note">
-              <p>La lingua documento si sceglie durante import, reindicizzazione o OCR e viene riproposta alla prossima operazione.</p>
-            </div>
             <SettingsRangeField
               id="ocr-processing-retries"
               label="Retry OCR"
+              tooltip="Tentativi aggiuntivi per pagina quando OCR fallisce o produce risultati insufficienti."
               min={0}
               max={2}
               value={ocrProcessingFormState.maxRetries}
@@ -32,6 +36,7 @@ export function OcrRuntimeSettingsPanel() {
             <SettingsRangeField
               id="ocr-processing-timeout"
               label="Timeout pagina"
+              tooltip="Tempo massimo concesso all'OCR per ogni pagina."
               min={15}
               max={600}
               step={15}
@@ -44,6 +49,7 @@ export function OcrRuntimeSettingsPanel() {
             <SettingsRangeField
               id="ocr-processing-low-confidence"
               label="Soglia bassa confidenza"
+              tooltip="Soglia sotto cui il testo OCR viene considerato poco affidabile."
               min={0.01}
               max={0.99}
               step={0.01}

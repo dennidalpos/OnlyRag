@@ -18,7 +18,10 @@ export function IngestionSettingsPanel() {
           <div className="settings-card__header">
             <h3>Ingestione</h3>
             {embeddingRecommendations && (
-              <span className="status-chip status-chip--muted">
+              <span
+                className="status-chip status-chip--muted"
+                title="Intervallo chunk suggerito in base al contesto del modello embedding."
+              >
                 {embeddingRecommendations.chunkMinimum.toLocaleString("it-IT")}-
                 {embeddingRecommendations.chunkMaximum.toLocaleString("it-IT")}
               </span>
@@ -28,6 +31,7 @@ export function IngestionSettingsPanel() {
             <SettingsRangeField
               id="ingestion-chunk-size"
               label="Dimensione chunk"
+              tooltip="Dimensione massima dei segmenti indicizzati per ricerca semantica."
               min={100}
               max={4000}
               step={50}
@@ -47,6 +51,7 @@ export function IngestionSettingsPanel() {
             <SettingsRangeField
               id="ingestion-overlap"
               label="Overlap chunk"
+              tooltip="Token ripetuti tra chunk adiacenti per conservare contesto."
               min={0}
               max={Math.min(1000, Math.floor(ingestionFormState.chunkSizeTokens / 2))}
               step={10}

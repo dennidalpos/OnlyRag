@@ -1,35 +1,31 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T22:36:34+02:00",
-  "active_objective": "Documentazione README, setup e handoff operativo allineata allo stato verificato del repository.",
+  "last_updated": "2026-05-25T22:50:00+02:00",
+  "active_objective": "Chiudere la pulizia UI impostazioni/header con verifica visiva finale e preparazione al commit.",
   "current_tasks": [],
   "next_tasks": [
-    "Eseguire Build-Installer.ps1 su una macchina con Inno Setup 6.",
-    "Firmare e verificare l'installer con signtool e certificato attendibile.",
-    "Eseguire Test-InstallerRelease.ps1 con lifecycle su macchina Windows pulita."
+    "1. Verificare visivamente header e impostazioni su viewport desktop e stretto.",
+    "2. Eseguire eventuale e2e web se serve coprire il layout nel browser reale.",
+    "3. Revisionare diff finale e preparare commit quando richiesto."
   ],
-  "blockers": [
-    "ISCC.exe e signtool.exe non disponibili in questo ambiente per packaging firmato e verifica release completa."
-  ],
+  "blockers": [],
   "risks": [
-    "Installer non generato ne firmato in questa passata; readiness applicativa verificata, release package non verificata end-to-end."
+    "La verifica visiva manuale/browser non e' ancora stata eseguita dopo le modifiche CSS."
   ],
   "quality_gates": {
     "format": "passed",
     "lint": "passed",
     "typecheck": "passed",
-    "tests": "passed",
+    "unit_tests": "passed",
     "build": "passed",
-    "release_gate": "passed"
+    "e2e": "not_run",
+    "visual_review": "not_run"
   },
   "commands": {
-    "fresh_install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
     "dev": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "release_verify": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
+    "web_check": "cd .\\src\\OnlyRag.Web; npm run format:check; npm run lint; npm run typecheck; npm run test:unit; npm run build",
+    "web_e2e": "cd .\\src\\OnlyRag.Web; npm run test:e2e"
   },
-  "last_completed_work": "README, Operations e scripts README chiariscono gate applicativo, package readiness e requisiti release firmata/lifecycle.",
-  "handoff_notes": "Docs principali e link Markdown locali verificati. Packaging release resta bloccato dai tool esterni mancanti in ambiente locale."
+  "handoff_notes": "Storico rimosso. Tracker limitato al residuo operativo corrente."
 }

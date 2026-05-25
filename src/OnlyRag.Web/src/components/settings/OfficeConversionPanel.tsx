@@ -1,4 +1,5 @@
 import {
+  SettingsFieldLabel,
   SettingsRangeField,
   normalizeOptionalValue
 } from "../SettingsSection.helpers";
@@ -25,11 +26,16 @@ export function OfficeConversionPanel() {
           </div>
           <div className="settings-form">
             <label className="field-group" htmlFor="libreoffice-path">
-              <span>Percorso LibreOffice</span>
+              <SettingsFieldLabel
+                text="Percorso LibreOffice"
+                tooltip="Percorso opzionale di soffice.exe per convertire file Office legacy."
+              />
               <input
                 id="libreoffice-path"
                 type="text"
                 value={officeFormState.libreOfficePath ?? ""}
+                title="Percorso opzionale di soffice.exe per convertire file Office legacy."
+                aria-label="Percorso LibreOffice"
                 onChange={(event) =>
                   setOfficeFormState((current) => ({
                     ...current,
@@ -42,6 +48,7 @@ export function OfficeConversionPanel() {
             <SettingsRangeField
               id="office-conversion-timeout"
               label="Timeout conversione"
+              tooltip="Tempo massimo concesso a LibreOffice per convertire un documento legacy."
               min={10}
               max={900}
               step={10}

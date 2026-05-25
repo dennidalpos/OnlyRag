@@ -93,7 +93,7 @@ describe("SettingsSection", () => {
 
     await userEvent.clear(screen.getByLabelText("URL Ollama"));
     await userEvent.type(screen.getByLabelText("URL Ollama"), "http://192.168.1.50:11434");
-    expect(screen.getByText(/Abilita la fiducia solo per un servizio Ollama/)).toBeInTheDocument();
+    expect(screen.getAllByTitle(/Abilita la fiducia solo su reti attendibili/).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByLabelText("Considera attendibile questo endpoint Ollama non locale"));
     await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
@@ -357,6 +357,15 @@ describe("SettingsSection", () => {
     expect(screen.getByRole("slider", { name: "DPI PDF" })).toHaveAccessibleDescription(
       "Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
     );
+    expect(screen.getByRole("slider", { name: "Chunk contesto" })).toHaveAccessibleDescription(
+      "Limita quanti chunk recuperati entrano nella risposta RAG; num_ctx Ollama resta configurato nei modelli."
+    );
+    expect(screen.getByRole("slider", { name: "Retry OCR" })).toHaveAccessibleDescription(
+      "Tentativi aggiuntivi per pagina quando OCR fallisce o produce risultati insufficienti."
+    );
+    expect(screen.queryByText(/Chunk contesto limita quanti chunk/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/La lingua documento si sceglie durante import/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ripristina default aggiorna solo le impostazioni/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Modalità PC poco performante")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Lingua OCR")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Salva impostazioni" })).toBeDisabled();

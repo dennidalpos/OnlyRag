@@ -32,6 +32,7 @@ type OcrSelectFieldProps = {
 type SettingsRangeFieldProps = {
   id: string;
   label: string;
+  tooltip?: string;
   min: number;
   max: number;
   step?: number;
@@ -45,6 +46,7 @@ type SettingsRangeFieldProps = {
 export function SettingsRangeField({
   id,
   label,
+  tooltip,
   min,
   max,
   step = 1,
@@ -54,14 +56,16 @@ export function SettingsRangeField({
   formatValue = formatOcrInteger,
   onChange
 }: SettingsRangeFieldProps) {
+  const descriptionId = useId();
   const normalizedValue = Math.min(max, Math.max(min, value));
   return (
     <label className="field-group settings-range-field" htmlFor={id}>
-      <span>{label}</span>
+      <SettingsFieldLabel text={label} tooltip={tooltip} />
       <span className="settings-range-field__value">
         {formatValue(normalizedValue)}
         {hint && <small>{hint}</small>}
       </span>
+      {tooltip && <span className="sr-only" id={descriptionId}>{tooltip}</span>}
       <input
         id={id}
         type="range"
@@ -70,6 +74,9 @@ export function SettingsRangeField({
         step={step}
         value={normalizedValue}
         disabled={disabled}
+        title={tooltip}
+        aria-label={label}
+        aria-describedby={tooltip ? descriptionId : undefined}
         onChange={(event) => onChange(Number(event.target.value))}
       />
     </label>
@@ -141,6 +148,7 @@ export function AdjustableModelContextBar({
         <SettingsRangeField
           id={sliderLabel.replaceAll(" ", "-")}
           label={sliderLabel}
+          tooltip="Imposta manualmente la finestra di contesto inviata a Ollama per questo modello."
           min={64}
           max={131072}
           step={64}
@@ -239,10 +247,14 @@ export function OcrRangeField({
 }
 
 export function OcrFieldLabel({ text, tooltip }: { text: string; tooltip: string }) {
+  return <SettingsFieldLabel text={text} tooltip={tooltip} />;
+}
+
+export function SettingsFieldLabel({ text, tooltip }: { text: string; tooltip?: string }) {
   return (
     <span className="ocr-field-label">
       <span>{text}</span>
-      <span className="ocr-tooltip" title={tooltip} aria-hidden="true">?</span>
+      {tooltip && <span className="ocr-tooltip" title={tooltip} aria-hidden="true">?</span>}
     </span>
   );
 }

@@ -154,10 +154,16 @@ export function DiagnosticsPanel() {
                 className="button-secondary"
                 onClick={() => void refreshDiagnostics()}
                 disabled={isBusy}
+                title="Rilegge diagnostica locale, stato modelli e servizi."
               >
                 Aggiorna
               </button>
-              <button type="button" onClick={() => void openLogsFolder()} disabled={isBusy}>
+              <button
+                type="button"
+                onClick={() => void openLogsFolder()}
+                disabled={isBusy}
+                title="Apre la cartella locale dei log applicativi."
+              >
                 Apri cartella log
               </button>
               <button
@@ -165,6 +171,7 @@ export function DiagnosticsPanel() {
                 className="button-secondary"
                 onClick={() => void configureOcrRuntime("auto")}
                 disabled={isBusy || Boolean(ocrProvisionStatus?.isRunning)}
+                title="Installa, configura o ripara il runtime OCR locale."
               >
                 {ocrConfigureButtonLabel}
               </button>
@@ -174,13 +181,11 @@ export function DiagnosticsPanel() {
                   className="button-danger"
                   onClick={() => void cancelOcrRuntimeConfiguration()}
                   disabled={isBusy}
+                  title="Interrompe la configurazione OCR in corso."
                 >
                   Annulla OCR
                 </button>
               )}
-            </div>
-            <div className="panel-note panel-note--warning">
-              <p>Ripristina default aggiorna solo le impostazioni. Reset dati elimina tutto al prossimo avvio dopo conferma.</p>
             </div>
             <div className="settings-actions">
               <button
@@ -188,6 +193,7 @@ export function DiagnosticsPanel() {
                 className="button-secondary"
                 onClick={() => void restoreBalancedDefaults()}
                 disabled={isBusy}
+                title="Ripristina solo le impostazioni bilanciate, senza eliminare dati."
               >
                 Ripristina default
               </button>
@@ -196,6 +202,7 @@ export function DiagnosticsPanel() {
                 className="button-danger"
                 onClick={() => void requestAppDataReset()}
                 disabled={isBusy}
+                title="Richiede conferma e programma l'eliminazione dei dati al prossimo avvio."
               >
                 Reset dati al riavvio
               </button>
