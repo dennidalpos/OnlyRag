@@ -10,6 +10,7 @@ using OnlyRag.Api;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api.Tests;
@@ -413,6 +414,74 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task DocumentsDelete_RemovesVectorIndexesBeforeDeletingDocument()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("delete-vector-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        CapturingQdrantVectorStore vectorStore = new();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { QdrantVectorStore = vectorStore });
+        LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
+        SqliteDocumentRepository documentRepository = new(connectionFactory);
+        SqliteEmbeddingRepository embeddingRepository = new(connectionFactory);
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempDescriptor.Root);
+        IReadOnlyList<DocumentChunkForEmbedding> chunks =
+            await embeddingRepository.ListChunksNeedingEmbeddingAsync(document.Id, "embed-a", 0, 10);
+        Assert.NotEmpty(chunks);
+        await embeddingRepository.MarkChunkIndexedAsync(
+            chunks[0].Id,
+            "embed-a",
+            chunks[0].ContentHash,
+            dimensions: 2,
+            vectorStore.BuildCollectionName("embed-a", 2),
+            vectorStore.BuildPointId(chunks[0].Id));
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage deleteResponse = await httpClient.DeleteAsync($"/api/documents/{document.Id}");
+        using HttpResponseMessage detailAfterDelete = await httpClient.GetAsync($"/api/documents/{document.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, detailAfterDelete.StatusCode);
+        Assert.Contains(vectorStore.DeletedDocuments, deleted =>
+            deleted.Model == "embed-a"
+            && deleted.Dimensions == 2
+            && deleted.DocumentId == document.Id);
+    }
+
+    [Fact]
+    public async Task DocumentsDelete_KeepsDocumentWhenVectorCleanupFails()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("delete-vector-failure-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        CapturingQdrantVectorStore vectorStore = new() { FailDeletes = true };
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { QdrantVectorStore = vectorStore });
+        LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
+        SqliteDocumentRepository documentRepository = new(connectionFactory);
+        SqliteEmbeddingRepository embeddingRepository = new(connectionFactory);
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempDescriptor.Root);
+        IReadOnlyList<DocumentChunkForEmbedding> chunks =
+            await embeddingRepository.ListChunksNeedingEmbeddingAsync(document.Id, "embed-a", 0, 10);
+        Assert.NotEmpty(chunks);
+        await embeddingRepository.MarkChunkIndexedAsync(
+            chunks[0].Id,
+            "embed-a",
+            chunks[0].ContentHash,
+            dimensions: 2,
+            vectorStore.BuildCollectionName("embed-a", 2),
+            vectorStore.BuildPointId(chunks[0].Id));
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage deleteResponse = await httpClient.DeleteAsync($"/api/documents/{document.Id}");
+        ImportedDocument? detailAfterDelete =
+            await httpClient.GetFromJsonAsync<ImportedDocument>($"/api/documents/{document.Id}", JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadGateway, deleteResponse.StatusCode);
+        Assert.NotNull(detailAfterDelete);
+        Assert.Equal(document.Id, detailAfterDelete.Id);
+    }
+
+    [Fact]
     public async Task DocumentPreview_ReturnsRequestedPageWindow()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
@@ -456,5 +525,66 @@ public sealed partial class InProcessBackendTests
         DocumentPageInfo page = Assert.Single(preview.Pages);
         Assert.Equal(2, page.PageNumber);
     }
+
+    private sealed class CapturingQdrantVectorStore : IQdrantVectorStore
+    {
+        public List<DeletedVectorDocument> DeletedDocuments { get; } = [];
+
+        public bool FailDeletes { get; init; }
+
+        public string BackendName => "Qdrant fake";
+
+        public int MaxSearchableVectors => int.MaxValue;
+
+        public bool IsVectorStoragePersistent => true;
+
+        public string BuildCollectionName(string model, int dimensions) => $"onlyrag_{dimensions}_test";
+
+        public string BuildPointId(long chunkId) => chunkId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        public Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertChunkAsync(
+            long chunkId,
+            long documentId,
+            int chunkIndex,
+            string model,
+            string contentHash,
+            IReadOnlyList<float> vector,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
+            string model,
+            IReadOnlyList<float> queryVector,
+            IReadOnlyCollection<long> documentIds,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
+        }
+
+        public Task DeleteDocumentAsync(
+            string model,
+            int dimensions,
+            long documentId,
+            CancellationToken cancellationToken = default)
+        {
+            if (FailDeletes)
+            {
+                throw new InvalidOperationException("Qdrant cleanup failed.");
+            }
+
+            DeletedDocuments.Add(new DeletedVectorDocument(model, dimensions, documentId));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed record DeletedVectorDocument(
+        string Model,
+        int Dimensions,
+        long DocumentId);
 }
 

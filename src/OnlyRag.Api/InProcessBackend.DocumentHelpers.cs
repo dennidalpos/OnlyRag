@@ -144,4 +144,23 @@ public static partial class InProcessBackend
             await Task.Delay(80, timeout.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
     }
+
+    private static async Task DeleteDocumentVectorsAsync(
+        long documentId,
+        IEmbeddingRepository embeddings,
+        IQdrantVectorStore vectorSearch,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DocumentVectorIndexReference> references =
+            await embeddings.ListDocumentVectorIndexReferencesAsync(documentId, cancellationToken);
+
+        foreach (DocumentVectorIndexReference reference in references)
+        {
+            await vectorSearch.DeleteDocumentAsync(
+                reference.Model,
+                reference.Dimensions,
+                documentId,
+                cancellationToken);
+        }
+    }
 }

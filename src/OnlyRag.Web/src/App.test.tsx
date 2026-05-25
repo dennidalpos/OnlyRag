@@ -119,7 +119,7 @@ describe("App initial setup", () => {
           isNvidiaRuntimeAvailable: false,
           isGpuUsable: false,
           recommendedRuntimeTarget: "cpu",
-          title: "Installa OCR CPU",
+          title: "OCR CPU da installare",
           message: "Prepara il runtime OCR locale.",
           findings: []
         }
@@ -148,7 +148,7 @@ describe("App initial setup", () => {
     render(<App />);
 
     expect(await screen.findByRole("dialog", { name: "Configurazione iniziale richiesta" })).toBeInTheDocument();
-    expect(screen.getAllByText("Installa OCR CPU").length).toBeGreaterThan(0);
+    expect(screen.getByText("OCR CPU da installare")).toBeInTheDocument();
     expect(screen.getByText("12.5%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
@@ -184,7 +184,7 @@ describe("App initial setup", () => {
           recommendedRuntimeTarget: "auto",
           title: "Runtime OCR da riparare",
           message:
-            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
           findings: []
         }
       },
@@ -194,7 +194,7 @@ describe("App initial setup", () => {
           isConfigured: false,
           isRunning: false,
           message:
-            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
           lastError: null,
           runtimeTarget: "auto",
           resolvedRuntime: "cpu",
@@ -332,7 +332,7 @@ describe("App initial setup", () => {
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
       recommendedRuntimeTarget: "cpu",
-      title: "Installa OCR CPU",
+      title: "OCR CPU da installare",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -412,10 +412,10 @@ describe("App initial setup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
     await flushPromises();
     expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
-    expect(screen.getByText(/Aggiornamento automatico ogni 5 secondi/)).toBeInTheDocument();
+    expect(screen.getByText(/Aggiornamento automatico ogni 3 secondi/)).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(3_000);
     });
 
     expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
@@ -435,7 +435,7 @@ describe("App initial setup", () => {
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
       recommendedRuntimeTarget: "cpu",
-      title: "Installa OCR CPU",
+      title: "OCR CPU da installare",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -517,7 +517,7 @@ describe("App initial setup", () => {
     expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(3_000);
     });
 
     expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
@@ -549,8 +549,8 @@ describe("App initial setup", () => {
           isNvidiaRuntimeAvailable: false,
           isGpuUsable: false,
           recommendedRuntimeTarget: "auto",
-          title: "OCR non configurato in OnlyRag",
-          message: "OnlyRag non vede ancora un runtime PaddleOCR funzionante.",
+          title: "OCR CPU da installare",
+          message: "OnlyRag non vede ancora un runtime PaddleOCR installato.",
           findings: []
         }
       },

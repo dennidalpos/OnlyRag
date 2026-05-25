@@ -156,14 +156,17 @@ export function DefaultModelsPanel() {
                 <p>Alcuni modelli salvati non sono piu presenti in Ollama: {unavailableDefaults.join(", ")}.</p>
               </div>
             )}
-            {hasDirtyOllamaSettings && (
-              <div className="settings-actions settings-actions--dirty" aria-live="polite">
-                <button type="button" onClick={saveSettings} disabled={isBusy}>
-                  Salva modelli predefiniti
-                </button>
-                <span className="dirty-hint">Modifiche non salvate</span>
-              </div>
-            )}
+            <div
+              className={hasDirtyOllamaSettings
+                ? "settings-actions settings-actions--dirty"
+                : "settings-actions"}
+              aria-live="polite"
+            >
+              <button type="button" onClick={saveSettings} disabled={isBusy || !hasDirtyOllamaSettings}>
+                Salva modelli predefiniti
+              </button>
+              {hasDirtyOllamaSettings && <span className="dirty-hint">Modifiche non salvate</span>}
+            </div>
           </div>
         </div>
   );

@@ -46,6 +46,7 @@ export function PerformanceSettingsPanel() {
     recommendedMaxContextChunks,
     chatModelDetailsLoading,
     embeddingModelDetailsLoading,
+    hasDirtyPerformanceSettings,
     savePerformanceSettings,
     isBusy
   } = useSettingsSectionContext();
@@ -161,9 +162,10 @@ export function PerformanceSettingsPanel() {
               <p>Chunk contesto limita quanti chunk recuperati entrano nella risposta RAG. La finestra Ollama num_ctx e separata e viene inviata solo quando impostata manualmente nei modelli predefiniti.</p>
             </div>
             <div className="settings-actions">
-              <button type="button" onClick={savePerformanceSettings} disabled={isBusy}>
+              <button type="button" onClick={savePerformanceSettings} disabled={isBusy || !hasDirtyPerformanceSettings}>
                 Salva prestazioni
               </button>
+              {hasDirtyPerformanceSettings && <span className="dirty-hint">Modifiche non salvate</span>}
             </div>
           </div>
         </div>

@@ -192,7 +192,7 @@ public sealed partial class DocumentIngestionService
             throw new InvalidOperationException(
                 string.IsNullOrWhiteSpace(availability.Message)
                     || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
-                    ? "PaddleOCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR."
+                    ? "Runtime OCR non installato. Apri Impostazioni > Diagnostica e usa Installa OCR."
                     : availability.Message);
         }
 

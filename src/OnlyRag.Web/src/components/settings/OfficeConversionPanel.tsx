@@ -9,6 +9,7 @@ export function OfficeConversionPanel() {
     officeStatus,
     officeFormState,
     setOfficeFormState,
+    hasDirtyOfficeSettings,
     saveOfficeSettings,
     isBusy,
     openLibreOfficeDownload
@@ -51,7 +52,7 @@ export function OfficeConversionPanel() {
               }
             />
             <div className="settings-actions">
-              <button type="button" onClick={saveOfficeSettings} disabled={isBusy}>
+              <button type="button" onClick={saveOfficeSettings} disabled={isBusy || !hasDirtyOfficeSettings}>
                 Salva
               </button>
               {officeStatus && !officeStatus.isAvailable && (
@@ -59,6 +60,7 @@ export function OfficeConversionPanel() {
                   Scarica LibreOffice
                 </button>
               )}
+              {hasDirtyOfficeSettings && <span className="dirty-hint">Modifiche non salvate</span>}
             </div>
             {officeStatus?.executablePath && (
               <div className="panel-note panel-note--path">

@@ -388,7 +388,7 @@ public sealed partial class DocumentIngestionServiceTests
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask));
 
-        Assert.Contains("PaddleOCR non configurato", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Runtime OCR non installato", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

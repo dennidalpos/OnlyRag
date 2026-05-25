@@ -6,6 +6,7 @@ export function OllamaConnectionPanel() {
     formState,
     setFormState,
     usesNonLocalOllamaEndpoint,
+    hasDirtyOllamaSettings,
     saveSettings,
     isBusy,
     testConnection,
@@ -52,7 +53,7 @@ export function OllamaConnectionPanel() {
               </label>
             )}
             <div className="settings-actions">
-              <button type="button" onClick={saveSettings} disabled={isBusy}>
+              <button type="button" onClick={saveSettings} disabled={isBusy || !hasDirtyOllamaSettings}>
                 Salva impostazioni
               </button>
               <button type="button" className="button-secondary" onClick={testConnection} disabled={isBusy}>
@@ -64,6 +65,7 @@ export function OllamaConnectionPanel() {
                 </button>
               )}
             </div>
+            {hasDirtyOllamaSettings && <span className="dirty-hint">Modifiche non salvate</span>}
             <div className="panel-note">
               <p>{status?.message ?? loadError ?? "Configura l'indirizzo Ollama e testa la connessione."}</p>
               {status?.suggestion && <p>{status.suggestion}</p>}

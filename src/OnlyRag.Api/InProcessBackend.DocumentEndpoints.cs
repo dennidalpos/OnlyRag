@@ -33,8 +33,12 @@ public static partial class InProcessBackend
         app.MapDelete("/api/documents/{id:long}", async (
             long id,
             IDocumentLibraryService documents,
+            IEmbeddingRepository embeddings,
+            IQdrantVectorStore vectorSearch,
             ILocalJobQueue jobs,
             RunningJobCancellationRegistry cancellationRegistry,
+            InProcessBackendDescriptor descriptor,
+            HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
@@ -44,6 +48,25 @@ public static partial class InProcessBackend
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
+            try
+            {
+                await DeleteDocumentVectorsAsync(id, embeddings, vectorSearch, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                BackendLog.WriteException(
+                    descriptor.StoragePaths,
+                    httpContext.TraceIdentifier,
+                    $"Document vector cleanup failed for document {id}.",
+                    ex);
+                return CreateProblem(
+                    "Pulizia vettori non completata",
+                    "Il documento non e stato eliminato per evitare dati vettoriali orfani. Riprovare dopo aver verificato Qdrant.",
+                    StatusCodes.Status502BadGateway,
+                    "document_vector_cleanup_failed",
+                    httpContext.TraceIdentifier);
+            }
+
             ImportedDocument? deleted = await documents.DeleteAsync(id, cancellationToken);
             return deleted is null ? CreateNotFoundProblem("Documento") : Results.Ok(deleted);
         });

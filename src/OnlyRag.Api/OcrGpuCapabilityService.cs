@@ -64,7 +64,7 @@ public sealed class OcrGpuCapabilityService
             return new OcrGpuCapabilityResponse(
                 false,
                 "Runtime PaddlePaddle senza CUDA",
-                "Il runtime OCR installato non supporta CUDA. Apri Impostazioni > Diagnostica e premi Configura OCR per installare il runtime NVIDIA GPU, oppure usa OCR CPU.",
+                "Il runtime OCR installato non supporta CUDA. Apri Impostazioni > Diagnostica e premi Installa OCR GPU per installare il runtime NVIDIA GPU, oppure usa OCR CPU.",
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,

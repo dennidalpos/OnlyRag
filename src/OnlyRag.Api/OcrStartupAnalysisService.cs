@@ -63,15 +63,15 @@ public sealed class OcrStartupAnalysisService
             ? hasRepairableOcrRuntimeIssue
                 ? "Runtime OCR da riparare"
                 : runtime.IsNvidia
-                    ? "Installa OCR GPU"
-                    : "Installa OCR CPU"
+                    ? "OCR GPU da installare"
+                    : "OCR CPU da installare"
             : availability.IsConfigured
                 ? "OCR già configurato"
                 : "Configurazione OCR manuale richiesta";
         string message = shouldPrompt
             ? hasRepairableOcrRuntimeIssue && !string.IsNullOrWhiteSpace(availability.Message)
                 ? availability.Message
-                : "OnlyRag non vede ancora un runtime PaddleOCR funzionante. Premi Configura OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
+                : "OnlyRag non vede ancora un runtime PaddleOCR installato. Premi Installa OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
             : availability.IsConfigured
                 ? "Il runtime OCR locale è già disponibile."
                 : "Completa i prerequisiti indicati, poi configura OCR dalle Impostazioni.";

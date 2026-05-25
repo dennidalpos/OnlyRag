@@ -66,7 +66,7 @@ export function InitialSetupWizardIssue({
         {issue.key === "ocr" && (
           <p className="setup-issue__meta">
             Ultima verifica: {formatSetupTime(ocrLastCheckedAt)}.
-            {issue.isRunning ? " Aggiornamento automatico ogni 5 secondi." : ""}
+            {issue.isRunning ? " Aggiornamento automatico ogni 3 secondi." : ""}
           </p>
         )}
       </div>

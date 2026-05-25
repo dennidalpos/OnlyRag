@@ -33,5 +33,9 @@ public interface IEmbeddingRepository
         string? model,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DocumentVectorIndexReference>> ListDocumentVectorIndexReferencesAsync(
+        long documentId,
+        CancellationToken cancellationToken = default);
+
     Task<int> CountIndexedChunksAsync(CancellationToken cancellationToken = default);
 }

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { SettingsSection } from "./SettingsSection";
@@ -219,7 +219,7 @@ describe("SettingsSection", () => {
             isUsable: false,
             status: "Runtime OCR da riparare",
             blockReason:
-              "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+              "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
             runtimeDetail: "NVIDIA compatibile.",
             engineVersion: "3.5.0",
             nvidiaName: "NVIDIA RTX",
@@ -238,7 +238,7 @@ describe("SettingsSection", () => {
           isConfigured: false,
           isRunning: false,
           message:
-            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
+            "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
           lastError: null,
           runtimeTarget: "auto",
           resolvedRuntime: "cuda129",
@@ -346,7 +346,7 @@ describe("SettingsSection", () => {
       "Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
     );
     expect(screen.getByRole("combobox", { name: "Dispositivo" })).toHaveAccessibleDescription(
-      "CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
+      "CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Installa OCR quando disponibile."
     );
     expect(screen.getByRole("combobox", { name: "Preset modello" })).toHaveAccessibleDescription(
       "Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
@@ -359,8 +359,33 @@ describe("SettingsSection", () => {
     );
     expect(screen.queryByLabelText("Modalità PC poco performante")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Lingua OCR")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Salva impostazioni" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva modelli predefiniti" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva prestazioni" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva ingestione" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva OCR" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salva OCR runtime" })).toBeDisabled();
+
+    await userEvent.clear(screen.getByLabelText("URL Ollama"));
+    await userEvent.type(screen.getByLabelText("URL Ollama"), "http://127.0.0.1:11434");
+    expect(screen.getByRole("button", { name: "Salva impostazioni" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Salva modelli predefiniti" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("slider", { name: /Dimensione chunk/ }), { target: { value: "850" } });
+    expect(screen.getByRole("button", { name: "Salva ingestione" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("slider", { name: /Timeout conversione/ }), { target: { value: "130" } });
+    expect(screen.getByRole("button", { name: "Salva" })).toBeEnabled();
+
+    fireEvent.click(screen.getByLabelText("Orientamento righe testo"));
+    expect(screen.getByRole("button", { name: "Salva OCR" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("slider", { name: /Timeout pagina/ }), { target: { value: "195" } });
+    expect(screen.getByRole("button", { name: "Salva OCR runtime" })).toBeEnabled();
 
     await userEvent.selectOptions(screen.getByLabelText("Profilo prestazioni"), "power");
+    expect(screen.getByRole("button", { name: "Salva prestazioni" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Salva prestazioni" }));
 
     const saveCall = api.calls.find((call) => call.path === "/api/settings/performance" && call.method === "PUT");

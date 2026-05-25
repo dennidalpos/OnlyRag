@@ -198,4 +198,58 @@ describe("ChatSection", () => {
       expect(window.sessionStorage.getItem("onlyrag.chat.session")).toContain("qwen2.5:7b")
     );
   });
+
+  it("refreshes selectable documents when the library changes and prunes stale selections", async () => {
+    let documents = [
+      createDocument({ id: 1, originalFileName: "manuale.pdf" }),
+      createDocument({ id: 2, documentUid: "doc-2", originalFileName: "nuovo.pdf" })
+    ];
+    window.sessionStorage.setItem(
+      chatStorageKeys.session,
+      JSON.stringify({
+        conversationId: null,
+        messages: [],
+        selectedDocumentIds: [1, 2],
+        selectedModel: "llama3.2:3b"
+      })
+    );
+
+    mockApi([{ path: "/api/documents", handler: () => ({ body: documents }) }]);
+
+    const { rerender } = render(
+      <ChatSection
+        models={[createModel()]}
+        defaultModel="llama3.2:3b"
+        ollamaStatus={createOllamaStatus()}
+        loadError={null}
+        documentLibraryVersion={0}
+        isActive
+      />
+    );
+
+    expect(await screen.findByText("manuale.pdf")).toBeInTheDocument();
+    expect(screen.getByText("nuovo.pdf")).toBeInTheDocument();
+
+    documents = [createDocument({ id: 2, documentUid: "doc-2", originalFileName: "nuovo.pdf" })];
+    rerender(
+      <ChatSection
+        models={[createModel()]}
+        defaultModel="llama3.2:3b"
+        ollamaStatus={createOllamaStatus()}
+        loadError={null}
+        documentLibraryVersion={1}
+        isActive
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("manuale.pdf")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("nuovo.pdf")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(JSON.parse(window.sessionStorage.getItem(chatStorageKeys.session) ?? "{}")).toMatchObject({
+        selectedDocumentIds: [2]
+      })
+    );
+  });
 });

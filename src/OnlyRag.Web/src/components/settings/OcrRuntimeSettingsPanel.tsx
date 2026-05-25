@@ -54,7 +54,7 @@ export function OcrRuntimeSettingsPanel() {
               }
             />
             <div className="settings-actions">
-              <button type="button" onClick={saveOcrProcessingSettings} disabled={isBusy}>
+              <button type="button" onClick={saveOcrProcessingSettings} disabled={isBusy || !hasDirtyOcrProcessingSettings}>
                 Salva OCR runtime
               </button>
               {hasDirtyOcrProcessingSettings && <span className="dirty-hint">Modifiche non salvate</span>}

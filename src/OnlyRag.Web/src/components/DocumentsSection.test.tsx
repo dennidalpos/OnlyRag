@@ -121,6 +121,35 @@ describe("DocumentsSection", () => {
     expect(await screen.findByText("Testo estratto dal contratto")).toBeInTheDocument();
   });
 
+  it("shows OCR languages as friendly names with technical codes", async () => {
+    mockApi([
+      { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+      {
+        path: "/api/ocr/languages",
+        response: [
+          createOcrLanguage({ code: "it", label: "Italiano", isDefault: true }),
+          createOcrLanguage({ code: "ku", label: "Curdo", scriptGroup: "Avanzate", isDefault: false })
+        ]
+      },
+      {
+        path: "/api/settings/ocr-processing",
+        response: { language: "it", maxRetries: 2, pageTimeoutSeconds: 180, lowConfidenceThreshold: 0.55 }
+      },
+      { path: "/api/documents", response: [] }
+    ]);
+
+    const { container } = render(<DocumentsSection />);
+    await screen.findByText("Nessun documento presente. Importa un file per iniziare.");
+
+    const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
+    await userEvent.upload(fileInput!, new File(["pdf"], "scansione.pdf", { type: "application/pdf" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Scegli modalità OCR" });
+    expect(within(dialog).getByRole("option", { name: "Italiano (it)" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("option", { name: "Curdo (ku)" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("option", { name: "it - Italiano" })).not.toBeInTheDocument();
+  });
+
   it("surfaces import failures as an error state", async () => {
     mockApi([
       { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
@@ -238,6 +267,41 @@ describe("DocumentsSection", () => {
 
       expect(screen.getAllByRole("alert").some((alert) => alert.textContent?.includes("Stato non aggiornato"))).toBe(true);
       expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not keep a stale selected detail when polling no longer returns the document", async () => {
+    vi.useFakeTimers();
+    let documents = [createDocument()];
+    try {
+      mockApi([
+        { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+        { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+        {
+          path: "/api/documents",
+          handler: () => ({ body: documents })
+        },
+        { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
+        { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
+        { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
+      ]);
+
+      render(<DocumentsSection />);
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+
+      documents = [];
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(screen.getByText("Nessun documento presente. Importa un file per iniziare.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Elimina" })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

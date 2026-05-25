@@ -1,21 +1,25 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T16:07:56+02:00",
-  "active_objective": "Rifinire header, navbar, metriche e gerarchia visiva dei riquadri React/WebView senza modificare backend o contratti API.",
+  "last_updated": "2026-05-25T19:27:24+02:00",
+  "active_objective": "Validazione finale delle correzioni documenti/chat, OCR, UI e metriche.",
   "current_tasks": [],
-  "next_tasks": [],
+  "next_tasks": [
+    "1. Eseguire scripts\\Invoke-Gate.ps1 -Configuration Release -ContinueOnError.",
+    "2. Correggere eventuali failure del gate Release.",
+    "3. Ripetere i check falliti fino a stato passed."
+  ],
   "blockers": [],
   "risks": [
-    "La verifica visuale delle metriche live complete e limitata dal backend offline: nella UI reale appare lo stato in attesa."
+    "Il gate Release completo non è ancora stato eseguito dopo le correzioni."
   ],
   "quality_gates": {
-    "typecheck": "passed",
-    "lint": "passed",
     "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
     "tests": "passed",
-    "visual_responsive": "passed"
+    "build": "passed",
+    "release_gate": "not_run"
   },
-  "last_completed_work": "Convertito il badge aggiornamento in ora corrente, aggiunti bordi navbar, aggregate le metriche e marcata la gerarchia dei riquadri.",
-  "handoff_notes": "Dev server Vite avviato su http://127.0.0.1:5173 per verifica locale."
+  "handoff_notes": "Residuo prioritario: eseguire il gate Release completo."
 }

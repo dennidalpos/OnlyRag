@@ -82,6 +82,7 @@ export default function App() {
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
+  const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
   const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -210,6 +211,10 @@ export default function App() {
     await runInitialSetupChecks({ showBusy: true });
   }
 
+  function notifyDocumentLibraryChanged() {
+    setDocumentLibraryVersion((current) => current + 1);
+  }
+
   useEffect(() => {
     initializeAppLifecycleBridge();
   }, []);
@@ -255,14 +260,14 @@ export default function App() {
   useEffect(() => {
     const handle = setInterval(() => {
       void refreshBackendStatus();
-    }, 10_000);
+    }, 3_000);
     return () => clearInterval(handle);
   }, []);
 
   useEffect(() => {
     const handle = setInterval(() => {
       void refreshDiagnostics().catch(() => {});
-    }, 5_000);
+    }, 3_000);
     return () => clearInterval(handle);
   }, []);
 
@@ -323,9 +328,11 @@ export default function App() {
               defaultModel={ollamaSettings?.defaultChatModel ?? null}
               ollamaStatus={ollamaStatus}
               loadError={ollamaLoadError}
+              documentLibraryVersion={documentLibraryVersion}
+              isActive={activeSection === "chat"}
             />
           </div>
-          {activeSection === "documents" && <DocumentsSection />}
+          {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
           {activeSection === "jobs" && (
             <JobsSection onJobsChanged={() => void refreshBackendStatus()} />
           )}

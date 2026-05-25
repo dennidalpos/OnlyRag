@@ -14,7 +14,7 @@ public sealed class UnavailableOcrEngine : IOcrEngine
             false,
             EngineName,
             EngineVersion,
-            "PaddleOCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR, oppure imposta ONLYRAG_OCR_PYTHON."));
+            "Runtime OCR non installato. Apri Impostazioni > Diagnostica e usa Installa OCR, oppure imposta ONLYRAG_OCR_PYTHON."));
     }
 
     public Task<OcrEngineAvailability> CheckAvailabilityAsync(
@@ -28,13 +28,13 @@ public sealed class UnavailableOcrEngine : IOcrEngine
         OcrPagePreparationRequest request,
         CancellationToken cancellationToken = default)
     {
-        throw new OcrEngineUnavailableException("PaddleOCR non configurato.");
+        throw new OcrEngineUnavailableException("Runtime OCR non installato.");
     }
 
     public Task<OcrPageResult> RecognizeAsync(
         OcrRecognitionRequest request,
         CancellationToken cancellationToken = default)
     {
-        throw new OcrEngineUnavailableException("PaddleOCR non configurato.");
+        throw new OcrEngineUnavailableException("Runtime OCR non installato.");
     }
 }

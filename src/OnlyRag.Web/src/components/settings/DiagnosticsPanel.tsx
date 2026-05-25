@@ -21,7 +21,11 @@ export function DiagnosticsPanel() {
     ? "Configurazione OCR..."
     : canRepairOcrRuntime
       ? "Ripara OCR"
-      : "Configura OCR";
+      : diagnostics?.ocrIsConfigured
+        ? "Configura OCR"
+        : diagnostics?.ocrGpuCapability.nvidiaName
+          ? "Installa OCR GPU"
+          : "Installa OCR CPU";
   const detectedGpuName =
     diagnostics?.ocrGpuCapability.nvidiaName ??
     diagnostics?.systemTelemetry.gpu?.name ??
@@ -122,7 +126,7 @@ export function DiagnosticsPanel() {
                     className={`panel-note${ocrProvisionStatus?.lastError ? " panel-note--warning" : ""}`}
                     role={ocrProvisionStatus?.isRunning ? "status" : "alert"}
                   >
-                    <p>{ocrProvisionStatus?.message ?? "OCR non configurato. Configura le dipendenze locali per abilitare OCR."}</p>
+                    <p>{ocrProvisionStatus?.message ?? "OCR da installare. Installa le dipendenze locali per abilitare OCR."}</p>
                     {ocrProvisionStatus?.isRunning && (
                       <ProgressBar
                         label={ocrProvisionStatus.stepLabel ?? "Configurazione OCR in corso"}

@@ -199,7 +199,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             throw new OcrEngineUnavailableException(
-                $"Python OCR non configurato. Apri Impostazioni > Diagnostica e usa Configura OCR, oppure imposta {PythonEnvVar}.",
+                $"Python OCR non configurato. Apri Impostazioni > Diagnostica e usa Installa OCR, oppure imposta {PythonEnvVar}.",
                 ex);
         }
 
@@ -328,13 +328,31 @@ public sealed class PaddleOcrEngine : IOcrEngine
             return message;
         }
 
+        if (IsMissingPaddleRuntimeMessage(message))
+        {
+            return "Runtime OCR non installato. " +
+                "Apri Impostazioni > Diagnostica e premi Installa OCR per installare PaddleOCR e il runtime PaddlePaddle corretto.";
+        }
+
         if (IsBrokenPaddleRuntimeMessage(message))
         {
             return "Runtime OCR locale incompleto o danneggiato. " +
-                "Apri Impostazioni > Diagnostica e premi Configura OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.";
+                "Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.";
         }
 
         return message;
+    }
+
+    private static bool IsMissingPaddleRuntimeMessage(string message)
+    {
+        return message.Contains("No module named 'paddle'", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("No module named \"paddle", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("No module named 'paddleocr'", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("No module named \"paddleocr", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("paddlepaddle-gpu", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("paddlepaddle", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsBrokenPaddleRuntimeMessage(string message)
@@ -342,11 +360,8 @@ public sealed class PaddleOcrEngine : IOcrEngine
         return message.Contains("partially initialized module 'paddle", StringComparison.OrdinalIgnoreCase)
             || message.Contains("partially initialized module \"paddle", StringComparison.OrdinalIgnoreCase)
             || message.Contains("cannot import name 'backward'", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("No module named 'paddle'", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("paddlepaddle-gpu", StringComparison.OrdinalIgnoreCase)
-                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("paddlepaddle", StringComparison.OrdinalIgnoreCase)
-                && message.Contains("not-installed", StringComparison.OrdinalIgnoreCase);
+            || message.Contains("DLL load failed", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("symbol not found", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolvePythonPath()

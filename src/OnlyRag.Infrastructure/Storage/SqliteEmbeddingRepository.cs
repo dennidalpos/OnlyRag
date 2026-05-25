@@ -232,6 +232,36 @@ public sealed class SqliteEmbeddingRepository : IEmbeddingRepository
             lastEmbeddedAtUtc);
     }
 
+    public async Task<IReadOnlyList<DocumentVectorIndexReference>> ListDocumentVectorIndexReferencesAsync(
+        long documentId,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT DISTINCT s.model, s.dimensions
+            FROM chunk_vector_index_status AS s
+            INNER JOIN chunks AS c ON c.id = s.chunk_id
+            WHERE c.document_id = $documentId
+              AND s.dimensions > 0
+              AND LENGTH(TRIM(s.model)) > 0
+            ORDER BY s.model, s.dimensions;
+            """;
+        command.AddParameter("$documentId", documentId);
+
+        List<DocumentVectorIndexReference> references = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            references.Add(new DocumentVectorIndexReference(
+                reader.GetString(0),
+                reader.GetInt32(1)));
+        }
+
+        return references;
+    }
+
     public async Task<int> CountIndexedChunksAsync(CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);

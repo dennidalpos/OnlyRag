@@ -28,7 +28,11 @@ import { isOcrCandidate } from "./DocumentsSection.helpers";
 import { useDocumentStatusPolling } from "./useDocumentStatusPolling";
 import { useDocumentPreviewController } from "./useDocumentPreviewController";
 
-export function useDocumentsSectionController() {
+type UseDocumentsSectionControllerOptions = {
+  onLibraryChanged?: () => void;
+};
+
+export function useDocumentsSectionController({ onLibraryChanged }: UseDocumentsSectionControllerOptions = {}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [documents, setDocuments] = useState<ImportedDocument[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<ImportedDocument | null>(null);
@@ -110,7 +114,7 @@ export function useDocumentsSectionController() {
         if (cancelled) return;
         setDocuments(docs);
         setSelectedDocument((current) =>
-          current ? (docs.find((d) => d.id === current.id) ?? current) : (docs[0] ?? null)
+          current ? (docs.find((d) => d.id === current.id) ?? docs[0] ?? null) : (docs[0] ?? null)
         );
         setDocumentRefreshStatus(markRefreshSuccess());
       } catch (error) {
@@ -161,6 +165,7 @@ export function useDocumentsSectionController() {
       } else {
         await refreshDocuments(selectedDocument?.id ?? null);
       }
+      onLibraryChanged?.();
       const dedupCount = imported.filter((d) => d.deduplicated).length;
       const importCount = imported.length - dedupCount;
       const failed = response.results.filter((result) => !result.succeeded);
@@ -239,6 +244,7 @@ export function useDocumentsSectionController() {
         { method: "POST" }
       );
       await refreshDocuments(document.id);
+      onLibraryChanged?.();
       setFeedback({ tone: "info", message: `Reindicizzazione avviata per ${document.originalFileName}.` });
     } catch (err) {
       setFeedback({ tone: "error", message: err instanceof Error ? err.message : "Reindicizzazione non riuscita." });
@@ -258,6 +264,7 @@ export function useDocumentsSectionController() {
     try {
       await apiRequest<DocumentEmbeddingStatus>(`/api/documents/${document.id}/embed`, { method: "POST" });
       await refreshDocuments(document.id);
+      onLibraryChanged?.();
       setFeedback({ tone: "info", message: `Rigenera ricerca semantica avviata per ${document.originalFileName}.` });
     } catch (err) {
       setFeedback({ tone: "error", message: err instanceof Error ? err.message : "Embedding non avviati." });
@@ -285,6 +292,7 @@ export function useDocumentsSectionController() {
       });
       await apiRequest<ImportedDocument>(`/api/documents/${document.id}/ocr?${query.toString()}`, { method: "POST" });
       await refreshDocuments(document.id);
+      onLibraryChanged?.();
       setFeedback({
         tone: "info",
         message: force
@@ -349,6 +357,7 @@ export function useDocumentsSectionController() {
     try {
       await apiRequest<ImportedDocument>(`/api/documents/${document.id}`, { method: "DELETE" });
       await refreshDocuments(selectedDocument?.id === document.id ? null : selectedDocument?.id ?? null);
+      onLibraryChanged?.();
       setFeedback({ tone: "info", message: `${document.originalFileName} eliminato.` });
     } catch (err) {
       setFeedback({ tone: "error", message: err instanceof Error ? err.message : "Eliminazione non riuscita." });

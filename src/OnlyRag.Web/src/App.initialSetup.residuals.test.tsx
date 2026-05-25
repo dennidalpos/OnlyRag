@@ -87,7 +87,7 @@ describe("App initial setup residual checks", () => {
       isNvidiaRuntimeAvailable: true,
       isGpuUsable: false,
       recommendedRuntimeTarget: "nvidia",
-      title: "Installa OCR GPU",
+      title: "OCR GPU da installare",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -186,7 +186,7 @@ describe("App initial setup residual checks", () => {
     await flushPromises();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(3_000);
     });
     await flushPromises();
 

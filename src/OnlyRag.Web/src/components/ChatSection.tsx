@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import {
   apiRequest,
   type ChatResponse,
@@ -27,13 +27,17 @@ type ChatSectionProps = {
   defaultModel: string | null;
   ollamaStatus: OllamaStatusResponse | null;
   loadError: string | null;
+  documentLibraryVersion?: number;
+  isActive?: boolean;
 };
 
 export function ChatSection({
   models,
   defaultModel,
   ollamaStatus,
-  loadError
+  loadError,
+  documentLibraryVersion = 0,
+  isActive = true
 }: ChatSectionProps) {
   const minDocumentsPanelWidth = 180;
   const maxDocumentsPanelWidth = 420;
@@ -41,6 +45,7 @@ export function ChatSection({
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatLayoutRef = useRef<HTMLDivElement | null>(null);
   const previousDefaultModelRef = useRef<string | null>(defaultModel);
+  const wasActiveRef = useRef(isActive);
   const [selectedModel, setSelectedModel] = useState(() => loadChatSession()?.selectedModel ?? "");
   const [documents, setDocuments] = useState<ImportedDocument[]>([]);
 
@@ -139,39 +144,46 @@ export function ChatSection({
     });
   }, [defaultModel, models]);
 
+  const refreshDocuments = useCallback(async (options: { isCancelled?: () => boolean } = {}) => {
+    try {
+      const docs = await apiRequest<ImportedDocument[]>("/api/documents");
+      if (options.isCancelled?.()) {
+        return;
+      }
+
+      setDocuments(docs);
+      setSelectedDocumentIds((current) => {
+        const available = new Set(docs.map((document) => document.id));
+        return current.filter((id) => available.has(id));
+      });
+      setDocumentsError(null);
+    } catch (error) {
+      if (!options.isCancelled?.()) {
+        setDocumentsError(error instanceof Error ? error.message : "Documenti non disponibili.");
+      }
+    } finally {
+      if (!options.isCancelled?.()) {
+        setIsDocsLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadDocuments() {
-      try {
-        const docs = await apiRequest<ImportedDocument[]>("/api/documents");
-        if (isCancelled) {
-          return;
-        }
-
-        setDocuments(docs);
-        setSelectedDocumentIds((current) => {
-          const available = new Set(docs.map((document) => document.id));
-          return current.filter((id) => available.has(id));
-        });
-        setDocumentsError(null);
-      } catch (error) {
-        if (!isCancelled) {
-          setDocumentsError(error instanceof Error ? error.message : "Documenti non disponibili.");
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsDocsLoading(false);
-        }
-      }
-    }
-
-    void loadDocuments();
+    void refreshDocuments({ isCancelled: () => isCancelled });
 
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [documentLibraryVersion, refreshDocuments]);
+
+  useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      void refreshDocuments();
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, refreshDocuments]);
 
   useEffect(() => {
     setExitContributor("chat", {

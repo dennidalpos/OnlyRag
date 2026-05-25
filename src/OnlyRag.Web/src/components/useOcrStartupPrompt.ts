@@ -66,7 +66,7 @@ export function useOcrStartupPrompt() {
 
     const interval = window.setInterval(() => {
       void refresh();
-    }, 5_000);
+    }, 3_000);
 
     return () => window.clearInterval(interval);
   }, [provisionStatus?.isRunning]);

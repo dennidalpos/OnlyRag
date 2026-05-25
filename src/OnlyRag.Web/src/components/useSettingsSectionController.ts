@@ -252,7 +252,7 @@ export function useSettingsSectionController({
     const interval = window.setInterval(() => {
       void actions.refreshDependencyStatus();
       void actions.refreshDiagnostics();
-    }, 5000);
+    }, 3000);
 
     return () => window.clearInterval(interval);
   }, [ocrProvisionStatus?.isRunning]);

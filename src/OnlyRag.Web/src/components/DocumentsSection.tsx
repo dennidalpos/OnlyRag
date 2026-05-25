@@ -9,7 +9,11 @@ import {
 } from "./DocumentsSection.helpers";
 import { useDocumentsSectionController } from "./useDocumentsSectionController";
 
-export function DocumentsSection() {
+type DocumentsSectionProps = {
+  onLibraryChanged?: () => void;
+};
+
+export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
   const {
     busyDocumentId,
     canPreview,
@@ -49,7 +53,7 @@ export function DocumentsSection() {
     selectedDocument,
     selectedJob,
     vectorHealth
-  } = useDocumentsSectionController();
+  } = useDocumentsSectionController({ onLibraryChanged });
 
   return (
     <div className="documents-panel">

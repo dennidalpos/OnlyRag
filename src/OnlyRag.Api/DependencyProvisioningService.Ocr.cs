@@ -16,7 +16,7 @@ public sealed partial class DependencyProvisioningService
     private OcrProvisionStatus lastOcrProvisionStatus = new(
         false,
         false,
-        "OCR non configurato. Usa Configura OCR per preparare automaticamente le dipendenze locali.",
+        "OCR da installare. Usa Installa OCR per preparare automaticamente le dipendenze locali.",
         null);
     private Task? ocrProvisionTask;
     private CancellationTokenSource? ocrProvisionCancellation;
@@ -80,7 +80,7 @@ public sealed partial class DependencyProvisioningService
 
         string message = string.IsNullOrWhiteSpace(availability.Message)
             || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
-            ? "OCR non configurato. Usa Configura OCR per preparare automaticamente le dipendenze locali."
+            ? "OCR da installare. Usa Installa OCR per preparare automaticamente le dipendenze locali."
             : availability.Message;
 
         return new OcrProvisionStatus(
@@ -90,7 +90,7 @@ public sealed partial class DependencyProvisioningService
             null,
             UpdatedAtUtc: DateTimeOffset.UtcNow,
             StepKey: "not-configured",
-            StepLabel: "OCR non configurato",
+            StepLabel: "OCR da installare",
             StepIndex: 0,
             StepCount: OcrProvisionStepCount,
             ProgressPercent: 0,
@@ -311,7 +311,7 @@ public sealed partial class DependencyProvisioningService
                 null,
                 runtimeTarget,
                 "cancelled",
-                "I processi di preparazione OCR in corso sono stati arrestati. Puoi ripetere Configura OCR quando vuoi.",
+                "I processi di preparazione OCR in corso sono stati arrestati. Puoi ripetere Installa OCR quando vuoi.",
                 StepKey: "cancelled",
                 StepLabel: "Configurazione annullata",
                 StepIndex: 0,
@@ -437,7 +437,7 @@ public sealed partial class DependencyProvisioningService
         throw new InvalidOperationException(
             "OCR richiede Python 3.10, 3.11, 3.12 o 3.13. " +
             "PaddlePaddle 3.3.1 non pubblica wheel Windows per Python 3.14. " +
-            $"{detail} Installa una versione compatibile di Python per Windows, poi ripeti Configura OCR.");
+            $"{detail} Installa una versione compatibile di Python per Windows, poi ripeti Installa OCR.");
     }
 
     private string ResolveOcrScriptsRoot()

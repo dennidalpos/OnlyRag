@@ -49,7 +49,7 @@ export function OcrEngineSettingsPanel() {
               <OcrSelectField
                 id="ocr-device"
                 label="Dispositivo"
-                tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Configura OCR quando disponibile."
+                tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Installa OCR quando disponibile."
                 value={ocrFormState.device}
                 options={[
                   { value: "cpu", label: "CPU" },
@@ -209,7 +209,7 @@ export function OcrEngineSettingsPanel() {
               </div>
             )}
             <div className="settings-actions">
-              <button type="button" onClick={saveOcrSettings} disabled={isBusy}>
+              <button type="button" onClick={saveOcrSettings} disabled={isBusy || !hasDirtyOcrSettings}>
                 Salva OCR
               </button>
               {hasDirtyOcrSettings && <span className="dirty-hint">Modifiche non salvate</span>}

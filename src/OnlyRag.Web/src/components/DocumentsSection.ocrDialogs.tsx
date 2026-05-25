@@ -167,7 +167,7 @@ export function OcrLanguageSelect({
               .sort((left, right) => left.label.localeCompare(right.label))
               .map((language) => (
                 <option key={language.code} value={language.code}>
-                  {language.code} - {language.label}
+                  {language.label} ({language.code})
                 </option>
               ))}
           </optgroup>

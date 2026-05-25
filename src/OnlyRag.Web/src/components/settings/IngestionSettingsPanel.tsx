@@ -57,7 +57,7 @@ export function IngestionSettingsPanel() {
               }
             />
             <div className="settings-actions">
-              <button type="button" onClick={saveIngestionSettings} disabled={isBusy}>
+              <button type="button" onClick={saveIngestionSettings} disabled={isBusy || !hasDirtyIngestionSettings}>
                 Salva ingestione
               </button>
               {hasDirtyIngestionSettings && <span className="dirty-hint">Modifiche non salvate</span>}

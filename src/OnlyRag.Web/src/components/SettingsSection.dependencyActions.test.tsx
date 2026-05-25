@@ -79,7 +79,7 @@ describe("SettingsSection dependency actions", () => {
                   lastError: null,
                   runtimeTarget: "auto",
                   resolvedRuntime: "cancelled",
-                  runtimeDetail: "Puoi ripetere Configura OCR quando vuoi."
+                  runtimeDetail: "Puoi ripetere Installa OCR quando vuoi."
                 }
         })
       },
@@ -152,6 +152,8 @@ describe("SettingsSection dependency actions", () => {
       {
         path: "/api/diagnostics",
         response: createDiagnostics({
+          ocrIsConfigured: false,
+          ocrStatus: "Non configurato",
           ocrGpuCapability: {
             isUsable: true,
             status: "GPU OCR utilizzabile",
@@ -209,7 +211,7 @@ describe("SettingsSection dependency actions", () => {
       />
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "Configura OCR" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Installa OCR GPU" }));
     expect(await screen.findByText("Configurazione OCR avviata.")).toBeInTheDocument();
 
     const provisionCalls = api.calls.filter((call) => call.path === "/api/dependencies/ocr/provision");
