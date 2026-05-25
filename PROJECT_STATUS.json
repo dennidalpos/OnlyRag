@@ -1,20 +1,20 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T22:17:00+02:00",
-  "active_objective": "Far aprire il wizard modelli appena le impostazioni Ollama sono disponibili all'avvio.",
+  "last_updated": "2026-05-25T23:05:00+02:00",
+  "active_objective": "Ridurre rischi concreti su sicurezza, supply chain, logging e performance prima della release.",
   "current_tasks": [],
   "next_tasks": [],
   "blockers": [],
   "risks": [],
   "quality_gates": {
     "format": "not_run",
-    "lint": "not_run",
-    "typecheck": "not_run",
+    "lint": "passed",
+    "typecheck": "passed",
     "tests": "passed",
     "build": "not_run",
     "release_gate": "not_run"
   },
-  "last_completed_work": "Il wizard iniziale puo comparire per modelli placeholder anche se il listing dei modelli Ollama non e ancora completato.",
-  "handoff_notes": "Verificati test unit web; API pubbliche e schema dati invariati."
+  "last_completed_work": "Rafforzata la redazione dei segreti nei messaggi diagnostici per varianti apiToken/sessionToken/access_token/clientSecret.",
+  "handoff_notes": "Audit mirato completato: npm audit e dotnet vulnerable senza vulnerabilita note; test redazione, lint e typecheck passati."
 }

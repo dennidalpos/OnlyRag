@@ -12,7 +12,7 @@ public static class UserFacingErrorText
     private static readonly Regex UncPathPattern = new(@"\\\\[^\s\\/:*?""<>|]+\\(?:[^\s\\/:*?""<>|]+\\)*[^\s\\/:*?""<>|]*", RegexOptions.Compiled);
     private static readonly Regex IpEndpointPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b", RegexOptions.Compiled);
     private static readonly Regex CredentialPattern = new(
-        @"\b(password|passwd|pwd|secret|token|api[-_ ]?key|authorization)\b\s*[:=]\s*(?:bearer\s+)?([^\s,;]+)",
+        @"\b(password|passwd|pwd|secret|token|api[-_ ]?key|apiToken|sessionToken|access_token|refresh_token|id_token|clientSecret|client_secret|authorization)\b\s*[:=]\s*(?:bearer\s+)?([^\s,;]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex BearerTokenPattern = new(
         @"\bbearer\s+[^\s,;]+",

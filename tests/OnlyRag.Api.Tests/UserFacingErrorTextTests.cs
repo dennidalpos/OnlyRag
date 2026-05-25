@@ -21,7 +21,7 @@ public sealed class UserFacingErrorTextTests
     [Fact]
     public void FromExternalDetail_RedactsCredentialLikeFragments()
     {
-        string sensitive = "request failed with password=dummy-value Authorization: Bearer dummy-token api_key=dummy-key bearer loose-token";
+        string sensitive = "request failed with password=dummy-value Authorization: Bearer dummy-token api_key=dummy-key apiToken=dummy-api-token sessionToken=dummy-session-token access_token=dummy-access-token clientSecret=dummy-client-secret bearer loose-token";
 
         string message = UserFacingErrorText.FromExternalDetail(
             sensitive,
@@ -31,9 +31,17 @@ public sealed class UserFacingErrorTextTests
         Assert.Contains("Authorization=[segreto]", message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Bearer [segreto]", message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("api_key=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("apiToken=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sessionToken=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("access_token=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("clientSecret=[segreto]", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-value", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-token", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-key", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-api-token", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-session-token", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-access-token", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-client-secret", message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
