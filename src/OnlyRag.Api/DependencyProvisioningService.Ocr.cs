@@ -6,6 +6,7 @@ namespace OnlyRag.Api;
 public sealed partial class DependencyProvisioningService
 {
     private static readonly TimeSpan DefaultOcrProvisionTimeout = TimeSpan.FromMinutes(45);
+    private const int OcrProvisionStepCount = 8;
     private readonly OcrProvisionRuntimeResolver ocrRuntimeResolver;
     private readonly Func<string, string?> executableResolver;
     private readonly string? ocrScriptsRootOverride;
@@ -57,7 +58,15 @@ public sealed partial class DependencyProvisioningService
                     ? capability.RuntimeDetail
                     : capability.BlockReason ?? availability.Message,
                 recentStatus.StartedAtUtc,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                "available",
+                "OCR disponibile",
+                OcrProvisionStepCount,
+                OcrProvisionStepCount,
+                100,
+                "success",
+                false,
+                capability.IsUsable ? "gpu" : "cpu");
         }
 
         if (IsTerminalProvisionStatus(recentStatus))
@@ -74,7 +83,19 @@ public sealed partial class DependencyProvisioningService
             ? "OCR non configurato. Usa Configura OCR per preparare automaticamente le dipendenze locali."
             : availability.Message;
 
-        return new OcrProvisionStatus(false, false, message, null, UpdatedAtUtc: DateTimeOffset.UtcNow);
+        return new OcrProvisionStatus(
+            false,
+            false,
+            message,
+            null,
+            UpdatedAtUtc: DateTimeOffset.UtcNow,
+            StepKey: "not-configured",
+            StepLabel: "OCR non configurato",
+            StepIndex: 0,
+            StepCount: OcrProvisionStepCount,
+            ProgressPercent: 0,
+            Severity: "warning",
+            CanRetry: true);
     }
 
     public DependencyActionResponse StartOcrProvision(string? runtimeTarget = null)
@@ -98,7 +119,15 @@ public sealed partial class DependencyProvisioningService
                 "resolving",
                 "Preparazione avviata: OnlyRag sta scegliendo il runtime OCR compatibile.",
                 now,
-                now);
+                now,
+                "resolve-runtime",
+                "Selezione runtime OCR",
+                1,
+                OcrProvisionStepCount,
+                CalculateProgressPercent(1),
+                "running",
+                false,
+                null);
             ocrProvisionCancellation?.Dispose();
             ocrProvisionCancellation = new CancellationTokenSource(ocrProvisionTimeout);
             ocrProvisionCancelRequested = false;
@@ -161,13 +190,19 @@ public sealed partial class DependencyProvisioningService
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 "Runtime OCR selezionato.",
-                runtime.Detail));
+                runtime.Detail,
+                "resolve-runtime",
+                "Selezione runtime OCR",
+                1));
 
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 "Verifica interprete Python compatibile in corso.",
-                "OnlyRag cerca Python 3.10, 3.11, 3.12 o 3.13."));
+                "OnlyRag cerca Python 3.10, 3.11, 3.12 o 3.13.",
+                "python",
+                "Verifica Python",
+                2));
             OcrPythonCommand python = await ResolveOcrPythonCommandAsync(cancellationToken);
 
             string installRoot = ResolveOcrInstallRoot();
@@ -198,7 +233,10 @@ public sealed partial class DependencyProvisioningService
                     runtimeTarget,
                     runtime.ResolvedRuntime,
                     "Creazione ambiente Python OCR in corso.",
-                    $"Cartella runtime: {installRoot}"));
+                    $"Cartella runtime: {installRoot}",
+                    "venv",
+                    "Creazione ambiente",
+                    3));
                 await RunProcessAsync(
                     python.FileName,
                     python.WithArguments(["-m", "venv", venvPath]),
@@ -210,19 +248,28 @@ public sealed partial class DependencyProvisioningService
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 "Aggiornamento pip OCR in corso.",
-                "Fase breve prima dell'installazione dei pacchetti PaddleOCR."));
+                "Fase breve prima dell'installazione dei pacchetti PaddleOCR.",
+                "pip-upgrade",
+                "Aggiornamento pip",
+                4));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"], null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 "Pulizia vecchi pacchetti Paddle in corso.",
-                "OnlyRag rimuove runtime Paddle incompatibili prima di reinstallare quello corretto."));
+                "OnlyRag rimuove runtime Paddle incompatibili prima di reinstallare quello corretto.",
+                "paddle-clean",
+                "Pulizia Paddle",
+                5));
             await RunProcessAsync(venvPython, ["-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu"], null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 "Installazione pacchetti PaddleOCR in corso.",
-                "Questa fase può durare diversi minuti e dipende da rete, pip e wheel disponibili."));
+                "Questa fase può durare diversi minuti e dipende da rete, pip e wheel disponibili.",
+                "paddle-install",
+                "Installazione PaddleOCR",
+                6));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "-r", requirementsPath, "--disable-pip-version-check"], null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
@@ -230,7 +277,10 @@ public sealed partial class DependencyProvisioningService
                 "Verifica runtime OCR appena installato in corso.",
                 runtime.IsNvidia
                     ? "OnlyRag controlla che PaddleOCR veda CUDA e la GPU."
-                    : "OnlyRag controlla che PaddleOCR CPU sia importabile e pronto."));
+                    : "OnlyRag controlla che PaddleOCR CPU sia importabile e pronto.",
+                "bridge-check",
+                "Verifica runtime",
+                7));
             await RunProcessAsync(venvPython, [bridgePath, "--mode", "check", "--device", runtime.IsNvidia ? "gpu" : "cpu"], null, cancellationToken);
 
             SetLastOcrStatus(new OcrProvisionStatus(
@@ -240,7 +290,15 @@ public sealed partial class DependencyProvisioningService
                 null,
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                runtime.Detail));
+                runtime.Detail,
+                StepKey: "complete",
+                StepLabel: "OCR configurato",
+                StepIndex: OcrProvisionStepCount,
+                StepCount: OcrProvisionStepCount,
+                ProgressPercent: 100,
+                Severity: "success",
+                CanRetry: false,
+                SelectedRuntime: runtime.ResolvedRuntime));
         }
         catch (OperationCanceledException)
         {
@@ -253,7 +311,15 @@ public sealed partial class DependencyProvisioningService
                 null,
                 runtimeTarget,
                 "cancelled",
-                "I processi di preparazione OCR in corso sono stati arrestati. Puoi ripetere Configura OCR quando vuoi."));
+                "I processi di preparazione OCR in corso sono stati arrestati. Puoi ripetere Configura OCR quando vuoi.",
+                StepKey: "cancelled",
+                StepLabel: "Configurazione annullata",
+                StepIndex: 0,
+                StepCount: OcrProvisionStepCount,
+                ProgressPercent: 0,
+                Severity: "warning",
+                CanRetry: true,
+                SelectedRuntime: null));
         }
         catch (Exception ex)
         {
@@ -267,7 +333,15 @@ public sealed partial class DependencyProvisioningService
                 lastError,
                 runtimeTarget,
                 "unknown",
-                null));
+                null,
+                StepKey: "failed",
+                StepLabel: "Configurazione non completata",
+                StepIndex: 0,
+                StepCount: OcrProvisionStepCount,
+                ProgressPercent: 0,
+                Severity: "error",
+                CanRetry: true,
+                SelectedRuntime: null));
         }
         finally
         {
@@ -296,7 +370,10 @@ public sealed partial class DependencyProvisioningService
         string runtimeTarget,
         string resolvedRuntime,
         string message,
-        string? runtimeDetail) =>
+        string? runtimeDetail,
+        string stepKey,
+        string stepLabel,
+        int stepIndex) =>
         new(
             false,
             true,
@@ -306,7 +383,15 @@ public sealed partial class DependencyProvisioningService
             resolvedRuntime,
             runtimeDetail,
             ocrProvisionStartedAtUtc,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            stepKey,
+            stepLabel,
+            stepIndex,
+            OcrProvisionStepCount,
+            CalculateProgressPercent(stepIndex),
+            "running",
+            false,
+            resolvedRuntime);
 
     private static bool IsTerminalProvisionStatus(OcrProvisionStatus status) =>
         !status.IsRunning
@@ -413,6 +498,11 @@ public sealed partial class DependencyProvisioningService
         return timeout.TotalMinutes >= 1
             ? $"{(int)Math.Ceiling(timeout.TotalMinutes)} minuti"
             : $"{(int)Math.Ceiling(timeout.TotalSeconds)} secondi";
+    }
+
+    private static int CalculateProgressPercent(int stepIndex)
+    {
+        return Math.Clamp((int)Math.Round(stepIndex * 100d / OcrProvisionStepCount), 0, 99);
     }
 
     internal static Version? ParsePythonVersion(string text)

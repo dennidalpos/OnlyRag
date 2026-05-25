@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using OnlyRag.Api;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ocr;
 
 namespace OnlyRag.Api.Tests;
 
@@ -99,6 +100,15 @@ public sealed partial class InProcessBackendTests
             Assert.True(start.Started);
 
             await pipStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            OcrProvisionStatus runningStatus = await dependencies.GetOcrStatusAsync(
+                new UnavailableOcrEngine(),
+                new OcrGpuCapabilityService(processLauncher),
+                CancellationToken.None);
+            Assert.True(runningStatus.IsRunning);
+            Assert.True(runningStatus.StepKey is "pip-upgrade" or "paddle-install", runningStatus.StepKey);
+            Assert.InRange(runningStatus.ProgressPercent, 1, 99);
+            Assert.Equal("running", runningStatus.Severity);
+
             DependencyActionResponse cancel = dependencies.CancelOcrProvision();
 
             Assert.True(cancel.Started);

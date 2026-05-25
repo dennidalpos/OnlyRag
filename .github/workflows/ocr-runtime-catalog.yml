@@ -1,0 +1,56 @@
+name: OCR Runtime Catalog
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check Paddle OCR runtime catalog
+        id: catalog
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File .\scripts\ocr\Test-OcrRuntimeCatalog.ps1 -OutputPath .\artifacts\ocr-runtime-catalog\ocr-runtime-catalog.json
+          $code = $LASTEXITCODE
+          "exit_code=$code" >> $env:GITHUB_OUTPUT
+          if ($code -ne 0 -and $code -ne 2) {
+            exit $code
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocr-runtime-catalog-py${{ matrix.python-version }}
+          path: artifacts/ocr-runtime-catalog/ocr-runtime-catalog.json
+
+      - name: Open update issue
+        if: steps.catalog.outputs.exit_code == '2'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $report = Get-Content -Raw .\artifacts\ocr-runtime-catalog\ocr-runtime-catalog.json
+          $body = @"
+          The scheduled OCR runtime catalog check found a PaddlePaddle GPU runtime that is reachable but not represented in scripts/ocr/runtime-manifest.json.
+
+          ````json
+          $report
+          ````
+          "@
+          gh issue create --title "Update OCR GPU runtime catalog" --body $body --label "maintenance"

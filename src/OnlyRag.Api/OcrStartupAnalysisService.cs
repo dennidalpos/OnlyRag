@@ -56,11 +56,15 @@ public sealed class OcrStartupAnalysisService
         bool canProvision = isWindowsSupported && hasMinimumDiskSpace && hasCompatiblePython;
         bool hasRepairableOcrRuntimeIssue = IsRepairableOcrRuntimeIssue(availability.Message);
         bool shouldPrompt = canProvision && !availability.IsConfigured;
-        string recommendedTarget = OcrProvisionRuntimeResolver.AutoTarget;
+        string recommendedTarget = runtime.IsNvidia
+            ? OcrProvisionRuntimeResolver.NvidiaTarget
+            : OcrProvisionRuntimeResolver.CpuTarget;
         string title = shouldPrompt
             ? hasRepairableOcrRuntimeIssue
                 ? "Runtime OCR da riparare"
-                : "OCR non configurato in OnlyRag"
+                : runtime.IsNvidia
+                    ? "Installa OCR GPU"
+                    : "Installa OCR CPU"
             : availability.IsConfigured
                 ? "OCR già configurato"
                 : "Configurazione OCR manuale richiesta";

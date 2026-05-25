@@ -4,13 +4,33 @@
   "pythonMinimumVersion": "3.10.0",
   "pythonMaximumVersion": "3.13.x",
   "minimumFreeDiskBytes": 5368709120,
+  "lastVerifiedAt": "2026-05-25",
   "runtimeTargets": [
     {
       "target": "cpu",
       "requirementsFile": "requirements-cpu.txt",
       "resolvedRuntime": "cpu",
       "paddlePackage": "paddlepaddle",
-      "paddleVersion": "3.3.1"
+      "paddleVersion": "3.3.1",
+      "supportedPythonMin": "3.10.0",
+      "supportedPythonMax": "3.13.x",
+      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cpu/",
+      "knownLimitations": []
+    },
+    {
+      "target": "nvidia",
+      "requirementsFile": "requirements-nvidia-cu130.txt",
+      "resolvedRuntime": "cuda130",
+      "paddlePackage": "paddlepaddle-gpu",
+      "paddleVersion": "3.3.0",
+      "minimumWindowsDriver": "580.82",
+      "minimumComputeCapability": "7.5",
+      "supportedPythonMin": "3.10.0",
+      "supportedPythonMax": "3.13.x",
+      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu130/",
+      "knownLimitations": [
+        "NVIDIA RTX 50 series Windows support is treated as experimental until stable PaddlePaddle wheels fully support it."
+      ]
     },
     {
       "target": "nvidia",
@@ -20,7 +40,12 @@
       "paddleVersion": "3.3.0",
       "cudnnPackage": "nvidia-cudnn-cu12",
       "cudnnVersion": "9.9.0.52",
-      "minimumWindowsDriver": "576.02"
+      "minimumWindowsDriver": "576.02",
+      "minimumComputeCapability": "7.5",
+      "supportedPythonMin": "3.10.0",
+      "supportedPythonMax": "3.13.x",
+      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu129/",
+      "knownLimitations": []
     },
     {
       "target": "nvidia",
@@ -28,7 +53,12 @@
       "resolvedRuntime": "cuda126",
       "paddlePackage": "paddlepaddle-gpu",
       "paddleVersion": "3.3.0",
-      "minimumWindowsDriver": "560.94"
+      "minimumWindowsDriver": "560.94",
+      "minimumComputeCapability": "7.5",
+      "supportedPythonMin": "3.10.0",
+      "supportedPythonMax": "3.13.x",
+      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu126/",
+      "knownLimitations": []
     },
     {
       "target": "nvidia",
@@ -36,7 +66,12 @@
       "resolvedRuntime": "cuda118",
       "paddlePackage": "paddlepaddle-gpu",
       "paddleVersion": "3.3.0",
-      "minimumWindowsDriver": "520.06"
+      "minimumWindowsDriver": "520.06",
+      "minimumComputeCapability": "7.5",
+      "supportedPythonMin": "3.10.0",
+      "supportedPythonMax": "3.13.x",
+      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu118/",
+      "knownLimitations": []
     }
   ],
   "modelCacheLocations": [

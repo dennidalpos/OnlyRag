@@ -26,7 +26,7 @@ export function useOcrStartupPrompt() {
     await autoEnableGpuAfterProvisioning(statusResult);
   }
 
-  async function configure() {
+  async function configure(runtimeTarget: "auto" | "cpu" | "nvidia" = "auto") {
     if (!analysis) {
       return;
     }
@@ -37,7 +37,7 @@ export function useOcrStartupPrompt() {
         method: "POST",
         body: JSON.stringify({
           confirmed: true,
-          runtimeTarget: "auto"
+          runtimeTarget
         })
       });
       await refresh();

@@ -222,6 +222,7 @@ function Test-OnlyRagPublishPayload {
         "scripts\ocr\requirements-nvidia-cu118.txt",
         "scripts\ocr\requirements-nvidia-cu126.txt",
         "scripts\ocr\requirements-nvidia-cu129.txt",
+        "scripts\ocr\requirements-nvidia-cu130.txt",
         "scripts\ocr\runtime-manifest.json"
     )
 

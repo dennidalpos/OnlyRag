@@ -1,25 +1,50 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T01:42:19+02:00",
-  "active_objective": "Prompt iniziale OCR coerente per runtime PaddleOCR riparabile.",
-  "current_tasks": [],
+  "current_phase": "post-implementation-validation",
+  "last_updated": "2026-05-25T09:50:00+02:00",
+  "active_objective": "Chiudere la validazione residua del supporto OCR GPU manifest-driven prima della release.",
+  "assumptions": [
+    "Windows desktop resta il target primario.",
+    "OCR CPU resta fallback obbligatorio.",
+    "OCR supporta Python 3.10-3.13."
+  ],
+  "current_tasks": [
+    {
+      "priority": 1,
+      "task": "Eseguire build/package installer completo e verifica release per confermare che manifest, requirements CUDA 13.0/12.9/12.6/11.8 e script OCR siano inclusi nel publish finale."
+    },
+    {
+      "priority": 2,
+      "task": "Eseguire il workflow OCR runtime catalog in CI su Python 3.10, 3.11, 3.12 e 3.13 per validare i dry-run pip non verificabili localmente con Python 3.14."
+    },
+    {
+      "priority": 3,
+      "task": "Validare manualmente su Windows: senza NVIDIA, NVIDIA compatibile, driver NVIDIA vecchio, venv OCR danneggiata, rete assente durante setup."
+    },
+    {
+      "priority": 4,
+      "task": "Monitorare fonti PaddlePaddle per supporto stabile NVIDIA RTX serie 50 Windows e aggiornare manifest solo dopo verifica ufficiale."
+    },
+    {
+      "priority": 5,
+      "task": "Valutare split di src/OnlyRag.Web/src/components/InitialSetupWizard.tsx, che resta sopra la soglia di review."
+    }
+  ],
   "blockers": [],
-  "risks": [],
-  "decisions": [
-    "Il wizard OCR usa lo stato verificato /api/dependencies/ocr come fonte autoritativa quando startup-analysis e lo stato non sono allineati.",
-    "I messaggi OCR riparabili sono presentati come riparazione runtime invece che come generica configurazione mancante.",
-    "Il wizard non mostra badge runtime non informativi come unknown.",
-    "InitialSetupWizard.tsx resta sopra la soglia review required, ma non e stato diviso per mantenere la correzione OCR circoscritta."
+  "risks": [
+    "La disponibilita delle wheel PaddlePaddle Windows GPU puo cambiare rispetto al manifest pinning.",
+    "La verifica catalogo locale ha saltato i dry-run pip perche il Python disponibile e 3.14.5, fuori range supportato."
   ],
   "quality_gates": {
-    "web_unit_app": "passed",
-    "web_typecheck": "passed",
-    "web_format": "passed",
-    "web_lint": "passed",
-    "api_tests": "passed",
-    "repository_gate": "passed",
-    "structure_review": "passed"
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests": "passed",
+    "build": "not_run",
+    "package": "not_run",
+    "manual_windows_matrix": "not_run",
+    "security_review": "not_run"
   },
-  "last_completed_work": "Rifinita la scheda iniziale di riparazione OCR rimuovendo il badge unknown e usando testo azione contestuale."
+  "last_completed_work": ""
 }

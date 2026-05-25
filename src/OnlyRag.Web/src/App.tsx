@@ -366,7 +366,7 @@ export default function App() {
           isConfiguringOcr={ocrStartupPrompt.isConfiguring}
           onOpenSettings={() => setActiveSection("settings")}
           onInstallOllama={() => void handleInstallOllama()}
-          onConfigureOcr={() => void ocrStartupPrompt.configure()}
+          onConfigureOcr={(runtimeTarget) => void ocrStartupPrompt.configure(runtimeTarget)}
           onCancelOcr={() => void ocrStartupPrompt.cancel()}
           onRecheck={() => void handleRecheckInitialSetup()}
         />

@@ -23,7 +23,7 @@ type InitialSetupWizardProps = {
   isConfiguringOcr: boolean;
   onOpenSettings: () => void;
   onInstallOllama: () => void;
-  onConfigureOcr: () => void;
+  onConfigureOcr: (runtimeTarget?: "auto" | "cpu" | "nvidia") => void;
   onCancelOcr: () => void;
   onRecheck: () => void;
 };
@@ -36,6 +36,7 @@ type SetupIssue = {
   badge?: string;
   action?: "install-ollama" | "configure-ocr" | "cancel-ocr";
   actionLabel?: string;
+  runtimeTarget?: "auto" | "cpu" | "nvidia";
   installCommand?: string | null;
   networkAccessHint?: string | null;
   isRunning?: boolean;
@@ -100,7 +101,11 @@ export function InitialSetupWizard({
                 <p>{issue.detail}</p>
                 {issue.isRunning && (
                   <div className="setup-issue__progress">
-                    <ProgressBar label="Configurazione OCR in corso" value={0} indeterminate />
+                    <ProgressBar
+                      label={ocrProvisionStatus?.stepLabel ?? "Configurazione OCR in corso"}
+                      value={ocrProvisionStatus?.progressPercent ?? 0}
+                      indeterminate={!ocrProvisionStatus?.progressPercent}
+                    />
                   </div>
                 )}
                 {issue.installCommand && <p>Pagina download: <code>{issue.installCommand}</code></p>}
@@ -137,7 +142,7 @@ export function InitialSetupWizard({
                     if (issue.action === "install-ollama") {
                       onInstallOllama();
                     } else if (issue.action === "configure-ocr") {
-                      onConfigureOcr();
+                      onConfigureOcr(issue.runtimeTarget);
                     } else {
                       onCancelOcr();
                     }
@@ -214,7 +219,8 @@ function detectSetupIssues(
       detail: ocrProvisionStatus?.message ?? ocrAnalysis.message,
       badge: ocrAnalysis.recommendedRuntimeTarget === "nvidia" ? "NVIDIA GPU" : "CPU",
       action: "configure-ocr",
-      actionLabel: "Configura OCR"
+      actionLabel: ocrAnalysis.recommendedRuntimeTarget === "nvidia" ? "Installa OCR GPU" : "Installa OCR CPU",
+      runtimeTarget: ocrAnalysis.recommendedRuntimeTarget
     });
   }
 

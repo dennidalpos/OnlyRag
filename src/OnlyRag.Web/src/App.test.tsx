@@ -37,8 +37,8 @@ describe("App initial setup", () => {
           isOcrConfigured: false,
           isNvidiaRuntimeAvailable: false,
           isGpuUsable: false,
-          recommendedRuntimeTarget: "auto",
-          title: "Configura OCR",
+          recommendedRuntimeTarget: "cpu",
+          title: "Installa OCR CPU",
           message: "Prepara il runtime OCR locale.",
           findings: []
         }
@@ -67,15 +67,15 @@ describe("App initial setup", () => {
     render(<App />);
 
     expect(await screen.findByRole("dialog", { name: "Configurazione iniziale richiesta" })).toBeInTheDocument();
-    expect(screen.getAllByText("Configura OCR").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Installa OCR CPU").length).toBeGreaterThan(0);
     expect(screen.getByText("12.5%")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    await userEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
 
     await waitFor(() => {
       const provisionCall = api.calls.find((call) => call.path === "/api/dependencies/ocr/provision");
       expect(provisionCall).toBeDefined();
-      expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "auto" });
+      expect(JSON.parse(String(provisionCall?.body))).toEqual({ confirmed: true, runtimeTarget: "cpu" });
     });
   });
 
@@ -250,8 +250,8 @@ describe("App initial setup", () => {
       isOcrConfigured: false,
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
-      recommendedRuntimeTarget: "auto",
-      title: "Configura OCR",
+      recommendedRuntimeTarget: "cpu",
+      title: "Installa OCR CPU",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -328,7 +328,7 @@ describe("App initial setup", () => {
     render(<App />);
     await flushPromises();
 
-    fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
     await flushPromises();
     expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
     expect(screen.getByText(/Aggiornamento automatico ogni 5 secondi/)).toBeInTheDocument();
@@ -353,8 +353,8 @@ describe("App initial setup", () => {
       isOcrConfigured: false,
       isNvidiaRuntimeAvailable: false,
       isGpuUsable: false,
-      recommendedRuntimeTarget: "auto",
-      title: "Configura OCR",
+      recommendedRuntimeTarget: "cpu",
+      title: "Installa OCR CPU",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -431,7 +431,7 @@ describe("App initial setup", () => {
     render(<App />);
     await flushPromises();
 
-    fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
     await flushPromises();
     expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
 

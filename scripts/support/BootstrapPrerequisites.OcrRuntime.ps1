@@ -39,6 +39,12 @@ function ConvertTo-OcrDriverVersion {
     return $null
 }
 
+function Test-OcrNvidiaSeries50 {
+    param([string]$GpuName)
+
+    return $GpuName -match '\bRTX\s+50\d{2}\b' -or $GpuName -match '\bRTX\s+5\d{3}\b'
+}
+
 function Get-OcrObjectPropertyValue {
     param(
         [object]$Object,
@@ -66,7 +72,10 @@ function Get-OcrNvidiaRuntimeSelection {
     }
 
     try {
-        $nvidiaOutput = (& $nvidiaSmi.Source --query-gpu=driver_version,name --format=csv,noheader 2>&1 | Out-String).Trim()
+        $nvidiaOutput = (& $nvidiaSmi.Source --query-gpu=driver_version,name,compute_cap --format=csv,noheader 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            $nvidiaOutput = (& $nvidiaSmi.Source --query-gpu=driver_version,name --format=csv,noheader 2>&1 | Out-String).Trim()
+        }
     }
     catch {
         return Get-OcrCpuRuntimeSelection -Manifest $Manifest -Detail "NVIDIA non utilizzabile: nvidia-smi non ha completato la verifica. Bootstrap OCR usera il runtime CPU."
@@ -82,10 +91,12 @@ function Get-OcrNvidiaRuntimeSelection {
         return Get-OcrCpuRuntimeSelection -Manifest $Manifest -Detail "NVIDIA rilevata, ma versione driver non leggibile. Bootstrap OCR usera il runtime CPU."
     }
 
-    $displayName = $firstLine
-    $commaIndex = $firstLine.IndexOf(",")
-    if ($commaIndex -ge 0 -and $commaIndex -lt ($firstLine.Length - 1)) {
-        $displayName = $firstLine.Substring($commaIndex + 1).Trim()
+    $parts = @($firstLine -split "," | ForEach-Object { $_.Trim() })
+    $displayName = if ($parts.Count -ge 2) { $parts[1] } else { $firstLine }
+    $computeCapability = if ($parts.Count -ge 3) { ConvertTo-OcrDriverVersion -Text $parts[2] } else { $null }
+
+    if (Test-OcrNvidiaSeries50 -GpuName $displayName) {
+        return Get-OcrCpuRuntimeSelection -Manifest $Manifest -Detail "NVIDIA $displayName rilevata, ma il supporto PaddlePaddle Windows per RTX serie 50 resta sperimentale/speciale. Bootstrap OCR usera il runtime CPU."
     }
 
     if (-not $Manifest -or -not $Manifest.runtimeTargets) {
@@ -101,6 +112,10 @@ function Get-OcrNvidiaRuntimeSelection {
     foreach ($target in $nvidiaTargets) {
         $minimumDriver = ConvertTo-OcrDriverVersion -Text ([string]$target.minimumWindowsDriver)
         if (-not $minimumDriver -or $driverVersion -lt $minimumDriver) {
+            continue
+        }
+        $minimumCompute = ConvertTo-OcrDriverVersion -Text ([string]$target.minimumComputeCapability)
+        if ($minimumCompute -and $computeCapability -and $computeCapability -lt $minimumCompute) {
             continue
         }
 

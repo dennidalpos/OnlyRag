@@ -21,6 +21,7 @@ $buildWebScript = Join-Path $PSScriptRoot "Build-Web.ps1"
 $buildAppScript = Join-Path $PSScriptRoot "Build-App.ps1"
 $buildInstallerScript = Join-Path $PSScriptRoot "Build-Installer.ps1"
 $testInstallerPrerequisitesScript = Join-Path $PSScriptRoot "Test-InstallerPrerequisites.ps1"
+$testOcrRuntimeManifestScript = Join-Path $PSScriptRoot "ocr\Test-OcrRuntimeManifest.ps1"
 $gateDiagnosticsScript = Join-Path $PSScriptRoot "support\GateDiagnostics.ps1"
 . $gateDiagnosticsScript
 
@@ -188,6 +189,10 @@ Invoke-GateStep ".NET tests" {
 
 Invoke-GateStep "installer prerequisite checks" {
     & $testInstallerPrerequisitesScript -SelfTest
+}
+
+Invoke-GateStep "OCR runtime manifest checks" {
+    & $testOcrRuntimeManifestScript
 }
 
 Invoke-GateStep "web build" {

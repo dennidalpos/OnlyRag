@@ -44,6 +44,12 @@ function Test-OcrPythonVersion {
     return $Version.Major -eq 3 -and $Version.Minor -ge 10 -and $Version.Minor -le 13
 }
 
+function Test-OcrNvidiaSeries50 {
+    param([string]$GpuName)
+
+    return $GpuName -match '\bRTX\s+50\d{2}\b' -or $GpuName -match '\bRTX\s+5\d{3}\b'
+}
+
 function Invoke-OcrSetupProcess {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -151,7 +157,12 @@ function Resolve-OcrRuntime {
         return Get-OcrCpuRuntime -Manifest $Manifest -Detail "NVIDIA not detected; setup selected CPU runtime."
     }
 
-    $nvidiaOutput = Invoke-OcrSetupProcess -FilePath $nvidiaSmi -Arguments @("--query-gpu=driver_version,name", "--format=csv,noheader") -Quiet
+    try {
+        $nvidiaOutput = Invoke-OcrSetupProcess -FilePath $nvidiaSmi -Arguments @("--query-gpu=driver_version,name,compute_cap", "--format=csv,noheader") -Quiet
+    }
+    catch {
+        $nvidiaOutput = Invoke-OcrSetupProcess -FilePath $nvidiaSmi -Arguments @("--query-gpu=driver_version,name", "--format=csv,noheader") -Quiet
+    }
     $firstLine = @($nvidiaOutput -split "(`r`n|`n|`r)" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1)
     if ($firstLine.Count -eq 0) {
         if ($RuntimeTarget -eq "nvidia") {
@@ -161,11 +172,22 @@ function Resolve-OcrRuntime {
     }
 
     $driverVersion = ConvertTo-OcrVersion -Text $firstLine[0]
+    $parts = @($firstLine[0] -split "," | ForEach-Object { $_.Trim() })
+    $gpuName = if ($parts.Count -ge 2) { $parts[1] } else { $firstLine[0] }
+    $computeCapability = if ($parts.Count -ge 3) { ConvertTo-OcrVersion -Text $parts[2] } else { $null }
     if (-not $driverVersion) {
         if ($RuntimeTarget -eq "nvidia") {
             throw "NVIDIA driver version was not readable from nvidia-smi."
         }
         return Get-OcrCpuRuntime -Manifest $Manifest -Detail "NVIDIA detected but driver version was not readable; setup selected CPU runtime."
+    }
+
+    if (Test-OcrNvidiaSeries50 -GpuName $gpuName) {
+        $message = "NVIDIA $gpuName detected, but PaddlePaddle Windows support for RTX 50 series is still treated as experimental/special; setup selected CPU runtime."
+        if ($RuntimeTarget -eq "nvidia") {
+            throw $message
+        }
+        return Get-OcrCpuRuntime -Manifest $Manifest -Detail $message
     }
 
     $targets = @(
@@ -179,6 +201,10 @@ function Resolve-OcrRuntime {
         if (-not $minimumDriver -or $driverVersion -lt $minimumDriver) {
             continue
         }
+        $minimumCompute = ConvertTo-OcrVersion -Text ([string]$target.minimumComputeCapability)
+        if ($minimumCompute -and $computeCapability -and $computeCapability -lt $minimumCompute) {
+            continue
+        }
 
         $requirementsPath = Join-Path $script:OcrRoot ([string]$target.requirementsFile)
         if (-not (Test-Path -LiteralPath $requirementsPath -PathType Leaf)) {
@@ -190,7 +216,7 @@ function Resolve-OcrRuntime {
             RequirementsFile = [string]$target.requirementsFile
             RequirementsPath = $requirementsPath
             Device = "gpu"
-            Detail = "NVIDIA driver $driverVersion selected $($target.resolvedRuntime)."
+            Detail = "NVIDIA $gpuName driver $driverVersion selected $($target.resolvedRuntime)."
         }
     }
 

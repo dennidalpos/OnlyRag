@@ -135,6 +135,14 @@ export type OcrProvisionStatus = {
   runtimeDetail: string | null;
   startedAtUtc: string | null;
   updatedAtUtc: string | null;
+  stepKey: string | null;
+  stepLabel: string | null;
+  stepIndex: number;
+  stepCount: number;
+  progressPercent: number;
+  severity: string;
+  canRetry: boolean;
+  selectedRuntime: string | null;
 };
 
 export type OcrStartupAnalysis = {

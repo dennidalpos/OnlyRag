@@ -206,7 +206,7 @@ begin
   if FindNvidiaSmiPath() <> '' then
   begin
     Result :=
-      BulletLine('NVIDIA OCR', 'NVIDIA management tools were detected. Setup will try the compatible GPU runtime automatically and OnlyRag will select GPU after Diagnostics reports it usable, unless CPU was saved manually.');
+      BulletLine('NVIDIA OCR', 'NVIDIA management tools were detected. Setup will try the newest compatible GPU runtime from the OCR manifest automatically and OnlyRag will select GPU after Diagnostics reports it usable, unless CPU was saved manually.');
   end
   else
   begin

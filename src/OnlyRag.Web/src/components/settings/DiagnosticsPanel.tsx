@@ -1,4 +1,5 @@
 import { useSettingsSectionContext } from "../SettingsSectionContext";
+import { ProgressBar } from "../ProgressBar";
 
 export function DiagnosticsPanel() {
   const {
@@ -103,6 +104,13 @@ export function DiagnosticsPanel() {
                     role={ocrProvisionStatus?.isRunning ? "status" : "alert"}
                   >
                     <p>{ocrProvisionStatus?.message ?? "OCR non configurato. Configura le dipendenze locali per abilitare OCR."}</p>
+                    {ocrProvisionStatus?.isRunning && (
+                      <ProgressBar
+                        label={ocrProvisionStatus.stepLabel ?? "Configurazione OCR in corso"}
+                        value={ocrProvisionStatus.progressPercent}
+                        indeterminate={!ocrProvisionStatus.progressPercent}
+                      />
+                    )}
                     {ocrProvisionStatus?.runtimeDetail && <p>{ocrProvisionStatus.runtimeDetail}</p>}
                     {ocrProvisionStatus?.lastError && <p>{ocrProvisionStatus.lastError}</p>}
                   </div>

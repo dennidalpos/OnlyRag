@@ -86,8 +86,8 @@ describe("App initial setup residual checks", () => {
       isOcrConfigured: false,
       isNvidiaRuntimeAvailable: true,
       isGpuUsable: false,
-      recommendedRuntimeTarget: "auto",
-      title: "Configura OCR",
+      recommendedRuntimeTarget: "nvidia",
+      title: "Installa OCR GPU",
       message: "Prepara il runtime OCR locale.",
       findings: []
     };
@@ -182,7 +182,7 @@ describe("App initial setup residual checks", () => {
     render(<App />);
     await flushPromises();
 
-    fireEvent.click(screen.getByRole("button", { name: "Configura OCR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Installa OCR GPU" }));
     await flushPromises();
 
     await act(async () => {

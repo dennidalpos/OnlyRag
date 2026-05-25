@@ -23,7 +23,15 @@ public sealed record OcrProvisionStatus(
     string ResolvedRuntime = "unknown",
     string? RuntimeDetail = null,
     DateTimeOffset? StartedAtUtc = null,
-    DateTimeOffset? UpdatedAtUtc = null);
+    DateTimeOffset? UpdatedAtUtc = null,
+    string? StepKey = null,
+    string? StepLabel = null,
+    int StepIndex = 0,
+    int StepCount = 0,
+    int ProgressPercent = 0,
+    string Severity = "info",
+    bool CanRetry = false,
+    string? SelectedRuntime = null);
 
 public sealed record OcrStartupAnalysisResponse(
     bool ShouldPrompt,
