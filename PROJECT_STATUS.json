@@ -1,35 +1,47 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T12:59:50+02:00",
-  "active_objective": "Ripristinare l'avvio del runtime Qdrant locale bundled e mostrare in topbar lo stato dei moduli principali.",
+  "last_updated": "2026-05-25T14:45:55+02:00",
+  "active_objective": "Validare nell'app aggiornata il fix OCR Unicode e chiudere le verifiche runtime residue.",
   "assumptions": [
-    "Qdrant locale deve essere avviato automaticamente quando useLocalBundledServer e attivo e il payload qdrant.exe e presente.",
-    "OCR GPU resta opzionale: in topbar lo stato non disponibile e neutro, non errore bloccante."
+    "Il fix OCR richiede una build/installazione che distribuisca la versione aggiornata di scripts/ocr/paddle_ocr_bridge.py.",
+    "Il PDF TrackWise puo riprendere dal checkpoint di importazione alla pagina 247."
   ],
   "execution_plan": [
     {
       "priority": "P1",
       "order": 1,
-      "task": "Verificare in app installata che qdrant.exe sia incluso nel payload e che il badge Qdrant passi Online dopo il riavvio.",
-      "residual": "I test coprono il comportamento backend/frontend, ma non avviano un qdrant.exe reale in questa sessione.",
+      "task": "Rigenerare o reinstallare l'app con il bridge OCR aggiornato.",
+      "residual": "L'app installata usa ancora la copia distribuita precedente del bridge OCR.",
+      "command": "pwsh .\\scripts\\Build-App.ps1 -Configuration Debug"
+    },
+    {
+      "priority": "P1",
+      "order": 2,
+      "task": "Riprendere l'importazione del PDF TrackWise e verificare che superi la pagina 247.",
+      "residual": "La pagina 247 passa nel bridge repo, ma manca la conferma end-to-end nell'app aggiornata.",
       "command": ""
+    },
+    {
+      "priority": "P2",
+      "order": 3,
+      "task": "Verificare Qdrant locale nell'app installata aggiornata.",
+      "residual": "Il comportamento e coperto da test, ma non ancora verificato contro qdrant.exe reale nel payload installato.",
+      "command": ""
+    },
+    {
+      "priority": "P3",
+      "order": 4,
+      "task": "Aggiungere una verifica installer/lifecycle per Qdrant locale post-installazione.",
+      "residual": "La suite automatica non esercita ancora il binario Qdrant reale dal pacchetto installato.",
+      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
     }
   ],
   "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
-    "api_tests": "passed",
-    "web_unit_tests": "passed",
-    "web_build": "passed",
-    "structure_review": "passed"
-  },
-  "environment": {
-    "os_target": "Windows",
-    "shell": "PowerShell"
-  },
-  "last_completed_work": "Aggiunto auto-start/wait per Qdrant bundled e badge topbar per Backend, Ollama, Qdrant, OCR, OCR GPU e Operazioni.",
-  "open_questions": [],
-  "handoff_notes": "Riavviare l'app desktop per far partire il nuovo ensure del runtime Qdrant locale; se resta Offline controllare che packaging/qdrant/payload/qdrant.exe sia incluso nell'output installato."
+    "api_ocr_tests": "passed",
+    "infrastructure_ocr_tests": "passed",
+    "python_compile": "passed",
+    "structure_review": "passed",
+    "full_gate": "not_run"
+  }
 }

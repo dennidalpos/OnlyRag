@@ -261,7 +261,7 @@ public sealed partial class DependencyProvisioningService
                 "paddle-clean",
                 "Pulizia Paddle",
                 5));
-            await RunProcessAsync(venvPython, ["-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu"], null, cancellationToken);
+            await RunPaddlePackageCleanupAsync(venvPython, null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
@@ -483,6 +483,36 @@ public sealed partial class DependencyProvisioningService
         }
 
         return string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
+    }
+
+    private async Task<string> RunPaddlePackageCleanupAsync(
+        string venvPython,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        string[] arguments = ["-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu"];
+        LocalProcessResult result = await processLauncher.RunAsync(venvPython, arguments, workingDirectory, cancellationToken);
+        string detail = string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput : result.StandardError;
+        if (result.ExitCode == 0 || IsBenignPaddlePackageCleanupOutput(detail))
+        {
+            return string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
+        }
+
+        throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
+            ? $"{venvPython} terminato con exit code {result.ExitCode}."
+            : detail.Trim());
+    }
+
+    private static bool IsBenignPaddlePackageCleanupOutput(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return false;
+        }
+
+        return output.Contains("Skipping paddlepaddle", StringComparison.OrdinalIgnoreCase)
+            && output.Contains("not installed", StringComparison.OrdinalIgnoreCase)
+            && !output.Contains("ERROR:", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool WasOcrProvisionTimedOut()

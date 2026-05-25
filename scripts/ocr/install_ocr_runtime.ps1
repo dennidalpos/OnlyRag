@@ -72,6 +72,15 @@ function Invoke-OcrSetupProcess {
     return $text
 }
 
+function Test-OcrBenignPaddleUninstallOutput {
+    param([string]$Text)
+
+    return -not [string]::IsNullOrWhiteSpace($Text) -and
+        $Text.Contains("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -and
+        $Text.Contains("not installed", [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $Text.Contains("ERROR:", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-OcrPythonCommand {
     $candidates = New-Object System.Collections.Generic.List[object]
     $python = Get-Command python -ErrorAction SilentlyContinue
@@ -288,7 +297,16 @@ function Initialize-OcrRuntime {
     }
 
     Invoke-OcrSetupProcess -FilePath $script:VenvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check") | Out-Null
-    Invoke-OcrSetupProcess -FilePath $script:VenvPython -Arguments @("-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu") | Out-Null
+    try {
+        Invoke-OcrSetupProcess -FilePath $script:VenvPython -Arguments @("-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu") | Out-Null
+    }
+    catch {
+        if (-not (Test-OcrBenignPaddleUninstallOutput -Text $_.Exception.Message)) {
+            throw
+        }
+
+        Write-OcrSetupLog "Paddle package cleanup skipped absent package warning."
+    }
     Invoke-OcrSetupProcess -FilePath $script:VenvPython -Arguments @("-m", "pip", "install", "--upgrade", "-r", $runtime.RequirementsPath, "--disable-pip-version-check") | Out-Null
     Invoke-OcrSetupProcess -FilePath $script:VenvPython -Arguments @($script:BridgePath, "--mode", "check", "--device", $runtime.Device) | Out-Null
 

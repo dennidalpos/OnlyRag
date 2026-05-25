@@ -157,6 +157,15 @@ function Test-OcrBenignNativeOutputLine {
         $text.Contains("criteri di ricerca indicati", [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-OcrBenignPaddleUninstallOutput {
+    param([string]$Text)
+
+    return -not [string]::IsNullOrWhiteSpace($Text) -and
+        $Text.Contains("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -and
+        $Text.Contains("not installed", [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $Text.Contains("ERROR:", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Invoke-OcrNativeCaptured {
     param(
         [Parameter(Mandatory)]

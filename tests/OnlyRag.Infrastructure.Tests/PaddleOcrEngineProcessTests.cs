@@ -97,6 +97,43 @@ public sealed class PaddleOcrEngineProcessTests
         Assert.Contains("diagnostic", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task RecognizeReadsAsciiEscapedUnicodeJson()
+    {
+        using TempBridge bridge = TempBridge.Create(
+            """
+            [Console]::Out.Write('{"text":"\u2202","boxes":[],"confidence":1.0,"engineVersion":"test"}')
+            """);
+        PaddleOcrEngine engine = bridge.CreateEngine();
+
+        OcrPageResult result = await engine.RecognizeAsync(
+            new OcrRecognitionRequest("prepared.png", "en", OcrSettings.Default));
+
+        Assert.Equal("\u2202", result.Text);
+    }
+
+    [Fact]
+    public async Task RecognizeFiltersBenignNativeDiagnosticsFromBridgeErrors()
+    {
+        using TempBridge bridge = TempBridge.Create(
+            """
+            [Console]::Error.WriteLine('INFORMAZIONI: impossibile trovare file corrispondenti ai criteri di ricerca indicati.')
+            [Console]::Error.WriteLine('C:\venv\site-packages\paddle\utils\cpp_extension\extension_utils.py:712: UserWarning: No ccache found.')
+            [Console]::Error.WriteLine('WARNING: OMP_NUM_THREADS set to 2, not 1.')
+            [Console]::Error.WriteLine('Real OCR failure')
+            exit 1
+            """);
+        PaddleOcrEngine engine = bridge.CreateEngine();
+
+        OcrEngineUnavailableException error = await Assert.ThrowsAsync<OcrEngineUnavailableException>(() =>
+            engine.RecognizeAsync(new OcrRecognitionRequest("prepared.png", "it", OcrSettings.Default)));
+
+        Assert.Contains("Real OCR failure", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ccache", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("OMP_NUM_THREADS", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("impossibile trovare file", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class TempBridge : IDisposable
     {
         private TempBridge(string root, string scriptPath, TimeSpan timeout)

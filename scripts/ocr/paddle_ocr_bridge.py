@@ -12,7 +12,7 @@ from pathlib import Path
 os.environ.setdefault("PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT", "0")
 
 def write_json(payload):
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+    sys.stdout.write(json.dumps(payload, ensure_ascii=True))
 
 
 def package_version(name):
@@ -279,11 +279,14 @@ def build_paddle_kwargs(args):
     return kwargs
 
 
+def configure_runtime_environment(args):
+    os.environ["OMP_NUM_THREADS"] = str(args.cpu_threads)
+    os.environ["CPU_NUM"] = str(args.cpu_threads)
+
+
 def ocr(args):
     from paddleocr import PaddleOCR
 
-    os.environ["OMP_NUM_THREADS"] = str(args.cpu_threads)
-    os.environ["CPU_NUM"] = str(args.cpu_threads)
     args.device = resolve_device(args.device)
     if args.device == "gpu":
         verify_gpu_available()
@@ -434,6 +437,7 @@ def main():
     parser.add_argument("--cpu-threads", type=int, default=2)
     parser.add_argument("--device", choices=["auto", "cpu", "gpu"], default="auto")
     args = parser.parse_args()
+    configure_runtime_environment(args)
 
     if args.mode == "check":
         return check(args)

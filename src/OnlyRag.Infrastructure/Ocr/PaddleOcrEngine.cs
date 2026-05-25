@@ -228,11 +228,11 @@ public sealed class PaddleOcrEngine : IOcrEngine
         string stderr = await stderrTask;
         if (process.ExitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            string detail = FormatBridgeErrorDetail(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr);
             throw new OcrEngineUnavailableException(
                 string.IsNullOrWhiteSpace(detail)
                     ? "Bridge PaddleOCR terminato con errore."
-                    : detail.Trim());
+                    : detail);
         }
 
         T? result;
@@ -242,11 +242,11 @@ public sealed class PaddleOcrEngine : IOcrEngine
         }
         catch (JsonException ex)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            string detail = FormatBridgeErrorDetail(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr);
             throw new InvalidOperationException(
                 string.IsNullOrWhiteSpace(detail)
                     ? "Risposta JSON OCR non valida."
-                    : $"Risposta JSON OCR non valida: {detail.Trim()}",
+                    : $"Risposta JSON OCR non valida: {detail}",
                 ex);
         }
 
@@ -277,6 +277,39 @@ public sealed class PaddleOcrEngine : IOcrEngine
         }
 
         return timeout;
+    }
+
+    private static string FormatBridgeErrorDetail(string detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return string.Empty;
+        }
+
+        string[] visibleLines = detail
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !IsBenignBridgeDiagnostic(line))
+            .ToArray();
+
+        return visibleLines.Length == 0
+            ? string.Empty
+            : string.Join(Environment.NewLine, visibleLines).Trim();
+    }
+
+    private static bool IsBenignBridgeDiagnostic(string line)
+    {
+        return line.Contains("No ccache found", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("extension_utils.py", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("warnings.warn(warning_message)", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("INFORMAZIONI: impossibile trovare file", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("criteri di ricerca indicati", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("OMP_NUM_THREADS", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("PLEASE USE OMP_NUM_THREADS WISELY", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("Creating model:", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("Model files already exist", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("Logging before InitGoogleLogging", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("gpu_resources.cc", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeDevice(string value)

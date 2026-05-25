@@ -302,7 +302,16 @@ function Ensure-OcrEnvironment {
         $runtimeChanged = $previousRuntimeName -ne $runtimeSelection.RuntimeName -or $previousRequirementsFile -ne $runtimeSelection.RequirementsFile
         if ($runtimeChanged) {
             Add-Verified "OCR runtime package set changed to $($runtimeSelection.RuntimeName); removing stale PaddlePaddle packages before install."
-            Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu") -Quiet | Out-Null
+            try {
+                Invoke-OcrNativeCaptured -FilePath $venvPython -Arguments @("-m", "pip", "uninstall", "-y", "paddlepaddle", "paddlepaddle-gpu") -Quiet | Out-Null
+            }
+            catch {
+                if (-not (Test-OcrBenignPaddleUninstallOutput -Text $_.Exception.Message)) {
+                    throw
+                }
+
+                Add-Verified "OCR PaddlePaddle cleanup skipped absent package warning."
+            }
         }
 
         if ($requirementsChanged) {
