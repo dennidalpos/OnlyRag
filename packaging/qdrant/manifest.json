@@ -1,0 +1,9 @@
+{
+  "version": "1.17.1",
+  "assetName": "qdrant-x86_64-pc-windows-msvc.zip",
+  "downloadUrl": "https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-pc-windows-msvc.zip",
+  "sha256": "FE28DF5993A9F9830B1E7290E2E341BECF3C91366941B73B4322A05E4F91585C",
+  "license": "Apache-2.0",
+  "licenseUrl": "https://raw.githubusercontent.com/qdrant/qdrant/v1.17.1/LICENSE",
+  "licenseSha256": "C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4"
+}

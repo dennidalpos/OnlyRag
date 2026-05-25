@@ -1,5 +1,6 @@
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -33,7 +34,7 @@ public static partial class InProcessBackend
         IDocumentLibraryService documents,
         IEmbeddingRepository embeddings,
         ILocalJobQueue jobs,
-        IVectorSearchService vectorSearch,
+        IQdrantVectorStore vectorSearch,
         CancellationToken cancellationToken)
     {
         ImportedDocument? document = await documents.GetAsync(documentId, cancellationToken);

@@ -1,5 +1,6 @@
 using System.Net;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Api;
 
@@ -14,6 +15,8 @@ public sealed record InProcessBackendOptions
     public LocalDocumentLibraryLimits DocumentLibraryLimits { get; init; } = LocalDocumentLibraryLimits.Default;
 
     public ILocalProcessLauncher? ProcessLauncher { get; init; }
+
+    public IQdrantVectorStore? QdrantVectorStore { get; init; }
 
     public bool EnableDevelopmentCorsOrigins { get; init; } =
 #if DEBUG

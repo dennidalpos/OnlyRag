@@ -31,7 +31,18 @@ public static partial class InProcessBackend
                     "documents_required");
             }
 
-            return Results.Ok(await retrieval.SearchAsync(request, cancellationToken));
+            try
+            {
+                return Results.Ok(await retrieval.SearchAsync(request, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return CreateProblem(
+                    "Retrieval Qdrant non disponibile",
+                    UserFacingErrorText.FromExternalDetail(ex.Message, "Ricostruisci gli embedding o verifica la connessione Qdrant."),
+                    StatusCodes.Status503ServiceUnavailable,
+                    "qdrant_retrieval_unavailable");
+            }
         });
 
         app.MapPost("/api/chat", async (
@@ -46,6 +57,14 @@ public static partial class InProcessBackend
             catch (ChatValidationException ex)
             {
                 return CreateBadRequestProblem(ex.Title, ex.Message, "chat_validation_failed");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return CreateProblem(
+                    "Chat documentale non disponibile",
+                    UserFacingErrorText.FromExternalDetail(ex.Message, "Ricostruisci gli embedding o verifica la connessione Qdrant."),
+                    StatusCodes.Status503ServiceUnavailable,
+                    "qdrant_retrieval_unavailable");
             }
             catch (OllamaApiException ex)
             {

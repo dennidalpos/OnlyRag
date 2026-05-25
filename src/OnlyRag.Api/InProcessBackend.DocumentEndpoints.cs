@@ -4,6 +4,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -138,7 +139,7 @@ public static partial class InProcessBackend
             IOllamaClient ollamaClient,
             ILocalJobQueue jobs,
             IEmbeddingRepository embeddings,
-            IVectorSearchService vectorSearch,
+            IQdrantVectorStore vectorSearch,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
@@ -222,7 +223,7 @@ public static partial class InProcessBackend
             IOllamaSettingsService settings,
             ILocalJobQueue jobs,
             IEmbeddingRepository embeddings,
-            IVectorSearchService vectorSearch,
+            IQdrantVectorStore vectorSearch,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);

@@ -45,7 +45,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
 
     public string EngineVersion => "paddleocr";
 
-    public string PreprocessVersion => "onlyrag-preprocess-v1";
+    public string PreprocessVersion => "onlyrag-preprocess-v2";
 
     public async Task<OcrEngineAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
     {
@@ -281,7 +281,11 @@ public sealed class PaddleOcrEngine : IOcrEngine
 
     private static string NormalizeDevice(string value)
     {
-        return string.Equals(value, "gpu", StringComparison.OrdinalIgnoreCase) ? "gpu" : "cpu";
+        return string.Equals(value, "gpu", StringComparison.OrdinalIgnoreCase)
+            ? "gpu"
+            : string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase)
+                ? "auto"
+                : "cpu";
     }
 
     private static string? FormatAvailabilityMessage(string? message)

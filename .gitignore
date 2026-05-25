@@ -16,6 +16,7 @@ __pycache__/
 *.pyc
 artifacts/
 output/
+packaging/qdrant/payload/
 certificates/app/*
 !certificates/app/
 !certificates/app/README.md

@@ -62,7 +62,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
         Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
-        Assert.True(await tempStorage.ColumnExistsAsync("embeddings", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("chunk_vector_index_status", "qdrant_collection"));
         Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
@@ -84,7 +84,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
         Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
-        Assert.True(await tempStorage.ColumnExistsAsync("embeddings", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("chunk_vector_index_status", "qdrant_collection"));
         Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
@@ -114,7 +114,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
         Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
-        Assert.True(await tempStorage.ColumnExistsAsync("embeddings", "content_hash"));
+        Assert.True(await tempStorage.ColumnExistsAsync("chunk_vector_index_status", "qdrant_collection"));
         Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
@@ -217,7 +217,7 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task EmbeddingRepository_SavesEmbeddingAndTracksModelSpecificStatus()
+    public async Task EmbeddingRepository_TracksQdrantIndexStatusByModel()
     {
         using TempStorage tempStorage = TempStorage.Create();
         LocalSqliteStorageService storage = tempStorage.CreateStorageService();
@@ -247,7 +247,13 @@ public sealed partial class LocalSqliteStorageTests
 
         IReadOnlyList<DocumentChunkForEmbedding> firstModelChunks =
             await embeddings.ListChunksNeedingEmbeddingAsync(document.Id, "embed-a", afterChunkIndex: 0, take: 4);
-        await embeddings.UpsertEmbeddingAsync(firstModelChunks[0].Id, "embed-a", "hash-a", [1f, 0f, 0f]);
+        await embeddings.MarkChunkIndexedAsync(
+            firstModelChunks[0].Id,
+            "embed-a",
+            "hash-a",
+            dimensions: 3,
+            qdrantCollection: "onlyrag_3_test",
+            qdrantPointId: firstModelChunks[0].Id.ToString());
 
         DocumentEmbeddingStatusSnapshot firstModelStatus =
             await embeddings.GetDocumentEmbeddingStatusAsync(document.Id, "embed-a");
@@ -260,58 +266,6 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal(1, firstModelStatus.ChunkCount);
         Assert.Equal(0, secondModelStatus.EmbeddedChunkCount);
         Assert.Single(secondModelChunks);
-    }
-
-    [Fact]
-    public async Task SqliteVecVectorSearchService_RanksWithSqliteVecExtension()
-    {
-        using TempStorage tempStorage = TempStorage.Create();
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-        await storage.InitializeAsync();
-        LocalSqliteConnectionFactory connectionFactory = tempStorage.CreateConnectionFactory();
-        SqliteDocumentRepository documents = new(connectionFactory);
-        SqliteEmbeddingRepository embeddings = new(connectionFactory);
-        SqliteVecVectorSearchService vectorSearch = new(connectionFactory);
-
-        ImportedDocument document = await documents.CreateAsync(new CreateDocumentRecordRequest(
-            "doc-vec",
-            "vectors.txt",
-            Path.Combine(tempStorage.Root, "vectors.txt"),
-            "sha-vec",
-            "text/plain",
-            ".txt",
-            12,
-            DocumentStatus.Indexed,
-            PageCount: 0,
-            CurrentJobId: null,
-            LastError: null,
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow));
-        await documents.SaveIngestedPageAsync(
-            document.Id,
-            new IngestedDocumentPage(1, "alpha beta"),
-            [
-                new IngestedDocumentChunk(1, 1, 0, "alpha", 1, "hash-alpha"),
-                new IngestedDocumentChunk(1, 1, 1, "beta", 1, "hash-beta")
-            ],
-            pageCount: 1);
-
-        IReadOnlyList<DocumentChunkForEmbedding> chunks =
-            await embeddings.ListChunksNeedingEmbeddingAsync(document.Id, "embed-vec", afterChunkIndex: 0, take: 4);
-        await embeddings.UpsertEmbeddingAsync(chunks.Single(chunk => chunk.ChunkIndex == 0).Id, "embed-vec", "hash-alpha", [1f, 0f]);
-        await embeddings.UpsertEmbeddingAsync(chunks.Single(chunk => chunk.ChunkIndex == 1).Id, "embed-vec", "hash-beta", [0f, 1f]);
-
-        IReadOnlyList<VectorSearchResult> results = await vectorSearch.SearchAsync(
-            "embed-vec",
-            [0.9f, 0.1f],
-            [document.Id],
-            limit: 2);
-
-        Assert.Equal(2, results.Count);
-        Assert.Equal(0, results[0].ChunkIndex);
-        Assert.True(results[0].Score > results[1].Score);
-        Assert.Contains("sqlite-vec", vectorSearch.BackendName, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(int.MaxValue, vectorSearch.MaxSearchableVectors);
     }
 
     [Fact]

@@ -21,12 +21,12 @@ public sealed class UserFacingErrorTextTests
     [Fact]
     public void StartupFailure_UsesGenericUserFacingPrefix()
     {
-        InvalidOperationException exception = new(@"vec0.dll failed from C:\Users\Alice\AppData\Local\OnlyRag\vec0.dll");
+        InvalidOperationException exception = new(@"qdrant.exe failed from C:\Users\Alice\AppData\Local\OnlyRag\qdrant\qdrant.exe");
 
         string message = UserFacingErrorText.StartupFailure(exception);
 
         Assert.StartsWith("Il backend locale non e stato avviato.", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Alice", message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("vec0.dll failed from C:", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("qdrant.exe failed from C:", message, StringComparison.OrdinalIgnoreCase);
     }
 }

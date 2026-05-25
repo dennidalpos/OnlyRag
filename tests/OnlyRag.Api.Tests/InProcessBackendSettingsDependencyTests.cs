@@ -284,7 +284,7 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(body);
         Assert.False(body.Applied);
-        Assert.Equal("cpu", body.Settings.Device);
+        Assert.Equal("auto", body.Settings.Device);
     }
 
     [Fact]

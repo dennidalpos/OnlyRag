@@ -13,6 +13,7 @@ using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -50,8 +51,16 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();
         builder.Services.AddSingleton<IDocumentRepository, SqliteDocumentRepository>();
         builder.Services.AddSingleton<IEmbeddingRepository, SqliteEmbeddingRepository>();
-        builder.Services.AddSingleton<SqliteVecVectorSearchService>();
-        builder.Services.AddSingleton<IVectorSearchService>(services => services.GetRequiredService<SqliteVecVectorSearchService>());
+        builder.Services.AddSingleton<QdrantSettingsStore>();
+        if (options.QdrantVectorStore is not null)
+        {
+            builder.Services.AddSingleton(options.QdrantVectorStore);
+        }
+        else
+        {
+            builder.Services.AddSingleton<IQdrantVectorStore, QdrantVectorStore>();
+        }
+        builder.Services.AddSingleton<QdrantLocalRuntimeService>();
         builder.Services.AddSingleton(HybridRetrievalOptions.Default);
         builder.Services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
         builder.Services.AddSingleton<IRetrievalChunkRepository, SqliteRetrievalChunkRepository>();

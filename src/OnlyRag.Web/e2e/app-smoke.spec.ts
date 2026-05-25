@@ -124,7 +124,7 @@ test("smoke: import, job state, backend offline, and preview modal", async ({ pa
 
     if (method === "GET" && path === "/api/diagnostics/vector-health") {
       await fulfillJson(route, {
-        backendName: "sqlite-vec",
+        backendName: "Qdrant gRPC",
         storagePersistent: true,
         vectorLimit: 100000,
         totalVectors: 4,
@@ -178,7 +178,7 @@ test("smoke: import, job state, backend offline, and preview modal", async ({ pa
         progressPercent: 100,
         currentJobId: null,
         currentStep: null,
-        vectorSearchBackend: "sqlite-vec",
+        vectorSearchBackend: "Qdrant gRPC",
         lastEmbeddedAtUtc: "2026-05-21T12:05:00Z"
       });
       return;

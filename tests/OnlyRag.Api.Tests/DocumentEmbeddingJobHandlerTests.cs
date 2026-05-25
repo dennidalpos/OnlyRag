@@ -3,6 +3,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api.Tests;
@@ -22,6 +23,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
         DocumentEmbeddingJobHandler handler = new(
             new StubDocumentLibraryService(documentRepository),
             embeddingRepository,
+            new FakeQdrantVectorStore(),
             ollamaClient,
             new StubOllamaSettingsService(new OllamaSettings(
                 OllamaEndpointOptions.DefaultBaseUrl,
@@ -65,6 +67,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
         DocumentEmbeddingJobHandler handler = new(
             documents,
             embeddingRepository,
+            new FakeQdrantVectorStore(),
             ollamaClient,
             new StubOllamaSettingsService(new OllamaSettings(
                 OllamaEndpointOptions.DefaultBaseUrl,
@@ -184,6 +187,52 @@ public sealed class DocumentEmbeddingJobHandlerTests
         public Task<ImportedDocument?> DeleteAsync(long id, CancellationToken cancellationToken = default)
         {
             return documents.DeleteAsync(id, cancellationToken);
+        }
+    }
+
+    private sealed class FakeQdrantVectorStore : IQdrantVectorStore
+    {
+        public string BackendName => "Qdrant fake";
+
+        public int MaxSearchableVectors => int.MaxValue;
+
+        public bool IsVectorStoragePersistent => true;
+
+        public string BuildCollectionName(string model, int dimensions) => $"onlyrag_{dimensions}_test";
+
+        public string BuildPointId(long chunkId) => chunkId.ToString();
+
+        public Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertChunkAsync(
+            long chunkId,
+            long documentId,
+            int chunkIndex,
+            string model,
+            string contentHash,
+            IReadOnlyList<float> vector,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
+            string model,
+            IReadOnlyList<float> queryVector,
+            IReadOnlyCollection<long> documentIds,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
+        }
+
+        public Task DeleteDocumentAsync(
+            string model,
+            int dimensions,
+            long documentId,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 

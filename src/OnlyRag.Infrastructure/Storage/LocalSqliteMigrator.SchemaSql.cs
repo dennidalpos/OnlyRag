@@ -64,15 +64,18 @@ public sealed partial class LocalSqliteMigrator
                 UNIQUE (document_id, chunk_index)
             );
 
-            CREATE TABLE embeddings (
+            CREATE TABLE chunk_vector_index_status (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 chunk_id INTEGER NOT NULL,
                 model TEXT NOT NULL,
                 dimensions INTEGER NOT NULL,
-                distance_metric TEXT NOT NULL DEFAULT 'cosine',
                 content_hash TEXT NOT NULL DEFAULT '',
-                vector_blob BLOB NOT NULL,
-                created_at_utc TEXT NOT NULL,
+                qdrant_collection TEXT NOT NULL,
+                qdrant_point_id TEXT NOT NULL,
+                indexed_at_utc TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'Pending',
+                last_error TEXT NULL,
+                updated_at_utc TEXT NOT NULL,
                 FOREIGN KEY (chunk_id) REFERENCES chunks(id) ON DELETE CASCADE,
                 UNIQUE (chunk_id, model)
             );
@@ -181,9 +184,10 @@ public sealed partial class LocalSqliteMigrator
             CREATE INDEX idx_chunks_page ON chunks(document_page_id);
             CREATE INDEX idx_chunks_document_ordinal ON chunks(document_id, chunk_index);
             CREATE INDEX idx_chunks_content_hash ON chunks(content_hash);
-            CREATE INDEX idx_embeddings_chunk ON embeddings(chunk_id);
-            CREATE INDEX idx_embeddings_model_chunk ON embeddings(model, chunk_id);
-            CREATE INDEX idx_embeddings_content_hash ON embeddings(content_hash);
+            CREATE INDEX idx_chunk_vector_index_status_chunk ON chunk_vector_index_status(chunk_id);
+            CREATE INDEX idx_chunk_vector_index_status_model_chunk ON chunk_vector_index_status(model, chunk_id);
+            CREATE INDEX idx_chunk_vector_index_status_content_hash ON chunk_vector_index_status(content_hash);
+            CREATE INDEX idx_chunk_vector_index_status_collection ON chunk_vector_index_status(qdrant_collection);
             CREATE INDEX idx_jobs_status_priority ON jobs(status, priority DESC, created_at_utc);
             CREATE INDEX idx_jobs_updated_at ON jobs(updated_at_utc);
             CREATE INDEX idx_chat_messages_conversation ON chat_messages(conversation_id, id);
@@ -196,7 +200,7 @@ public sealed partial class LocalSqliteMigrator
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (12, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (13, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 

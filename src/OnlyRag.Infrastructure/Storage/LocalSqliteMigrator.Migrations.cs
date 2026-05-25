@@ -9,7 +9,6 @@ public sealed partial class LocalSqliteMigrator
         ("documents", "file_extension"),
         ("documents", "current_job_id"),
         ("chunks", "content_hash"),
-        ("embeddings", "content_hash"),
         ("jobs", "checkpoint_json"),
         ("translation_units", "layout_metadata_json"),
         ("translation_units", "machine_translated_text")
@@ -24,13 +23,19 @@ public sealed partial class LocalSqliteMigrator
         await AddColumnIfMissingAsync(connection, transaction, "documents", "file_extension", "TEXT NULL", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "documents", "current_job_id", "TEXT NULL", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "chunks", "content_hash", "TEXT NOT NULL DEFAULT ''", cancellationToken);
-        await AddColumnIfMissingAsync(connection, transaction, "embeddings", "content_hash", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        if (await TableExistsAsync(connection, "embeddings", cancellationToken))
+        {
+            await AddColumnIfMissingAsync(connection, transaction, "embeddings", "content_hash", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        }
         await AddColumnIfMissingAsync(connection, transaction, "jobs", "checkpoint_json", "TEXT NOT NULL DEFAULT '{}'", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "translation_units", "layout_metadata_json", "TEXT NOT NULL DEFAULT '{}'", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "translation_units", "machine_translated_text", "TEXT NULL", cancellationToken);
 
         await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);", cancellationToken);
-        await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_embeddings_content_hash ON embeddings(content_hash);", cancellationToken);
+        if (await TableExistsAsync(connection, "embeddings", cancellationToken))
+        {
+            await ExecuteInTransactionAsync(connection, transaction, "CREATE INDEX IF NOT EXISTS idx_embeddings_content_hash ON embeddings(content_hash);", cancellationToken);
+        }
         await EnsureChunkFtsObjectsAsync(connection, transaction, textSearchBackend, cancellationToken);
     }
 
@@ -103,6 +108,69 @@ public sealed partial class LocalSqliteMigrator
     {
         await SqliteStatusConstraints.ValidateExistingStatusesAsync(connection, transaction, cancellationToken);
         await SqliteStatusConstraints.CreateValidationTriggersAsync(connection, transaction, cancellationToken);
+    }
+
+    private static async Task ApplySchemaVersion13Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            """
+            CREATE TABLE IF NOT EXISTS chunk_vector_index_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chunk_id INTEGER NOT NULL,
+                model TEXT NOT NULL,
+                dimensions INTEGER NOT NULL,
+                content_hash TEXT NOT NULL DEFAULT '',
+                qdrant_collection TEXT NOT NULL,
+                qdrant_point_id TEXT NOT NULL,
+                indexed_at_utc TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'Pending',
+                last_error TEXT NULL,
+                updated_at_utc TEXT NOT NULL,
+                FOREIGN KEY (chunk_id) REFERENCES chunks(id) ON DELETE CASCADE,
+                UNIQUE (chunk_id, model)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_chunk
+            ON chunk_vector_index_status(chunk_id);
+
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_model_chunk
+            ON chunk_vector_index_status(model, chunk_id);
+
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_content_hash
+            ON chunk_vector_index_status(content_hash);
+
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_collection
+            ON chunk_vector_index_status(qdrant_collection);
+            """,
+            cancellationToken);
+
+        if (await TableExistsAsync(connection, "embeddings", cancellationToken))
+        {
+            await ExecuteInTransactionAsync(
+                connection,
+                transaction,
+                """
+                UPDATE documents
+                SET status = 'RequiresEmbeddingRebuild',
+                    current_job_id = NULL,
+                    last_error = 'Embedding legacy SQLite eliminati durante migrazione v13: ricostruire indice Qdrant.',
+                    updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id IN (
+                    SELECT DISTINCT c.document_id
+                    FROM chunks AS c
+                    INNER JOIN embeddings AS e ON e.chunk_id = c.id
+                );
+
+                DROP TABLE embeddings;
+                """,
+                cancellationToken);
+        }
     }
 
     private static async Task EnsureNoDuplicateDocumentHashesAsync(

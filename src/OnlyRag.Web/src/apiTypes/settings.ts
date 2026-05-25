@@ -11,6 +11,16 @@ export type OllamaSettings = {
   trustNonLocalEndpoint: boolean;
 };
 
+export type QdrantSettings = {
+  grpcEndpoint: string;
+  apiKey: string | null;
+  trustNonLoopbackEndpoint: boolean;
+  requireTlsForRemoteEndpoint: boolean;
+  useLocalBundledServer: boolean;
+  localGrpcPort: number;
+  requestTimeoutSeconds: number;
+};
+
 export type OllamaModelDetails = {
   name: string;
   numCtx: number | null;

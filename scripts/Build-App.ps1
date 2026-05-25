@@ -18,7 +18,9 @@ $supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "OnlyRag.sln"
 $buildWebScript = Join-Path $PSScriptRoot "Build-Web.ps1"
+$downloadQdrantScript = Join-Path $PSScriptRoot "Download-Qdrant.ps1"
 $webIndex = Join-Path $repoRoot "src\OnlyRag.Web\dist\index.html"
+$qdrantExe = Join-Path $repoRoot "packaging\qdrant\payload\qdrant.exe"
 
 if (-not $SkipWebBuild) {
     & $buildWebScript -SkipInstallWhenUpToDate
@@ -26,6 +28,10 @@ if (-not $SkipWebBuild) {
 
 if (-not (Test-Path -LiteralPath $webIndex -PathType Leaf)) {
     throw "Web assets not found at $webIndex. Run scripts\Build-Web.ps1 first or rerun Build-App.ps1 without -SkipWebBuild."
+}
+
+if (-not (Test-Path -LiteralPath $qdrantExe -PathType Leaf)) {
+    & $downloadQdrantScript
 }
 
 if (-not $NoRestore) {

@@ -207,11 +207,11 @@ function Test-AppLaunch {
     if (Test-Path -LiteralPath $logPath -PathType Leaf) {
         $logContent = Get-Content -Raw -LiteralPath $logPath
         $currentLogLength = (Get-Item -LiteralPath $logPath).Length
-        if ($currentLogLength -gt $previousLogLength -and $logContent.Contains("sqlite-vec native extension verified.")) {
-            Add-Check -Id "first-launch-sqlite-vec-load" -Status "pass" -Message "First launch verified sqlite-vec native extension loading." -Data @{ logPath = $logPath }
+        if ($currentLogLength -gt $previousLogLength -and $logContent.Contains("In-process backend listening")) {
+            Add-Check -Id "first-launch-backend-start" -Status "pass" -Message "First launch verified backend startup." -Data @{ logPath = $logPath }
         }
         else {
-            Add-Check -Id "first-launch-sqlite-vec-load" -Status "fail" -Message "First launch log did not confirm sqlite-vec native extension loading." -Data @{ logPath = $logPath }
+            Add-Check -Id "first-launch-backend-start" -Status "fail" -Message "First launch log did not confirm backend startup." -Data @{ logPath = $logPath }
         }
     }
     else {
@@ -260,7 +260,8 @@ else {
     Test-PathExpectation -Id "webview2-wpf-assembly" -Path (Join-Path $installDir "Microsoft.Web.WebView2.Wpf.dll") -Kind "file"
     Test-PathExpectation -Id "webview2-loader-native-asset" -Path (Join-Path $installDir "WebView2Loader.dll") -Kind "file"
     Test-PathExpectation -Id "sqlite-native-provider" -Path (Join-Path $installDir "e_sqlite3.dll") -Kind "file"
-    Test-PathExpectation -Id "sqlite-vec-native-asset" -Path (Join-Path $installDir "vec0.dll") -Kind "file"
+    Test-PathExpectation -Id "qdrant-native-binary" -Path (Join-Path $installDir "qdrant\qdrant.exe") -Kind "file"
+    Test-PathExpectation -Id "qdrant-license" -Path (Join-Path $installDir "qdrant\LICENSE") -Kind "file"
     Test-PathExpectation -Id "ocr-setup-preinstall-script" -Path (Join-Path $installDir "scripts\ocr\install_ocr_runtime.ps1") -Kind "file"
     Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"

@@ -34,7 +34,7 @@ public sealed partial class OcrPipelineTests
         Assert.Equal(0.50d, normalized.RecognitionScoreThreshold);
         Assert.Equal(6, normalized.RecognitionBatchSize);
         Assert.Equal(2, normalized.CpuThreads);
-        Assert.Equal("cpu", normalized.Device);
+        Assert.Equal("auto", normalized.Device);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed partial class OcrPipelineTests
         Assert.Equal(0.01d, normalized.RecognitionScoreThreshold);
         Assert.Equal(32, normalized.RecognitionBatchSize);
         Assert.Equal(16, normalized.CpuThreads);
-        Assert.Equal("cpu", normalized.Device);
+        Assert.Equal("auto", normalized.Device);
     }
 
     [Theory]
@@ -108,7 +108,7 @@ public sealed partial class OcrPipelineTests
         Assert.Equal(cpuThreads, normalized.CpuThreads);
         Assert.Equal("PP-OCRv5", normalized.ModelPreset);
         Assert.Equal("PP-OCRv5", normalized.ModelVersion);
-        Assert.Equal("cpu", normalized.Device);
+        Assert.Equal("auto", normalized.Device);
     }
 
     [Fact]

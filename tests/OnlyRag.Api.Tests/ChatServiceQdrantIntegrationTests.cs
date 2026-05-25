@@ -4,13 +4,14 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Api.Tests;
 
-public sealed class ChatServiceSqliteVecIntegrationTests
+public sealed class ChatServiceQdrantIntegrationTests
 {
     [Fact]
-    public async Task SendAsync_WithDocuments_UsesSqliteVecRetrievalAndReturnsSourceSnippet()
+    public async Task SendAsync_WithDocuments_UsesQdrantRetrievalAndReturnsSourceSnippet()
     {
         using TempChatStorage tempStorage = TempChatStorage.Create();
         await tempStorage.InitializeAsync();
@@ -24,7 +25,7 @@ public sealed class ChatServiceSqliteVecIntegrationTests
                 "Appendice amministrativa senza il codice rilevante."
             ]);
         await EmbedDocumentAsync(
-            retrievalServices.Embeddings,
+            retrievalServices,
             document.Id,
             "embed-rag",
             [[1f, 0f], [0f, 1f]]);
@@ -38,7 +39,7 @@ public sealed class ChatServiceSqliteVecIntegrationTests
             "gemma3:4b",
             UseDocuments: true,
             SelectedDocumentIds: [document.Id],
-            ConversationId: "conv-sqlite-vec"));
+            ConversationId: "conv-qdrant"));
 
         Assert.True(response.UsedDocuments);
         Assert.Contains(response.Sources, source =>
@@ -52,27 +53,31 @@ public sealed class ChatServiceSqliteVecIntegrationTests
     }
 
     private static async Task EmbedDocumentAsync(
-        SqliteEmbeddingRepository embeddings,
+        ChatRetrievalServices services,
         long documentId,
         string model,
         IReadOnlyList<IReadOnlyList<float>> vectors)
     {
         IReadOnlyList<DocumentChunkForEmbedding> chunks =
-            await embeddings.ListChunksNeedingEmbeddingAsync(documentId, model, 0, vectors.Count);
+            await services.Embeddings.ListChunksNeedingEmbeddingAsync(documentId, model, 0, vectors.Count);
 
         Assert.Equal(vectors.Count, chunks.Count);
         for (int index = 0; index < chunks.Count; index++)
         {
-            await embeddings.UpsertEmbeddingAsync(
+            services.VectorStore.AddVector(chunks[index], model, vectors[index]);
+            await services.Embeddings.MarkChunkIndexedAsync(
                 chunks[index].Id,
                 model,
                 chunks[index].ContentHash,
-                vectors[index]);
+                vectors[index].Count,
+                services.VectorStore.BuildCollectionName(model, vectors[index].Count),
+                services.VectorStore.BuildPointId(chunks[index].Id));
         }
     }
 
     private sealed record ChatRetrievalServices(
         SqliteEmbeddingRepository Embeddings,
+        FakeQdrantVectorStore VectorStore,
         IHybridRetrievalService Retrieval);
 
     private sealed class StaticQueryEmbeddingGenerator : IQueryEmbeddingGenerator
@@ -125,11 +130,12 @@ public sealed class ChatServiceSqliteVecIntegrationTests
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
             SqliteEmbeddingRepository embeddings = new(connectionFactory);
+            FakeQdrantVectorStore vectorStore = new();
             HybridRetrievalService retrieval = new(
                 new SqliteDocumentRepository(connectionFactory),
                 embeddings,
                 new SqliteKeywordSearchService(connectionFactory),
-                new SqliteVecVectorSearchService(connectionFactory),
+                vectorStore,
                 new SqliteRetrievalChunkRepository(connectionFactory),
                 queryEmbeddingGenerator,
                 new HybridRetrievalOptions(
@@ -140,7 +146,7 @@ public sealed class ChatServiceSqliteVecIntegrationTests
                     SnippetMaxCharacters: 180,
                     MaxContextCharacters: 1000));
 
-            return new ChatRetrievalServices(embeddings, retrieval);
+            return new ChatRetrievalServices(embeddings, vectorStore, retrieval);
         }
 
         public async Task<ImportedDocument> CreateDocumentAsync(
@@ -191,6 +197,86 @@ public sealed class ChatServiceSqliteVecIntegrationTests
             {
                 Directory.Delete(Root, recursive: true);
             }
+        }
+    }
+
+    private sealed class FakeQdrantVectorStore : IQdrantVectorStore
+    {
+        private readonly List<(DocumentChunkForEmbedding Chunk, string Model, IReadOnlyList<float> Vector)> vectors = [];
+
+        public string BackendName => "Qdrant fake";
+
+        public int MaxSearchableVectors => int.MaxValue;
+
+        public bool IsVectorStoragePersistent => true;
+
+        public void AddVector(DocumentChunkForEmbedding chunk, string model, IReadOnlyList<float> vector)
+        {
+            vectors.Add((chunk, model, vector));
+        }
+
+        public string BuildCollectionName(string model, int dimensions) => $"onlyrag_{dimensions}_test";
+
+        public string BuildPointId(long chunkId) => chunkId.ToString();
+
+        public Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertChunkAsync(
+            long chunkId,
+            long documentId,
+            int chunkIndex,
+            string model,
+            string contentHash,
+            IReadOnlyList<float> vector,
+            CancellationToken cancellationToken = default)
+        {
+            vectors.Add((new DocumentChunkForEmbedding(chunkId, documentId, chunkIndex, string.Empty, contentHash), model, vector));
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
+            string model,
+            IReadOnlyList<float> queryVector,
+            IReadOnlyCollection<long> documentIds,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<VectorSearchResult> results = vectors
+                .Where(item => item.Model == model && documentIds.Contains(item.Chunk.DocumentId))
+                .Select(item => new VectorSearchResult(
+                    item.Chunk.Id,
+                    item.Chunk.DocumentId,
+                    item.Chunk.ChunkIndex,
+                    Cosine(queryVector, item.Vector)))
+                .OrderByDescending(result => result.Score)
+                .Take(limit)
+                .ToArray();
+            return Task.FromResult(results);
+        }
+
+        public Task DeleteDocumentAsync(
+            string model,
+            int dimensions,
+            long documentId,
+            CancellationToken cancellationToken = default)
+        {
+            vectors.RemoveAll(item => item.Model == model && item.Chunk.DocumentId == documentId);
+            return Task.CompletedTask;
+        }
+
+        private static double Cosine(IReadOnlyList<float> left, IReadOnlyList<float> right)
+        {
+            double dot = 0;
+            double leftNorm = 0;
+            double rightNorm = 0;
+            for (int index = 0; index < Math.Min(left.Count, right.Count); index++)
+            {
+                dot += left[index] * right[index];
+                leftNorm += left[index] * left[index];
+                rightNorm += right[index] * right[index];
+            }
+
+            return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm));
         }
     }
 

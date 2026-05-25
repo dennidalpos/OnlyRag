@@ -20,8 +20,8 @@ For RAG answers, OnlyRag sends retrieved snippets to the model, not full source 
 - Convert `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
   are prepared.
-- Generate embeddings through a configured Ollama endpoint and store vectors locally in SQLite.
-- Search selected documents with hybrid keyword and sqlite-vec vector retrieval.
+- Generate embeddings through a configured Ollama endpoint and store vectors in Qdrant.
+- Search selected documents with hybrid SQLite FTS keyword and Qdrant vector retrieval.
 - Chat with selected documents and show source snippets for grounded answers.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
@@ -60,7 +60,7 @@ Installed app:
 
 - Windows 10 1809 or newer, or Windows 11.
 - Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions. Direct app launch also checks this before loading the UI.
-- The installer package is self-contained for the required .NET runtime components and includes the required `sqlite-vec` native asset; end users do not need to install .NET separately.
+- The installer package is self-contained for the required .NET runtime components and includes the bundled Qdrant runtime; end users do not need to install .NET separately.
 
 ## Fresh Install
 

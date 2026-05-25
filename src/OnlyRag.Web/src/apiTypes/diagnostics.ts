@@ -4,11 +4,28 @@ export type DiagnosticsResponse = {
   logsDirectory: string;
   ollamaStatus: string;
   ollamaIsReachable: boolean;
+  qdrant: QdrantStatusResponse;
   ocrStatus: string;
   ocrIsConfigured: boolean;
   ocrEngineName: string;
   ocrGpuCapability: OcrGpuCapability;
   systemTelemetry: SystemTelemetry;
+};
+
+export type QdrantStatusResponse = {
+  status: string;
+  isReachable: boolean;
+  grpcEndpoint: string;
+  isLoopback: boolean;
+  isTls: boolean;
+  hasApiKey: boolean;
+  version: string | null;
+  binaryPath: string | null;
+  configPath: string | null;
+  storageDirectory: string | null;
+  processId: number | null;
+  warning: string | null;
+  error: string | null;
 };
 
 export type OcrGpuCapability = {

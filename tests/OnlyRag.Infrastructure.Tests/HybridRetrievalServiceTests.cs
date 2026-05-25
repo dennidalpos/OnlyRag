@@ -2,6 +2,7 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Infrastructure.Tests;
 
@@ -20,7 +21,7 @@ public sealed class HybridRetrievalServiceTests
                 "Codice pratica ABC-123 del 2026.",
                 "Contenuto generico senza il riferimento."
             ]);
-        await EmbedDocumentAsync(services.Embeddings, document.Id, [[1f, 0f], [0f, 1f]]);
+        await EmbedDocumentAsync(services, document.Id, [[1f, 0f], [0f, 1f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("ABC-123", [document.Id], 5));
@@ -43,8 +44,8 @@ public sealed class HybridRetrievalServiceTests
         TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument first = await tempStorage.CreateDocumentAsync("doc-1", "alpha.txt", ["Scadenza 2026-04-25."]);
         ImportedDocument second = await tempStorage.CreateDocumentAsync("doc-2", "beta.txt", ["Scadenza 2026-05-01."]);
-        await EmbedDocumentAsync(services.Embeddings, first.Id, [[1f, 0f]]);
-        await EmbedDocumentAsync(services.Embeddings, second.Id, [[0.9f, 0.1f]]);
+        await EmbedDocumentAsync(services, first.Id, [[1f, 0f]]);
+        await EmbedDocumentAsync(services, second.Id, [[0.9f, 0.1f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("Scadenza", [first.Id, second.Id], 5));
@@ -62,8 +63,8 @@ public sealed class HybridRetrievalServiceTests
         TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument selected = await tempStorage.CreateDocumentAsync("doc-1", "selected.txt", ["Riferimento Q4-2026."]);
         ImportedDocument excluded = await tempStorage.CreateDocumentAsync("doc-2", "excluded.txt", ["Riferimento Q4-2026."]);
-        await EmbedDocumentAsync(services.Embeddings, selected.Id, [[1f, 0f]]);
-        await EmbedDocumentAsync(services.Embeddings, excluded.Id, [[1f, 0f]]);
+        await EmbedDocumentAsync(services, selected.Id, [[1f, 0f]]);
+        await EmbedDocumentAsync(services, excluded.Id, [[1f, 0f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("Q4-2026", [selected.Id], 5));
@@ -78,7 +79,7 @@ public sealed class HybridRetrievalServiceTests
         await tempStorage.InitializeAsync();
         TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "dedupe.txt", ["Protocollo ZX-77 prioritario."]);
-        await EmbedDocumentAsync(services.Embeddings, document.Id, [[1f, 0f]]);
+        await EmbedDocumentAsync(services, document.Id, [[1f, 0f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("ZX-77", [document.Id], 10));
@@ -88,20 +89,17 @@ public sealed class HybridRetrievalServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_FallsBackToKeywordWhenVectorSearchIsUnavailable()
+    public async Task SearchAsync_FailsWhenVectorSearchIsUnavailable()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
         TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
         ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "keyword-only.txt", ["Numero fattura 98765."]);
 
-        DocumentSearchResponse response = await services.Retrieval.SearchAsync(
-            new DocumentSearchRequest("98765", [document.Id], 5));
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            services.Retrieval.SearchAsync(new DocumentSearchRequest("98765", [document.Id], 5)));
 
-        DocumentSearchResult result = Assert.Single(response.Results);
-        Assert.Equal(document.Id, result.DocumentId);
-        Assert.Contains("98765", result.Snippet, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("non disponibile", response.VectorBackend, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("retrieval Qdrant", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -109,7 +107,7 @@ public sealed class HybridRetrievalServiceTests
     {
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
-        TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
+        TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument document = await tempStorage.CreateDocumentAsync(
             "doc-bm25",
             "bm25.txt",
@@ -127,25 +125,25 @@ public sealed class HybridRetrievalServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_UsesSqliteVecWithoutFallbackVectorLimit()
+    public async Task SearchAsync_UsesQdrantWithoutKeywordOnlyFallback()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
         TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument document = await tempStorage.CreateDocumentAsync(
-            "doc-sqlite-vec",
-            "sqlite-vec.txt",
+            "doc-qdrant",
+            "qdrant.txt",
             [
                 "Ricerca vettoriale primo chunk.",
                 "Ricerca vettoriale secondo chunk."
             ]);
-        await EmbedDocumentAsync(services.Embeddings, document.Id, [[1f, 0f], [0.9f, 0.1f]]);
+        await EmbedDocumentAsync(services, document.Id, [[1f, 0f], [0.9f, 0.1f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("Ricerca", [document.Id], 5));
 
         Assert.NotEmpty(response.Results);
-        Assert.Contains("sqlite-vec", response.VectorBackend, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Qdrant", response.VectorBackend, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fallback", response.VectorBackend, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -155,8 +153,9 @@ public sealed class HybridRetrievalServiceTests
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
         await tempStorage.ReplaceFtsIndexWithFts4Async();
-        TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
+        TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
         ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "fallback.txt", ["Riferimento contratto CN-445."]);
+        await EmbedDocumentAsync(services, document.Id, [[1f, 0f]]);
 
         DocumentSearchResponse response = await services.Retrieval.SearchAsync(
             new DocumentSearchRequest("CN-445", [document.Id], 5));
@@ -168,26 +167,30 @@ public sealed class HybridRetrievalServiceTests
     }
 
     private static async Task EmbedDocumentAsync(
-        SqliteEmbeddingRepository embeddings,
+        TestServices services,
         long documentId,
         IReadOnlyList<IReadOnlyList<float>> vectors)
     {
         IReadOnlyList<DocumentChunkForEmbedding> chunks =
-            await embeddings.ListChunksNeedingEmbeddingAsync(documentId, "embed-test", 0, vectors.Count);
+            await services.Embeddings.ListChunksNeedingEmbeddingAsync(documentId, "embed-test", 0, vectors.Count);
 
         Assert.Equal(vectors.Count, chunks.Count);
         for (int index = 0; index < chunks.Count; index++)
         {
-            await embeddings.UpsertEmbeddingAsync(
+            services.VectorStore.AddVector(chunks[index], "embed-test", vectors[index]);
+            await services.Embeddings.MarkChunkIndexedAsync(
                 chunks[index].Id,
                 "embed-test",
                 chunks[index].ContentHash,
-                vectors[index]);
+                vectors[index].Count,
+                services.VectorStore.BuildCollectionName("embed-test", vectors[index].Count),
+                services.VectorStore.BuildPointId(chunks[index].Id));
         }
     }
 
     private sealed record TestServices(
         SqliteEmbeddingRepository Embeddings,
+        FakeQdrantVectorStore VectorStore,
         IHybridRetrievalService Retrieval);
 
     private sealed class StaticQueryEmbeddingGenerator : IQueryEmbeddingGenerator
@@ -249,7 +252,7 @@ public sealed class HybridRetrievalServiceTests
             SqliteDocumentRepository documents = new(connectionFactory);
             SqliteEmbeddingRepository embeddings = new(connectionFactory);
             SqliteKeywordSearchService keywordSearch = new(connectionFactory);
-            SqliteVecVectorSearchService vectorSearch = new(connectionFactory);
+            FakeQdrantVectorStore vectorSearch = new();
             SqliteRetrievalChunkRepository chunks = new(connectionFactory);
             HybridRetrievalService retrieval = new(
                 documents,
@@ -266,7 +269,7 @@ public sealed class HybridRetrievalServiceTests
                     SnippetMaxCharacters: 180,
                     MaxContextCharacters: 1000));
 
-            return new TestServices(embeddings, retrieval);
+            return new TestServices(embeddings, vectorSearch, retrieval);
         }
 
         public async Task<ImportedDocument> CreateDocumentAsync(
@@ -352,6 +355,70 @@ public sealed class HybridRetrievalServiceTests
             {
                 Directory.Delete(Root, recursive: true);
             }
+        }
+    }
+
+    private sealed class FakeQdrantVectorStore : IQdrantVectorStore
+    {
+        private readonly List<(DocumentChunkForEmbedding Chunk, string Model, IReadOnlyList<float> Vector)> vectors = [];
+
+        public string BackendName => "Qdrant fake";
+
+        public int MaxSearchableVectors => int.MaxValue;
+
+        public bool IsVectorStoragePersistent => true;
+
+        public void AddVector(DocumentChunkForEmbedding chunk, string model, IReadOnlyList<float> vector)
+        {
+            vectors.Add((chunk, model, vector));
+        }
+
+        public string BuildCollectionName(string model, int dimensions) => $"onlyrag_{dimensions}_test";
+
+        public string BuildPointId(long chunkId) => chunkId.ToString();
+
+        public Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertChunkAsync(long chunkId, long documentId, int chunkIndex, string model, string contentHash, IReadOnlyList<float> vector, CancellationToken cancellationToken = default)
+        {
+            vectors.Add((new DocumentChunkForEmbedding(chunkId, documentId, chunkIndex, string.Empty, contentHash), model, vector));
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(string model, IReadOnlyList<float> queryVector, IReadOnlyCollection<long> documentIds, int limit, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<VectorSearchResult> results = vectors
+                .Where(item => item.Model == model && documentIds.Contains(item.Chunk.DocumentId))
+                .Select(item => new VectorSearchResult(
+                    item.Chunk.Id,
+                    item.Chunk.DocumentId,
+                    item.Chunk.ChunkIndex,
+                    Cosine(queryVector, item.Vector)))
+                .OrderByDescending(result => result.Score)
+                .Take(limit)
+                .ToArray();
+            return Task.FromResult(results);
+        }
+
+        public Task DeleteDocumentAsync(string model, int dimensions, long documentId, CancellationToken cancellationToken = default)
+        {
+            vectors.RemoveAll(item => item.Model == model && item.Chunk.DocumentId == documentId);
+            return Task.CompletedTask;
+        }
+
+        private static double Cosine(IReadOnlyList<float> left, IReadOnlyList<float> right)
+        {
+            double dot = 0;
+            double leftNorm = 0;
+            double rightNorm = 0;
+            for (int index = 0; index < Math.Min(left.Count, right.Count); index++)
+            {
+                dot += left[index] * right[index];
+                leftNorm += left[index] * left[index];
+                rightNorm += right[index] * right[index];
+            }
+
+            return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm));
         }
     }
 }

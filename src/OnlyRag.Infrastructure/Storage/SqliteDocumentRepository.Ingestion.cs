@@ -15,7 +15,13 @@ public sealed partial class SqliteDocumentRepository
         await using (SqliteCommand deleteChunks = connection.CreateCommand())
         {
             deleteChunks.Transaction = transaction;
-            deleteChunks.CommandText = "DELETE FROM chunks WHERE document_id = $documentId;";
+            deleteChunks.CommandText =
+                """
+                DELETE FROM chunk_vector_index_status
+                WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = $documentId);
+
+                DELETE FROM chunks WHERE document_id = $documentId;
+                """;
             deleteChunks.AddParameter("$documentId", documentId);
             await deleteChunks.ExecuteNonQueryAsync(cancellationToken);
         }

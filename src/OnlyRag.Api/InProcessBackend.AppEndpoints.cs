@@ -5,6 +5,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -67,11 +68,11 @@ public static partial class InProcessBackend
             Results.Ok(new BackendHealthResponse("Healthy")));
 
         app.MapGet("/api/diagnostics/vector-health", async (
-            IVectorSearchService vectorSearch,
+            IQdrantVectorStore vectorSearch,
             IEmbeddingRepository embeddings,
             CancellationToken cancellationToken) =>
         {
-            int totalEmbeddings = await embeddings.CountTotalEmbeddingsAsync(cancellationToken);
+            int totalEmbeddings = await embeddings.CountIndexedChunksAsync(cancellationToken);
             int limit = vectorSearch.MaxSearchableVectors;
             bool nearLimit = totalEmbeddings >= (int)(limit * 0.80);
             return Results.Ok(new VectorBackendHealthResponse(
@@ -89,6 +90,8 @@ public static partial class InProcessBackend
             InProcessBackendDescriptor descriptor,
             IOllamaClient ollamaClient,
             IOllamaSettingsService ollamaSettings,
+            QdrantLocalRuntimeService qdrantRuntime,
+            IQdrantVectorStore qdrantVectorStore,
             IOcrEngine ocrEngine,
             OcrGpuCapabilityService ocrGpuCapability,
             SystemTelemetryService systemTelemetry,
@@ -111,6 +114,7 @@ public static partial class InProcessBackend
             }
 
             OcrEngineAvailability ocrAvailability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+            QdrantStatusResponse qdrantStatus = await qdrantRuntime.GetStatusAsync(qdrantVectorStore, cancellationToken);
             OcrGpuCapabilityResponse gpuCapability = await ocrGpuCapability.CheckAsync(ocrEngine, cancellationToken);
             SystemTelemetryResponse telemetry = await systemTelemetry.CaptureAsync(cancellationToken);
 
@@ -120,6 +124,7 @@ public static partial class InProcessBackend
                 descriptor.StoragePaths.LogsDirectory,
                 ollamaStatus,
                 ollamaReachable,
+                qdrantStatus,
                 ocrAvailability.IsConfigured ? "Disponibile" : "Non configurato",
                 ocrAvailability.IsConfigured,
                 ocrAvailability.EngineName,

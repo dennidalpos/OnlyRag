@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api.Tests;
@@ -14,7 +15,9 @@ public sealed partial class InProcessBackendTests
     {
         await using FakeOllamaServer ollama = await FakeOllamaServer.StartAsync();
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
-        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { QdrantVectorStore = new FakeQdrantVectorStore() });
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         OllamaSettings ollamaSettings = new(
@@ -181,6 +184,104 @@ public sealed partial class InProcessBackendTests
             + Path.DirectorySeparatorChar;
         string normalizedPath = Path.GetFullPath(path);
         Assert.StartsWith(normalizedRoot, normalizedPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class FakeQdrantVectorStore : IQdrantVectorStore
+    {
+        private readonly List<StoredVector> vectors = [];
+
+        public string BackendName => "Qdrant fake";
+
+        public int MaxSearchableVectors => int.MaxValue;
+
+        public bool IsVectorStoragePersistent => true;
+
+        public string BuildCollectionName(string model, int dimensions) => $"onlyrag_{dimensions}_test";
+
+        public string BuildPointId(long chunkId) => chunkId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        public Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertChunkAsync(
+            long chunkId,
+            long documentId,
+            int chunkIndex,
+            string model,
+            string contentHash,
+            IReadOnlyList<float> vector,
+            CancellationToken cancellationToken = default)
+        {
+            lock (vectors)
+            {
+                vectors.RemoveAll(item => item.ChunkId == chunkId && item.Model == model);
+                vectors.Add(new StoredVector(chunkId, documentId, chunkIndex, model, vector.ToArray()));
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
+            string model,
+            IReadOnlyList<float> queryVector,
+            IReadOnlyCollection<long> documentIds,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            StoredVector[] snapshot;
+            lock (vectors)
+            {
+                snapshot = vectors.ToArray();
+            }
+
+            IReadOnlyList<VectorSearchResult> results = snapshot
+                .Where(item => item.Model == model && documentIds.Contains(item.DocumentId))
+                .Select(item => new VectorSearchResult(
+                    item.ChunkId,
+                    item.DocumentId,
+                    item.ChunkIndex,
+                    Cosine(queryVector, item.Vector)))
+                .OrderByDescending(result => result.Score)
+                .Take(limit)
+                .ToArray();
+
+            return Task.FromResult(results);
+        }
+
+        public Task DeleteDocumentAsync(
+            string model,
+            int dimensions,
+            long documentId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (vectors)
+            {
+                vectors.RemoveAll(item => item.Model == model && item.DocumentId == documentId);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private static double Cosine(IReadOnlyList<float> left, IReadOnlyList<float> right)
+        {
+            double dot = 0;
+            double leftNorm = 0;
+            double rightNorm = 0;
+            for (int index = 0; index < Math.Min(left.Count, right.Count); index++)
+            {
+                dot += left[index] * right[index];
+                leftNorm += left[index] * left[index];
+                rightNorm += right[index] * right[index];
+            }
+
+            return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm));
+        }
+
+        private sealed record StoredVector(
+            long ChunkId,
+            long DocumentId,
+            int ChunkIndex,
+            string Model,
+            IReadOnlyList<float> Vector);
     }
 
 }

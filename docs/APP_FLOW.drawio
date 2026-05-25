@@ -55,10 +55,10 @@
         <mxCell id="job-system" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Persistent local jobs&lt;br&gt;SqliteLocalJobQueue + LocalJobWorkerService&lt;br&gt;ingestion, embedding, translation" vertex="1">
           <mxGeometry height="90" width="300" x="830" y="530" as="geometry" />
         </mxCell>
-        <mxCell id="infra" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Infrastructure adapters&lt;br&gt;SQLite repositories, ingestion, OCR cache,&lt;br&gt;sqlite-vec vector search, process launcher" vertex="1">
+        <mxCell id="infra" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" value="Infrastructure adapters&lt;br&gt;SQLite repositories, ingestion, OCR cache,&lt;br&gt;Qdrant vector search, process launcher" vertex="1">
           <mxGeometry height="90" width="300" x="830" y="660" as="geometry" />
         </mxCell>
-        <mxCell id="db-main" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;" value="%LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db&lt;br&gt;documents, pages, chunks, embeddings,&lt;br&gt;settings, OCR cache, chat, translations" vertex="1">
+        <mxCell id="db-main" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;" value="%LOCALAPPDATA%\\OnlyRag\\data\\onlyrag.db&lt;br&gt;documents, pages, chunks, vector index status,&lt;br&gt;settings, OCR cache, chat, translations" vertex="1">
           <mxGeometry height="90" width="250" x="1245" y="170" as="geometry" />
         </mxCell>
         <mxCell id="db-jobs" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;" value="jobs.db&lt;br&gt;persistent queue and checkpoints" vertex="1">
@@ -177,7 +177,7 @@
         <mxCell id="chunks" value="Persist pages and chunks&lt;br&gt;update document pipeline status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1340" y="325" width="250" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="embedding" value="If embedding model exists&lt;br&gt;enqueue document-embedding&lt;br&gt;Ollama embed chunks, store sqlite-vec vectors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="embedding" value="If embedding model exists&lt;br&gt;enqueue document-embedding&lt;br&gt;Ollama embed chunks, upsert Qdrant points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="1340" y="445" width="250" height="100" as="geometry" />
         </mxCell>
         <mxCell id="chat-start" value="Ask a question&lt;br&gt;POST /api/chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">

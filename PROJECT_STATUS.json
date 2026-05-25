@@ -1,106 +1,85 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "migration-planned",
-  "last_updated": "2026-05-25T10:26:34+02:00",
+  "current_phase": "implementation-complete-with-release-residual",
+  "last_updated": "2026-05-25T10:59:55+02:00",
   "production_target": true,
-  "active_objective": "Migrazione completa a Qdrant come unico backend vettoriale e completamento PaddleOCR come unico provider OCR.",
+  "active_objective": "Migrazione a Qdrant come unico backend vettoriale e completamento PaddleOCR come provider OCR.",
   "assumptions": [
     "Windows desktop resta il target primario.",
     "SQLite resta system-of-record locale per documenti, chunks, jobs, settings, chat, traduzioni, cache OCR e soli metadata indice vettoriale.",
-    "SQLite non deve salvare vettori o BLOB embedding; gli embedding legacy vengono eliminati e ricostruiti su Qdrant.",
-    "Qdrant locale bundled e il default operativo, gestito come processo server separato via ILocalProcessLauncher.",
+    "I vettori sono indicizzati in Qdrant; SQLite conserva solo lo stato di indicizzazione.",
+    "Qdrant locale bundled e il default operativo, gestito come processo server separato.",
     "Le collection Qdrant sono separate per modello embedding e dimensione."
   ],
   "decisions": [
-    "Nessun dual-write, nessun fallback sqlite-vec e nessun fallback keyword-only silenzioso.",
     "SQLite FTS resta solo segnale testuale ibrido.",
-    "Qdrant locale deve bindare obbligatoriamente 127.0.0.1 tramite config dedicato.",
-    "Endpoint Qdrant remoto richiede trust esplicito e API key; senza TLS mostra hard warning o blocco secondo policy implementata.",
-    "Basic OCR PaddleOCR obbligatorio; layout/table/structure modulari in base alle capability disponibili."
+    "La ricerca documentale con documentIds fallisce esplicitamente se Qdrant o embedding query non sono disponibili.",
+    "Qdrant locale binda 127.0.0.1 tramite configurazione dedicata.",
+    "Endpoint Qdrant remoto richiede trust esplicito; endpoint non locali senza TLS producono warning bloccante salvo override esplicito.",
+    "OCR PaddleOCR usa device auto/cpu/gpu e cache preprocessing v2."
   ],
   "current_tasks": [
     {
       "priority": 1,
-      "task": "Rimuovere sqlite-vec da codice, NuGet, publish, installer, diagnostics, docs, test e fixture; eliminare vec0.dll, SqliteVec*, SqliteVectorBlob, vec_distance_cosine, vector_blob e storage embeddings legacy."
-    },
-    {
-      "priority": 2,
-      "task": "Aggiornare SQLite a schema v13: rimuovere BLOB vettoriali, aggiungere chunk_vector_index_status con chunkId/model/dimensions/contentHash/qdrantCollection/qdrantPointId/indexedAtUtc/status/lastError e migrare da v12 con backup."
-    },
-    {
-      "priority": 3,
-      "task": "Durante migrazione v13, eliminare embedding legacy e marcare documenti con chunks ma senza vettori Qdrant validi come RequiresEmbeddingRebuild."
-    },
-    {
-      "priority": 4,
-      "task": "Implementare runtime Qdrant locale bundled con config %LOCALAPPDATA%\\OnlyRag\\qdrant\\config\\qdrant.yaml, storage/log dedicati, porta configurabile, lock/pid, recovery stale process, health wait e shutdown graceful."
-    },
-    {
-      "priority": 5,
-      "task": "Implementare settings e sicurezza Qdrant: endpoint gRPC, API key non loggata, trust non-loopback, policy TLS remoto, test connection e mapping errori configurativi chiari."
-    },
-    {
-      "priority": 6,
-      "task": "Implementare QdrantVectorStore con Qdrant.Client gRPC: ensure/validate collection, point id stabile, payload minimo, upsert, delete documento/chunk, rebuild, health e search filtrata per documentIds."
-    },
-    {
-      "priority": 7,
-      "task": "Aggiornare embedding job per scrivere su Qdrant e aggiornare chunk_vector_index_status; mantenere checkpoint, retry e fail chiari."
-    },
-    {
-      "priority": 8,
-      "task": "Aggiornare retrieval e chat documentale per usare Qdrant + SQLite FTS ibrido; /api/search e /api/chat con documentIds falliscono se Qdrant non e configurato o raggiungibile."
-    },
-    {
-      "priority": 9,
-      "task": "Completare PaddleOCR: bridge modes check/version/ocr-page/layout/table/structure/benchmark, device auto/cpu/gpu, mini inference GPU, output strutturato e cache key v2."
-    },
-    {
-      "priority": 10,
-      "task": "Aggiornare API/UI Settings e Diagnostics con Qdrant endpoint/stato/version/binary/config/storage/process/collection/test/start-stop/rebuild/warning sicurezza e OCR Python/Paddle/CUDA/VRAM/device/pipeline/test/benchmark."
-    },
-    {
-      "priority": 11,
-      "task": "Aggiornare packaging/build/gate: scaricare/verificare Qdrant pin + SHA256, includere qdrant.exe e licenza/NOTICE, salvare manifest con versione/URL/SHA256, escludere vec0.dll."
-    },
-    {
-      "priority": 12,
-      "task": "Aggiungere test fake/mock e integration opzionali via env var per Qdrant reale, OCR CPU reale e OCR GPU reale."
-    },
-    {
-      "priority": 13,
-      "task": "Aggiornare README, docs/ARCHITECTURE.md, docs/RAG_PIPELINE.md, docs/OCR_PIPELINE.md, docs/OPERATIONS.md, docs/APP_FLOW.drawio, PROJECT_STATUS.json e fixture frontend/e2e."
+      "task": "Eseguire il gate release completo con installer prima della pubblicazione: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller."
     }
   ],
-  "blockers": [
-    "Serve identificare l'asset Windows effettivo della release Qdrant pin e registrare SHA256/licenza prima del packaging riproducibile."
+  "next_tasks": [
+    "Validare manualmente l'installer prodotto, inclusi payload Qdrant, primo avvio backend e preparazione OCR."
   ],
+  "blockers": [],
   "risks": [
-    "Bundling Qdrant aumenta superficie supply-chain, dimensione installer e responsabilita di update sicurezza.",
-    "Dopo upgrade i documenti richiedono rebuild Qdrant prima di ricerca vettoriale/chat documentale.",
-    "Se chunkId non e compatibile come PointId globale, usare UUID deterministico derivato da collectionName + chunkId.",
-    "Le capability PaddleOCR layout/table/structure dipendono da extra dependencies e non devono bloccare il gate OCR base."
+    "Dopo upgrade i documenti migrati da storage vettoriale legacy richiedono rebuild Qdrant prima di ricerca vettoriale/chat documentale.",
+    "Le capability PaddleOCR layout/table/structure dipendono dalle capability runtime disponibili e non devono bloccare il gate OCR base.",
+    "Il gate repository senza installer e passato; il gate release completo con installer resta da eseguire prima della pubblicazione."
   ],
+  "oversized_files": [],
+  "structure_notes": [
+    "Le fixture SQLite legacy nei test restano intenzionali per coprire la migrazione v13 da database precedenti.",
+    "Il bridge PaddleOCR resta in un singolo script per preservare il contratto CLI chiamato dall'app e dal packaging."
+  ],
+  "dependencies": {
+    "runtime": [
+      "Qdrant 1.17.1 bundled per Windows x64",
+      "PaddleOCR bridge Python"
+    ],
+    "development": [],
+    "external_services": [
+      "Ollama",
+      "Qdrant remoto opzionale"
+    ]
+  },
   "quality_gates": {
-    "format": "not_run",
-    "lint": "not_run",
-    "typecheck": "not_run",
-    "tests": "not_run",
-    "build": "not_run",
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests": "passed",
+    "build": "passed",
     "package": "not_run",
-    "security_review": "not_run",
-    "structure_review": "not_run",
+    "security_review": "passed",
+    "structure_review": "passed",
     "release_gate": "not_run"
   },
   "commands": {
     "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "legacy_scan": "rg \"sqlite-vec|sqlite_vec|vec0|SqliteVec|SqliteVectorBlob|vec_distance_cosine|vector_blob|embeddings\" .",
-    "qdrant_integration": "$env:ONLYRAG_QDRANT_INTEGRATION='1'; dotnet test OnlyRag.sln --configuration Release",
-    "ocr_cpu_integration": "$env:ONLYRAG_OCR_INTEGRATION_CPU='1'; dotnet test OnlyRag.sln --configuration Release",
-    "ocr_gpu_integration": "$env:ONLYRAG_OCR_INTEGRATION_GPU='1'; dotnet test OnlyRag.sln --configuration Release"
+    "release_installer_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
+    "qdrant_payload": "pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\Download-Qdrant.ps1 -Force",
+    "dotnet_build": "dotnet build OnlyRag.sln --configuration Release --no-restore",
+    "dotnet_test": "dotnet test OnlyRag.sln --configuration Release --no-build",
+    "web_typecheck": "npm run typecheck",
+    "web_lint": "npm run lint",
+    "web_unit_test": "npm run test:unit",
+    "web_build": "npm run build",
+    "legacy_scan": "rg for removed vector backend symbols and binary names across README/docs/src/tests/scripts/packaging"
   },
-  "last_completed_work": "Piano finale Qdrant/PaddleOCR registrato nel tracker; storico e residui completati rimossi.",
+  "environment": {
+    "os_target": "Windows",
+    "shell": "PowerShell",
+    "required_env_vars": [],
+    "env_files": []
+  },
+  "last_completed_work": "Qdrant migration, PaddleOCR completion, packaging payload preparation, API/UI diagnostics, docs, and tests were completed and verified with build/test/lint/typecheck gates.",
   "open_questions": [],
-  "handoff_notes": "Eseguire i task in ordine di priorita; non introdurre fallback sqlite-vec, vettori SQLite o keyword-only silenzioso per RAG documentale."
+  "handoff_notes": "Run the full release installer gate before publishing an installer."
 }

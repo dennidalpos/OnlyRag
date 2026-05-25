@@ -45,11 +45,6 @@ public static partial class InProcessBackend
                 BackendLog.Write(descriptor.StoragePaths, $"Recovered {recoveredJobs} interrupted job(s).");
             }
 
-            await app.Services
-                .GetRequiredService<SqliteVecVectorSearchService>()
-                .VerifyAvailabilityAsync(cancellationToken);
-            BackendLog.Write(descriptor.StoragePaths, "sqlite-vec native extension verified.");
-
             await app.StartAsync(cancellationToken);
             Uri baseUri = ResolveBaseUri(app);
             runtimeState.BaseUri = baseUri;

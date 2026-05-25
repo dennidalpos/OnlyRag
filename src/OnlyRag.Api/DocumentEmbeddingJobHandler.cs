@@ -2,6 +2,7 @@ using System.Text.Json;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -12,6 +13,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
 
     private readonly IDocumentLibraryService documents;
     private readonly IEmbeddingRepository embeddings;
+    private readonly IQdrantVectorStore vectorStore;
     private readonly IOllamaClient ollamaClient;
     private readonly IOllamaSettingsService settingsService;
     private readonly IPerformanceSettingsService performanceSettings;
@@ -19,12 +21,14 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
     public DocumentEmbeddingJobHandler(
         IDocumentLibraryService documents,
         IEmbeddingRepository embeddings,
+        IQdrantVectorStore vectorStore,
         IOllamaClient ollamaClient,
         IOllamaSettingsService settingsService,
         IPerformanceSettingsService performanceSettings)
     {
         this.documents = documents;
         this.embeddings = embeddings;
+        this.vectorStore = vectorStore;
         this.ollamaClient = ollamaClient;
         this.settingsService = settingsService;
         this.performanceSettings = performanceSettings;
@@ -155,11 +159,21 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                     throw new InvalidOperationException("Ollama ha restituito un embedding vuoto.");
                 }
 
-                await embeddings.UpsertEmbeddingAsync(
+                await vectorStore.UpsertChunkAsync(
                     chunks[index].Id,
+                    chunks[index].DocumentId,
+                    chunks[index].ChunkIndex,
                     model,
                     chunks[index].ContentHash,
                     vector,
+                    cancellationToken);
+                await embeddings.MarkChunkIndexedAsync(
+                    chunks[index].Id,
+                    model,
+                    chunks[index].ContentHash,
+                    vector.Count,
+                    vectorStore.BuildCollectionName(model, vector.Count),
+                    vectorStore.BuildPointId(chunks[index].Id),
                     cancellationToken);
             }
 

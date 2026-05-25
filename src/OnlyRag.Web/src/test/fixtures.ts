@@ -11,6 +11,7 @@ import type {
   OllamaSettings,
   OllamaStatusResponse,
   PerformanceSettings,
+  QdrantStatusResponse,
   VectorBackendHealth
 } from "../api";
 
@@ -79,12 +80,31 @@ export function createOllamaStatus(overrides: Partial<OllamaStatusResponse> = {}
 
 export function createVectorHealth(overrides: Partial<VectorBackendHealth> = {}): VectorBackendHealth {
   return {
-    backendName: "sqlite-vec",
+    backendName: "Qdrant gRPC",
     storagePersistent: true,
     vectorLimit: 100000,
     totalVectors: 4,
     nearLimit: false,
     warning: null,
+    ...overrides
+  };
+}
+
+export function createQdrantStatus(overrides: Partial<QdrantStatusResponse> = {}): QdrantStatusResponse {
+  return {
+    status: "Online",
+    isReachable: true,
+    grpcEndpoint: "http://127.0.0.1:6334",
+    isLoopback: true,
+    isTls: false,
+    hasApiKey: false,
+    version: "1.18.1",
+    binaryPath: "C:\\OnlyRag\\qdrant\\qdrant.exe",
+    configPath: "C:\\OnlyRag\\qdrant\\config\\qdrant.yaml",
+    storageDirectory: "C:\\OnlyRag\\qdrant\\storage",
+    processId: 1234,
+    warning: null,
+    error: null,
     ...overrides
   };
 }
@@ -123,7 +143,7 @@ export function createEmbeddingStatus(overrides: Partial<DocumentEmbeddingStatus
     progressPercent: 100,
     currentJobId: null,
     currentStep: null,
-    vectorSearchBackend: "sqlite-vec",
+    vectorSearchBackend: "Qdrant gRPC",
     lastEmbeddedAtUtc: "2026-05-21T12:05:00Z",
     ...overrides
   };
@@ -171,6 +191,7 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
     logsDirectory: "C:\\OnlyRag\\logs",
     ollamaStatus: "Ready",
     ollamaIsReachable: true,
+    qdrant: createQdrantStatus(),
     ocrStatus: "Configured",
     ocrIsConfigured: true,
     ocrEngineName: "PaddleOCR",

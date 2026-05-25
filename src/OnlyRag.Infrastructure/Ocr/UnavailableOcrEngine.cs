@@ -6,7 +6,7 @@ public sealed class UnavailableOcrEngine : IOcrEngine
 
     public string EngineVersion => "not-configured";
 
-    public string PreprocessVersion => "onlyrag-preprocess-v1";
+    public string PreprocessVersion => "onlyrag-preprocess-v2";
 
     public Task<OcrEngineAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
     {

@@ -1,5 +1,6 @@
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
@@ -8,7 +9,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
     private readonly IDocumentRepository documents;
     private readonly IEmbeddingRepository embeddings;
     private readonly IKeywordSearchService keywordSearch;
-    private readonly IVectorSearchService vectorSearch;
+    private readonly IQdrantVectorStore vectorSearch;
     private readonly IRetrievalChunkRepository chunks;
     private readonly IQueryEmbeddingGenerator queryEmbeddingGenerator;
     private readonly HybridRetrievalOptions options;
@@ -18,7 +19,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         IDocumentRepository documents,
         IEmbeddingRepository embeddings,
         IKeywordSearchService keywordSearch,
-        IVectorSearchService vectorSearch,
+        IQdrantVectorStore vectorSearch,
         IRetrievalChunkRepository chunks,
         IQueryEmbeddingGenerator queryEmbeddingGenerator,
         HybridRetrievalOptions? options = null,
@@ -64,10 +65,8 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             options.KeywordTopK,
             cancellationToken);
 
-        QueryEmbeddingResult? queryEmbedding = await TryGenerateQueryEmbeddingAsync(query, cancellationToken);
-        VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
-            ? new([], $"{vectorSearch.BackendName} (non disponibile per questa query)")
-            : await TryVectorSearchAsync(queryEmbedding, documentIds, cancellationToken);
+        QueryEmbeddingResult queryEmbedding = await GenerateQueryEmbeddingAsync(query, cancellationToken);
+        VectorSearchAttempt vectorSearchAttempt = await VectorSearchAsync(queryEmbedding, documentIds, cancellationToken);
 
         IReadOnlyList<DocumentSearchResult> results = await MergeResultsAsync(
             query,
@@ -78,7 +77,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         IReadOnlyList<DocumentSearchDocumentStatus> documentStatuses = await BuildDocumentStatusesAsync(
             documentIds,
-            queryEmbedding?.Model,
+            queryEmbedding.Model,
             cancellationToken);
 
         return new DocumentSearchResponse(
@@ -108,52 +107,46 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             : options.DefaultTopK;
     }
 
-    private async Task<QueryEmbeddingResult?> TryGenerateQueryEmbeddingAsync(
+    private async Task<QueryEmbeddingResult> GenerateQueryEmbeddingAsync(
         string query,
         CancellationToken cancellationToken)
     {
         try
         {
             QueryEmbeddingResult result = await queryEmbeddingGenerator.GenerateAsync(query, cancellationToken);
-            return result.Vector.Count == 0 ? null : result;
+            if (result.Vector.Count == 0)
+            {
+                throw new InvalidOperationException("Embedding query vuoto: retrieval Qdrant non eseguibile.");
+            }
+
+            return result;
         }
         catch (QueryEmbeddingUnavailableException)
         {
-            return null;
+            throw new InvalidOperationException("Embedding query non disponibile: retrieval Qdrant non eseguibile.");
         }
         catch (InvalidOperationException)
         {
-            return null;
+            throw;
         }
-        catch (NotSupportedException)
+        catch (NotSupportedException ex)
         {
-            return null;
+            throw new InvalidOperationException("Generatore embedding query non supportato: retrieval Qdrant non eseguibile.", ex);
         }
     }
 
-    private async Task<VectorSearchAttempt> TryVectorSearchAsync(
+    private async Task<VectorSearchAttempt> VectorSearchAsync(
         QueryEmbeddingResult queryEmbedding,
         IReadOnlyCollection<long> documentIds,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            IReadOnlyList<VectorSearchResult> results = await vectorSearch.SearchAsync(
-                queryEmbedding.Model,
-                queryEmbedding.Vector,
-                documentIds,
-                options.VectorTopK,
-                cancellationToken);
-            return new VectorSearchAttempt(results, vectorSearch.BackendName);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return new VectorSearchAttempt([], $"{vectorSearch.BackendName} ({ex.Message})");
-        }
-        catch (NotSupportedException ex)
-        {
-            return new VectorSearchAttempt([], $"{vectorSearch.BackendName} ({ex.Message})");
-        }
+        IReadOnlyList<VectorSearchResult> results = await vectorSearch.SearchAsync(
+            queryEmbedding.Model,
+            queryEmbedding.Vector,
+            documentIds,
+            options.VectorTopK,
+            cancellationToken);
+        return new VectorSearchAttempt(results, vectorSearch.BackendName);
     }
 
     private async Task<IReadOnlyList<DocumentSearchResult>> MergeResultsAsync(

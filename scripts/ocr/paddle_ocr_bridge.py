@@ -61,6 +61,16 @@ def get_paddle_runtime_info():
     }
 
 
+def resolve_device(device):
+    if device != "auto":
+        return device
+    try:
+        verify_gpu_available()
+        return "gpu"
+    except Exception:
+        return "cpu"
+
+
 def check(args):
     missing = []
     for package in ("paddleocr", "paddle", "PIL", "pypdfium2"):
@@ -69,7 +79,8 @@ def check(args):
         except Exception as exc:
             missing.append(f"{package}: {exc}")
 
-    if args.device == "gpu":
+    effective_device = resolve_device(args.device)
+    if effective_device == "gpu":
         try:
             verify_gpu_available()
         except Exception as exc:
@@ -84,6 +95,8 @@ def check(args):
         "compiledWithCuda": runtime_info["compiledWithCuda"],
         "cudaDeviceCount": runtime_info["cudaDeviceCount"],
         "activeDevice": runtime_info["activeDevice"],
+        "requestedDevice": args.device,
+        "effectiveDevice": effective_device,
         "packageVersions": {
             "paddleocr": package_version("paddleocr"),
             "paddlepaddle": package_version("paddlepaddle"),
@@ -271,6 +284,7 @@ def ocr(args):
 
     os.environ["OMP_NUM_THREADS"] = str(args.cpu_threads)
     os.environ["CPU_NUM"] = str(args.cpu_threads)
+    args.device = resolve_device(args.device)
     if args.device == "gpu":
         verify_gpu_available()
 
@@ -304,15 +318,107 @@ def ocr(args):
     return 0
 
 
+def version(args):
+    runtime_info = get_paddle_runtime_info()
+    write_json({
+        "engineVersion": package_version("paddleocr"),
+        "packageVersions": {
+            "paddleocr": package_version("paddleocr"),
+            "paddlepaddle": package_version("paddlepaddle"),
+            "paddlepaddle-gpu": package_version("paddlepaddle-gpu"),
+            "pypdfium2": package_version("pypdfium2"),
+            "Pillow": package_version("Pillow")
+        },
+        "compiledWithCuda": runtime_info["compiledWithCuda"],
+        "cudaDeviceCount": runtime_info["cudaDeviceCount"],
+        "activeDevice": runtime_info["activeDevice"]
+    })
+    return 0
+
+
+def ocr_page(args):
+    if not args.input:
+        raise ValueError("--input e obbligatorio per ocr-page")
+
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory(prefix="onlyrag-ocr-page-") as output_dir:
+        args.output_dir = output_dir
+        prepare_payload = capture_json(lambda: prepare(args))
+        prepared_path = prepare_payload["preparedImagePath"]
+        args.input = prepared_path
+        ocr_payload = capture_json(lambda: ocr(args))
+        ocr_payload["preparedImage"] = prepare_payload
+        write_json(ocr_payload)
+    return 0
+
+
+def capture_json(action):
+    from io import StringIO
+    original = sys.stdout
+    buffer = StringIO()
+    try:
+        sys.stdout = buffer
+        code = action()
+        if code != 0:
+            raise RuntimeError(f"Bridge action failed with exit code {code}")
+    finally:
+        sys.stdout = original
+    return json.loads(buffer.getvalue() or "{}")
+
+
+def structured_mode(args, mode):
+    payload = capture_json(lambda: ocr(args))
+    lines = payload.get("boxes", [])
+    write_json({
+        "mode": mode,
+        "engineVersion": payload.get("engineVersion"),
+        "text": payload.get("text", ""),
+        "confidence": payload.get("confidence"),
+        "blocks": [
+            {
+                "kind": "text",
+                "text": line.get("text", ""),
+                "confidence": line.get("confidence"),
+                "points": line.get("points", [])
+            }
+            for line in lines
+        ],
+        "tables": [] if mode in ("layout", "structure") else [
+            {
+                "rowIndex": index,
+                "cells": [line.get("text", "")]
+            }
+            for index, line in enumerate(lines)
+        ]
+    })
+    return 0
+
+
+def benchmark(args):
+    import time
+    start = time.perf_counter()
+    check_payload = capture_json(lambda: check(args))
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    write_json({
+        "available": check_payload.get("available", False),
+        "requestedDevice": args.device,
+        "effectiveDevice": check_payload.get("effectiveDevice"),
+        "elapsedMs": elapsed_ms,
+        "engineVersion": check_payload.get("engineVersion"),
+        "packageVersions": check_payload.get("packageVersions", {})
+    })
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["check", "prepare", "ocr"], required=True)
+    parser.add_argument("--mode", choices=["check", "version", "prepare", "ocr", "ocr-page", "layout", "table", "structure", "benchmark"], required=True)
     parser.add_argument("--input")
     parser.add_argument("--kind", choices=["pdf", "image"], default="image")
     parser.add_argument("--page", type=int, default=1)
     parser.add_argument("--dpi", type=int, default=200)
     parser.add_argument("--output-dir")
-    parser.add_argument("--preprocess-version", default="onlyrag-preprocess-v1")
+    parser.add_argument("--preprocess-version", default="onlyrag-preprocess-v2")
     parser.add_argument("--language", default="it")
     parser.add_argument("--model-preset", default="PP-OCRv5")
     parser.add_argument("--model-version", default="PP-OCRv5")
@@ -326,11 +432,13 @@ def main():
     parser.add_argument("--use-document-unwarping", type=parse_bool, default=False)
     parser.add_argument("--recognition-batch-size", type=int, default=6)
     parser.add_argument("--cpu-threads", type=int, default=2)
-    parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--device", choices=["auto", "cpu", "gpu"], default="auto")
     args = parser.parse_args()
 
     if args.mode == "check":
         return check(args)
+    if args.mode == "version":
+        return version(args)
     if args.mode == "prepare":
         if not args.input or not args.output_dir:
             raise ValueError("--input e --output-dir sono obbligatori per prepare")
@@ -339,6 +447,14 @@ def main():
         if not args.input:
             raise ValueError("--input e obbligatorio per ocr")
         return ocr(args)
+    if args.mode == "ocr-page":
+        return ocr_page(args)
+    if args.mode in ("layout", "table", "structure"):
+        if not args.input:
+            raise ValueError("--input e obbligatorio")
+        return structured_mode(args, args.mode)
+    if args.mode == "benchmark":
+        return benchmark(args)
     return 2
 
 

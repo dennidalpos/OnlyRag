@@ -33,7 +33,7 @@ public sealed record OcrSettings(
     public const bool DefaultUseDocumentUnwarping = false;
     public const int DefaultRecognitionBatchSize = 6;
     public const int DefaultCpuThreads = 2;
-    public const string DefaultDevice = "cpu";
+    public const string DefaultDevice = "auto";
 
     public static OcrSettings Default { get; } = ForProfile(DefaultProfile);
 
@@ -157,7 +157,7 @@ public sealed record OcrSettings(
     private static string NormalizeDevice(string value)
     {
         string normalized = NormalizeToken(value, DefaultDevice, 32).ToLowerInvariant();
-        return normalized is "cpu" or "gpu"
+        return normalized is "auto" or "cpu" or "gpu"
             ? normalized
             : DefaultDevice;
     }

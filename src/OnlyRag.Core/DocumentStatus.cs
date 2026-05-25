@@ -6,6 +6,7 @@ public enum DocumentStatus
     Queued,
     Processing,
     Indexed,
+    RequiresEmbeddingRebuild,
     RequiresAdditionalComponent,
     Failed
 }

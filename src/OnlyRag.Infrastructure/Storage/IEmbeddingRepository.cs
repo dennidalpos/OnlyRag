@@ -9,11 +9,23 @@ public interface IEmbeddingRepository
         int take,
         CancellationToken cancellationToken = default);
 
-    Task UpsertEmbeddingAsync(
+    Task MarkChunkIndexedAsync(
         long chunkId,
         string model,
         string contentHash,
-        IReadOnlyList<float> vector,
+        int dimensions,
+        string qdrantCollection,
+        string qdrantPointId,
+        CancellationToken cancellationToken = default);
+
+    Task MarkChunkIndexFailedAsync(
+        long chunkId,
+        string model,
+        string contentHash,
+        int dimensions,
+        string qdrantCollection,
+        string qdrantPointId,
+        string lastError,
         CancellationToken cancellationToken = default);
 
     Task<DocumentEmbeddingStatusSnapshot> GetDocumentEmbeddingStatusAsync(
@@ -21,11 +33,5 @@ public interface IEmbeddingRepository
         string? model,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<StoredEmbeddingVector>> ListEmbeddingVectorsAsync(
-        string model,
-        long afterChunkId,
-        int take,
-        CancellationToken cancellationToken = default);
-
-    Task<int> CountTotalEmbeddingsAsync(CancellationToken cancellationToken = default);
+    Task<int> CountIndexedChunksAsync(CancellationToken cancellationToken = default);
 }

@@ -6,6 +6,7 @@ public sealed record DiagnosticsResponse(
     string LogsDirectory,
     string OllamaStatus,
     bool OllamaIsReachable,
+    QdrantStatusResponse Qdrant,
     string OcrStatus,
     bool OcrIsConfigured,
     string OcrEngineName,

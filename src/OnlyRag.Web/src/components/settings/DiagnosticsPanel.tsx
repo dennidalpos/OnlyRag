@@ -65,6 +65,25 @@ export function DiagnosticsPanel() {
                   </span>
                 </div>
                 <div className="diagnostic-row">
+                  <span className="diagnostic-label">Qdrant</span>
+                  <span
+                    className={`status-chip status-chip--${diagnostics.qdrant.isReachable ? "online" : "offline"}`}
+                  >
+                    {diagnostics.qdrant.status}
+                  </span>
+                  <code className="diagnostic-value">{diagnostics.qdrant.grpcEndpoint}</code>
+                </div>
+                {diagnostics.qdrant.warning && (
+                  <div className="panel-note panel-note--warning">
+                    <p>{diagnostics.qdrant.warning}</p>
+                  </div>
+                )}
+                {diagnostics.qdrant.error && (
+                  <div className="panel-note panel-note--warning">
+                    <p>{diagnostics.qdrant.error}</p>
+                  </div>
+                )}
+                <div className="diagnostic-row">
                   <span className="diagnostic-label">OCR ({diagnostics.ocrEngineName})</span>
                   <span
                     className={`status-chip status-chip--${diagnostics.ocrIsConfigured ? "online" : "offline"}`}

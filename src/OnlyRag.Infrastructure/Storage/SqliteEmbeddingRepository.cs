@@ -30,11 +30,11 @@ public sealed class SqliteEmbeddingRepository : IEmbeddingRepository
             """
             SELECT c.id, c.document_id, c.chunk_index, c.content, c.content_hash
             FROM chunks AS c
-            LEFT JOIN embeddings AS e ON e.chunk_id = c.id AND e.model = $model
+            LEFT JOIN chunk_vector_index_status AS s ON s.chunk_id = c.id AND s.model = $model
             WHERE c.document_id = $documentId
               AND c.chunk_index >= $afterChunkIndex
               AND LENGTH(TRIM(c.content)) > 0
-              AND (e.id IS NULL OR e.content_hash <> c.content_hash)
+              AND (s.id IS NULL OR s.status <> 'Indexed' OR s.content_hash <> c.content_hash)
             ORDER BY c.chunk_index ASC
             LIMIT $take;
             """;
@@ -58,57 +58,123 @@ public sealed class SqliteEmbeddingRepository : IEmbeddingRepository
         return chunks;
     }
 
-    public async Task UpsertEmbeddingAsync(
+    public Task MarkChunkIndexedAsync(
         long chunkId,
         string model,
         string contentHash,
-        IReadOnlyList<float> vector,
+        int dimensions,
+        string qdrantCollection,
+        string qdrantPointId,
         CancellationToken cancellationToken = default)
+    {
+        return UpsertStatusAsync(
+            chunkId,
+            model,
+            contentHash,
+            dimensions,
+            qdrantCollection,
+            qdrantPointId,
+            "Indexed",
+            lastError: null,
+            indexedAtUtc: DateTimeOffset.UtcNow,
+            cancellationToken);
+    }
+
+    public Task MarkChunkIndexFailedAsync(
+        long chunkId,
+        string model,
+        string contentHash,
+        int dimensions,
+        string qdrantCollection,
+        string qdrantPointId,
+        string lastError,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(lastError);
+        return UpsertStatusAsync(
+            chunkId,
+            model,
+            contentHash,
+            dimensions,
+            qdrantCollection,
+            qdrantPointId,
+            "Failed",
+            lastError,
+            indexedAtUtc: null,
+            cancellationToken);
+    }
+
+    private async Task UpsertStatusAsync(
+        long chunkId,
+        string model,
+        string contentHash,
+        int dimensions,
+        string qdrantCollection,
+        string qdrantPointId,
+        string status,
+        string? lastError,
+        DateTimeOffset? indexedAtUtc,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentException.ThrowIfNullOrWhiteSpace(contentHash);
-        if (vector.Count == 0)
+        ArgumentException.ThrowIfNullOrWhiteSpace(qdrantCollection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(qdrantPointId);
+        if (dimensions <= 0)
         {
-            throw new ArgumentException("Vector must contain at least one dimension.", nameof(vector));
+            throw new ArgumentOutOfRangeException(nameof(dimensions), "Vector dimensions must be positive.");
         }
 
         string now = DateTimeOffset.UtcNow.ToString("O");
-        byte[] vectorBlob = SqliteVectorBlob.Serialize(vector);
+        string? indexedAt = indexedAtUtc?.ToString("O");
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            INSERT INTO embeddings (
+            INSERT INTO chunk_vector_index_status (
                 chunk_id,
                 model,
                 dimensions,
-                distance_metric,
                 content_hash,
-                vector_blob,
-                created_at_utc
+                qdrant_collection,
+                qdrant_point_id,
+                indexed_at_utc,
+                status,
+                last_error,
+                updated_at_utc
             )
             VALUES (
                 $chunkId,
                 $model,
                 $dimensions,
-                'cosine',
                 $contentHash,
-                $vectorBlob,
+                $qdrantCollection,
+                $qdrantPointId,
+                $indexedAtUtc,
+                $status,
+                $lastError,
                 $now
             )
             ON CONFLICT(chunk_id, model) DO UPDATE SET
                 dimensions = excluded.dimensions,
-                distance_metric = excluded.distance_metric,
                 content_hash = excluded.content_hash,
-                vector_blob = excluded.vector_blob,
-                created_at_utc = excluded.created_at_utc;
+                qdrant_collection = excluded.qdrant_collection,
+                qdrant_point_id = excluded.qdrant_point_id,
+                indexed_at_utc = excluded.indexed_at_utc,
+                status = excluded.status,
+                last_error = excluded.last_error,
+                updated_at_utc = excluded.updated_at_utc;
             """;
         command.AddParameter("$chunkId", chunkId);
         command.AddParameter("$model", model);
-        command.AddParameter("$dimensions", vector.Count);
+        command.AddParameter("$dimensions", dimensions);
         command.AddParameter("$contentHash", contentHash);
-        command.AddParameter("$vectorBlob", vectorBlob);
+        command.AddParameter("$qdrantCollection", qdrantCollection);
+        command.AddParameter("$qdrantPointId", qdrantPointId);
+        command.AddParameter("$indexedAtUtc", indexedAt);
+        command.AddParameter("$status", status);
+        command.AddParameter("$lastError", lastError);
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -136,11 +202,12 @@ public sealed class SqliteEmbeddingRepository : IEmbeddingRepository
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT COUNT(e.id), MAX(e.created_at_utc)
+            SELECT COUNT(s.id), MAX(s.indexed_at_utc)
             FROM chunks AS c
-            LEFT JOIN embeddings AS e ON e.chunk_id = c.id
-                AND e.model = $model
-                AND e.content_hash = c.content_hash
+            LEFT JOIN chunk_vector_index_status AS s ON s.chunk_id = c.id
+                AND s.model = $model
+                AND s.content_hash = c.content_hash
+                AND s.status = 'Indexed'
             WHERE c.document_id = $documentId
               AND LENGTH(TRIM(c.content)) > 0;
             """;
@@ -165,58 +232,11 @@ public sealed class SqliteEmbeddingRepository : IEmbeddingRepository
             lastEmbeddedAtUtc);
     }
 
-    public async Task<IReadOnlyList<StoredEmbeddingVector>> ListEmbeddingVectorsAsync(
-        string model,
-        long afterChunkId,
-        int take,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(model);
-        if (take <= 0)
-        {
-            return [];
-        }
-
-        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT c.id, c.document_id, c.chunk_index, e.model, e.content_hash, e.vector_blob, e.dimensions
-            FROM embeddings AS e
-            INNER JOIN chunks AS c ON c.id = e.chunk_id
-            WHERE e.model = $model
-              AND e.chunk_id > $afterChunkId
-              AND e.content_hash = c.content_hash
-            ORDER BY e.chunk_id ASC
-            LIMIT $take;
-            """;
-        command.AddParameter("$model", model);
-        command.AddParameter("$afterChunkId", afterChunkId);
-        command.AddParameter("$take", take);
-
-        List<StoredEmbeddingVector> vectors = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            byte[] blob = (byte[])reader["vector_blob"];
-            int dimensions = reader.GetInt32(6);
-            vectors.Add(new StoredEmbeddingVector(
-                reader.GetInt64(0),
-                reader.GetInt64(1),
-                reader.GetInt32(2),
-                reader.GetString(3),
-                reader.GetString(4),
-                SqliteVectorBlob.Deserialize(blob, dimensions)));
-        }
-
-        return vectors;
-    }
-
-    public async Task<int> CountTotalEmbeddingsAsync(CancellationToken cancellationToken = default)
+    public async Task<int> CountIndexedChunksAsync(CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM embeddings;";
+        command.CommandText = "SELECT COUNT(*) FROM chunk_vector_index_status WHERE status = 'Indexed';";
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         return result is long count ? (int)Math.Min(count, int.MaxValue) : 0;
     }

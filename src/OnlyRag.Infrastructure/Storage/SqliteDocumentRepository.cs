@@ -126,7 +126,7 @@ public async Task<ImportedDocument?> DeleteAsync(long id, CancellationToken canc
         // (from document_pages) in the same cascade operation.
         foreach (string sql in new[]
         {
-            "DELETE FROM embeddings WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = $id);",
+            "DELETE FROM chunk_vector_index_status WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = $id);",
             "DELETE FROM chunks WHERE document_id = $id;",
             "DELETE FROM translation_units WHERE translation_id IN (SELECT id FROM translations WHERE document_id = $id);",
             "DELETE FROM translations WHERE document_id = $id;",

@@ -3,6 +3,7 @@ export type DocumentStatus =
   | "Queued"
   | "Processing"
   | "Indexed"
+  | "RequiresEmbeddingRebuild"
   | "RequiresAdditionalComponent"
   | "Failed";
 

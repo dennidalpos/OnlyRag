@@ -4,6 +4,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
+using OnlyRag.Infrastructure.Vector;
 
 namespace OnlyRag.Api;
 
@@ -13,6 +14,85 @@ public static partial class InProcessBackend
     {
         app.MapGet("/api/settings/ollama", async (IOllamaSettingsService settings, CancellationToken cancellationToken) =>
             Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapGet("/api/settings/qdrant", async (
+            QdrantSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/qdrant", async (
+            QdrantSettings request,
+            QdrantSettingsStore settings,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return CreateBadRequestProblem(
+                    "Impostazioni Qdrant non valide",
+                    ex.Message,
+                    "qdrant_settings_invalid");
+            }
+        });
+
+        app.MapGet("/api/qdrant/status", async (
+            QdrantLocalRuntimeService runtime,
+            IQdrantVectorStore vectorStore,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await runtime.GetStatusAsync(vectorStore, cancellationToken)));
+
+        app.MapPost("/api/qdrant/test", async (
+            QdrantLocalRuntimeService runtime,
+            IQdrantVectorStore vectorStore,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await runtime.GetStatusAsync(vectorStore, cancellationToken)));
+
+        app.MapPost("/api/qdrant/start", async (
+            ProcessLaunchRequest request,
+            QdrantLocalRuntimeService runtime,
+            IQdrantVectorStore vectorStore,
+            CancellationToken cancellationToken) =>
+        {
+            if (!request.Confirmed)
+            {
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'avvio del server locale Qdrant richiede conferma esplicita.",
+                    "confirmation_required");
+            }
+
+            try
+            {
+                return Results.Ok(await runtime.StartAsync(vectorStore, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return CreateBadRequestProblem(
+                    "Qdrant non avviato",
+                    ex.Message,
+                    "qdrant_start_failed");
+            }
+        });
+
+        app.MapPost("/api/qdrant/stop", async (
+            ProcessLaunchRequest request,
+            QdrantLocalRuntimeService runtime,
+            CancellationToken cancellationToken) =>
+        {
+            if (!request.Confirmed)
+            {
+                return CreateBadRequestProblem(
+                    "Conferma richiesta",
+                    "L'arresto del server locale Qdrant richiede conferma esplicita.",
+                    "confirmation_required");
+            }
+
+            await runtime.StopAsync(cancellationToken);
+            return Results.Ok(new OperationMessageResponse("Qdrant locale arrestato."));
+        });
 
         app.MapPut("/api/settings/ollama", async (
             OllamaSettings request,
