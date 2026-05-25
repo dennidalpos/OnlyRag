@@ -194,9 +194,17 @@ OnlyRag is an implementation-stage Windows desktop application. The repository s
 dependency install, web build, .NET build, tests, local run, unsigned installer packaging, scripted
 release signing, and non-invasive installer evidence generation.
 
-Signed release completion is blocked until a trusted Windows code-signing certificate is provided
-and full installer lifecycle verification is run on a clean Windows verification machine. Real
-residual work is tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
+The canonical application readiness check is:
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+```
+
+Release/package readiness additionally requires `Invoke-Gate.ps1 -IncludeInstaller` or
+`Build-Installer.ps1` on a machine with Inno Setup 6, a signed installer, and
+`Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle` on a clean Windows verification
+machine. An unsigned installer or an installer without lifecycle evidence is not release-ready.
+Current operational residuals are tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
 
 ## Documentation
 

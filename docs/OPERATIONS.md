@@ -48,6 +48,15 @@ needed:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
 ```
 
+Interpretation:
+
+- `Invoke-Gate.ps1 -Configuration Release` verifies application readiness: dependency restore,
+  audits, format, lint, typecheck, tests, web build, and .NET build.
+- `-IncludeInstaller` is required before claiming package readiness because it compiles the Inno
+  Setup installer.
+- A release candidate also needs signing and installer lifecycle evidence on a clean Windows
+  verification machine.
+
 ## Local Runtime Locations
 
 User data is stored under `%LOCALAPPDATA%\OnlyRag`, including documents, SQLite state, Qdrant

@@ -1,8 +1,8 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T22:34:36+02:00",
-  "active_objective": "Repository pronto per handoff tecnico dopo gate Release completo; packaging finale richiede tool esterni.",
+  "last_updated": "2026-05-25T22:36:34+02:00",
+  "active_objective": "Documentazione README, setup e handoff operativo allineata allo stato verificato del repository.",
   "current_tasks": [],
   "next_tasks": [
     "Eseguire Build-Installer.ps1 su una macchina con Inno Setup 6.",
@@ -30,6 +30,6 @@
     "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
     "release_verify": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
   },
-  "last_completed_work": "Gate Release completo superato: restore, audit npm/NuGet, format, lint, typecheck, test web/e2e, test .NET, manifest OCR, web build e .NET build.",
-  "handoff_notes": "Codice e docs/script principali coerenti per handoff tecnico. Packaging release resta bloccato dai tool esterni mancanti in ambiente locale."
+  "last_completed_work": "README, Operations e scripts README chiariscono gate applicativo, package readiness e requisiti release firmata/lifecycle.",
+  "handoff_notes": "Docs principali e link Markdown locali verificati. Packaging release resta bloccato dai tool esterni mancanti in ambiente locale."
 }
