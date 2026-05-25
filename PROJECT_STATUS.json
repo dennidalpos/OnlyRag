@@ -1,135 +1,176 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "structure_cleanliness_review",
-  "last_updated": "2026-05-25T23:21:52+02:00",
+  "current_phase": "dependency_supply_chain_review",
+  "last_updated": "2026-05-25T23:24:58+02:00",
   "production_target": true,
-  "summary": "Windows + PowerShell production-readiness review focused on repository structure, cleanliness, navigability, generated outputs, naming, duplicate assets, dead references, oversized files, and mixed responsibilities.",
-  "active_objective": "Make the repository structure clean and navigable for a new production-ready Windows desktop project without introducing legacy folders, compatibility fallbacks, or historical tracker notes.",
+  "summary": "Windows + PowerShell production-readiness review focused on package managers, lockfiles, runtime/dev dependencies, supply-chain verification, package scripts, version consistency, and dependency auditability.",
+  "active_objective": "Make dependency and supply-chain state production-ready without installing, updating, removing, or changing packages.",
   "assumptions": [
-    "Expected structure is the documented WPF/WebView2 desktop shell, React/Vite frontend, in-process .NET backend, Core contracts, Infrastructure adapters, Worker job abstractions, tests, PowerShell scripts, docs, packaging, and brand assets.",
-    "Only PROJECT_STATUS.json may be changed during this review."
+    "Target runtime is Windows 10 1809+ or Windows 11 with PowerShell 7.",
+    "Frontend package manager is npm because src\\OnlyRag.Web contains package.json and package-lock.json and no pnpm, Yarn, or Bun lockfiles.",
+    ".NET dependencies are resolved by SDK-style csproj PackageReference entries; no NuGet lockfile or central package management file is present.",
+    "OCR runtime package sets are controlled by scripts\\ocr\\requirements*.txt and scripts\\ocr\\runtime-manifest.json.",
+    "Bundled Qdrant runtime is controlled by packaging\\qdrant\\manifest.json."
   ],
   "current_tasks": [
-    "Remove local generated outputs from the working tree before release handoff: artifacts, all bin and obj folders, src\\OnlyRag.Web\\dist, src\\OnlyRag.Web\\node_modules, src\\OnlyRag.Web\\tsconfig.tsbuildinfo, and packaging\\qdrant\\payload.",
-    "Remove the empty local directory src\\components because it is outside the documented src\\OnlyRag.* project layout and has no tracked responsibility.",
-    "Review duplicated tracked brand/web/GitHub assets and document or enforce a single source-of-truth generation path for copied PNG/SVG assets.",
-    "Split oversized production source files where responsibilities are mixed, starting with OCR provisioning, document controller state, settings actions, OCR engine process handling, app composition, retrieval ranking, settings endpoints, translation export, local document library, Ollama client, Office extraction, and SQLite migration.",
-    "Split oversized test files by scenario or fixture responsibility so production behavior remains navigable and failures are localized.",
-    "Review naming for broad controller/action/helper files and replace ambiguous responsibilities with feature-specific names during split work."
+    "Enable NuGet dependency lockfiles for the solution so production restores are deterministic and reviewable.",
+    "Run NuGet vulnerability audit after a controlled restore: dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive.",
+    "Pin the npm CLI version used for production builds by adding an explicit package manager policy in the appropriate project metadata or tooling.",
+    "Audit all npm runtime and dev dependencies from package-lock.json before release, including install-script packages esbuild, fsevents, and Playwright transitive fsevents.",
+    "Add a Python OCR supply-chain verification policy for scripts\\ocr\\requirements*.txt because packages are version-pinned but not hash-pinned.",
+    "Verify OCR package availability from the declared indexes for each supported Python version before release.",
+    "Prepare and verify the Qdrant payload from packaging\\qdrant\\manifest.json before packaging; the local payload is currently absent.",
+    "Document and enforce allowed package sources for npm, NuGet, Python OCR indexes, and Qdrant downloads in the release gate."
   ],
   "next_tasks": [
-    "Run git status --short --ignored after cleanup to confirm only intentional ignored directories remain absent from the workspace.",
-    "Run markdown link validation again after structural cleanup.",
-    "Run the repository gate only after structure cleanup is complete."
+    "Run the canonical gate after dependency lock and source policy work is complete: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
+    "Run installer-inclusive verification after Qdrant payload preparation: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller.",
+    "Review CI tool setup for exact SDK/package-manager alignment with local production builds.",
+    "Generate a release dependency inventory for .NET packages, npm packages, Python OCR packages, and bundled Qdrant."
   ],
   "blockers": [
-    "The local workspace is not structurally clean because ignored generated outputs and an empty out-of-layout src\\components directory are present.",
-    "Several production files exceed review thresholds and should be split before calling the repository production-ready for a new project handoff."
+    "NuGet vulnerability status is not verifiable from the current clean workspace without restore assets or NuGet lockfiles; dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore fails because project.assets.json files are absent.",
+    "NuGet restore is not locked, so production restore can change transitive package resolution.",
+    "Qdrant production payload is absent under packaging\\qdrant\\payload, so packaging depends on fetching the manifest-pinned external asset before release."
   ],
   "risks": [
-    "Generated/local output size inspected under artifacts, src\\OnlyRag.Web\\dist, and packaging\\qdrant\\payload is about 442 MB across 615 files, increasing cleanup and handoff risk even though ignored.",
-    "Tracked asset duplicates exist across assets\\brand, src\\OnlyRag.Web\\public, and .github\\assets; without a clear source-of-truth rule, brand/public assets can drift.",
-    "Large UI controller and service files concentrate state, side effects, formatting, process orchestration, and API workflow logic, reducing navigability for production maintenance.",
-    "Large test files make scenario ownership harder to scan and can hide fixture duplication."
+    "package.json does not declare a packageManager field, so npm version selection relies on the developer or CI environment even though package-lock.json is present.",
+    "package-lock.json uses lockfileVersion 3 with 292 package entries; npm audit currently reports no vulnerabilities, but install-script packages need explicit release review.",
+    "Runtime npm dependencies use semver ranges in package.json while package-lock.json pins resolved versions; production installs must use npm ci only.",
+    ".NET PackageReference versions are direct and exact, but transitive dependency resolution is not committed without packages.lock.json.",
+    "Python OCR requirements pin versions but do not pin hashes and use an extra PaddlePaddle package index for GPU runtimes.",
+    "Qdrant download is constrained to GitHub/raw.githubusercontent.com HTTPS URLs and SHA256-checked by script, but build/package steps still depend on external availability when payload is missing.",
+    "CI uses actions/setup-node with node-version lts/* while package.json accepts ^20.19.0 || >=22.12.0; exact production Node major should be fixed for release reproducibility.",
+    "CI uses actions/setup-dotnet 10.0.x while global.json pins 10.0.300 with latestFeature roll-forward; release builds should use a documented exact SDK acquisition path."
   ],
-  "files_to_remove_or_clean": [
-    "artifacts\\",
-    "packaging\\qdrant\\payload\\",
-    "src\\OnlyRag.Api\\bin\\",
-    "src\\OnlyRag.Api\\obj\\",
-    "src\\OnlyRag.App\\bin\\",
-    "src\\OnlyRag.App\\obj\\",
-    "src\\OnlyRag.Core\\bin\\",
-    "src\\OnlyRag.Core\\obj\\",
-    "src\\OnlyRag.Infrastructure\\bin\\",
-    "src\\OnlyRag.Infrastructure\\obj\\",
-    "src\\OnlyRag.Web\\dist\\",
-    "src\\OnlyRag.Web\\node_modules\\",
-    "src\\OnlyRag.Web\\tsconfig.tsbuildinfo",
-    "src\\OnlyRag.Worker\\bin\\",
-    "src\\OnlyRag.Worker\\obj\\",
-    "tests\\OnlyRag.Api.Tests\\obj\\",
-    "tests\\OnlyRag.Core.Tests\\obj\\",
-    "tests\\OnlyRag.Infrastructure.Tests\\obj\\",
-    "tests\\OnlyRag.PlaywrightBackendHost\\obj\\",
-    "src\\components\\"
+  "package_managers": {
+    "javascript": {
+      "manager": "npm",
+      "manifest": "src\\OnlyRag.Web\\package.json",
+      "lockfile": "src\\OnlyRag.Web\\package-lock.json",
+      "lockfile_version": 3,
+      "package_count": 292,
+      "mixing_risk": "No pnpm, Yarn, or Bun lockfiles found."
+    },
+    "dotnet": {
+      "manager": "NuGet via SDK-style PackageReference",
+      "solution": "OnlyRag.sln",
+      "sdk": "global.json pins 10.0.300 with latestFeature roll-forward",
+      "lockfile": "",
+      "central_package_management": ""
+    },
+    "python_ocr": {
+      "manager": "pip requirements files",
+      "manifest": "scripts\\ocr\\runtime-manifest.json",
+      "requirements": [
+        "scripts\\ocr\\requirements.txt",
+        "scripts\\ocr\\requirements-common.txt",
+        "scripts\\ocr\\requirements-cpu.txt",
+        "scripts\\ocr\\requirements-nvidia-cu118.txt",
+        "scripts\\ocr\\requirements-nvidia-cu126.txt",
+        "scripts\\ocr\\requirements-nvidia-cu129.txt",
+        "scripts\\ocr\\requirements-nvidia-cu130.txt"
+      ],
+      "lockfile": ""
+    },
+    "bundled_native_runtime": {
+      "name": "Qdrant",
+      "manifest": "packaging\\qdrant\\manifest.json",
+      "version": "1.17.1",
+      "hash_pinned": true,
+      "payload_present": false
+    }
+  },
+  "runtime_dependencies": [
+    "React 19.2.6",
+    "react-dom 19.2.6",
+    "Microsoft.Web.WebView2 1.0.3967.48",
+    "Microsoft.Data.Sqlite 10.0.8",
+    "DocumentFormat.OpenXml 3.5.1",
+    "PdfPig 0.1.14",
+    "Qdrant.Client 1.18.1",
+    "Microsoft.AspNetCore.App framework reference",
+    "Qdrant 1.17.1 native Windows payload from packaging manifest",
+    "PaddleOCR 3.5.0 and selected PaddlePaddle runtime for OCR provisioning"
   ],
-  "files_to_split": [
-    "src\\OnlyRag.Api\\DependencyProvisioningService.Ocr.cs: 499 lines",
-    "src\\OnlyRag.Web\\src\\components\\useDocumentsSectionController.ts: 407 lines",
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.actions.ts: 395 lines",
-    "src\\OnlyRag.Infrastructure\\Ocr\\PaddleOcrEngine.cs: 378 lines",
-    "src\\OnlyRag.Web\\src\\App.tsx: 365 lines",
-    "src\\OnlyRag.Web\\src\\components\\useTranslationSectionController.ts: 351 lines",
-    "src\\OnlyRag.Web\\src\\components\\ChatSection.tsx: 336 lines",
-    "src\\OnlyRag.Infrastructure\\Retrieval\\HybridRetrievalService.cs: 330 lines",
-    "src\\OnlyRag.Web\\src\\components\\useSettingsSectionController.ts: 322 lines",
-    "src\\OnlyRag.Api\\OcrProvisionRuntimeResolver.cs: 319 lines",
-    "src\\OnlyRag.Api\\InProcessBackend.SettingsEndpoints.cs: 317 lines",
-    "src\\OnlyRag.Api\\TranslationExportService.cs: 315 lines",
-    "src\\OnlyRag.Infrastructure\\Storage\\LocalDocumentLibraryService.cs: 313 lines",
-    "scripts\\Test-InstallerRelease.ps1: 312 lines",
-    "src\\OnlyRag.Infrastructure\\Storage\\SqliteLocalJobQueue.cs: 306 lines",
-    "src\\OnlyRag.Api\\Ollama\\OllamaClient.cs: 305 lines",
-    "src\\OnlyRag.Infrastructure\\Ingestion\\OfficeOpenXmlTextExtractor.cs: 304 lines",
-    "src\\OnlyRag.Infrastructure\\Storage\\LocalSqliteMigrator.cs: 302 lines"
+  "development_dependencies": [
+    ".NET SDK 10.0.300",
+    "PowerShell 7",
+    "Node.js ^20.19.0 || >=22.12.0 with npm",
+    "@eslint/js 10.0.1",
+    "@playwright/test 1.60.0",
+    "@testing-library packages",
+    "@vitejs/plugin-react 5.0.0",
+    "axe-core 4.11.4",
+    "eslint 10.4.0",
+    "jsdom 29.1.1",
+    "prettier 3.8.3",
+    "typescript 5.9.0",
+    "typescript-eslint 8.59.4",
+    "vite 7.3.3",
+    "vitest 4.1.7",
+    "coverlet.collector 10.0.0",
+    "Microsoft.NET.Test.Sdk 18.4.0",
+    "xunit 2.9.3",
+    "xunit.runner.visualstudio 3.1.5"
   ],
-  "test_files_to_split": [
-    "src\\OnlyRag.Web\\src\\App.test.tsx: 679 lines",
-    "src\\OnlyRag.Web\\src\\App.initialSetup.residuals.test.tsx: 573 lines",
-    "tests\\OnlyRag.Api.Tests\\InProcessBackendDocumentTests.cs: 513 lines",
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.test.tsx: 490 lines",
-    "tests\\OnlyRag.Api.Tests\\DocumentEmbeddingJobHandlerTests.cs: 390 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\DocumentIngestionServiceTests.cs: 374 lines",
-    "tests\\OnlyRag.Api.Tests\\InProcessBackendSettingsDependencyTests.cs: 367 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\HybridRetrievalServiceTests.cs: 361 lines",
-    "src\\OnlyRag.Web\\src\\components\\SettingsSection.dependencyActions.test.tsx: 360 lines",
-    "tests\\OnlyRag.Api.Tests\\ChatServiceQdrantIntegrationTests.cs: 356 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\DocumentIngestionServiceTests.Fixtures.cs: 354 lines",
-    "tests\\OnlyRag.Api.Tests\\OllamaClientTests.cs: 343 lines",
-    "src\\OnlyRag.Web\\src\\components\\DocumentsSection.test.tsx: 321 lines",
-    "tests\\OnlyRag.Api.Tests\\DocumentTranslationJobHandlerTests.cs: 319 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\OcrSettingsTests.cs: 319 lines",
-    "tests\\OnlyRag.Api.Tests\\DocumentIngestionJobHandlerTests.cs: 318 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\LocalSqliteStorageTests.Fixtures.cs: 317 lines",
-    "tests\\OnlyRag.Infrastructure.Tests\\SqliteStatusConstraintTests.cs: 309 lines"
+  "suspicious_or_sensitive_packages_to_review": [
+    "npm install script: node_modules/esbuild@0.27.7",
+    "npm install script: node_modules/fsevents@2.3.3",
+    "npm install script: node_modules/playwright/node_modules/fsevents@2.3.2",
+    "Python OCR GPU packages from PaddlePaddle extra indexes",
+    "nvidia-cudnn-cu12 9.9.0.52 in requirements-nvidia-cu129.txt",
+    "Bundled native qdrant.exe downloaded from GitHub release asset"
   ],
-  "duplicate_assets_to_review": [
-    "assets\\brand\\logos\\onlyrag-icon-32.png and src\\OnlyRag.Web\\public\\favicon-32x32.png",
-    "assets\\brand\\logos\\onlyrag-icon-180.png and src\\OnlyRag.Web\\public\\apple-touch-icon.png",
-    ".github\\assets\\onlyrag-icon.svg, assets\\brand\\logos\\onlyrag-icon.svg, and src\\OnlyRag.Web\\public\\favicon.svg",
-    "assets\\brand\\social\\x-twitter-card-1600x900.png and src\\OnlyRag.Web\\public\\social\\x-twitter-card-1600x900.png",
-    ".github\\assets\\onlyrag-logo-horizontal.png and assets\\brand\\logos\\onlyrag-logo-horizontal-1200x400.png",
-    ".github\\assets\\onlyrag-icon.png, assets\\brand\\logos\\onlyrag-icon-512.png, and src\\OnlyRag.Web\\public\\icon-512.png",
-    "assets\\brand\\logos\\onlyrag-icon-192.png and src\\OnlyRag.Web\\public\\icon-192.png",
-    "assets\\brand\\social\\open-graph-1200x630.png and src\\OnlyRag.Web\\public\\social\\open-graph-1200x630.png"
-  ],
-  "structure_notes": [
-    "No broken local Markdown links were found in tracked Markdown files during this review.",
-    "No tracked old, backup, temp, misc, stuff, final, or new catch-all folders were found.",
-    ".gitignore covers the generated outputs observed in git status --short --ignored.",
-    "The tracked top-level layout is coherent, but local ignored outputs and the empty src\\components directory reduce repository cleanliness and navigability."
+  "version_inconsistencies_to_resolve": [
+    "CI Node selection uses lts/* while package.json allows ^20.19.0 || >=22.12.0; choose and enforce the production Node major/version.",
+    "CI .NET selection uses 10.0.x while global.json pins 10.0.300 with roll-forward; document whether release builds must use exactly 10.0.300 or feature roll-forward.",
+    "package.json uses semver ranges; production must rely on package-lock.json and npm ci."
   ],
   "quality_gates": {
-    "structure_review": "passed",
-    "repository_cleanliness": "failed",
-    "dead_reference_review": "passed",
-    "generated_output_review": "failed",
-    "duplicate_asset_review": "failed",
-    "file_size_review": "failed",
+    "npm_audit_production": "passed",
+    "npm_audit_all": "passed",
+    "nuget_vulnerability_audit": "not_run",
+    "ocr_manifest": "passed",
+    "qdrant_payload_verification": "failed",
+    "package_manager_mixing_review": "passed",
+    "lockfile_review": "failed",
+    "dependency_inventory_review": "passed",
+    "supply_chain_review": "failed",
     "format": "not_run",
     "lint": "not_run",
     "typecheck": "not_run",
     "tests": "not_run",
     "build": "not_run"
   },
+  "verification_notes": [
+    "git status --short was clean before analysis.",
+    "Only npm package files were found for the frontend: src\\OnlyRag.Web\\package.json and src\\OnlyRag.Web\\package-lock.json.",
+    "No pnpm-lock.yaml, yarn.lock, bun.lock, .npmrc, NuGet.config, Directory.Packages.props, packages.lock.json, pyproject.toml, poetry.lock, Pipfile, or uv.lock were found.",
+    "npm audit --omit=dev --audit-level=moderate reported 0 vulnerabilities.",
+    "npm audit --audit-level=moderate reported 0 vulnerabilities.",
+    "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore failed because restore assets were absent; no restore was run.",
+    "scripts\\ocr\\Test-OcrRuntimeManifest.ps1 passed for 5 targets.",
+    "Local tools detected: dotnet 10.0.300, node v22.22.3, npm 10.9.8, PowerShell 7.6.2.",
+    "Qdrant payload and payload manifest are currently absent under packaging\\qdrant\\payload."
+  ],
   "commands": {
-    "initial_status": "git status --short",
-    "ignored_status": "git status --short --ignored",
-    "tracked_files": "git ls-files",
-    "cleanliness_recheck": "git status --short --ignored",
-    "canonical_gate_after_cleanup": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release"
+    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
+    "npm_install_locked": "Set-Location .\\src\\OnlyRag.Web; npm ci",
+    "dotnet_restore": "dotnet restore .\\OnlyRag.sln",
+    "ocr_runtime_install": "pwsh .\\scripts\\ocr\\install_ocr_runtime.ps1",
+    "qdrant_prepare": "pwsh .\\scripts\\Download-Qdrant.ps1",
+    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "dependency_audit_npm_production": "Set-Location .\\src\\OnlyRag.Web; npm audit --omit=dev --audit-level=moderate",
+    "dependency_audit_npm_all": "Set-Location .\\src\\OnlyRag.Web; npm audit --audit-level=moderate",
+    "dependency_audit_nuget": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive",
+    "ocr_manifest_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
+    "ocr_catalog_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeCatalog.ps1 -OutputPath .\\artifacts\\ocr-runtime-catalog\\ocr-runtime-catalog.json",
+    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
+    "web_build": "pwsh .\\scripts\\Build-Web.ps1",
+    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
+    "release_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller"
   },
   "environment": {
     "os_target": "Windows 10 1809+ or Windows 11",
@@ -138,5 +179,5 @@
     "env_files": []
   },
   "open_questions": [],
-  "handoff_notes": "Keep this tracker limited to current structural cleanup and navigability work. Do not add historical completion notes."
+  "handoff_notes": "Keep this tracker limited to current dependency and supply-chain production tasks. Do not add historical completion notes."
 }
