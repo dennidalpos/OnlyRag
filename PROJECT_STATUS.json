@@ -1,53 +1,106 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "external-release-validation",
-  "last_updated": "2026-05-25T10:08:00+02:00",
-  "active_objective": "Chiudere le verifiche esterne non eseguibili dalla macchina locale prima della release.",
+  "current_phase": "migration-planned",
+  "last_updated": "2026-05-25T10:26:34+02:00",
+  "production_target": true,
+  "active_objective": "Migrazione completa a Qdrant come unico backend vettoriale e completamento PaddleOCR come unico provider OCR.",
   "assumptions": [
     "Windows desktop resta il target primario.",
-    "OCR CPU resta fallback obbligatorio.",
-    "OCR supporta Python 3.10-3.13."
+    "SQLite resta system-of-record locale per documenti, chunks, jobs, settings, chat, traduzioni, cache OCR e soli metadata indice vettoriale.",
+    "SQLite non deve salvare vettori o BLOB embedding; gli embedding legacy vengono eliminati e ricostruiti su Qdrant.",
+    "Qdrant locale bundled e il default operativo, gestito come processo server separato via ILocalProcessLauncher.",
+    "Le collection Qdrant sono separate per modello embedding e dimensione."
+  ],
+  "decisions": [
+    "Nessun dual-write, nessun fallback sqlite-vec e nessun fallback keyword-only silenzioso.",
+    "SQLite FTS resta solo segnale testuale ibrido.",
+    "Qdrant locale deve bindare obbligatoriamente 127.0.0.1 tramite config dedicato.",
+    "Endpoint Qdrant remoto richiede trust esplicito e API key; senza TLS mostra hard warning o blocco secondo policy implementata.",
+    "Basic OCR PaddleOCR obbligatorio; layout/table/structure modulari in base alle capability disponibili."
   ],
   "current_tasks": [
     {
       "priority": 1,
-      "task": "Eseguire il workflow OCR runtime catalog in CI su Python 3.10, 3.11, 3.12 e 3.13; la verifica locale ha confermato sorgenti raggiungibili e manifest coperto, ma i dry-run pip restano da CI perche il Python locale e 3.14.5."
+      "task": "Rimuovere sqlite-vec da codice, NuGet, publish, installer, diagnostics, docs, test e fixture; eliminare vec0.dll, SqliteVec*, SqliteVectorBlob, vec_distance_cosine, vector_blob e storage embeddings legacy."
     },
     {
       "priority": 2,
-      "task": "Validare manualmente su Windows: senza NVIDIA, NVIDIA compatibile, driver NVIDIA vecchio, venv OCR danneggiata, rete assente durante setup."
+      "task": "Aggiornare SQLite a schema v13: rimuovere BLOB vettoriali, aggiungere chunk_vector_index_status con chunkId/model/dimensions/contentHash/qdrantCollection/qdrantPointId/indexedAtUtc/status/lastError e migrare da v12 con backup."
     },
     {
       "priority": 3,
-      "task": "Monitorare fonti PaddlePaddle per supporto stabile NVIDIA RTX serie 50 Windows e aggiornare manifest solo dopo verifica ufficiale; al 2026-05-25 la documentazione ufficiale Windows PIP elenca CUDA 11.8/12.6/12.9/13.0 e capability > 7.5, ma non una garanzia specifica RTX serie 50 Windows."
+      "task": "Durante migrazione v13, eliminare embedding legacy e marcare documenti con chunks ma senza vettori Qdrant validi come RequiresEmbeddingRebuild."
+    },
+    {
+      "priority": 4,
+      "task": "Implementare runtime Qdrant locale bundled con config %LOCALAPPDATA%\\OnlyRag\\qdrant\\config\\qdrant.yaml, storage/log dedicati, porta configurabile, lock/pid, recovery stale process, health wait e shutdown graceful."
+    },
+    {
+      "priority": 5,
+      "task": "Implementare settings e sicurezza Qdrant: endpoint gRPC, API key non loggata, trust non-loopback, policy TLS remoto, test connection e mapping errori configurativi chiari."
+    },
+    {
+      "priority": 6,
+      "task": "Implementare QdrantVectorStore con Qdrant.Client gRPC: ensure/validate collection, point id stabile, payload minimo, upsert, delete documento/chunk, rebuild, health e search filtrata per documentIds."
+    },
+    {
+      "priority": 7,
+      "task": "Aggiornare embedding job per scrivere su Qdrant e aggiornare chunk_vector_index_status; mantenere checkpoint, retry e fail chiari."
+    },
+    {
+      "priority": 8,
+      "task": "Aggiornare retrieval e chat documentale per usare Qdrant + SQLite FTS ibrido; /api/search e /api/chat con documentIds falliscono se Qdrant non e configurato o raggiungibile."
+    },
+    {
+      "priority": 9,
+      "task": "Completare PaddleOCR: bridge modes check/version/ocr-page/layout/table/structure/benchmark, device auto/cpu/gpu, mini inference GPU, output strutturato e cache key v2."
+    },
+    {
+      "priority": 10,
+      "task": "Aggiornare API/UI Settings e Diagnostics con Qdrant endpoint/stato/version/binary/config/storage/process/collection/test/start-stop/rebuild/warning sicurezza e OCR Python/Paddle/CUDA/VRAM/device/pipeline/test/benchmark."
+    },
+    {
+      "priority": 11,
+      "task": "Aggiornare packaging/build/gate: scaricare/verificare Qdrant pin + SHA256, includere qdrant.exe e licenza/NOTICE, salvare manifest con versione/URL/SHA256, escludere vec0.dll."
+    },
+    {
+      "priority": 12,
+      "task": "Aggiungere test fake/mock e integration opzionali via env var per Qdrant reale, OCR CPU reale e OCR GPU reale."
+    },
+    {
+      "priority": 13,
+      "task": "Aggiornare README, docs/ARCHITECTURE.md, docs/RAG_PIPELINE.md, docs/OCR_PIPELINE.md, docs/OPERATIONS.md, docs/APP_FLOW.drawio, PROJECT_STATUS.json e fixture frontend/e2e."
     }
   ],
   "blockers": [
-    "GitHub CLI non installata localmente: impossibile avviare o leggere da questa macchina il workflow_dispatch OCR Runtime Catalog.",
-    "La matrice manuale richiede macchine/stati dedicati: senza NVIDIA, NVIDIA compatibile, driver NVIDIA vecchio, venv OCR danneggiata, rete assente durante setup.",
-    "La verifica release completa con install/upgrade/uninstall e firma richiede una macchina Windows pulita e, per release firmata, un certificato di code signing."
+    "Serve identificare l'asset Windows effettivo della release Qdrant pin e registrare SHA256/licenza prima del packaging riproducibile."
   ],
   "risks": [
-    "La disponibilita delle wheel PaddlePaddle Windows GPU puo cambiare rispetto al manifest pinning.",
-    "La verifica catalogo locale ha saltato i dry-run pip perche il Python disponibile e 3.14.5, fuori range supportato.",
-    "La run release locale ha prodotto installer non firmato e non ha eseguito install lifecycle."
+    "Bundling Qdrant aumenta superficie supply-chain, dimensione installer e responsabilita di update sicurezza.",
+    "Dopo upgrade i documenti richiedono rebuild Qdrant prima di ricerca vettoriale/chat documentale.",
+    "Se chunkId non e compatibile come PointId globale, usare UUID deterministico derivato da collectionName + chunkId.",
+    "Le capability PaddleOCR layout/table/structure dipendono da extra dependencies e non devono bloccare il gate OCR base."
   ],
   "quality_gates": {
-    "format": "passed",
-    "lint": "passed",
-    "typecheck": "passed",
-    "tests": "passed",
-    "build": "passed",
-    "package": "passed",
-    "installer_release_evidence": "passed_with_warnings_not_signed_lifecycle_skipped",
-    "ocr_runtime_manifest": "passed",
-    "ocr_runtime_catalog_local": "passed_sources_reachable_pip_dry_runs_skipped_python_3_14_5",
-    "ocr_runtime_catalog_ci": "blocked_gh_cli_missing",
-    "local_ocr_cpu_check": "passed",
-    "local_ocr_gpu_check": "passed",
-    "manual_windows_matrix": "blocked_external_matrix_required",
-    "dependency_security_audits": "passed"
+    "format": "not_run",
+    "lint": "not_run",
+    "typecheck": "not_run",
+    "tests": "not_run",
+    "build": "not_run",
+    "package": "not_run",
+    "security_review": "not_run",
+    "structure_review": "not_run",
+    "release_gate": "not_run"
   },
-  "last_completed_work": "Refactor InitialSetupWizard.tsx split completato; gate Release con IncludeInstaller passato; installer generato in artifacts/installer/OnlyRag-Setup-0.1.0-win-x64.exe; evidence non invasiva generata in artifacts/release-verification/OnlyRag-release-verification-20260525-100535.json; catalogo OCR locale generato in artifacts/ocr-runtime-catalog/ocr-runtime-catalog-local.json."
+  "commands": {
+    "gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "legacy_scan": "rg \"sqlite-vec|sqlite_vec|vec0|SqliteVec|SqliteVectorBlob|vec_distance_cosine|vector_blob|embeddings\" .",
+    "qdrant_integration": "$env:ONLYRAG_QDRANT_INTEGRATION='1'; dotnet test OnlyRag.sln --configuration Release",
+    "ocr_cpu_integration": "$env:ONLYRAG_OCR_INTEGRATION_CPU='1'; dotnet test OnlyRag.sln --configuration Release",
+    "ocr_gpu_integration": "$env:ONLYRAG_OCR_INTEGRATION_GPU='1'; dotnet test OnlyRag.sln --configuration Release"
+  },
+  "last_completed_work": "Piano finale Qdrant/PaddleOCR registrato nel tracker; storico e residui completati rimossi.",
+  "open_questions": [],
+  "handoff_notes": "Eseguire i task in ordine di priorita; non introdurre fallback sqlite-vec, vettori SQLite o keyword-only silenzioso per RAG documentale."
 }
