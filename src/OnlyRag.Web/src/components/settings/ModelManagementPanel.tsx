@@ -55,8 +55,8 @@ export function ModelManagementPanel() {
               {models.map((model) => (
                 <div className="model-row" key={model.name}>
                   <div className="model-row__details">
-                    <strong>{model.name}</strong>
-                    <span>
+                    <strong title={model.name}>{model.name}</strong>
+                    <span title={`${model.family ?? "Famiglia non indicata"} | ${formatModelSize(model.size)}`}>
                       {model.family ?? "Famiglia non indicata"} | {formatModelSize(model.size)}
                     </span>
                   </div>

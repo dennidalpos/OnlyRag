@@ -1,53 +1,21 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "last_updated": "2026-05-25T15:25:00+02:00",
-  "active_objective": "Chiudere le verifiche residue sull'installer aggiornato, sul lifecycle Qdrant installato e sull'import TrackWise.",
-  "execution_plan": [
-    {
-      "priority": "P1",
-      "order": 1,
-      "task": "Chiudere eventuali istanze OnlyRag/Qdrant dell'installazione utente e validare installazione, primo avvio, payload Qdrant/OCR e uninstall.",
-      "residual": "La verifica lifecycle installata non e stata eseguita perche puo chiudere e disinstallare l'app utente.",
-      "command": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RunInstallLifecycle"
-    },
-    {
-      "priority": "P1",
-      "order": 2,
-      "task": "Installare di nuovo l'installer aggiornato se il lifecycle test ha lasciato l'app disinstallata.",
-      "residual": "TrackWise deve essere verificato contro l'app aggiornata installata, non solo contro build o repository.",
-      "command": ".\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe"
-    },
-    {
-      "priority": "P1",
-      "order": 3,
-      "task": "Verificare Qdrant reale dall'app installata aggiornata: avvio locale, chiusura normale e chiusura forzata dell'app senza qdrant.exe residuo.",
-      "residual": "Il fix e coperto da test e build, ma manca conferma manuale sul payload installato.",
-      "command": "Get-Process qdrant -ErrorAction SilentlyContinue"
-    },
-    {
-      "priority": "P1",
-      "order": 4,
-      "task": "Riprendere importazione PDF TrackWise e confermare superamento pagina 247 nell'app aggiornata.",
-      "residual": "Il PDF e lo stato di importazione sono locali all'ambiente utente.",
-      "command": ""
-    },
-    {
-      "priority": "P2",
-      "order": 5,
-      "task": "Firmare o marcare esplicitamente come unsigned l'installer prima di distribuirlo.",
-      "residual": "L'installer generato e valido ma non firmato.",
-      "command": ""
-    }
-  ],
-  "blockers": [
-    "Le verifiche installate possono chiudere o disinstallare l'app utente.",
-    "La verifica TrackWise richiede PDF e stato locale non presenti nel repository."
+  "last_updated": "2026-05-25T16:07:56+02:00",
+  "active_objective": "Rifinire header, navbar, metriche e gerarchia visiva dei riquadri React/WebView senza modificare backend o contratti API.",
+  "current_tasks": [],
+  "next_tasks": [],
+  "blockers": [],
+  "risks": [
+    "La verifica visuale delle metriche live complete e limitata dal backend offline: nella UI reale appare lo stato in attesa."
   ],
   "quality_gates": {
-    "installer_lifecycle": "not_run",
-    "installed_qdrant_lifecycle": "not_run",
-    "trackwise_runtime": "not_run",
-    "installer_signing": "not_run"
-  }
+    "typecheck": "passed",
+    "lint": "passed",
+    "format": "passed",
+    "tests": "passed",
+    "visual_responsive": "passed"
+  },
+  "last_completed_work": "Convertito il badge aggiornamento in ora corrente, aggiunti bordi navbar, aggregate le metriche e marcata la gerarchia dei riquadri.",
+  "handoff_notes": "Dev server Vite avviato su http://127.0.0.1:5173 per verifica locale."
 }

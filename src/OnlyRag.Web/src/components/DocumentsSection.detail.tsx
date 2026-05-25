@@ -78,7 +78,7 @@ export function DocumentDetailCard({
   return (
     <div className="settings-card document-detail-card">
       <div className="settings-card__header">
-        <h3 style={{ fontSize: "15px" }}>{document.originalFileName}</h3>
+        <h3 title={document.originalFileName}>{document.originalFileName}</h3>
         <span className={getDocumentStatusClassName(document.status)}>
           {statusLabels[document.status]}
         </span>

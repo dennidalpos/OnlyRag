@@ -52,7 +52,7 @@ export function DefaultModelsPanel() {
             </label>
             {formState.defaultChatModel && (
               <AdjustableModelContextBar
-                title="Finestra di contesto chat (num_ctx)"
+                title="Contesto chat (num_ctx)"
                 sliderLabel="num_ctx chat"
                 loading={chatModelDetailsLoading}
                 details={chatModelDetails}
@@ -93,7 +93,7 @@ export function DefaultModelsPanel() {
 
             {formState.defaultEmbeddingModel && (
               <AdjustableModelContextBar
-                title="Finestra di contesto embedding (num_ctx)"
+                title="Contesto embedding (num_ctx)"
                 sliderLabel="num_ctx embedding"
                 loading={embeddingModelDetailsLoading}
                 details={embeddingModelDetails}
@@ -133,7 +133,7 @@ export function DefaultModelsPanel() {
             </label>
             {formState.defaultTranslationModel && (
               <AdjustableModelContextBar
-                title="Finestra di contesto traduzione (num_ctx)"
+                title="Contesto traduzione (num_ctx)"
                 sliderLabel="num_ctx traduzione"
                 loading={translationModelDetailsLoading}
                 details={translationModelDetails}

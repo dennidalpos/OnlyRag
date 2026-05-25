@@ -4,7 +4,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
 }
 
 .jobs-error {
@@ -16,18 +16,21 @@
 .jobs-refresh-state {
   color: #627084;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .jobs-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .job-row {
   min-width: 0;
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #ffffff;
@@ -40,29 +43,34 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .job-row__header div {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
 .job-row__header strong {
   color: #172033;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .job-row__header span,
 .job-row__meta {
   color: #627084;
   font-size: 13px;
+  min-width: 0;
 }
 
 .job-status {
   max-width: 100%;
-  min-width: 104px;
-  padding: 5px 9px;
+  min-width: 82px;
+  padding: 3px 8px;
   border: 1px solid #d4dce5;
   border-radius: 999px;
   background: #f8fafc;
@@ -70,7 +78,10 @@
   font-size: 12px;
   font-weight: 700;
   text-align: center;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .job-status--running {
@@ -99,7 +110,7 @@
 }
 
 .progress-track {
-  height: 10px;
+  height: 8px;
   overflow: hidden;
   border-radius: 999px;
   background: #edf1f5;
@@ -112,7 +123,7 @@
 }
 
 .job-error-message {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #e7c9c9;
   border-radius: 8px;
   background: #fff4f3;
@@ -121,4 +132,3 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-

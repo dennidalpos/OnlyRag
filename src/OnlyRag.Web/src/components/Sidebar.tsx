@@ -40,7 +40,7 @@ export function Sidebar({
               aria-current={section === activeSection ? "page" : undefined}
               onClick={() => onSectionChange(section)}
             >
-              {sections[section]}
+              <span className="nav-item__label">{sections[section]}</span>
               {badge !== null && (
                 <span className="nav-badge" aria-label={`${badge} operazioni attive`}>
                   {badge}
@@ -79,36 +79,38 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
         <span>Metriche</span>
         <small>live</small>
       </div>
-      <MetricRow
-        label="CPU"
-        value={formatTelemetryPercent(telemetry.cpu.usagePercent)}
-        detail={`${telemetry.cpu.logicalProcessorCount} thread`}
-      />
-      <MetricRow
-        label="RAM"
-        value={formatTelemetryBytes(telemetry.memory.availableBytes)}
-        detail={`liberi di ${formatTelemetryBytes(telemetry.memory.totalBytes)}`}
-      />
-      <MetricRow
-        label={`Disco ${telemetry.systemDisk.name}`}
-        value={formatTelemetryBytes(telemetry.systemDisk.availableBytes)}
-        detail={`liberi di ${formatTelemetryBytes(telemetry.systemDisk.totalBytes)}`}
-      />
-      <MetricRow
-        label="GPU"
-        value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
-        detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non rilevata"}
-      />
-      <MetricRow
-        label="VRAM"
-        value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
-        detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
-      />
-      <MetricRow
-        label="CUDA Paddle"
-        value={cudaValue}
-        detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
-      />
+      <div className="sidebar-metrics__grid">
+        <MetricRow
+          label="CPU"
+          value={formatTelemetryPercent(telemetry.cpu.usagePercent)}
+          detail={`${telemetry.cpu.logicalProcessorCount} thread`}
+        />
+        <MetricRow
+          label="RAM"
+          value={formatTelemetryBytes(telemetry.memory.availableBytes)}
+          detail={`liberi di ${formatTelemetryBytes(telemetry.memory.totalBytes)}`}
+        />
+        <MetricRow
+          label={`Disco ${telemetry.systemDisk.name}`}
+          value={formatTelemetryBytes(telemetry.systemDisk.availableBytes)}
+          detail={`liberi di ${formatTelemetryBytes(telemetry.systemDisk.totalBytes)}`}
+        />
+        <MetricRow
+          label="GPU"
+          value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
+          detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non rilevata"}
+        />
+        <MetricRow
+          label="VRAM"
+          value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
+          detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
+        />
+        <MetricRow
+          label="CUDA Paddle"
+          value={cudaValue}
+          detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
+        />
+      </div>
     </section>
   );
 }

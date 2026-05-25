@@ -1,10 +1,10 @@
 @media (max-width: 1100px) {
   .app-header {
-    padding: 20px 24px;
+    padding: 12px 16px;
   }
 
   .workspace-content {
-    padding: 22px;
+    padding: 14px;
   }
 
   .chat-layout {
@@ -17,7 +17,7 @@
   .document-dropzone,
   .documents-list-card,
   .settings-card {
-    padding: 16px;
+    padding: 12px;
   }
 
   .documents-layout {
@@ -64,8 +64,8 @@
   }
 
   .sidebar {
-    gap: 16px;
-    padding: 16px;
+    gap: 10px;
+    padding: 10px;
     border-right: 0;
     border-bottom: 1px solid #d9e0e8;
   }
@@ -91,7 +91,8 @@
   .app-header {
     align-items: flex-start;
     flex-direction: column;
-    padding: 20px;
+    padding: 12px;
+    gap: 8px;
   }
 
   .status-row {
@@ -99,7 +100,7 @@
   }
 
   .workspace-content {
-    padding: 20px;
+    padding: 12px;
   }
 
   .section-layout {

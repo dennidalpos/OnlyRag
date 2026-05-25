@@ -35,9 +35,12 @@ body {
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 h1,
@@ -52,7 +55,13 @@ summary,
 label {
   min-width: 0;
   max-width: 100%;
-  overflow-wrap: anywhere;
+}
+
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 button:focus-visible,
@@ -76,7 +85,7 @@ textarea {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 218px minmax(0, 1fr);
   overflow: hidden;
   background: #f3f6f8;
 }
@@ -86,23 +95,26 @@ textarea {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 24px 18px;
-  border-right: 1px solid #d9e0e8;
-  background: #ffffff;
+  gap: 16px;
+  padding: 16px 12px;
+  border-right: 2px solid #cbd8e4;
+  background: #f7fbfd;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
 .brand-mark {
-  width: 42px;
-  height: 42px;
-  display: block;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
 }
 
@@ -112,8 +124,11 @@ textarea {
 }
 
 .brand p {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand span {
@@ -129,10 +144,12 @@ textarea {
 .sidebar-metrics {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #edf1f5;
+  padding: 9px;
+  border: 2px solid #cbd8e4;
+  border-radius: 8px;
+  background: #fbfdff;
 }
 
 .sidebar-metrics__header,
@@ -144,7 +161,14 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #dce5ed;
+}
+
+.sidebar-metrics__grid {
+  display: grid;
+  gap: 0;
 }
 
 .sidebar-metrics__header span,
@@ -158,42 +182,69 @@ textarea {
 .sidebar-metric small {
   color: #627084;
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.25;
 }
 
 .sidebar-metric {
   display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  border: 1px solid #d9e0e8;
-  border-radius: 8px;
-  background: #f8fafc;
+  grid-template-columns: minmax(42px, 0.65fr) minmax(0, 0.9fr);
+  gap: 2px 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e2e9f0;
+}
+
+.sidebar-metric:last-child {
+  border-bottom: 0;
 }
 
 .sidebar-metric strong {
   color: #172033;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 750;
+  text-align: right;
+}
+
+.sidebar-metric small {
+  grid-column: 1 / -1;
+}
+
+.sidebar-metrics__header span,
+.sidebar-metrics__header small,
+.sidebar-metric span,
+.sidebar-metric strong,
+.sidebar-metric small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-item {
   width: 100%;
-  min-height: 40px;
-  padding: 9px 12px;
-  border: 1px solid transparent;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid #d4dee8;
   border-radius: 8px;
-  background: transparent;
+  background: #fbfdff;
   color: #425066;
   text-align: left;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  line-height: 1.15;
+}
+
+.nav-item__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-item:hover {
-  background: #eef3f7;
+  border-color: #b7c9d9;
+  background: #eef5fa;
 }
 
 /* Button hover / active states */
@@ -230,23 +281,23 @@ button.button-secondary--active {
 }
 
 .nav-item--active {
-  border-color: #c7d6e4;
-  background: #e7f0f7;
+  border-color: #9fb8cb;
+  background: #e5f0f8;
   color: #16324f;
   font-weight: 650;
 }
 
 .nav-badge {
   flex-shrink: 0;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: #2d6f8f;
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  line-height: 20px;
+  line-height: 18px;
   text-align: center;
 }
 
@@ -262,15 +313,19 @@ button.button-secondary--active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 24px 28px;
-  border-bottom: 1px solid #d9e0e8;
-  background: #ffffff;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 2px solid #cbd8e4;
+  background: #fbfdff;
 }
 
 .app-header > h1 {
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: max-content;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 h1,
@@ -281,14 +336,16 @@ p {
 
 h1 {
   color: #172033;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
+  line-height: 1.18;
 }
 
 h2 {
   color: #172033;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .status-row {
@@ -296,21 +353,32 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 5px 10px;
+  gap: 4px;
+  min-width: 0;
+  max-width: 190px;
+  min-height: 24px;
+  padding: 3px 8px;
   border: 1px solid #d4dce5;
   border-radius: 999px;
   background: #f8fafc;
   color: #5d6878;
   font-size: 12px;
-  white-space: normal;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-badge span,
+.status-badge strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-badge strong {
@@ -343,7 +411,8 @@ h2 {
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  padding: 28px;
+  padding: 18px;
+  background: #eef4f8;
 }
 
 .workspace-content--chat {
@@ -359,14 +428,14 @@ h2 {
 .section-layout {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 420px) minmax(280px, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
 .section-copy {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .section-copy p,
@@ -377,11 +446,11 @@ h2 {
 
 .empty-state,
 .settings-list {
-  min-height: 220px;
-  padding: 22px;
-  border: 1px solid #d9e0e8;
+  min-height: 140px;
+  padding: 14px;
+  border: 2px solid #cbd8e4;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fbfdff;
 }
 
 .empty-state {

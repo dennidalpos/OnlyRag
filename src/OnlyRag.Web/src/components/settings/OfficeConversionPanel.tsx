@@ -17,14 +17,14 @@ export function OfficeConversionPanel() {
   return (
         <div className="settings-card">
           <div className="settings-card__header">
-            <h3>Supporto file Office vecchi (.doc, .xls, .ppt)</h3>
+            <h3>Office legacy (.doc, .xls, .ppt)</h3>
             <span className={`status-chip status-chip--${officeStatus?.isAvailable ? "online" : "offline"}`}>
               {officeStatus?.isAvailable ? "Disponibile" : "Non installato"}
             </span>
           </div>
           <div className="settings-form">
             <label className="field-group" htmlFor="libreoffice-path">
-              <span>Percorso LibreOffice (opzionale — rilevato automaticamente se installato)</span>
+              <span>Percorso LibreOffice</span>
               <input
                 id="libreoffice-path"
                 type="text"
@@ -61,8 +61,10 @@ export function OfficeConversionPanel() {
               )}
             </div>
             {officeStatus?.executablePath && (
-              <div className="panel-note">
-                <p>Rilevato: {officeStatus.executablePath}</p>
+              <div className="panel-note panel-note--path">
+                <p title={officeStatus.executablePath} aria-label={`Percorso rilevato: ${officeStatus.executablePath}`}>
+                  {officeStatus.executablePath}
+                </p>
               </div>
             )}
             {officeStatus?.suggestion && (

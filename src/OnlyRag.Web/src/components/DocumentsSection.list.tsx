@@ -41,7 +41,7 @@ export function DocumentListRow({
     >
       <div className="document-row__header">
         <div>
-          <strong>{document.originalFileName}</strong>
+          <strong title={document.originalFileName}>{document.originalFileName}</strong>
           <span>{formatDocumentType(document)}</span>
         </div>
         <span className={getDocumentStatusClassName(document.status)}>

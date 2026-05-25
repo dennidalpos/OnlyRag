@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { BackendStatus } from "../App";
 import type { DiagnosticsResponse } from "../api";
 import { formatTime } from "../pollingStatus";
@@ -15,6 +16,7 @@ type AppHeaderProps = {
 };
 
 export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHeaderProps) {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
   const statusBadges: StatusBadge[] = [
     { label: "Backend", value: backendStatus.backendValue, tone: backendStatus.backendTone },
@@ -29,22 +31,25 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
     }
   ];
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
   return (
     <header className="app-header">
-      <h1>{currentSection}</h1>
+      <h1 title={currentSection}>{currentSection}</h1>
       <div className="status-row" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
         {statusBadges.map((badge) => (
-          <span className={`status-badge status-badge--${badge.tone}`} key={badge.label}>
+          <span className={`status-badge status-badge--${badge.tone}`} key={badge.label} title={`${badge.label} ${badge.value}`}>
             <span>{badge.label}</span>
             <strong>{badge.value}</strong>
           </span>
         ))}
-        {backendStatus.refreshStatus.lastSuccessfulRefreshAt && (
-          <span className="status-badge status-badge--neutral">
-            <span>Aggiornato</span>
-            <strong>{formatTime(backendStatus.refreshStatus.lastSuccessfulRefreshAt)}</strong>
-          </span>
-        )}
+        <span className="status-badge status-badge--neutral" title={`Ora corrente ${formatTime(currentTime.toISOString())}`}>
+          <span>Ora</span>
+          <strong>{formatTime(currentTime.toISOString())}</strong>
+        </span>
       </div>
     </header>
   );

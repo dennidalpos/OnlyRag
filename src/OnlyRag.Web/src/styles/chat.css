@@ -1,7 +1,7 @@
 .jobs-panel {
   min-width: 0;
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .chat-layout {
@@ -19,11 +19,11 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid #d9e0e8;
+  gap: 10px;
+  padding: 12px;
+  border: 2px solid #cbd8e4;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fbfdff;
 }
 
 .chat-documents-panel {
@@ -45,7 +45,7 @@
   grid-row: 2;
   min-width: 0;
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .chat-status-stack:empty {
@@ -91,7 +91,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 14px;
+  gap: 8px;
 }
 
 .chat-model-field {
@@ -103,13 +103,15 @@
 .chat-document-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .toggle-row input,
 .chat-document-row input {
   width: 16px;
   height: 16px;
+  flex: 0 0 16px;
   accent-color: #2d6f8f;
 }
 
@@ -117,6 +119,10 @@
   color: #425066;
   font-size: 13px;
   font-weight: 650;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-document-list {
@@ -124,30 +130,38 @@
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 6px;
   overflow: auto;
 }
 
 .chat-document-row {
-  padding: 12px;
-  border: 1px solid #d9e0e8;
+  padding: 8px;
+  border: 1px solid #d7e1ea;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #f3f8fb;
 }
 
 .chat-document-row span {
   min-width: 0;
   display: grid;
-  gap: 3px;
+  flex: 1 1 auto;
+  gap: 2px;
 }
 
 .chat-document-row strong {
   color: #172033;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-document-row small {
   color: #627084;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-messages {
@@ -156,9 +170,9 @@
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 10px;
   overflow: auto;
-  padding: 4px;
+  padding: 2px;
 }
 
 .chat-message {
@@ -175,10 +189,10 @@
 
 .chat-message__bubble {
   max-width: min(760px, 88%);
-  padding: 13px 15px;
-  border: 1px solid #d9e0e8;
+  padding: 10px 12px;
+  border: 1px solid #d7e1ea;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #f5f9fc;
 }
 
 .chat-message--user .chat-message__bubble {
@@ -193,9 +207,9 @@
 
 .chat-sources {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid #d9e0e8;
 }
 
@@ -205,10 +219,10 @@
 }
 
 .chat-source {
-  padding: 8px 10px;
-  border: 1px solid #d9e0e8;
+  padding: 7px 8px;
+  border: 1px solid #d7e1ea;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fbfdff;
 }
 
 .chat-source summary {
@@ -230,11 +244,11 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid #d9e0e8;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d7e1ea;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #f5f9fc;
   color: #425066;
 }
 
@@ -243,19 +257,19 @@
   min-width: 0;
   align-self: end;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 112px);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 88px);
+  gap: 8px;
   align-items: end;
-  padding-top: 12px;
-  border-top: 1px solid #edf1f5;
-  background: #ffffff;
+  padding-top: 8px;
+  border-top: 1px solid #dce5ed;
+  background: #fbfdff;
 }
 
 .chat-input-row textarea {
   width: 100%;
-  min-height: 76px;
+  min-height: 58px;
   resize: vertical;
-  padding: 11px 12px;
+  padding: 8px 10px;
   border: 1px solid #cfd8e2;
   border-radius: 8px;
   color: #172033;
@@ -268,8 +282,8 @@
 
 .chat-input-row button,
 .chat-generating button {
-  min-height: 42px;
-  padding: 9px 14px;
+  min-height: 32px;
+  padding: 6px 10px;
   border: 1px solid #2d6f8f;
   border-radius: 8px;
   background: #2d6f8f;
@@ -283,6 +297,5 @@
 }
 
 .chat-empty-state {
-  min-height: 160px;
+  min-height: 96px;
 }
-

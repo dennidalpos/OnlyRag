@@ -4,18 +4,18 @@
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 16px;
   background: rgba(23, 32, 51, 0.42);
 }
 
 .compare-modal {
   width: min(1180px, 100%);
-  max-height: min(820px, calc(100vh - 48px));
+  max-height: min(820px, calc(100vh - 32px));
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  gap: 14px;
+  gap: 10px;
   overflow: auto;
-  padding: 20px;
+  padding: 14px;
   border: 1px solid #cfd8e2;
   border-radius: 8px;
   background: #ffffff;
@@ -31,13 +31,16 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .compare-modal__header h3 {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: #172033;
-  font-size: 18px;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .compare-modal__header span,
@@ -48,7 +51,7 @@
 }
 
 .compare-toolbar {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #f8fafc;
@@ -57,8 +60,8 @@
 .compare-toolbar button,
 .compare-modal__header button,
 .compare-footer button {
-  min-height: 40px;
-  padding: 9px 14px;
+  min-height: 32px;
+  padding: 6px 10px;
   border: 1px solid #2d6f8f;
   border-radius: 8px;
   background: #2d6f8f;
@@ -85,14 +88,14 @@ button.button-danger {
 
 .compare-unit-list {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
 }
 
 .compare-unit-pill {
-  min-height: 34px;
-  padding: 7px 11px;
+  min-height: 30px;
+  padding: 5px 9px;
   border: 1px solid #d4dce5;
   border-radius: 999px;
   background: #ffffff;
@@ -112,15 +115,15 @@ button.button-danger {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: stretch;
-  gap: 16px;
+  gap: 10px;
 }
 
 .compare-column {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #ffffff;
@@ -134,8 +137,8 @@ button.button-danger {
   flex: 1;
   overflow: auto;
   white-space: pre-wrap;
-  line-height: 1.55;
-  min-height: 200px;
+  line-height: 1.45;
+  min-height: 160px;
   font-family: inherit;
   font-size: inherit;
 }
@@ -143,9 +146,9 @@ button.button-danger {
 .compare-column textarea {
   flex: 1;
   width: 100%;
-  min-height: 200px;
+  min-height: 160px;
   resize: vertical;
-  padding: 12px;
+  padding: 8px 10px;
   border: 1px solid #cfd8e2;
   border-radius: 8px;
   color: #172033;
@@ -164,7 +167,7 @@ button.button-danger {
 }
 
 .machine-translation-note {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #f8fafc;
@@ -194,7 +197,7 @@ button.button-danger {
 }
 
 .compare-empty {
-  min-height: 180px;
+  min-height: 120px;
 }
 
 .compare-footer {
@@ -204,7 +207,7 @@ button.button-danger {
 .compare-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -241,25 +244,25 @@ button.button-danger {
   z-index: 100;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 16px;
   background: rgba(23, 32, 51, 0.72);
 }
 
 .setup-gate-modal {
   width: min(520px, 100%);
-  padding: 32px;
+  padding: 18px;
   border: 1px solid #cfd8e2;
   border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 24px 64px rgba(23, 32, 51, 0.28);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .setup-gate-modal--wide {
   width: min(760px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
+  max-height: min(760px, calc(100vh - 32px));
   overflow: auto;
 }
 
@@ -270,21 +273,21 @@ button.button-danger {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .setup-issue-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .setup-issue {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: 10px;
   align-items: start;
-  padding: 14px;
+  padding: 10px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #f8fafc;
@@ -309,7 +312,7 @@ button.button-danger {
 }
 
 .setup-issue__progress {
-  margin: 10px 0 2px;
+  margin: 8px 0 2px;
 }
 
 .setup-issue__meta {
@@ -317,8 +320,8 @@ button.button-danger {
 }
 
 .setup-issue button {
-  min-height: 40px;
-  padding: 9px 14px;
+  min-height: 32px;
+  padding: 6px 10px;
   border: 1px solid #2d6f8f;
   border-radius: 8px;
   background: #2d6f8f;
@@ -338,7 +341,7 @@ button.button-danger {
 
 .setup-gate-modal h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   color: #172033;
 }
 
@@ -351,5 +354,5 @@ button.button-danger {
 .setup-gate-modal p {
   margin: 0;
   color: #425066;
-  line-height: 1.6;
+  line-height: 1.45;
 }

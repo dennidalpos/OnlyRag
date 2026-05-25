@@ -35,13 +35,13 @@ export function ChatDocumentsPanel({
           </div>
         ) : (
           documents.map((document) => (
-            <label className="chat-document-row" key={document.id}>
+            <label className="chat-document-row" key={document.id} title={document.originalFileName}>
               <input
                 type="checkbox"
                 checked={selectedDocumentIds.includes(document.id)}
                 onChange={(event) => onToggleDocument(document.id, event.target.checked)}
               />
-              <span>
+              <span className="chat-document-row__text">
                 <strong>{document.originalFileName}</strong>
                 <small>
                   {document.chunkCount === 0 ? "Non ancora pronto per la ricerca" : "Pronto per la ricerca"}

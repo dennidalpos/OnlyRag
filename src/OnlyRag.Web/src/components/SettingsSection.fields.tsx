@@ -101,7 +101,7 @@ export function AdjustableModelContextBar({
   const activeValue = value ?? nativeNumCtx;
   const trackLabel = value == null
     ? nativeNumCtx
-      ? `${nativeNumCtx.toLocaleString("it-IT")} token (nativo)`
+      ? `${nativeNumCtx.toLocaleString("it-IT")} token`
       : "Automatico"
     : nativeNumCtx
       ? `${value.toLocaleString("it-IT")} / ${nativeNumCtx.toLocaleString("it-IT")} token`
@@ -121,7 +121,7 @@ export function AdjustableModelContextBar({
         {loading && <span className="model-context-bar__hint">Caricamento...</span>}
         {!loading && details?.numCtx && (
           <span className="model-context-bar__hint">
-            Finestra nativa: {details.numCtx.toLocaleString("it-IT")} token
+            Nativo: {details.numCtx.toLocaleString("it-IT")}
           </span>
         )}
         {!loading && !details?.numCtx && (
@@ -137,9 +137,6 @@ export function AdjustableModelContextBar({
         />
         <span>Automatico</span>
       </label>
-      <span className="model-context-bar__hint">
-        In Automatico OnlyRag non invia num_ctx e lascia il valore nativo del modello.
-      </span>
       {value != null && (
         <SettingsRangeField
           id={sliderLabel.replaceAll(" ", "-")}
@@ -155,11 +152,13 @@ export function AdjustableModelContextBar({
       )}
       {activeValue && (
         <div className="model-context-bar__track">
-          <div
-            className="model-context-bar__fill"
-            style={{ width: `${nativeNumCtx && value != null ? Math.min(100, Math.round((value / nativeNumCtx) * 100)) : 100}%` }}
-            title={trackTitle}
-          />
+          <div className="model-context-bar__rail">
+            <div
+              className="model-context-bar__fill"
+              style={{ width: `${nativeNumCtx && value != null ? Math.min(100, Math.round((value / nativeNumCtx) * 100)) : 100}%` }}
+              title={trackTitle}
+            />
+          </div>
           <span className="model-context-bar__track-label">
             {trackLabel}
           </span>

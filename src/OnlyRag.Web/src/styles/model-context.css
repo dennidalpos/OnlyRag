@@ -3,8 +3,8 @@
 .model-context-bar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 8px 10px;
   background: #f8fafc;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
@@ -18,8 +18,18 @@
   font-size: 13px;
   font-weight: 500;
   color: #425066;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.model-context-bar__label span,
+.model-context-bar__hint,
+.model-context-bar__track-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-context-bar__hint {
@@ -29,11 +39,17 @@
 }
 
 .model-context-bar__track {
-  position: relative;
-  height: 8px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.model-context-bar__rail {
+  height: 7px;
   background: #d9e0e8;
   border-radius: 4px;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .model-context-bar__fill {
@@ -46,7 +62,6 @@
 
 .model-context-bar__track-label {
   display: block;
-  margin-top: 4px;
   font-size: 11px;
   color: #627084;
   text-align: right;
