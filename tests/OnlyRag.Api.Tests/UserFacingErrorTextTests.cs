@@ -19,6 +19,24 @@ public sealed class UserFacingErrorTextTests
     }
 
     [Fact]
+    public void FromExternalDetail_RedactsCredentialLikeFragments()
+    {
+        string sensitive = "request failed with password=dummy-value Authorization: Bearer dummy-token api_key=dummy-key bearer loose-token";
+
+        string message = UserFacingErrorText.FromExternalDetail(
+            sensitive,
+            "Errore tecnico.");
+
+        Assert.Contains("password=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Authorization=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Bearer [segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("api_key=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-value", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-token", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dummy-key", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void StartupFailure_UsesGenericUserFacingPrefix()
     {
         InvalidOperationException exception = new(@"qdrant.exe failed from C:\Users\Alice\AppData\Local\OnlyRag\qdrant\qdrant.exe");

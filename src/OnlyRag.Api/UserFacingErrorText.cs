@@ -11,6 +11,12 @@ public static class UserFacingErrorText
     private static readonly Regex WindowsPathPattern = new(@"(?<![\w.])[A-Za-z]:\\(?:[^\s\\/:*?""<>|]+\\)*[^\s\\/:*?""<>|]*", RegexOptions.Compiled);
     private static readonly Regex UncPathPattern = new(@"\\\\[^\s\\/:*?""<>|]+\\(?:[^\s\\/:*?""<>|]+\\)*[^\s\\/:*?""<>|]*", RegexOptions.Compiled);
     private static readonly Regex IpEndpointPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b", RegexOptions.Compiled);
+    private static readonly Regex CredentialPattern = new(
+        @"\b(password|passwd|pwd|secret|token|api[-_ ]?key|authorization)\b\s*[:=]\s*(?:bearer\s+)?([^\s,;]+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex BearerTokenPattern = new(
+        @"\bbearer\s+[^\s,;]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static string FromExternalDetail(string? detail, string fallback)
     {
@@ -24,6 +30,8 @@ public static class UserFacingErrorText
         normalized = WindowsPathPattern.Replace(normalized, "[percorso locale]");
         normalized = UncPathPattern.Replace(normalized, "[percorso locale]");
         normalized = UrlPattern.Replace(normalized, "[endpoint esterno]");
+        normalized = CredentialPattern.Replace(normalized, "$1=[segreto]");
+        normalized = BearerTokenPattern.Replace(normalized, "Bearer [segreto]");
         normalized = IpEndpointPattern.Replace(normalized, "[host]");
         normalized = CollapseWhitespace(normalized);
 

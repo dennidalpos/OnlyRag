@@ -9,6 +9,15 @@ public sealed record QdrantSettings(
     int LocalGrpcPort = 6334,
     int RequestTimeoutSeconds = 30);
 
+public sealed record QdrantSettingsResponse(
+    string GrpcEndpoint,
+    bool HasApiKey,
+    bool TrustNonLoopbackEndpoint,
+    bool RequireTlsForRemoteEndpoint,
+    bool UseLocalBundledServer,
+    int LocalGrpcPort,
+    int RequestTimeoutSeconds);
+
 public sealed record QdrantStatusResponse(
     string Status,
     bool IsReachable,

@@ -18,7 +18,7 @@ public static partial class InProcessBackend
         app.MapGet("/api/settings/qdrant", async (
             QdrantSettingsStore settings,
             CancellationToken cancellationToken) =>
-            Results.Ok(await settings.GetAsync(cancellationToken)));
+            Results.Ok(ToQdrantSettingsResponse(await settings.GetAsync(cancellationToken))));
 
         app.MapPut("/api/settings/qdrant", async (
             QdrantSettings request,
@@ -27,7 +27,7 @@ public static partial class InProcessBackend
         {
             try
             {
-                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
+                return Results.Ok(ToQdrantSettingsResponse(await settings.UpdateAsync(request, cancellationToken)));
             }
             catch (InvalidOperationException ex)
             {
@@ -337,5 +337,17 @@ public static partial class InProcessBackend
                 app.Services,
                 "/api/ollama/models/details",
                 cancellationToken));
+    }
+
+    private static QdrantSettingsResponse ToQdrantSettingsResponse(QdrantSettings settings)
+    {
+        return new QdrantSettingsResponse(
+            settings.GrpcEndpoint,
+            !string.IsNullOrWhiteSpace(settings.ApiKey),
+            settings.TrustNonLoopbackEndpoint,
+            settings.RequireTlsForRemoteEndpoint,
+            settings.UseLocalBundledServer,
+            settings.LocalGrpcPort,
+            settings.RequestTimeoutSeconds);
     }
 }

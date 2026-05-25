@@ -23,7 +23,9 @@ $buildInstallerScript = Join-Path $PSScriptRoot "Build-Installer.ps1"
 $testInstallerPrerequisitesScript = Join-Path $PSScriptRoot "Test-InstallerPrerequisites.ps1"
 $testOcrRuntimeManifestScript = Join-Path $PSScriptRoot "ocr\Test-OcrRuntimeManifest.ps1"
 $gateDiagnosticsScript = Join-Path $PSScriptRoot "support\GateDiagnostics.ps1"
+$buildSupportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 . $gateDiagnosticsScript
+. $buildSupportScript
 
 $script:GateResults = New-Object System.Collections.Generic.List[object]
 $script:GateFailures = New-Object System.Collections.Generic.List[object]
@@ -92,14 +94,21 @@ Write-Host "Inno Setup: $(if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) 
 
 Invoke-GateStep "preflight" {
     if (-not $IsWindows) {
-        throw "OnlyRag targets Windows; run this gate on Windows."
+        throw (New-OnlyRagPrerequisiteMessage `
+            -Software "Microsoft Windows" `
+            -MinimumVersion "Windows 10 version 1809/build 17763 or Windows 11" `
+            -WhyRequired "OnlyRag is a Windows WPF/WebView2 desktop app and the repository gate validates Windows packaging/runtime assumptions" `
+            -Instruction "Run this gate on a supported Windows 10/11 client or Windows CI runner" `
+            -Verify "Press Win+R, run winver, and confirm Windows 10 version 1809/build 17763 or newer, or Windows 11")
     }
 
-    Assert-CommandAvailable -Name "dotnet" -InstallHint "Install .NET 10 SDK for Windows."
-    Assert-CommandAvailable -Name "node" -InstallHint "Install Node.js matching src\OnlyRag.Web\package.json."
-    Assert-CommandAvailable -Name "npm" -InstallHint "Install Node.js with npm matching src\OnlyRag.Web\package.json."
+    $dotnetCommand = Assert-OnlyRagDotNetSdk
+    $nodeToolchain = Assert-OnlyRagNodeToolchain
+    Write-Host "  dotnet: $($dotnetCommand.Source)"
+    Write-Host "  node: $($nodeToolchain.Node.Source)"
+    Write-Host "  npm: $($nodeToolchain.Npm.Source)"
     Write-GateToolVersion -Name "dotnet" -Arguments @("--version")
-    Write-GateToolVersion -Name "node" -Arguments @("--version")
+    Write-Host "  node version: $($nodeToolchain.NodeVersionText)"
     Write-GateToolVersion -Name "npm" -Arguments @("--version")
 
     if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) {

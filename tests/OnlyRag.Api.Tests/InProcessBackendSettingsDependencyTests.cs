@@ -168,6 +168,43 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task QdrantSettings_DoesNotReturnStoredApiKey()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        const string apiKey = "dummy-qdrant-api-key";
+
+        QdrantSettings request = new(
+            GrpcEndpoint: "https://qdrant.example.test:6334",
+            ApiKey: apiKey,
+            TrustNonLoopbackEndpoint: true,
+            RequireTlsForRemoteEndpoint: true,
+            UseLocalBundledServer: false,
+            LocalGrpcPort: 6334,
+            RequestTimeoutSeconds: 45);
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync(
+            "/api/settings/qdrant",
+            request,
+            JsonOptions);
+        string putBody = await putResponse.Content.ReadAsStringAsync();
+        using HttpResponseMessage getResponse = await httpClient.GetAsync("/api/settings/qdrant");
+        string getBody = await getResponse.Content.ReadAsStringAsync();
+        QdrantSettingsResponse? current = JsonSerializer.Deserialize<QdrantSettingsResponse>(getBody, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.DoesNotContain(apiKey, putBody, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, getBody, StringComparison.Ordinal);
+        Assert.NotNull(current);
+        Assert.True(current.HasApiKey);
+        Assert.Equal("https://qdrant.example.test:6334", current.GrpcEndpoint);
+        Assert.False(current.UseLocalBundledServer);
+        Assert.Equal(45, current.RequestTimeoutSeconds);
+    }
+
+    [Fact]
     public async Task OllamaModelEndpoints_AcceptNamesWithSlashAndTag()
     {
         await using FakeOllamaServer ollama = await FakeOllamaServer.StartAsync();

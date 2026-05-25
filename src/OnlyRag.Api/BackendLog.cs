@@ -49,7 +49,7 @@ internal static class BackendLog
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"OnlyRag backend log write failed: {ex.Message}");
+            Debug.WriteLine($"OnlyRag backend log write failed: {SanitizeLogMessage(ex.Message)}");
         }
     }
 

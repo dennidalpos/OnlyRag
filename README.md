@@ -54,7 +54,7 @@ Optional features:
 - Python 3.10 through 3.13 for the PaddleOCR bridge. Python 3.14 is not supported by the pinned PaddlePaddle runtime.
 - Optional NVIDIA GPU OCR acceleration through PaddlePaddle GPU wheels when a compatible Windows NVIDIA driver is available. CPU OCR remains the fallback.
 - Inno Setup 6 for installer generation.
-- Windows SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
+- Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
 
 Installed app:
 
@@ -79,6 +79,8 @@ development server is not running.
 When a blocking prerequisite is missing, bootstrap/build/package scripts stop with the software
 name, supported version, reason, official install action, and verification command instead of
 continuing to a generic tool failure.
+The repository gate performs the same early checks for .NET 10 SDK, supported Node.js/npm, and
+Windows host compatibility before restore, tests, build, or packaging steps run.
 
 In Debug builds the WPF shell can use the Vite dev server on loopback. If `ONLYRAG_WEB_DEV_SERVER`
 is set, it must be an `http` or `https` loopback URL without embedded credentials; other URLs are
@@ -162,6 +164,21 @@ Check installer prerequisite messaging:
 ```powershell
 pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest
 ```
+
+Troubleshoot prerequisite failures:
+
+- **.NET SDK**: install the official .NET 10 SDK for Windows, then verify with
+  `dotnet --list-sdks`.
+- **Node.js/npm**: install official Node.js 20.19.x or 22.12+ for Windows with npm, then verify
+  with `node --version` and `npm --version`.
+- **WebView2 Runtime**: install the official Microsoft Edge WebView2 Evergreen Runtime, then
+  verify from Settings > Apps or by locating `msedgewebview2.exe` under
+  `Program Files\Microsoft\EdgeWebView\Application`.
+- **Inno Setup**: install official Inno Setup 6, then verify with `ISCC.exe /?`.
+- **Windows SDK signing tools**: install the official Microsoft Windows 10/11 SDK or pass
+  `-SignToolPath`, then verify with `signtool.exe /?`.
+- **Python OCR**: install Python 3.10, 3.11, 3.12, or 3.13 for Windows when OCR provisioning is
+  needed, then verify with `python --version` or `py -3.13 --version`.
 
 Create installer evidence without installing:
 

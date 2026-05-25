@@ -25,6 +25,32 @@ if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
 }
 
 $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+$assetName = [string]$manifest.assetName
+if ([string]::IsNullOrWhiteSpace($assetName) -or $assetName -ne [System.IO.Path]::GetFileName($assetName)) {
+    throw "Qdrant manifest assetName must be a file name without directory components."
+}
+
+$requiredProperties = @("downloadUrl", "sha256")
+foreach ($propertyName in $requiredProperties) {
+    if ($manifest.PSObject.Properties.Name -notcontains $propertyName -or [string]::IsNullOrWhiteSpace([string]$manifest.$propertyName)) {
+        throw "Qdrant manifest must contain a non-empty $propertyName value."
+    }
+}
+
+foreach ($propertyName in @("downloadUrl", "licenseUrl")) {
+    if ($manifest.PSObject.Properties.Name -notcontains $propertyName) {
+        continue
+    }
+
+    $uri = $null
+    if (-not [System.Uri]::TryCreate([string]$manifest.$propertyName, [System.UriKind]::Absolute, [ref]$uri) `
+        -or $uri.Scheme -ne [System.Uri]::UriSchemeHttps `
+        -or $uri.UserInfo.Length -gt 0 `
+        -or ($uri.Host -ne "github.com" -and $uri.Host -ne "raw.githubusercontent.com")) {
+        throw "Qdrant manifest $propertyName must be an HTTPS github.com or raw.githubusercontent.com URL without credentials."
+    }
+}
+
 $qdrantExe = Join-Path $OutputDirectory "qdrant.exe"
 $licensePath = Join-Path $OutputDirectory "LICENSE"
 if (-not $Force -and (Test-Path -LiteralPath $qdrantExe -PathType Leaf) -and (Test-Path -LiteralPath $licensePath -PathType Leaf)) {

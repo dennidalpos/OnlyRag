@@ -22,7 +22,7 @@ public static partial class InProcessBackend
             throw new InvalidOperationException("OnlyRag in-process backend can only bind to a loopback address.");
         }
 
-        Directory.CreateDirectory(descriptor.StoragePaths.DataRoot);
+        PrepareDataRoot(descriptor.StoragePaths.DataRoot);
         BackendLog.Write(descriptor.StoragePaths, "Starting in-process backend.");
 
         string sessionToken = ResolveSessionToken(options);
@@ -57,6 +57,22 @@ public static partial class InProcessBackend
             BackendLog.Write(descriptor.StoragePaths, $"In-process backend failed to start: {ex.Message}");
             await app.DisposeAsync();
             throw;
+        }
+    }
+
+    private static void PrepareDataRoot(string dataRoot)
+    {
+        try
+        {
+            Directory.CreateDirectory(dataRoot);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            throw new InvalidOperationException(
+                "Impossibile preparare la directory runtime principale di OnlyRag. " +
+                $"Percorso: {dataRoot}. " +
+                "Verifica che il percorso non sia un file e che l'utente corrente abbia permessi di lettura e scrittura.",
+                ex);
         }
     }
 }

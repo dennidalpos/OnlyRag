@@ -256,6 +256,9 @@ function Assert-Condition {
 }
 
 if ($SelfTest) {
+    $buildSupportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
+    . $buildSupportScript
+
     $present = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $true -WebView2Present $true
     Assert-Condition -Condition $present.CanInstall -Message "Expected simulated present WebView2 to allow setup."
     Assert-Condition -Condition ($present.Missing.Count -eq 0) -Message "Expected no missing prerequisites for simulated present WebView2."
@@ -290,6 +293,20 @@ if ($SelfTest) {
     $longNameMessage = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $true -WebView2Present $false -AppName $longProductName
     Assert-Condition -Condition ($longNameMessage.Message -like "*$longProductName*") -Message "Expected installer message to preserve long product name."
     Assert-InstallerMessageLayout -Message $longNameMessage.Message -Scenario "long product name"
+
+    $missingSignToolPath = Join-Path ([System.IO.Path]::GetTempPath()) "onlyrag-missing-signtool-$([Guid]::NewGuid().ToString('N')).exe"
+    $signToolMessage = $null
+    try {
+        Get-OnlyRagSignTool -RequestedPath $missingSignToolPath | Out-Null
+    }
+    catch {
+        $signToolMessage = $_.Exception.Message
+    }
+
+    Assert-Condition -Condition (-not [string]::IsNullOrWhiteSpace($signToolMessage)) -Message "Expected missing signtool path to fail."
+    foreach ($expected in @("Windows SDK signtool.exe", "Minimum supported version", "Why it is required", "Instruction", "Verify")) {
+        Assert-Condition -Condition ($signToolMessage -like "*$expected*") -Message "Expected signtool prerequisite message to contain '$expected'."
+    }
 
     Write-Host "Installer prerequisite self-test passed." -ForegroundColor Green
     exit 0

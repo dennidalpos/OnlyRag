@@ -108,7 +108,12 @@ function Get-OnlyRagSignTool {
 
     if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
         if (-not (Test-Path -LiteralPath $RequestedPath -PathType Leaf)) {
-            throw "signtool.exe was not found at '$RequestedPath'."
+            throw (New-OnlyRagPrerequisiteMessage `
+                -Software "Windows SDK signtool.exe" `
+                -MinimumVersion "Windows 10/11 SDK with x64 signtool.exe" `
+                -WhyRequired "OnlyRag uses signtool.exe to Authenticode-sign and verify Windows installer release candidates" `
+                -Instruction "Install the official Microsoft Windows SDK or pass -SignToolPath with the full path to signtool.exe, then rerun the signing command" `
+                -Verify "Run signtool.exe /? or confirm signtool.exe exists under Program Files\Windows Kits\10\bin\*\x64")
         }
 
         return (Resolve-Path -LiteralPath $RequestedPath).Path
@@ -167,7 +172,12 @@ function Invoke-OnlyRagInstallerSigning {
 
     $resolvedSignTool = Get-OnlyRagSignTool -RequestedPath $SignToolPath
     if (-not $resolvedSignTool) {
-        throw "signtool.exe was not found. Install the Windows SDK or pass -SignToolPath."
+        throw (New-OnlyRagPrerequisiteMessage `
+            -Software "Windows SDK signtool.exe" `
+            -MinimumVersion "Windows 10/11 SDK with x64 signtool.exe" `
+            -WhyRequired "OnlyRag uses signtool.exe to Authenticode-sign and verify Windows installer release candidates" `
+            -Instruction "Install the official Microsoft Windows SDK or pass -SignToolPath with the full path to signtool.exe, then rerun the signing command" `
+            -Verify "Run signtool.exe /? or confirm signtool.exe exists under Program Files\Windows Kits\10\bin\*\x64")
     }
 
     $normalizedThumbprint = $CertificateThumbprint.Replace(" ", "")

@@ -21,6 +21,10 @@ export type QdrantSettings = {
   requestTimeoutSeconds: number;
 };
 
+export type QdrantSettingsResponse = Omit<QdrantSettings, "apiKey"> & {
+  hasApiKey: boolean;
+};
+
 export type OllamaModelDetails = {
   name: string;
   numCtx: number | null;
