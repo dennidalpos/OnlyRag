@@ -29,6 +29,21 @@ The bootstrap checks the Windows host, PowerShell, .NET, WebView2, Node/npm, opt
 optional LibreOffice, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages, installs web
 dependencies, and prepares OCR when supported Python is available.
 
+## Command Map
+
+Run these from the repository root with PowerShell 7:
+
+| task | command |
+|---|---|
+| Setup dependencies | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` |
+| Check all required gates | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Build desktop app | `pwsh .\scripts\Build-App.ps1 -Configuration Release` |
+| Start desktop app | `dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug` |
+| Build unsigned installer | `pwsh .\scripts\Build-Installer.ps1 -Configuration Release` |
+| Sign installer | `pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>` |
+| Verify signed installer lifecycle | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle` |
+| Clean generated outputs | `pwsh .\scripts\Clean.ps1` |
+
 ## Main Verification
 
 Use the repository gate before handoff or release candidate work:
@@ -56,6 +71,19 @@ Interpretation:
   Setup installer.
 - A release candidate also needs signing and installer lifecycle evidence on a clean Windows
   verification machine.
+- CI uses `.github\workflows\ci.yml` to run `Invoke-Gate.ps1 -Configuration Release` on
+  `windows-latest`.
+
+## Runtime Configuration
+
+Required environment variables: none.
+
+Optional environment variables:
+
+- `ONLYRAG_WEB_DEV_SERVER`: Debug-only WebView2 source override. Only loopback `http` or `https`
+  URLs without embedded credentials are accepted.
+- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice is outside standard
+  Windows install locations.
 
 ## Local Runtime Locations
 
@@ -64,6 +92,18 @@ local storage, jobs, settings, chat history, OCR cache, logs, WebView2 profile d
 
 Installed application files are placed under `%LOCALAPPDATA%\Programs\OnlyRag` by the Inno Setup
 installer. Uninstall preserves user data under `%LOCALAPPDATA%\OnlyRag`.
+
+Generated repository outputs are ignored by Git:
+
+- `src\OnlyRag.Web\dist`
+- `src\OnlyRag.Web\node_modules`
+- project `bin` and `obj` folders
+- `packaging\qdrant\payload`
+- `artifacts`
+- frontend and Playwright test output folders
+
+Use `pwsh .\scripts\Clean.ps1` after local verification when generated outputs are no longer
+needed.
 
 ## Release Handoff
 

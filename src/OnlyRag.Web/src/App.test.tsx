@@ -82,6 +82,9 @@ describe("App initial setup", () => {
 
     render(<App />);
 
+    expect(screen.getByRole("link", { name: "Salta al contenuto principale" })).toHaveAttribute("href", "#main-workspace");
+    expect(screen.getByRole("main", { name: "Chat" })).toBeInTheDocument();
+
     const status = await screen.findByLabelText("Stato applicazione");
     await waitFor(() => {
       expect(status).toHaveTextContent("Backend");

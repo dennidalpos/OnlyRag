@@ -76,11 +76,11 @@
   background: #f3f8fb;
 }
 
-.document-row[role="button"] {
+.document-row[role="option"] {
   cursor: pointer;
 }
 
-.document-row[role="button"]:hover {
+.document-row[role="option"]:hover {
   border-color: #c7d6e4;
   background: #f1f7fb;
 }

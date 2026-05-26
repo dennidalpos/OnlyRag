@@ -34,6 +34,28 @@ body {
   border: 0;
 }
 
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 2000;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  border: 2px solid #2d6f8f;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: #16324f;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus-visible {
+  outline: 2px solid #2d6f8f;
+  outline-offset: 2px;
+  transform: translateY(0);
+}
+
 button {
   display: inline-flex;
   align-items: center;
@@ -67,7 +89,8 @@ label {
 button:focus-visible,
 input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible,
-[role="button"]:focus-visible {
+[role="button"]:focus-visible,
+[role="option"]:focus-visible {
   outline: 2px solid #2d6f8f;
   outline-offset: 2px;
 }
@@ -307,6 +330,10 @@ button.button-secondary--active {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.workspace:focus {
+  outline: none;
 }
 
 .app-header {

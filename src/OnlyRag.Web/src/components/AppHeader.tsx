@@ -38,7 +38,7 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
 
   return (
     <header className="app-header">
-      <h1 title={currentSection}>{currentSection}</h1>
+      <h1 id="workspace-title" title={currentSection}>{currentSection}</h1>
       <div className="status-row">
         <div className="status-row__states" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
           {statusBadges.map((badge) => (

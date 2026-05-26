@@ -62,7 +62,7 @@ Installed app:
 - Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions. Direct app launch also checks this before loading the UI.
 - The installer package is self-contained for the required .NET runtime components and includes the bundled Qdrant runtime; end users do not need to install .NET separately.
 
-## Fresh Install
+## Fresh Checkout
 
 From a clean checkout on Windows, run PowerShell 7 from the repository root:
 
@@ -106,6 +106,21 @@ End users configure optional dependencies from **Settings** in the app:
 
 ## Commands
 
+Run commands from the repository root with PowerShell 7 unless a command explicitly changes into
+`src\OnlyRag.Web`.
+
+| task | command |
+|---|---|
+| Setup dependencies | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` |
+| Start desktop app | `dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug` |
+| Start Vite dev server | `Set-Location .\src\OnlyRag.Web; npm run dev` |
+| Check repository | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Build app | `pwsh .\scripts\Build-App.ps1 -Configuration Release` |
+| Build installer | `pwsh .\scripts\Build-Installer.ps1 -Configuration Release` |
+| Sign release installer | `pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>` |
+| Verify signed installer lifecycle | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle` |
+| Clean generated outputs | `pwsh .\scripts\Clean.ps1` |
+
 Build the web UI:
 
 ```powershell
@@ -132,6 +147,7 @@ The gate includes npm production dependency audit, NuGet transitive vulnerabilit
 typecheck/lint/format/test, .NET tests, installer prerequisite self-test, web build, and .NET build.
 Use `-ContinueOnError` when diagnosing a failing checkout and you want the gate to keep running
 independent checks before printing a consolidated failure summary.
+CI runs the same Release gate on `windows-latest`.
 
 Run web tests, lint, and formatter checks directly:
 
@@ -186,7 +202,27 @@ Create installer evidence without installing:
 pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe
 ```
 
-The repository gate runs web lint and formatter checks before tests and builds.
+## Runtime Configuration
+
+Required environment variables: none.
+
+Supported optional environment variables:
+
+- `ONLYRAG_WEB_DEV_SERVER`: Debug-only WebView2 source override. Must be a loopback `http` or
+  `https` URL without credentials.
+- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice is installed outside
+  the standard locations.
+
+Generated local outputs:
+
+- `src\OnlyRag.Web\dist`: bundled production web UI.
+- `src\OnlyRag.Web\node_modules`: npm dependencies.
+- `bin` and `obj` folders under .NET projects.
+- `packaging\qdrant\payload`: verified Qdrant runtime payload.
+- `artifacts\publish`, `artifacts\installer`, and `artifacts\release-verification`: packaging
+  and release evidence outputs.
+
+These paths are ignored by Git. Use `pwsh .\scripts\Clean.ps1` to remove generated outputs.
 
 ## Project Status
 

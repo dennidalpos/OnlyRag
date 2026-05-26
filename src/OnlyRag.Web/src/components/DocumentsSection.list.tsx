@@ -32,9 +32,9 @@ export function DocumentListRow({
   return (
     <article
       className={isSelected ? "document-row document-row--selected" : "document-row"}
-      role="button"
+      role="option"
       tabIndex={isBusy ? -1 : 0}
-      aria-pressed={isSelected}
+      aria-selected={isSelected}
       aria-disabled={isBusy}
       onClick={() => !isBusy && onSelect(document.id)}
       onKeyDown={handleKeyDown}

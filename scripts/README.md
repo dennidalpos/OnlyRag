@@ -2,6 +2,29 @@
 
 Run repository scripts from the repository root with PowerShell 7 unless noted otherwise.
 
+## Canonical Flows
+
+```powershell
+pwsh .\scripts\Bootstrap-Prerequisites.ps1
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+pwsh .\scripts\Build-App.ps1 -Configuration Release
+dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
+```
+
+Installer packaging and signed release verification require additional local tools:
+
+```powershell
+pwsh .\scripts\Build-Installer.ps1 -Configuration Release
+pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>
+pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle
+```
+
+Generated outputs can be removed with:
+
+```powershell
+pwsh .\scripts\Clean.ps1
+```
+
 | script | path | purpose | when to use | called by | prerequisites | outputs | notes |
 |---|---|---|---|---|---|---|---|
 | Bootstrap prerequisites | `scripts\Bootstrap-Prerequisites.ps1` | Verify local prerequisites, restore .NET packages, install web dependencies, and prepare optional OCR runtime. | Fresh checkout setup or dependency repair. | Manual. | Windows, PowerShell 7, .NET 10 SDK; Node/npm unless `-SkipNode`; optional Python/Ollama/LibreOffice. | `%LOCALAPPDATA%\OnlyRag`, restored packages, `src\OnlyRag.Web\node_modules`, optional OCR env. | Does not build, package, deploy, sign, or release. |

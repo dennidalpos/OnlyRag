@@ -38,6 +38,10 @@ pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>
 
 See [Signing](../docs/SIGNING.md) for certificate handling.
 
+The normal CI workflow does not compile the installer. Package readiness requires
+`pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` or
+`pwsh .\scripts\Build-Installer.ps1 -Configuration Release` on a Windows machine with Inno Setup 6.
+
 ## Installer Behavior
 
 The installer:

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
 
@@ -183,7 +184,15 @@ public sealed partial class SqliteDocumentRepository
             insertChunk.AddParameter("$contentHash", chunk.ContentHash);
             insertChunk.AddParameter(
                 "$metadataJson",
-                $$"""{"document_id":{{documentId}},"page_start":{{chunk.PageStart}},"page_end":{{chunk.PageEnd}},"ordinal":{{chunk.Ordinal}},"token_count":{{chunk.ApproximateTokenCount}},"content_hash":"{{chunk.ContentHash}}"}""");
+                JsonSerializer.Serialize(new
+                {
+                    document_id = documentId,
+                    page_start = chunk.PageStart,
+                    page_end = chunk.PageEnd,
+                    ordinal = chunk.Ordinal,
+                    token_count = chunk.ApproximateTokenCount,
+                    content_hash = chunk.ContentHash,
+                }));
             insertChunk.AddParameter("$now", now);
             await insertChunk.ExecuteNonQueryAsync(cancellationToken);
         }

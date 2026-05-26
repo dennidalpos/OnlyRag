@@ -307,6 +307,9 @@ export default function App() {
 
   return (
     <div className="desktop-shell">
+      <a className="skip-link" href="#main-workspace">
+        Salta al contenuto principale
+      </a>
       <Sidebar
         activeSection={activeSection}
         sections={sectionLabels}
@@ -314,9 +317,9 @@ export default function App() {
         activeJobCount={parseInt(backendStatus.jobsValue, 10) || 0}
         diagnostics={diagnostics}
       />
-      <main className="workspace">
+      <main className="workspace" id="main-workspace" aria-labelledby="workspace-title" tabIndex={-1}>
         <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} diagnostics={diagnostics} />
-        <section className={`workspace-content workspace-content--${activeSection}`} aria-label={sectionLabels[activeSection]}>
+        <section className={`workspace-content workspace-content--${activeSection}`} aria-labelledby="workspace-title">
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
               {shouldSurfaceRefreshFailure(backendStatus.refreshStatus)

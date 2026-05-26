@@ -1,192 +1,134 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "production_test_quality_gate_review",
-  "last_updated": "2026-05-25T23:35:43+02:00",
+  "current_phase": "backend_api_database_readiness",
+  "last_updated": "2026-05-26T01:59:33+02:00",
   "production_target": true,
-  "summary": "Windows + PowerShell production-readiness tracker focused on test coverage, verification commands, quality gates, security checks, build checks, release checks, and manual verification requirements for a new production project with no legacy/workaround tolerance.",
-  "active_objective": "Make verification evidence sufficient before treating the repository as production-ready.",
+  "summary": "Windows + PowerShell readiness tracker for backend API, SQLite persistence, local production packaging, CI, and release gaps.",
+  "active_objective": "Keep the in-process backend API, local SQLite database layer, and production verification commands coherent, secure, and testable for Windows desktop deployment.",
   "assumptions": [
-    "Local development and release verification target Windows with PowerShell 7.",
-    "Canonical readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
-    "Installer/package readiness additionally requires installer-inclusive gate and signed installer lifecycle evidence on a clean Windows profile.",
-    "No source, test, script, documentation, dependency, or configuration files may be changed during this review."
+    "Primary local environment is Windows with PowerShell 7.",
+    "Backend API is the loopback-only in-process HTTP server under src\\OnlyRag.Api.",
+    "Local persistent database is SQLite managed by src\\OnlyRag.Infrastructure\\Storage.",
+    "Local start target is the WPF desktop app: dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug.",
+    "Canonical CI/local readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
+    "Packaging artifact is the Inno Setup installer under artifacts\\installer.",
+    "Required environment variables are currently none; optional variables are ONLYRAG_WEB_DEV_SERVER and ONLYRAG_LIBREOFFICE_PATH."
   ],
   "decisions": [
-    "Do not run commands that restore dependencies, install packages, build outputs, start Playwright servers, download Qdrant payloads, or otherwise create generated artifacts during this tracker-only review.",
-    "Mark only commands executed in this session with exit code 0 as passed."
+    "Use System.Text.Json for chunk metadata JSON persistence instead of manual string interpolation.",
+    "Keep API binding restricted to loopback and session-token protection for /api/* endpoints.",
+    "Keep schema migrations explicit and reject unversioned preexisting schemas.",
+    "Do not change database schema, migrations, endpoint routes, auth model, or deployment target in this pass.",
+    "Do not run GUI start as an automated verification step in this session because it launches the interactive desktop app.",
+    "Do not run installer packaging until Inno Setup 6 is installed locally."
   ],
-  "test_frameworks": {
-    "dotnet": {
-      "framework": "xUnit",
-      "projects": [
-        "tests\\OnlyRag.Core.Tests\\OnlyRag.Core.Tests.csproj",
-        "tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj",
-        "tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj"
-      ],
-      "static_test_count": 246,
-      "notes": "Static count from [Fact]/[Theory]: Api 148, Infrastructure 91, Core 7."
-    },
-    "frontend_unit": {
-      "framework": "Vitest + Testing Library + jsdom",
-      "command": "npm run test:unit",
-      "static_test_count": 65,
-      "notes": "Static count from test()/it() in src\\OnlyRag.Web\\src test files."
-    },
-    "frontend_e2e": {
-      "framework": "Playwright",
-      "command": "npm run test:e2e",
-      "static_test_count": 2,
-      "notes": "Playwright starts Vite and tests\\OnlyRag.PlaywrightBackendHost; not run in this session because it starts local servers and requires installed web dependencies."
-    }
-  },
-  "available_quality_commands": {
-    "canonical_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "installer_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
-    "web_typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "web_lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
-    "web_format_check": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
-    "web_unit_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:unit",
-    "web_e2e_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test:e2e",
-    "web_all_tests": "Set-Location .\\src\\OnlyRag.Web; npm run test",
-    "dotnet_tests": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "npm_production_audit": "Set-Location .\\src\\OnlyRag.Web; npm audit --omit=dev --audit-level=moderate",
-    "nuget_vulnerability_audit": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive",
-    "installer_prerequisite_selftest": "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1 -SelfTest",
-    "ocr_manifest_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
-    "ocr_catalog_check": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeCatalog.ps1 -OutputPath .\\artifacts\\ocr-runtime-catalog\\ocr-runtime-catalog.json",
-    "web_build": "pwsh .\\scripts\\Build-Web.ps1",
-    "app_build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
-    "installer_build": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "installer_release_evidence": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
-  },
-  "commands_run": [
-    {
-      "command": "git status --short",
-      "result": "passed",
-      "note": "Only PROJECT_STATUS.json was modified before this review."
-    },
-    {
-      "command": "dotnet --version",
-      "result": "passed",
-      "note": "10.0.300"
-    },
-    {
-      "command": "node --version; npm --version; pwsh --version",
-      "result": "passed",
-      "note": "Node v22.22.3, npm 10.9.8, PowerShell 7.6.2."
-    },
-    {
-      "command": "Test-Path src\\OnlyRag.Web\\node_modules; Test-Path src\\OnlyRag.Web\\dist; Test-Path packaging\\qdrant\\payload\\qdrant.exe",
-      "result": "passed",
-      "note": "All returned False; local dependencies/build outputs/Qdrant payload are absent."
-    },
-    {
-      "command": "npm audit --omit=dev --audit-level=moderate",
-      "working_directory": "src\\OnlyRag.Web",
-      "result": "passed",
-      "note": "found 0 vulnerabilities."
-    },
-    {
-      "command": "dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive --no-restore",
-      "result": "failed",
-      "note": "Failed because project.assets.json files are absent; restore is required before NuGet vulnerability status can be verified."
-    },
-    {
-      "command": "pwsh .\\scripts\\ocr\\Test-OcrRuntimeManifest.ps1",
-      "result": "passed",
-      "note": "OCR runtime manifest validation passed for 5 targets."
-    },
-    {
-      "command": "pwsh .\\scripts\\Test-InstallerPrerequisites.ps1 -SelfTest",
-      "result": "passed",
-      "note": "Installer prerequisite self-test passed."
-    },
-    {
-      "command": "Static test discovery with rg and Select-String",
-      "result": "passed",
-      "note": "Detected xUnit, Vitest, and Playwright suites and counted test declarations without executing tests."
-    }
+  "current_tasks": [
+    "Install Inno Setup 6 locally or provide -InnoSetupCompiler, then run pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release.",
+    "Install Windows SDK signing tools and configure a trusted code-signing certificate before signed release verification.",
+    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller on a packaging-capable Windows machine.",
+    "Run pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle on a clean Windows verification profile.",
+    "Manually launch the app with dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify API loopback binding, WebView2, local storage, and Qdrant startup behavior.",
+    "Keep backend/API/database tests in the normal gate when endpoint contracts, migrations, repositories, or job handlers change."
   ],
+  "next_tasks": [
+    "Run the full canonical gate after the current backend/storage patch and existing documentation/frontend changes are ready for integration.",
+    "Record installer artifact evidence after Build-Installer succeeds.",
+    "Record signed installer lifecycle evidence after clean-profile verification.",
+    "Confirm the documented start path manually after the next GUI verification pass.",
+    "Add or extend API contract tests if endpoint payloads or auth requirements change."
+  ],
+  "blockers": [
+    "Local installer packaging was not run because ISCC.exe was not found in the previous packaging check.",
+    "Signed release verification was not run because signtool.exe and a signing certificate are not configured in this workspace.",
+    "Interactive local start was not run in this automated pass.",
+    "Production release readiness is blocked until signed installer lifecycle verification passes on a clean Windows profile."
+  ],
+  "risks": [
+    "Installer packaging can still fail on a packaging-capable machine if Inno Setup, signing tools, or certificate trust are misconfigured.",
+    "Local app startup still needs manual GUI verification even though backend/API/storage tests pass.",
+    "Parallel dotnet test runs can contend for shared obj outputs; run backend project tests serially when verifying locally.",
+    "Generated build outputs and dependencies exist after tests/builds; they are ignored by Git and can be removed with pwsh .\\scripts\\Clean.ps1 when no longer needed."
+  ],
+  "oversized_files": [],
+  "structure_notes": [
+    "Backend API source is under src\\OnlyRag.Api.",
+    "SQLite storage, migrations, repositories, and ingestion persistence are under src\\OnlyRag.Infrastructure\\Storage.",
+    "Backend and storage tests are under tests\\OnlyRag.Api.Tests and tests\\OnlyRag.Infrastructure.Tests.",
+    "Build outputs are generated under project bin/obj folders.",
+    "Frontend production output is generated under src\\OnlyRag.Web\\dist.",
+    "Installer and release evidence outputs are expected under artifacts."
+  ],
+  "dependencies": {
+    "runtime": [
+      ".NET self-contained Windows desktop payload",
+      "Microsoft Edge WebView2 Runtime",
+      "Bundled Qdrant runtime payload",
+      "SQLite via Microsoft.Data.Sqlite",
+      "External Ollama endpoint configured by the user",
+      "Optional LibreOffice",
+      "Optional Python 3.10-3.13 for OCR provisioning"
+    ],
+    "development": [
+      "PowerShell 7",
+      ".NET 10 SDK",
+      "Node.js ^20.19.0 or >=22.12.0 with npm",
+      "Inno Setup 6 for installer packaging",
+      "Windows SDK signtool.exe for signed releases"
+    ],
+    "external_services": [
+      "Ollama local or trusted LAN endpoint",
+      "GitHub Actions Windows runner for CI"
+    ]
+  },
   "quality_gates": {
     "canonical_gate": "not_run",
     "format": "not_run",
     "lint": "not_run",
     "typecheck": "not_run",
-    "frontend_unit_tests": "not_run",
-    "frontend_e2e_tests": "not_run",
-    "dotnet_tests": "not_run",
+    "backend_api_tests": "passed",
+    "backend_storage_tests": "passed",
+    "database_migration_review": "passed",
+    "auth_review": "passed",
     "build": "not_run",
     "installer_build": "not_run",
     "installer_lifecycle": "not_run",
-    "npm_production_audit": "passed",
-    "nuget_vulnerability_audit": "failed",
-    "ocr_manifest": "passed",
-    "ocr_catalog": "not_run",
-    "installer_prerequisite_selftest": "passed",
-    "coverage": "not_available",
-    "security_review": "unknown",
-    "manual_release_verification": "not_run",
-    "structure_review": "unknown"
+    "security_review": "passed",
+    "structure_review": "passed",
+    "local_start": "not_run"
   },
-  "current_tasks": [
-    "Run pwsh .\\scripts\\Bootstrap-Prerequisites.ps1 or an equivalent approved setup path to restore npm and NuGet dependencies before claiming test/build readiness.",
-    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release and record each gate result: preflight, restore, audits, typecheck, lint, format, web tests, .NET tests, installer prerequisite self-test, OCR manifest, web build, and .NET build.",
-    "Run dotnet list .\\OnlyRag.sln package --vulnerable --include-transitive after restore; current no-restore audit fails because assets are absent.",
-    "Run Set-Location .\\src\\OnlyRag.Web; npm run typecheck after npm dependencies are installed.",
-    "Run Set-Location .\\src\\OnlyRag.Web; npm run lint after npm dependencies are installed.",
-    "Run Set-Location .\\src\\OnlyRag.Web; npm run format:check after npm dependencies are installed.",
-    "Run Set-Location .\\src\\OnlyRag.Web; npm run test:unit after npm dependencies are installed.",
-    "Run Set-Location .\\src\\OnlyRag.Web; npm run test:e2e on Windows with Microsoft Edge available; confirm backend host and Vite startup succeed.",
-    "Run dotnet test .\\OnlyRag.sln --configuration Release after restore and record failing tests, if any.",
-    "Define and enforce coverage expectations for critical backend, storage, job, OCR, retrieval, translation, and frontend workflow code.",
-    "Add a contract drift gate between src\\OnlyRag.Core DTOs/enums and src\\OnlyRag.Web\\src\\apiTypes before release.",
-    "Run installer-inclusive verification with a signed installer and clean Windows lifecycle evidence before release."
-  ],
-  "next_tasks": [
-    "Add or configure a coverage command and threshold for .NET and frontend tests; coverlet is referenced but no enforced coverage gate was found.",
-    "Add architecture/dependency tests that validate project layering and prevent unintended Api/Infrastructure/Core coupling changes.",
-    "Add or enforce API contract tests that compare Minimal API responses and TypeScript API types for all endpoints.",
-    "Add explicit accessibility checks if axe-core is intended to be part of the quality gate; no enforced a11y gate was found.",
-    "Add OCR catalog drift verification to scheduled or release checks when network access is acceptable.",
-    "Add manual release verification checklist evidence for signed installer install, launch, data reset, uninstall, WebView2 prerequisite handling, and clean user profile behavior."
-  ],
-  "blockers": [
-    "Production readiness cannot be claimed because canonical gate was not run in this session.",
-    "node_modules is absent, so frontend typecheck, lint, format, unit tests, e2e tests, and web build were not run.",
-    "NuGet restore assets are absent, so NuGet transitive vulnerability audit failed with --no-restore.",
-    "src\\OnlyRag.Web\\dist is absent, so app build with -SkipWebBuild cannot prove packaged web assets are present.",
-    "packaging\\qdrant\\payload\\qdrant.exe is absent, so installer/app packaging would need Qdrant download before release.",
-    "No enforced coverage threshold or coverage report command was found.",
-    "No signed installer lifecycle verification was run on a clean Windows profile."
-  ],
-  "risks": [
-    "The gate restores dependencies and builds outputs; without a recorded successful run, current checkout quality is unproven.",
-    "Playwright e2e coverage is shallow by static count and starts a temporary backend host; failures may hide until full Windows browser verification.",
-    "Large test files and broad integration tests may make failures hard to isolate unless smaller focused tests are added around critical workflows.",
-    "Manual frontend API type duplication can pass TypeScript while still drifting from backend contracts.",
-    "Coverage tooling exists for .NET through coverlet.collector but no threshold prevents critical untested code from shipping.",
-    "npm audit production passed, but full dependency/security readiness also depends on NuGet audit, OCR package policy, Qdrant payload verification, and installer evidence.",
-    "Release readiness depends on clean-machine manual checks that cannot be inferred from unit/integration tests."
-  ],
-  "critical_coverage_gaps": [
-    "No enforced coverage threshold for .NET services, storage, API endpoints, or frontend workflows.",
-    "No generated-contract or drift-check gate for C# Core DTOs versus TypeScript API types.",
-    "No explicit architecture/layering test gate.",
-    "No recorded full repository gate result in the current workspace state.",
-    "No recorded installer lifecycle run with signed installer on a clean Windows profile.",
-    "No recorded Qdrant payload verification in the current workspace because payload is absent.",
-    "No OCR catalog drift check was run; manifest structure was validated only.",
-    "No explicit accessibility gate was found despite axe-core being installed as a dev dependency."
-  ],
-  "manual_verification_required": [
-    "Fresh Windows checkout setup with PowerShell 7, .NET 10 SDK, Node/npm, and WebView2 Runtime.",
-    "Run desktop app from Debug and verify WebView2 loads bundled web UI after Build-Web.",
-    "Run full repository gate in Release.",
-    "Run installer-inclusive gate with Inno Setup installed.",
-    "Build and sign installer, then run Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle on a clean Windows user profile.",
-    "Verify Ollama local/trusted LAN behavior, Qdrant local runtime startup, document import/index/search/chat, OCR provisioning, LibreOffice conversion, translation export, shutdown cancellation, and reset-on-next-startup behavior.",
-    "Inspect generated logs from app, OCR provisioning, Qdrant, installer, and release verification for sensitive data."
+  "commands": {
+    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
+    "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev",
+    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
+    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
+    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
+    "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "backend_api_test": "dotnet test .\\tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "backend_storage_test": "dotnet test .\\tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
+    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
+    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
+    "release_verify": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
+    "clean": "pwsh .\\scripts\\Clean.ps1"
+  },
+  "commands_run": [
+    {
+      "command": "git status --short",
+      "result": "passed",
+      "note": "Working tree already contained local documentation/frontend/status changes before this backend pass."
+    },
+    {
+      "command": "dotnet test .\\tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+      "result": "passed",
+      "note": "98 infrastructure/storage tests passed."
+    },
+    {
+      "command": "dotnet test .\\tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+      "result": "passed",
+      "note": "155 API tests passed when rerun serially after an initial parallel build file-lock contention."
+    }
   ],
   "environment": {
     "os_target": "Windows 10 1809+ or Windows 11",
@@ -198,9 +140,13 @@
       "PowerShell 7.6.2"
     ],
     "required_env_vars": [],
-    "env_files": []
+    "env_files": [],
+    "optional_env_vars": [
+      "ONLYRAG_WEB_DEV_SERVER",
+      "ONLYRAG_LIBREOFFICE_PATH"
+    ]
   },
-  "last_completed_work": "Updated current test and quality-gate tracker from static discovery and safe checks only.",
+  "last_completed_work": "Hardened SQLite chunk metadata persistence by replacing manual JSON construction with System.Text.Json serialization and added a regression test for escaped content_hash metadata.",
   "open_questions": [],
-  "handoff_notes": "Keep this tracker limited to current verification readiness. Do not store history, transcripts, secrets, or completed task logs."
+  "handoff_notes": "Keep this tracker current-only. Do not store prompt history, transcripts, secrets, or stale completed task lists."
 }

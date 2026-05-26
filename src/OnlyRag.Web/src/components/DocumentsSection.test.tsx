@@ -103,6 +103,8 @@ describe("DocumentsSection", () => {
 
     expect(await screen.findByText("1 file importato. Analisi e indicizzazione in corso.")).toBeInTheDocument();
     expect((await screen.findAllByText("contratto.pdf")).length).toBeGreaterThan(0);
+    const documentList = screen.getByRole("listbox", { name: "Documenti importati" });
+    expect(within(documentList).getByRole("option", { name: /contratto\.pdf/ })).toHaveAttribute("aria-selected", "true");
 
     const importCall = api.calls.find((call) => call.path === "/api/documents/import");
     expect(importCall?.body).toBeInstanceOf(FormData);

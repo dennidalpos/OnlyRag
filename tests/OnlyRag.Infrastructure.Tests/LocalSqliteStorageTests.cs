@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
@@ -299,6 +300,46 @@ public sealed partial class LocalSqliteStorageTests
         await documents.ClearIngestionAsync(document.Id);
 
         Assert.Equal(0, await CountRowsAsync(tempStorage, "chunks", "document_id = $documentId", document.Id));
+    }
+
+    [Fact]
+    public async Task DocumentRepository_SaveIngestedPageAsync_WritesValidChunkMetadataJson()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+        await storage.InitializeAsync();
+        SqliteDocumentRepository documents = new(tempStorage.CreateConnectionFactory());
+
+        ImportedDocument document = await documents.CreateAsync(new CreateDocumentRecordRequest(
+            "doc-metadata",
+            "sample.txt",
+            Path.Combine(tempStorage.Root, "sample.txt"),
+            "sha-metadata",
+            "text/plain",
+            ".txt",
+            12,
+            DocumentStatus.Imported,
+            PageCount: 0,
+            CurrentJobId: null,
+            LastError: null,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow));
+        const string contentHash = "hash-\"quoted\"\\slash";
+        await documents.SaveIngestedPageAsync(
+            document.Id,
+            new IngestedDocumentPage(1, "alpha beta"),
+            [new IngestedDocumentChunk(1, 1, 0, "alpha beta", 2, contentHash)],
+            pageCount: 1);
+
+        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT metadata_json FROM chunks WHERE document_id = $documentId;";
+        command.AddParameter("$documentId", document.Id);
+
+        string metadataJson = Assert.IsType<string>(await command.ExecuteScalarAsync());
+        using JsonDocument metadata = JsonDocument.Parse(metadataJson);
+        Assert.Equal(document.Id, metadata.RootElement.GetProperty("document_id").GetInt64());
+        Assert.Equal(contentHash, metadata.RootElement.GetProperty("content_hash").GetString());
     }
 
 }

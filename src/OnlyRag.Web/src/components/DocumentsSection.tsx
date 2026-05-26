@@ -149,7 +149,7 @@ export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
           ) : documents.length === 0 ? (
             <div className="empty-state" role="status"><p>Nessun documento presente. Importa un file per iniziare.</p></div>
           ) : (
-            <div className="documents-list" aria-label="Documenti importati">
+            <div className="documents-list" role="listbox" aria-label="Documenti importati">
               {documents.map((doc) => (
                 <DocumentListRow
                   key={doc.id}
