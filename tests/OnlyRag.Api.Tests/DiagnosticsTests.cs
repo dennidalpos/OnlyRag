@@ -251,6 +251,33 @@ public sealed class DiagnosticsTests
         }
     }
 
+    [Fact]
+    public void BackendLog_ConcurrentWrites_DoNotDropEntries()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "OnlyRag.DiagTests", Guid.NewGuid().ToString("N"));
+        AppStoragePaths paths = AppStoragePaths.FromRoot(root);
+
+        try
+        {
+            const int entryCount = 64;
+            Parallel.For(0, entryCount, index =>
+                BackendLog.Write(paths, $"concurrent-log-entry-{index:D2}"));
+
+            string content = File.ReadAllText(Path.Combine(paths.LogsDirectory, "backend.log"));
+            for (int index = 0; index < entryCount; index++)
+            {
+                Assert.Contains($"concurrent-log-entry-{index:D2}", content, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static HttpClient CreateAuthenticatedClient(InProcessBackendHandle backend)
     {
         HttpClient httpClient = new()

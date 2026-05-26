@@ -1,62 +1,69 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "backend_api_database_readiness",
-  "last_updated": "2026-05-26T01:59:33+02:00",
+  "current_phase": "production_readiness_performance_observability",
+  "last_updated": "2026-05-26T02:36:00+02:00",
   "production_target": true,
-  "summary": "Windows + PowerShell readiness tracker for backend API, SQLite persistence, local production packaging, CI, and release gaps.",
-  "active_objective": "Keep the in-process backend API, local SQLite database layer, and production verification commands coherent, secure, and testable for Windows desktop deployment.",
+  "summary": "Windows + PowerShell readiness tracker for backend API, local SQLite persistence, frontend build, installer packaging, performance, logging, and observability.",
+  "active_objective": "Keep the local Windows desktop app production-ready by validating performance-sensitive paths, preserving sanitized local logs, and closing packaging and runtime verification gaps.",
   "assumptions": [
     "Primary local environment is Windows with PowerShell 7.",
     "Backend API is the loopback-only in-process HTTP server under src\\OnlyRag.Api.",
-    "Local persistent database is SQLite managed by src\\OnlyRag.Infrastructure\\Storage.",
-    "Local start target is the WPF desktop app: dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug.",
-    "Canonical CI/local readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
-    "Packaging artifact is the Inno Setup installer under artifacts\\installer.",
+    "Local persistence is SQLite under src\\OnlyRag.Infrastructure\\Storage.",
+    "Frontend is the Vite/React WebView app under src\\OnlyRag.Web.",
+    "Canonical local readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
     "Required environment variables are currently none; optional variables are ONLYRAG_WEB_DEV_SERVER and ONLYRAG_LIBREOFFICE_PATH."
   ],
   "decisions": [
-    "Use System.Text.Json for chunk metadata JSON persistence instead of manual string interpolation.",
-    "Keep API binding restricted to loopback and session-token protection for /api/* endpoints.",
-    "Keep schema migrations explicit and reject unversioned preexisting schemas.",
-    "Do not change database schema, migrations, endpoint routes, auth model, or deployment target in this pass.",
-    "Do not run GUI start as an automated verification step in this session because it launches the interactive desktop app.",
-    "Do not run installer packaging until Inno Setup 6 is installed locally."
+    "Keep API binding restricted to loopback with session-token protection for /api/* endpoints.",
+    "Keep local backend logs sanitized and bounded by file rotation.",
+    "Prefer small verified observability fixes over speculative instrumentation.",
+    "Do not introduce new dependencies, telemetry backends, metrics exporters, schema changes, or public API changes without explicit production requirements."
   ],
   "current_tasks": [
-    "Install Inno Setup 6 locally or provide -InnoSetupCompiler, then run pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release.",
-    "Install Windows SDK signing tools and configure a trusted code-signing certificate before signed release verification.",
-    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller on a packaging-capable Windows machine.",
-    "Run pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle on a clean Windows verification profile.",
-    "Manually launch the app with dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify API loopback binding, WebView2, local storage, and Qdrant startup behavior.",
-    "Keep backend/API/database tests in the normal gate when endpoint contracts, migrations, repositories, or job handlers change."
+    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release after local changes are ready for full verification.",
+    "Run remaining frontend checks from src\\OnlyRag.Web: npm run lint and npm run format:check.",
+    "Manually launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify WebView2, loopback API, Qdrant startup, document import, job progress, diagnostics, and logs.",
+    "Define production observability requirements before adding structured metrics, retention policy changes, external telemetry, or traffic-level performance targets.",
+    "Install Inno Setup 6 and Windows SDK signing tools before signed installer verification."
   ],
   "next_tasks": [
-    "Run the full canonical gate after the current backend/storage patch and existing documentation/frontend changes are ready for integration.",
-    "Record installer artifact evidence after Build-Installer succeeds.",
-    "Record signed installer lifecycle evidence after clean-profile verification.",
-    "Confirm the documented start path manually after the next GUI verification pass.",
-    "Add or extend API contract tests if endpoint payloads or auth requirements change."
+    "Review Diagnostics endpoint cost under realistic polling frequency and document library size.",
+    "Profile ingestion, embedding, and retrieval with representative local documents before changing batching, caching, or concurrency defaults.",
+    "Verify installer build with pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release on a packaging-capable Windows machine.",
+    "Verify signed installer lifecycle with pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle."
   ],
   "blockers": [
-    "Local installer packaging was not run because ISCC.exe was not found in the previous packaging check.",
-    "Signed release verification was not run because signtool.exe and a signing certificate are not configured in this workspace.",
-    "Interactive local start was not run in this automated pass.",
-    "Production release readiness is blocked until signed installer lifecycle verification passes on a clean Windows profile."
+    "Traffic, polling frequency, log retention, and metrics backend requirements are not defined.",
+    "Installer packaging is blocked locally until ISCC.exe from Inno Setup 6 is available.",
+    "Signed release verification is blocked until signtool.exe and a trusted code-signing certificate are configured.",
+    "Interactive desktop startup and installer lifecycle verification require manual Windows execution."
   ],
   "risks": [
-    "Installer packaging can still fail on a packaging-capable machine if Inno Setup, signing tools, or certificate trust are misconfigured.",
-    "Local app startup still needs manual GUI verification even though backend/API/storage tests pass.",
-    "Parallel dotnet test runs can contend for shared obj outputs; run backend project tests serially when verifying locally.",
-    "Generated build outputs and dependencies exist after tests/builds; they are ignored by Git and can be removed with pwsh .\\scripts\\Clean.ps1 when no longer needed."
+    "Diagnostics currently gathers live system, OCR, Ollama, and Qdrant status; frequent UI polling could become expensive without measured polling targets.",
+    "Local file logging is intentionally simple and sanitized; it is not a substitute for centralized production telemetry if fleet observability is required.",
+    "Ingestion, OCR, embedding, and translation throughput depend on local hardware, Ollama model choice, Qdrant state, LibreOffice, Python OCR packages, and document mix.",
+    "Parallel dotnet test runs can contend for shared obj outputs; run project-level backend tests serially when verifying locally.",
+    "Generated build outputs under bin, obj, dist, artifacts, and package caches must remain ignored and out of source changes."
   ],
   "oversized_files": [],
+  "critical_files": [
+    "src\\OnlyRag.Api\\BackendLog.cs",
+    "src\\OnlyRag.Api\\InProcessBackend.cs",
+    "src\\OnlyRag.Api\\InProcessBackend.Application.cs",
+    "src\\OnlyRag.Api\\InProcessBackend.AppEndpoints.cs",
+    "src\\OnlyRag.Api\\LocalJobWorkerService.cs",
+    "src\\OnlyRag.Api\\QdrantLocalRuntimeService.cs",
+    "src\\OnlyRag.Api\\SystemTelemetryService.cs",
+    "src\\OnlyRag.Infrastructure\\Storage",
+    "src\\OnlyRag.Web\\package.json",
+    "scripts\\Invoke-Gate.ps1"
+  ],
   "structure_notes": [
     "Backend API source is under src\\OnlyRag.Api.",
     "SQLite storage, migrations, repositories, and ingestion persistence are under src\\OnlyRag.Infrastructure\\Storage.",
+    "Frontend source is under src\\OnlyRag.Web\\src; production output is generated under src\\OnlyRag.Web\\dist.",
     "Backend and storage tests are under tests\\OnlyRag.Api.Tests and tests\\OnlyRag.Infrastructure.Tests.",
-    "Build outputs are generated under project bin/obj folders.",
-    "Frontend production output is generated under src\\OnlyRag.Web\\dist.",
     "Installer and release evidence outputs are expected under artifacts."
   ],
   "dependencies": {
@@ -84,12 +91,14 @@
   "quality_gates": {
     "canonical_gate": "not_run",
     "format": "not_run",
+    "dotnet_format": "passed",
     "lint": "not_run",
-    "typecheck": "not_run",
+    "typecheck": "passed",
+    "frontend_build": "passed",
     "backend_api_tests": "passed",
-    "backend_storage_tests": "passed",
-    "database_migration_review": "passed",
-    "auth_review": "passed",
+    "backend_storage_tests": "not_run",
+    "database_migration_review": "not_run",
+    "auth_review": "not_run",
     "build": "not_run",
     "installer_build": "not_run",
     "installer_lifecycle": "not_run",
@@ -113,31 +122,13 @@
     "release_verify": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
     "clean": "pwsh .\\scripts\\Clean.ps1"
   },
-  "commands_run": [
-    {
-      "command": "git status --short",
-      "result": "passed",
-      "note": "Working tree already contained local documentation/frontend/status changes before this backend pass."
-    },
-    {
-      "command": "dotnet test .\\tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-      "result": "passed",
-      "note": "98 infrastructure/storage tests passed."
-    },
-    {
-      "command": "dotnet test .\\tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-      "result": "passed",
-      "note": "155 API tests passed when rerun serially after an initial parallel build file-lock contention."
-    }
-  ],
   "environment": {
     "os_target": "Windows 10 1809+ or Windows 11",
     "shell": "PowerShell 7",
     "observed_tools": [
-      "dotnet 10.0.300",
-      "node v22.22.3",
-      "npm 10.9.8",
-      "PowerShell 7.6.2"
+      ".NET 10 SDK",
+      "Node.js and npm",
+      "PowerShell 7"
     ],
     "required_env_vars": [],
     "env_files": [],
@@ -146,7 +137,11 @@
       "ONLYRAG_LIBREOFFICE_PATH"
     ]
   },
-  "last_completed_work": "Hardened SQLite chunk metadata persistence by replacing manual JSON construction with System.Text.Json serialization and added a regression test for escaped content_hash metadata.",
-  "open_questions": [],
-  "handoff_notes": "Keep this tracker current-only. Do not store prompt history, transcripts, secrets, or stale completed task lists."
+  "last_completed_work": "Hardened local backend logging for concurrent writes and added sanitized ingestion/Qdrant operational log events with API test coverage.",
+  "open_questions": [
+    "What production polling interval is expected for diagnostics and status views?",
+    "Should production observability remain local-file-only, or integrate with a specific metrics/log collector?",
+    "What document sizes, model choices, and concurrent job counts define the immediate production performance target?"
+  ],
+  "handoff_notes": "Keep this tracker current-only. Do not store prompt history, transcripts, secrets, stale completed task lists, or report-style logs."
 }

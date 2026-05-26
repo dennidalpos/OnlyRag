@@ -87,13 +87,13 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
         }
         catch (OfficeConversionUnavailableException ex)
         {
-            BackendLog.Write(descriptor.StoragePaths, $"Office conversion unavailable for document {document.Id}: {ex.Message}");
+            BackendLog.WriteException(descriptor.StoragePaths, job.Id, $"Office conversion unavailable for document {document.Id}.", ex);
             await documents.SetStatusAsync(document.Id, DocumentStatus.RequiresAdditionalComponent, job.Id, ex.Message, cancellationToken);
             await queue.FailAsync(job.Id, ex.Message, retryable: false, cancellationToken);
         }
         catch (OfficeConversionException ex)
         {
-            BackendLog.Write(descriptor.StoragePaths, $"Office conversion failed for document {document.Id}: {ex.Message}");
+            BackendLog.WriteException(descriptor.StoragePaths, job.Id, $"Office conversion failed for document {document.Id}.", ex);
             string message = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
                 "Conversione Office non completata. Dettagli tecnici disponibili nei log locali.");
@@ -105,6 +105,7 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
             string message = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
                 "Documento non indicizzato. Dettagli tecnici disponibili nei log locali.");
+            BackendLog.WriteException(descriptor.StoragePaths, job.Id, $"Document ingestion failed for document {document.Id}.", ex);
             await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
             await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
         }
@@ -132,7 +133,7 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
         }
         catch (Exception ex)
         {
-            BackendLog.Write(descriptor.StoragePaths, $"Auto-embedding skipped for document {documentId}: {ex.Message}");
+            BackendLog.WriteException(descriptor.StoragePaths, null, $"Auto-embedding skipped for document {documentId}.", ex);
         }
     }
 

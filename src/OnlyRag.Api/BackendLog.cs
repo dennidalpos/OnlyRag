@@ -8,6 +8,7 @@ internal static class BackendLog
     private const long MaxLogFileSizeBytes = 5 * 1024 * 1024;
     private const int MaxLogFiles = 3;
     private const string LogFileName = "backend.log";
+    private static readonly object FileLock = new();
 
     public static void Write(AppStoragePaths paths, string message) =>
         WriteCore(paths, correlationId: null, message);
@@ -42,10 +43,13 @@ internal static class BackendLog
 
         try
         {
-            Directory.CreateDirectory(paths.LogsDirectory);
-            string logPath = Path.Combine(paths.LogsDirectory, LogFileName);
-            RotateIfNeeded(logPath);
-            File.AppendAllText(logPath, line);
+            lock (FileLock)
+            {
+                Directory.CreateDirectory(paths.LogsDirectory);
+                string logPath = Path.Combine(paths.LogsDirectory, LogFileName);
+                RotateIfNeeded(logPath);
+                File.AppendAllText(logPath, line);
+            }
         }
         catch (Exception ex)
         {

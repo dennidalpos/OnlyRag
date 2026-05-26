@@ -181,6 +181,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             attached = true;
 
             await File.WriteAllTextAsync(ResolvePidPath(), process.Id.ToString(), cancellationToken);
+            BackendLog.Write(descriptor.StoragePaths, $"Qdrant local runtime process started with pid {process.Id}.");
         }
         catch
         {
