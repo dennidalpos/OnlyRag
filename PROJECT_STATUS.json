@@ -1,11 +1,11 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "production_readiness_performance_observability",
-  "last_updated": "2026-05-26T02:17:29+02:00",
+  "current_phase": "production_readiness_manual_release_verification",
+  "last_updated": "2026-05-26T02:33:50+02:00",
   "production_target": true,
   "summary": "Windows + PowerShell readiness tracker for backend API, local SQLite persistence, frontend build, installer packaging, performance, logging, and observability.",
-  "active_objective": "Keep the local Windows desktop app production-ready; automated Release verification is passing, with only manual desktop and release-signing environment checks still open.",
+  "active_objective": "Keep the local Windows desktop app production-ready; automated Release verification is passing, Diagnostics polling cost is mitigated, and only manual desktop plus release-signing environment checks remain open.",
   "assumptions": [
     "Primary local environment is Windows with PowerShell 7.",
     "Backend API is the loopback-only in-process HTTP server under src\\OnlyRag.Api.",
@@ -17,36 +17,37 @@
   "decisions": [
     "Keep API binding restricted to loopback with session-token protection for /api/* endpoints.",
     "Keep local backend logs sanitized and bounded by file rotation.",
-    "Prefer small verified observability fixes over speculative instrumentation.",
+    "Cache expensive Diagnostics probes briefly instead of adding telemetry backends or broad instrumentation without defined production requirements.",
     "Do not introduce new dependencies, telemetry backends, metrics exporters, schema changes, or public API changes without explicit production requirements."
   ],
   "current_tasks": [
     "Manually launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify WebView2, loopback API, Qdrant startup, document import, job progress, diagnostics, and logs.",
-    "Define production observability requirements before adding structured metrics, retention policy changes, external telemetry, or traffic-level performance targets.",
-    "Install Inno Setup 6 and Windows SDK signing tools before signed installer verification."
+    "Install Inno Setup 6, Windows SDK signing tools, and a trusted code-signing certificate before signed installer verification.",
+    "Run installer build and signed installer lifecycle verification after the packaging/signing tools are available."
   ],
   "next_tasks": [
-    "Review Diagnostics endpoint cost under realistic polling frequency and document library size.",
     "Profile ingestion, embedding, and retrieval with representative local documents before changing batching, caching, or concurrency defaults.",
-    "Verify installer build with pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release on a packaging-capable Windows machine.",
-    "Verify signed installer lifecycle with pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle."
+    "Define production observability requirements before adding structured metrics, retention policy changes, external telemetry, or traffic-level performance targets.",
+    "Resolve existing full-solution dotnet format CRLF/whitespace drift before making dotnet format a release gate."
   ],
   "blockers": [
-    "Traffic, polling frequency, log retention, and metrics backend requirements are not defined.",
+    "Traffic, log retention, and metrics backend requirements are not defined.",
     "Installer packaging is blocked locally because ISCC.exe from Inno Setup 6 was not found on PATH.",
     "Signed release verification is blocked because signtool.exe was not found on PATH and a trusted code-signing certificate is not configured.",
     "Interactive desktop startup and installer lifecycle verification require manual Windows execution."
   ],
   "risks": [
-    "Diagnostics currently gathers live system, OCR, Ollama, and Qdrant status; frequent UI polling could become expensive without measured polling targets.",
+    "Diagnostics live Ollama and Qdrant checks still run per request; OCR and system telemetry probes are cached for 10 seconds, but realistic polling targets should still be measured before adding more instrumentation.",
     "Local file logging is intentionally simple and sanitized; it is not a substitute for centralized production telemetry if fleet observability is required.",
     "Ingestion, OCR, embedding, and translation throughput depend on local hardware, Ollama model choice, Qdrant state, LibreOffice, Python OCR packages, and document mix.",
+    "Full-solution dotnet format currently reports pre-existing CRLF/whitespace drift outside the Diagnostics change scope; the touched files pass targeted dotnet format verification.",
     "Parallel dotnet test runs can contend for shared obj outputs; run project-level backend tests serially when verifying locally.",
     "Generated build outputs under bin, obj, dist, artifacts, and package caches must remain ignored and out of source changes."
   ],
   "oversized_files": [],
   "critical_files": [
     "src\\OnlyRag.Api\\BackendLog.cs",
+    "src\\OnlyRag.Api\\DiagnosticsProbeCacheService.cs",
     "src\\OnlyRag.Api\\InProcessBackend.cs",
     "src\\OnlyRag.Api\\InProcessBackend.Application.cs",
     "src\\OnlyRag.Api\\InProcessBackend.AppEndpoints.cs",
@@ -89,7 +90,7 @@
   "quality_gates": {
     "canonical_gate": "passed",
     "format": "passed",
-    "dotnet_format": "passed",
+    "dotnet_format": "failed",
     "lint": "passed",
     "typecheck": "passed",
     "frontend_build": "passed",
@@ -135,7 +136,7 @@
       "ONLYRAG_LIBREOFFICE_PATH"
     ]
   },
-  "last_completed_work": "Aligned the Playwright smoke test with the document listbox option role and passed the full Release repository gate.",
+  "last_completed_work": "Added short-lived caching for expensive Diagnostics probes and passed the full Release repository gate.",
   "open_questions": [
     "What production polling interval is expected for diagnostics and status views?",
     "Should production observability remain local-file-only, or integrate with a specific metrics/log collector?",

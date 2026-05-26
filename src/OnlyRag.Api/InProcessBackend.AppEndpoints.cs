@@ -95,6 +95,7 @@ public static partial class InProcessBackend
             IOcrEngine ocrEngine,
             OcrGpuCapabilityService ocrGpuCapability,
             SystemTelemetryService systemTelemetry,
+            DiagnosticsProbeCacheService diagnosticsProbeCache,
             CancellationToken cancellationToken) =>
         {
             string ollamaStatus;
@@ -113,10 +114,10 @@ public static partial class InProcessBackend
                 ollamaReachable = false;
             }
 
-            OcrEngineAvailability ocrAvailability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
             QdrantStatusResponse qdrantStatus = await qdrantRuntime.EnsureLocalServerAsync(qdrantVectorStore, cancellationToken);
-            OcrGpuCapabilityResponse gpuCapability = await ocrGpuCapability.CheckAsync(ocrEngine, cancellationToken);
-            SystemTelemetryResponse telemetry = await systemTelemetry.CaptureAsync(cancellationToken);
+            OcrEngineAvailability ocrAvailability = await diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken);
+            OcrGpuCapabilityResponse gpuCapability = await diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, cancellationToken);
+            SystemTelemetryResponse telemetry = await diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken);
 
             return Results.Ok(new DiagnosticsResponse(
                 BackendLog.ResolveAppVersion(),
