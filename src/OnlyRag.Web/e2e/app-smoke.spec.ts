@@ -263,7 +263,7 @@ test("smoke: import, job state, backend offline, and preview modal", async ({ pa
     buffer: Buffer.from("# Contratto")
   });
   await expect(page.getByText("1 file importato. Analisi e indicizzazione in corso.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /contratto\.md Markdown Pronto/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /contratto\.md Markdown Pronto/ })).toBeVisible();
 
   await page.getByRole("button", { name: "Operazioni 1" }).click();
   await expect(page.getByText("Importazione documento")).toBeVisible();

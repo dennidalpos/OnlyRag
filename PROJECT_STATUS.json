@@ -2,10 +2,10 @@
   "project_name": "OnlyRag",
   "status": "active",
   "current_phase": "production_readiness_performance_observability",
-  "last_updated": "2026-05-26T02:36:00+02:00",
+  "last_updated": "2026-05-26T02:17:29+02:00",
   "production_target": true,
   "summary": "Windows + PowerShell readiness tracker for backend API, local SQLite persistence, frontend build, installer packaging, performance, logging, and observability.",
-  "active_objective": "Keep the local Windows desktop app production-ready by validating performance-sensitive paths, preserving sanitized local logs, and closing packaging and runtime verification gaps.",
+  "active_objective": "Keep the local Windows desktop app production-ready; automated Release verification is passing, with only manual desktop and release-signing environment checks still open.",
   "assumptions": [
     "Primary local environment is Windows with PowerShell 7.",
     "Backend API is the loopback-only in-process HTTP server under src\\OnlyRag.Api.",
@@ -21,8 +21,6 @@
     "Do not introduce new dependencies, telemetry backends, metrics exporters, schema changes, or public API changes without explicit production requirements."
   ],
   "current_tasks": [
-    "Run pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release after local changes are ready for full verification.",
-    "Run remaining frontend checks from src\\OnlyRag.Web: npm run lint and npm run format:check.",
     "Manually launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify WebView2, loopback API, Qdrant startup, document import, job progress, diagnostics, and logs.",
     "Define production observability requirements before adding structured metrics, retention policy changes, external telemetry, or traffic-level performance targets.",
     "Install Inno Setup 6 and Windows SDK signing tools before signed installer verification."
@@ -35,8 +33,8 @@
   ],
   "blockers": [
     "Traffic, polling frequency, log retention, and metrics backend requirements are not defined.",
-    "Installer packaging is blocked locally until ISCC.exe from Inno Setup 6 is available.",
-    "Signed release verification is blocked until signtool.exe and a trusted code-signing certificate are configured.",
+    "Installer packaging is blocked locally because ISCC.exe from Inno Setup 6 was not found on PATH.",
+    "Signed release verification is blocked because signtool.exe was not found on PATH and a trusted code-signing certificate is not configured.",
     "Interactive desktop startup and installer lifecycle verification require manual Windows execution."
   ],
   "risks": [
@@ -89,17 +87,17 @@
     ]
   },
   "quality_gates": {
-    "canonical_gate": "not_run",
-    "format": "not_run",
+    "canonical_gate": "passed",
+    "format": "passed",
     "dotnet_format": "passed",
-    "lint": "not_run",
+    "lint": "passed",
     "typecheck": "passed",
     "frontend_build": "passed",
     "backend_api_tests": "passed",
-    "backend_storage_tests": "not_run",
+    "backend_storage_tests": "passed",
     "database_migration_review": "not_run",
     "auth_review": "not_run",
-    "build": "not_run",
+    "build": "passed",
     "installer_build": "not_run",
     "installer_lifecycle": "not_run",
     "security_review": "passed",
@@ -137,7 +135,7 @@
       "ONLYRAG_LIBREOFFICE_PATH"
     ]
   },
-  "last_completed_work": "Hardened local backend logging for concurrent writes and added sanitized ingestion/Qdrant operational log events with API test coverage.",
+  "last_completed_work": "Aligned the Playwright smoke test with the document listbox option role and passed the full Release repository gate.",
   "open_questions": [
     "What production polling interval is expected for diagnostics and status views?",
     "Should production observability remain local-file-only, or integrate with a specific metrics/log collector?",
