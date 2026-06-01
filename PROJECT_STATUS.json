@@ -1,143 +1,53 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "structure_cleanup_audit",
-  "last_updated": "2026-06-01T09:46:45+02:00",
-  "production_target": true,
-  "summary": "Repository layout is coherent for a Windows desktop app, but scoped cleanup remains before it should be considered structure-clean.",
-  "active_objective": "Finish safe repository structure and cleanliness hardening without broad functional refactors.",
-  "assumptions": [
-    "Primary production target is Windows 10 1809 or newer / Windows 11 with PowerShell 7 for repository operations.",
-    "npm is the frontend package manager because src/OnlyRag.Web/package-lock.json is present.",
-    "Generated build, dependency, test, and packaging outputs should stay ignored rather than tracked."
-  ],
-  "decisions": [
-    "Keep verification centered on scripts\\Invoke-Gate.ps1 -Configuration Release.",
-    "Do not remove ignored artifacts automatically when they may contain current local validation evidence.",
-    "Do not split oversized source or test files in a structure audit unless the responsibility boundary is obvious and low-risk."
-  ],
-  "current_tasks": [
-    "Review remaining oversized source, style, script, and test files and split only where responsibilities are clear.",
-    "Decide whether ignored artifacts\\ollama-resilience-audit.md should be deleted, moved into docs, or retained as local evidence.",
-    "Keep .gitignore aligned with generated outputs, local editor state, and secret-bearing environment files.",
-    "Confirm certificate handling keeps private signing material outside the repository."
-  ],
-  "next_tasks": [
-    "Run scripts\\Invoke-Gate.ps1 -Configuration Release before implementation or release handoff.",
-    "Run scripts\\Clean.ps1 when local build/test/dependency outputs are no longer needed.",
-    "Run installer lifecycle validation only on a clean Windows verification machine when packaging is in scope."
-  ],
-  "blockers": [
-    "Signed installer lifecycle validation requires Inno Setup, signtool, a trusted signing certificate, and a clean Windows verification machine.",
-    "Live Ollama, WebView shell, and OCR GPU validation require representative local runtime environments."
+  "last_updated": "2026-06-01T16:40:57+02:00",
+  "active_objective": "Close remaining validation and handoff work after the translation placeholder repair.",
+  "plan": [
+    {
+      "priority": 1,
+      "task": "Validate the affected translation document with a live Ollama model and confirm placeholders such as {Folder1name} survive repair.",
+      "status": "pending",
+      "blocked_by": "Requires local Ollama runtime and the affected document."
+    },
+    {
+      "priority": 2,
+      "task": "Run the canonical repository gate: pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
+      "status": "pending",
+      "blocked_by": null
+    },
+    {
+      "priority": 3,
+      "task": "Review oversized files touched or identified during cleanup and split only where responsibilities are clearly mixed.",
+      "status": "pending",
+      "blocked_by": null
+    },
+    {
+      "priority": 4,
+      "task": "Remove generated/local outputs when no longer needed: packaging\\qdrant\\payload, bin/obj, src\\OnlyRag.Web\\dist, node_modules.",
+      "status": "pending",
+      "blocked_by": "Keep local outputs if they are still needed for immediate verification."
+    },
+    {
+      "priority": 5,
+      "task": "Run release-only checks when packaging is in scope: installer lifecycle, WebView shell validation, and representative OCR/Ollama runtime checks.",
+      "status": "pending",
+      "blocked_by": "Requires Inno Setup, signtool/signing certificate where applicable, and representative Windows runtime environments."
+    }
   ],
   "risks": [
-    "Several files exceed review thresholds and may hide mixed responsibilities until explicitly split.",
-    "Ignored artifacts may contain useful local evidence or stale reports; removal policy needs a project decision.",
-    "Full production readiness cannot be proven from structure cleanup alone without the canonical gate and external runtime validation."
+    "A live model may still fail the repair prompt; validation should then keep the unit failed rather than save corrupted output.",
+    "Full release readiness is unknown until the Release gate and runtime-specific validations pass."
   ],
-  "oversized_files": [
-    "tests/OnlyRag.Api.Tests/InProcessBackendDocumentTests.cs (513 lines)",
-    "src/OnlyRag.Web/src/components/SettingsSection.test.tsx (492 lines)",
-    "tests/OnlyRag.Api.Tests/DocumentEmbeddingJobHandlerTests.cs (476 lines)",
-    "src/OnlyRag.Web/src/styles/base.css (451 lines)",
-    "src/OnlyRag.Api/InProcessBackend.SettingsEndpoints.cs (431 lines)",
-    "tests/OnlyRag.Api.Tests/OllamaClientTests.cs (411 lines)",
-    "src/OnlyRag.Web/src/components/useDocumentsSectionController.ts (407 lines)",
-    "scripts/ocr/paddle_ocr_bridge.py (399 lines)",
-    "src/OnlyRag.Web/src/components/useSettingsSectionController.actions.ts (395 lines)",
-    "tests/OnlyRag.Api.Tests/InProcessBackendSettingsDependencyTests.cs (391 lines)",
-    "src/OnlyRag.Api/DependencyProvisioningService.Ocr.cs (383 lines)",
-    "src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs (378 lines)",
-    "tests/OnlyRag.Infrastructure.Tests/DocumentIngestionServiceTests.cs (374 lines)",
-    "src/OnlyRag.Web/src/App.tsx (368 lines)",
-    "tests/OnlyRag.Api.Tests/ChatServiceQdrantIntegrationTests.cs (363 lines)",
-    "tests/OnlyRag.Infrastructure.Tests/HybridRetrievalServiceTests.cs (361 lines)",
-    "src/OnlyRag.Web/src/components/SettingsSection.dependencyActions.test.tsx (361 lines)",
-    "src/OnlyRag.Web/src/components/useSettingsSectionController.ts (357 lines)",
-    "tests/OnlyRag.Infrastructure.Tests/DocumentIngestionServiceTests.Fixtures.cs (354 lines)",
-    "src/OnlyRag.Web/src/components/useTranslationSectionController.ts (351 lines)"
-  ],
-  "cleanup_candidates": [
-    "artifacts/ollama-resilience-audit.md",
-    "packaging/qdrant/payload",
-    "project bin and obj folders",
-    "src/OnlyRag.Web/dist",
-    "src/OnlyRag.Web/node_modules"
-  ],
-  "structure_notes": [
-    "Solution layout is coherent for a Windows WPF shell, in-process API, shared core contracts, infrastructure adapters, worker abstractions, Vite React UI, packaging, scripts, docs, and tests.",
-    "Generated outputs are ignored: artifacts, packaging\\qdrant\\payload, bin/obj, src\\OnlyRag.Web\\dist, node_modules, test-results, coverage, and Playwright reports.",
-    "certificates\\app now has a local README clarifying that private signing material must not be stored in the repository.",
-    ".gitignore now covers common Windows/editor state, temporary files, backup files, and local environment files."
-  ],
-  "dependencies": {
-    "runtime": [
-      ".NET 10 self-contained Windows app payload",
-      "Microsoft Edge WebView2 Runtime",
-      "Ollama",
-      "Bundled Qdrant runtime",
-      "Optional LibreOffice",
-      "Optional Python 3.10-3.13 PaddleOCR runtime"
-    ],
-    "development": [
-      "Windows",
-      "PowerShell 7",
-      ".NET SDK 10.0.300 or compatible 10.0 feature roll-forward",
-      "Node.js ^20.19.0 or >=22.12.0 with npm",
-      "xUnit",
-      "Vitest",
-      "Playwright",
-      "ESLint",
-      "Prettier",
-      "Optional Inno Setup 6",
-      "Optional Windows SDK signtool"
-    ],
-    "external_services": [
-      "Optional local or trusted-LAN Ollama endpoint",
-      "Optional trusted remote Qdrant endpoint"
-    ]
-  },
   "quality_gates": {
-    "format": "not_run",
-    "lint": "not_run",
-    "typecheck": "not_run",
-    "tests": "not_run",
-    "build": "not_run",
-    "security_review": "not_run",
-    "structure_review": "failed",
-    "repository_cleanliness": "failed",
-    "dependency_audit": "not_run",
-    "installer_lifecycle": "not_run",
-    "external_ollama_validation": "not_run",
-    "webview_manual_validation": "not_run",
-    "nvidia_ocr_validation": "not_run"
+    "api_tests": "passed",
+    "release_gate": "not_run",
+    "live_ollama_validation": "not_run",
+    "release_runtime_validation": "not_run"
   },
   "commands": {
-    "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "dev": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
-    "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
-    "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore; Set-Location .\\src\\OnlyRag.Web; npm run test",
-    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
-  },
-  "environment": {
-    "os_target": "Windows",
-    "shell": "PowerShell 7",
-    "required_env_vars": [],
-    "env_files": [
-      ".env",
-      ".env.*",
-      ".env.example"
-    ]
-  },
-  "last_completed_work": "Performed scoped repository structure cleanup: removed temporary web test/typecheck output, hardened .gitignore, and documented certificate folder safety.",
-  "open_questions": [
-    "Should ignored local audit artifacts be retained as evidence, moved into docs, or deleted during cleanup passes?"
-  ],
-  "handoff_notes": "Run the canonical Release gate before handoff. Treat release/package readiness as blocked until signed installer lifecycle and representative external runtime validations are recorded."
+    "api_tests": "dotnet test .\\tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --configuration Release",
+    "release_gate": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
+    "clean": "pwsh .\\scripts\\Clean.ps1"
+  }
 }

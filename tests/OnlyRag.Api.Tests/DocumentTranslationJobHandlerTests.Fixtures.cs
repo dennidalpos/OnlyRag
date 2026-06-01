@@ -10,8 +10,24 @@ public sealed partial class DocumentTranslationJobHandlerTests
 {
     private static async Task<ImportedDocument> CreateIndexedDocumentAsync(
         SqliteDocumentRepository documents,
-        string root)
+        string root,
+        string? pageText = null)
     {
+        string sourceText = pageText ?? "Ciao {name} 123\n\nSeconda riga 456";
+        IngestedDocumentChunk[] chunks = pageText is null
+            ? [
+                new IngestedDocumentChunk(1, 1, 0, "Ciao {name} 123", 3, "hash-a"),
+                new IngestedDocumentChunk(1, 1, 1, "Seconda riga 456", 3, "hash-b")
+            ]
+            : [
+                new IngestedDocumentChunk(
+                    1,
+                    1,
+                    0,
+                    sourceText,
+                    sourceText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length,
+                    "hash-a")
+            ];
         DateTimeOffset now = DateTimeOffset.UtcNow;
         ImportedDocument document = await documents.CreateAsync(new CreateDocumentRecordRequest(
             "doc-translation-1",
@@ -30,11 +46,8 @@ public sealed partial class DocumentTranslationJobHandlerTests
 
         await documents.SaveIngestedPageAsync(
             document.Id,
-            new IngestedDocumentPage(1, "Ciao {name} 123\n\nSeconda riga 456"),
-            [
-                new IngestedDocumentChunk(1, 1, 0, "Ciao {name} 123", 3, "hash-a"),
-                new IngestedDocumentChunk(1, 1, 1, "Seconda riga 456", 3, "hash-b")
-            ],
+            new IngestedDocumentPage(1, sourceText),
+            chunks,
             pageCount: 1);
 
         return document;
@@ -115,6 +128,16 @@ public sealed partial class DocumentTranslationJobHandlerTests
 
         protected static string ExtractSource(string prompt)
         {
+            const string startTag = "<source_text>";
+            const string endTag = "</source_text>";
+            int taggedStart = prompt.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+            int taggedEnd = prompt.IndexOf(endTag, StringComparison.OrdinalIgnoreCase);
+            if (taggedStart >= 0 && taggedEnd > taggedStart)
+            {
+                taggedStart += startTag.Length;
+                return prompt[taggedStart..taggedEnd].Trim();
+            }
+
             const string startMarker = "<<<ONLYRAG_TRANSLATION_UNIT";
             const string endMarker = "ONLYRAG_TRANSLATION_UNIT";
             int start = prompt.IndexOf(startMarker, StringComparison.Ordinal);
@@ -137,6 +160,8 @@ public sealed partial class DocumentTranslationJobHandlerTests
     private sealed class RepairingTranslationClient : IOllamaClient
     {
         public int CallCount { get; private set; }
+
+        public bool SawRepairPrompt { get; private set; }
 
         public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -170,6 +195,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
         {
             CallCount++;
             string prompt = messages[^1].Content;
+            SawRepairPrompt |= prompt.Contains("<failed_output>", StringComparison.OrdinalIgnoreCase);
             string source = ExtractTaggedSource(prompt);
             if (CallCount > 1)
             {
@@ -208,6 +234,25 @@ public sealed partial class DocumentTranslationJobHandlerTests
 
             start += startTag.Length;
             return prompt[start..end].Trim();
+        }
+    }
+
+    private sealed class FolderPlaceholderRepairTranslationClient : EchoTranslationClient
+    {
+        public bool SawRepairPrompt { get; private set; }
+
+        public override Task<string> GenerateChatAsync(
+            string modelName,
+            IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCallCount();
+            string prompt = messages[^1].Content;
+            SawRepairPrompt |= prompt.Contains("<failed_output>", StringComparison.OrdinalIgnoreCase);
+            return SawRepairPrompt
+                ? Task.FromResult("Importante: non includere caratteri speciali nel nome file per {Folder1name}.")
+                : Task.FromResult("Importante: non includere caratteri speciali nel nome file.");
         }
     }
 

@@ -8,8 +8,10 @@ OnlyRag supports local document translation workflows backed by Ollama.
 2. The backend creates a local translation job.
 3. Source text is processed into page-based translation units.
 4. Ollama receives translation prompts for the configured model.
-5. Translation units are persisted locally and can be edited in the UI.
-6. Export creates TXT, Markdown, HTML, DOCX, or PDF output.
+5. Outputs are validated for required placeholders. If validation fails, the job asks Ollama to
+   repair the same unit before marking it failed.
+6. Translation units are persisted locally and can be edited in the UI.
+7. Export creates TXT, Markdown, HTML, DOCX, or PDF output.
 
 Backend translation code lives in [`src/OnlyRag.Api`](../src/OnlyRag.Api), especially the
 translation endpoints, prompt builder, output validator, and export services. Storage for

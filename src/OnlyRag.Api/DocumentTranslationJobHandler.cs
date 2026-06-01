@@ -263,7 +263,20 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                     return new UnitTranslationResult(translatedText, validation.Warnings);
                 }
 
-                lastValidationWarning = BuildUnitRetryValidationWarning(unit.SourceText, validation.Warnings);
+                UnitTranslationResult repaired = await RepairInvalidTranslationAsync(
+                    targetLanguage,
+                    unit,
+                    model,
+                    translationNumCtx,
+                    translatedText,
+                    validation.Warnings,
+                    cancellationToken);
+                if (!repaired.IsFailure)
+                {
+                    return repaired;
+                }
+
+                lastValidationWarning = BuildUnitRetryValidationWarning(unit.SourceText, repaired.ValidationWarnings);
             }
             catch (OllamaApiException ex) when (IsLocalRetryable(ex))
             {
@@ -286,6 +299,31 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
             string.Empty,
             lastValidationWarning ?? "Validazione traduzione fallita dopo retry locali.",
             IsFailure: true);
+    }
+
+    private async Task<UnitTranslationResult> RepairInvalidTranslationAsync(
+        string targetLanguage,
+        StoredTranslationUnit unit,
+        string model,
+        int? translationNumCtx,
+        string failedOutput,
+        string? validationWarnings,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<OllamaChatMessage> repairMessages = DocumentTranslationPromptBuilder.BuildRepairMessages(
+            targetLanguage,
+            unit,
+            failedOutput,
+            validationWarnings ?? "Output non valido.");
+        string repairedText = StripDelimiters(
+            await ollamaClient.GenerateChatAsync(model, repairMessages, translationNumCtx, cancellationToken));
+        TranslationValidationResult repairValidation = TranslationOutputValidator.Validate(unit.SourceText, repairedText);
+        return repairValidation.IsValid
+            ? new UnitTranslationResult(repairedText, repairValidation.Warnings)
+            : new UnitTranslationResult(
+                string.Empty,
+                repairValidation.Warnings ?? validationWarnings ?? "Output riparato non valido.",
+                IsFailure: true);
     }
 
     private static TranslationCheckpoint ReadCheckpoint(
