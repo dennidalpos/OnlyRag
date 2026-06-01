@@ -1,68 +1,84 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "residual_validation",
-  "last_updated": "2026-06-01T09:09:10+02:00",
+  "current_phase": "scoped_structure_cleanup",
+  "last_updated": "2026-06-01T09:40:41+02:00",
   "production_target": true,
-  "summary": "Local Ollama resilience residuals are implemented and the canonical Release gate passes. Remaining work is external validation and optional structure cleanup.",
-  "active_objective": "Validate the completed Ollama resilience work in real runtime environments and address structure cleanup when scoped.",
+  "summary": "Scoped structure cleanup split translation test fixtures, OCR runtime helpers, and Ollama model-pull logic. API Release tests pass; external validation remains.",
+  "active_objective": "Resolve remaining external production validation blockers before release.",
   "assumptions": [
-    "Existing in-flight jobs keep their persisted max_retries; newly created jobs use the queue default of 5.",
-    "Automatic num_ctx means OnlyRag omits options.num_ctx and lets Ollama decide the effective context."
+    "Primary production target is Windows 10 1809 or newer / Windows 11 with PowerShell 7 for repository operations.",
+    "npm is the frontend package manager because package-lock.json is present.",
+    "The repository gate is the canonical local and CI readiness check."
   ],
   "decisions": [
-    "Keep endpoint and model choices primary; keep manual num_ctx, batch, timeout, and parallelism as advanced/custom controls with warning copy.",
-    "Fail exhausted translation placeholder validation non-retryably after local retries from the original source text.",
-    "Treat missing Ollama ps/version endpoints as degraded diagnostics, not as Ollama offline."
+    "Keep verification centered on scripts\\Invoke-Gate.ps1 -Configuration Release.",
+    "Do not treat unsigned installer output as release-ready without signing and lifecycle evidence.",
+    "Keep generated build, dependency, test, and packaging outputs ignored rather than tracked."
   ],
   "current_tasks": [
-    "Validate live Ollama offline/restart behavior, interrupted model pulls, and large-context failures on a machine with representative models.",
-    "Validate long chat layout in the Windows WPF WebView shell at desktop and narrow widths.",
-    "Validate OCR GPU diagnostics on representative CPU-only, NVIDIA-driver-missing, runtime-missing, and runtime-ready Windows machines.",
-    "Review oversized files and split only where responsibility boundaries are clear."
+    "Validate live Ollama offline/restart behavior, interrupted model pulls, and large-context failures with representative local models.",
+    "Validate long chat/layout behavior in the Windows WPF WebView shell at desktop and narrow widths.",
+    "Validate OCR GPU diagnostics and provisioning on representative CPU-only, NVIDIA-driver-missing, runtime-missing, and runtime-ready Windows machines.",
+    "Run signed installer lifecycle validation on a clean Windows verification machine.",
+    "Continue scoped oversized source and test file review; split remaining files only where responsibility boundaries are clear."
   ],
   "next_tasks": [
-    "Run signed installer lifecycle validation on a clean Windows verification machine when packaging is in scope."
+    "Run scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller on a machine with Inno Setup when installer packaging is in scope.",
+    "Run scripts\\Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle against the signed installer candidate.",
+    "Capture external validation evidence for Ollama, WebView2 shell, OCR GPU states, and installer lifecycle."
   ],
   "blockers": [
-    "Live Ollama resilience validation requires a local Ollama instance and enough disk/network capacity for representative model pulls.",
-    "NVIDIA/OCR validation requires representative Windows hardware or reliable mocked process/WMI outputs.",
-    "Signed installer lifecycle validation requires Inno Setup, signtool, a signing certificate, and a clean Windows verification machine."
+    "Live Ollama validation requires a local Ollama instance plus disk/network capacity for representative model pulls.",
+    "NVIDIA/OCR validation requires representative Windows hardware or reliable mocked driver/runtime states.",
+    "Signed installer lifecycle validation requires Inno Setup, signtool, a trusted signing certificate, and a clean Windows verification machine."
   ],
   "risks": [
-    "External/manual acceptance criteria cannot be proven from this workspace alone.",
-    "Local translation retries add up to 3.5 seconds per persistently invalid unit before non-retryable failure.",
-    "Existing queued jobs may retain older persisted retry limits until recreated."
+    "Release readiness still depends on external runtime validation that cannot be proven from this workspace alone.",
+    "Installer packaging and install/uninstall lifecycle were not executed in this audit pass.",
+    "Some source/test files still exceed review thresholds and increase maintenance risk until scoped cleanup is completed.",
+    "Qdrant remote endpoints without TLS or API key are allowed with warnings and must be limited to explicitly trusted networks."
   ],
   "oversized_files": [
+    "tests/OnlyRag.Api.Tests/InProcessBackendDocumentTests.cs",
     "src/OnlyRag.Api/DependencyProvisioningService.Ocr.cs",
-    "src/OnlyRag.Web/src/App.tsx",
+    "src/OnlyRag.Api/Ollama/OllamaClient.cs",
+    "src/OnlyRag.Api/InProcessBackend.SettingsEndpoints.cs",
     "src/OnlyRag.Web/src/components/useDocumentsSectionController.ts",
     "src/OnlyRag.Web/src/components/useSettingsSectionController.actions.ts",
-    "tests/OnlyRag.Api.Tests/InProcessBackendDocumentTests.cs",
-    "several long PowerShell scripts under scripts/"
+    "src/OnlyRag.Web/src/App.tsx"
   ],
   "structure_notes": [
-    "No structural split was performed in this pass; behavior changes stayed scoped to existing modules."
+    "Solution layout is coherent for a Windows WPF shell, in-process API, shared core contracts, infrastructure adapters, worker abstractions, Vite React UI, packaging, scripts, docs, and tests.",
+    "Generated outputs are ignored: artifacts, packaging\\qdrant\\payload, bin/obj, src\\OnlyRag.Web\\dist, node_modules, test-results, coverage, and Playwright reports.",
+    "A minimal test cleanup fix was applied so LocalJobWorkerService instances are disposed before temporary SQLite storage deletion.",
+    "DocumentTranslationJobHandlerTests fixtures, OCR runtime/process helpers, and Ollama model-pull logic were split into focused partial files without behavior changes."
   ],
   "dependencies": {
     "runtime": [
-      ".NET 10",
+      ".NET 10 self-contained Windows app payload",
+      "Microsoft Edge WebView2 Runtime",
       "Ollama",
-      "Qdrant",
-      "WebView2",
-      "Node.js/npm"
+      "Bundled Qdrant runtime",
+      "Optional LibreOffice",
+      "Optional Python 3.10-3.13 PaddleOCR runtime"
     ],
     "development": [
+      "Windows",
       "PowerShell 7",
+      ".NET SDK 10.0.300 or compatible 10.0 feature roll-forward",
+      "Node.js ^20.19.0 or >=22.12.0 with npm",
       "xUnit",
       "Vitest",
       "Playwright",
       "ESLint",
-      "Prettier"
+      "Prettier",
+      "Optional Inno Setup 6",
+      "Optional Windows SDK signtool"
     ],
     "external_services": [
-      "Optional local or LAN Ollama endpoint"
+      "Optional local or trusted-LAN Ollama endpoint",
+      "Optional trusted remote Qdrant endpoint"
     ]
   },
   "quality_gates": {
@@ -73,10 +89,11 @@
     "build": "passed",
     "security_review": "passed",
     "structure_review": "failed",
+    "dependency_audit": "passed",
+    "installer_lifecycle": "not_run",
     "external_ollama_validation": "not_run",
     "webview_manual_validation": "not_run",
-    "nvidia_ocr_validation": "not_run",
-    "installer_lifecycle": "not_run"
+    "nvidia_ocr_validation": "not_run"
   },
   "commands": {
     "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
@@ -85,20 +102,20 @@
     "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
     "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
     "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "test": "dotnet test .\\OnlyRag.sln --no-restore; Set-Location .\\src\\OnlyRag.Web; npm run test -- --run",
+    "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore; Set-Location .\\src\\OnlyRag.Web; npm run test",
     "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
     "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
     "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
   },
   "environment": {
     "os_target": "Windows",
-    "shell": "PowerShell",
+    "shell": "PowerShell 7",
     "required_env_vars": [],
     "env_files": []
   },
-  "last_completed_work": "Implemented local Ollama resilience residuals, added audit artifact, and passed the canonical Release gate.",
+  "last_completed_work": "Split focused oversized C# test/source responsibilities and passed the OnlyRag.Api.Tests Release suite.",
   "open_questions": [
-    "Should oversized-file cleanup be handled now as a separate refactor task or deferred until after external runtime validation?"
+    "Which machine will be used for signed installer lifecycle validation and external Ollama/OCR/WebView acceptance evidence?"
   ],
-  "handoff_notes": "Start external validation with live Ollama model pulls and interruption/retry scenarios, then verify WebView chat layout and representative OCR GPU states."
+  "handoff_notes": "Use the canonical Release gate before handoff. Treat release as blocked until signed installer lifecycle and representative external runtime validations are recorded."
 }

@@ -23,7 +23,7 @@ public sealed class LocalJobWorkerServiceTests
             tempStorage.Descriptor,
             LocalJobQueueDescriptor.Default,
             new OllamaEndpointOptions());
-        LocalJobWorkerService service = new(
+        using LocalJobWorkerService service = new(
             queue,
             LocalJobQueueDescriptor.Default,
             [handler],
@@ -53,7 +53,7 @@ public sealed class LocalJobWorkerServiceTests
             tempStorage.Descriptor,
             LocalJobQueueDescriptor.Default,
             new OllamaEndpointOptions());
-        LocalJobWorkerService service = new(
+        using LocalJobWorkerService service = new(
             queue,
             LocalJobQueueDescriptor.Default,
             [handler],
@@ -90,7 +90,7 @@ public sealed class LocalJobWorkerServiceTests
             tempStorage.Descriptor,
             LocalJobQueueDescriptor.Default,
             new OllamaEndpointOptions());
-        LocalJobWorkerService service = new(
+        using LocalJobWorkerService service = new(
             queue,
             LocalJobQueueDescriptor.Default,
             [handler],
