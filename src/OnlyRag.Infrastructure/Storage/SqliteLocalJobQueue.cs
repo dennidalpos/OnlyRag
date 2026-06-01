@@ -50,6 +50,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                 error,
                 retry_count,
                 max_retries,
+                next_attempt_at_utc,
                 created_at_utc,
                 updated_at_utc
             )
@@ -65,6 +66,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                 NULL,
                 0,
                 $maxRetries,
+                NULL,
                 $now,
                 $now
             );
@@ -91,7 +93,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
         command.CommandText =
             """
             SELECT id, type, status, priority, progress_percent, current_step, payload_json,
-                   checkpoint_json, error, retry_count, max_retries, created_at_utc, updated_at_utc
+                   checkpoint_json, error, retry_count, max_retries, next_attempt_at_utc, created_at_utc, updated_at_utc
             FROM jobs
             ORDER BY
                 CASE status
@@ -104,6 +106,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                     WHEN 'Cancelled' THEN 6
                     ELSE 7
                 END,
+                next_attempt_at_utc ASC NULLS FIRST,
                 priority DESC,
                 created_at_utc ASC
             LIMIT $limit;
@@ -175,6 +178,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                     WHEN current_step = '' THEN 'Ripresa dopo interruzione'
                     ELSE current_step
                 END,
+                next_attempt_at_utc = NULL,
                 updated_at_utc = $now
             WHERE {interruptedStatusPredicate};
             """;
@@ -201,9 +205,11 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                 SELECT id
                 FROM jobs
                 WHERE {pendingStatusPredicate}
+                  AND (next_attempt_at_utc IS NULL OR next_attempt_at_utc <= $now)
                 ORDER BY priority DESC, created_at_utc ASC
                 LIMIT 1;
                 """;
+            select.AddParameter("$now", now);
             id = await select.ExecuteScalarAsync(cancellationToken) as string;
         }
 
@@ -221,6 +227,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
                 UPDATE jobs
                 SET status = $runningStatus,
                     error = NULL,
+                    next_attempt_at_utc = NULL,
                     current_step = CASE WHEN current_step = '' THEN 'In esecuzione' ELSE current_step END,
                     updated_at_utc = $now
                 WHERE id = $id
@@ -257,7 +264,8 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
         bool retryable,
         CancellationToken cancellationToken = default)
     {
-        string now = DateTimeOffset.UtcNow.ToString("O");
+        DateTimeOffset nowTimestamp = DateTimeOffset.UtcNow;
+        string now = nowTimestamp.ToString("O");
         string runningStatusPredicate = SqliteStatusConstraints.BuildJobStatusEqualsPredicate(JobStatus.Running);
 
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
@@ -271,9 +279,13 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
         JobStatus nextStatus = retryable && nextRetryCount <= current.MaxRetries
             ? JobStatus.Pending
             : JobStatus.Failed;
+        DateTimeOffset? nextAttemptAt = nextStatus is JobStatus.Pending
+            ? nowTimestamp.Add(ComputeRetryDelay(nextRetryCount))
+            : null;
         string currentStep = nextStatus is JobStatus.Pending
             ? "Retry pianificato"
             : "Errore";
+        string storedError = BuildRetryAwareError(errorMessage, retryable, current.MaxRetries, nextRetryCount, nextAttemptAt);
 
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
@@ -282,6 +294,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
             SET status = $status,
                 error = $error,
                 retry_count = $retryCount,
+                next_attempt_at_utc = $nextAttemptAt,
                 current_step = $currentStep,
                 updated_at_utc = $now
             WHERE id = $id
@@ -289,8 +302,9 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
             """;
         command.AddParameter("$id", id);
         command.AddParameter("$status", nextStatus.ToString());
-        command.AddParameter("$error", errorMessage);
+        command.AddParameter("$error", storedError);
         command.AddParameter("$retryCount", nextRetryCount);
+        command.AddParameter("$nextAttemptAt", nextAttemptAt?.ToString("O"));
         command.AddParameter("$currentStep", currentStep);
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -307,7 +321,7 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
         command.CommandText =
             """
             SELECT id, type, status, priority, progress_percent, current_step, payload_json,
-                   checkpoint_json, error, retry_count, max_retries, created_at_utc, updated_at_utc
+                   checkpoint_json, error, retry_count, max_retries, next_attempt_at_utc, created_at_utc, updated_at_utc
             FROM jobs
             WHERE id = $id;
             """;
@@ -330,7 +344,42 @@ public sealed partial class SqliteLocalJobQueue : ILocalJobQueue
             reader.IsDBNull(8) ? null : reader.GetString(8),
             reader.GetInt32(9),
             reader.GetInt32(10),
-            DateTimeOffset.Parse(reader.GetString(11)),
-            DateTimeOffset.Parse(reader.GetString(12)));
+            reader.IsDBNull(11) ? null : DateTimeOffset.Parse(reader.GetString(11)),
+            DateTimeOffset.Parse(reader.GetString(12)),
+            DateTimeOffset.Parse(reader.GetString(13)));
+    }
+
+    private static TimeSpan ComputeRetryDelay(int retryCount)
+    {
+        int seconds = retryCount switch
+        {
+            <= 1 => 5,
+            2 => 15,
+            3 => 45,
+            _ => 120
+        };
+
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static string BuildRetryAwareError(
+        string errorMessage,
+        bool retryable,
+        int maxRetries,
+        int nextRetryCount,
+        DateTimeOffset? nextAttemptAt)
+    {
+        if (!retryable)
+        {
+            return $"{errorMessage} Retry non previsto: errore permanente o validazione non recuperabile.";
+        }
+
+        int retriesRemaining = Math.Max(0, maxRetries - nextRetryCount);
+        if (nextAttemptAt is null)
+        {
+            return $"{errorMessage} Retry esauriti: 0 tentativi rimanenti. Se coinvolge Ollama, verifica servizio, modello, num_ctx e ollama ps.";
+        }
+
+        return $"{errorMessage} Retry automatico pianificato alle {nextAttemptAt:O}; tentativi rimanenti: {retriesRemaining}. Se coinvolge Ollama, verifica servizio, modello, num_ctx e ollama ps.";
     }
 }

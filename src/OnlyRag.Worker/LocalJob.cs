@@ -12,5 +12,6 @@ public sealed record LocalJob(
     string? Error,
     int RetryCount,
     int MaxRetries,
+    DateTimeOffset? NextAttemptAtUtc,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

@@ -30,6 +30,15 @@ export type OllamaModelDetails = {
   numCtx: number | null;
 };
 
+export type OllamaRunningModel = {
+  name: string;
+  model: string;
+  size: number | null;
+  sizeVram: number | null;
+  digest: string | null;
+  contextLength: number | null;
+};
+
 export type OfficeConversionSettings = {
   libreOfficePath: string | null;
   conversionTimeoutSeconds: number;
@@ -101,6 +110,8 @@ export type OllamaStatusResponse = {
   installedModelCount: number;
   message: string;
   suggestion: string | null;
+  version: string | null;
+  runningModels: OllamaRunningModel[] | null;
 };
 
 export type OllamaModel = {
@@ -119,6 +130,13 @@ export type OllamaModelsResponse = {
 };
 
 export type OperationMessageResponse = {
+  message: string;
+};
+
+export type OllamaModelPullStartResponse = {
+  jobId: string;
+  modelName: string;
+  status: string;
   message: string;
 };
 

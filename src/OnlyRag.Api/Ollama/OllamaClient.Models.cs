@@ -22,7 +22,28 @@ internal sealed partial class OllamaClient
         [property: JsonPropertyName("parameter_size")] string? ParameterSize,
         [property: JsonPropertyName("quantization_level")] string? QuantizationLevel);
 
-    private sealed record PullResponse(string Status);
+    private sealed record OllamaVersionResponse(string? Version);
+
+    private sealed record OllamaPsResponse(IReadOnlyList<OllamaRunningModelPayload> Models);
+
+    private sealed record OllamaRunningModelPayload(
+        string Name,
+        string Model,
+        long? Size,
+        [property: JsonPropertyName("size_vram")]
+        long? SizeVram,
+        string? Digest,
+        [property: JsonPropertyName("context_length")]
+        int? ContextLength,
+        [property: JsonPropertyName("model_info")]
+        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? ModelInfo);
+
+    private sealed record PullResponse(
+        string Status,
+        long? Total,
+        long? Completed,
+        string? Digest,
+        string? Layer);
 
     private sealed record OllamaChatResponse(bool Done, OllamaChatResponseMessage? Message);
 

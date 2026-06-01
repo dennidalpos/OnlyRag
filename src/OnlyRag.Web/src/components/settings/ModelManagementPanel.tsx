@@ -1,3 +1,5 @@
+import { apiRequest, type LocalJob } from "../../api";
+import { ProgressBar } from "../ProgressBar";
 import {
   formatModelSize
 } from "../SettingsSection.helpers";
@@ -11,8 +13,20 @@ export function ModelManagementPanel() {
     isBusy,
     openOllamaModelLibrary,
     models,
-    removeModel
+    removeModel,
+    modelPullJobs
   } = useSettingsSectionContext();
+  const normalizedModelToInstall = modelToInstall.trim().toLowerCase();
+  const activePullForInput = modelPullJobs.some((job) =>
+    isActivePullJob(job) && getPullJobModelName(job).toLowerCase() === normalizedModelToInstall
+  );
+
+  async function transitionPullJob(jobId: string, action: "cancel" | "resume") {
+    await apiRequest<LocalJob>(`/api/jobs/${jobId}/${action}`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  }
 
   return (
         <div className="settings-card">
@@ -34,9 +48,9 @@ export function ModelManagementPanel() {
               <button
                 type="button"
                 onClick={installModel}
-                disabled={isBusy || modelToInstall.trim().length === 0}
+                disabled={isBusy || modelToInstall.trim().length === 0 || activePullForInput}
               >
-                Installa
+                {activePullForInput ? "Installazione in corso" : "Installa"}
               </button>
               <button
                 type="button"
@@ -46,6 +60,44 @@ export function ModelManagementPanel() {
                 Elenco modelli Ollama
               </button>
             </div>
+            {modelPullJobs.length > 0 && (
+              <div className="model-list" aria-label="Installazioni modelli">
+                {modelPullJobs.map((job) => (
+                  <div className="model-row" key={job.id}>
+                    <div className="model-row__details">
+                      <strong>{getPullJobModelName(job)}</strong>
+                      <span>{job.currentStep || job.status}</span>
+                      {isActivePullJob(job) && (
+                        <ProgressBar label={`Installazione ${job.progressPercent}%`} value={job.progressPercent} />
+                      )}
+                      {job.error && <span className="job-error-message">{job.error}</span>}
+                    </div>
+                    <div className="model-row__actions">
+                      {(job.status === "Pending" || job.status === "Running" || job.status === "Pausing") && (
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => void transitionPullJob(job.id, "cancel")}
+                          disabled={isBusy}
+                        >
+                          Annulla
+                        </button>
+                      )}
+                      {(job.status === "Paused" || job.status === "Failed") && (
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => void transitionPullJob(job.id, "resume")}
+                          disabled={isBusy}
+                        >
+                          Riprova
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="model-list" aria-label="Modelli installati">
               {models.length === 0 && (
                 <div className="model-row model-row--empty">
@@ -80,5 +132,18 @@ export function ModelManagementPanel() {
           </div>
         </div>
   );
+}
+
+function isActivePullJob(job: LocalJob) {
+  return job.status === "Pending" || job.status === "Running" || job.status === "Pausing" || job.status === "Paused";
+}
+
+function getPullJobModelName(job: LocalJob) {
+  try {
+    const payload = JSON.parse(job.payloadJson) as { modelName?: string; ModelName?: string };
+    return payload.modelName?.trim() || payload.ModelName?.trim() || "Modello Ollama";
+  } catch {
+    return "Modello Ollama";
+  }
 }
 

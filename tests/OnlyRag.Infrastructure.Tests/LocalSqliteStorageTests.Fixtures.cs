@@ -165,7 +165,7 @@ public sealed partial class LocalSqliteStorageTests
                 payload_json TEXT NOT NULL DEFAULT '{}',
                 error TEXT NULL,
                 retry_count INTEGER NOT NULL DEFAULT 0,
-                max_retries INTEGER NOT NULL DEFAULT 3,
+                max_retries INTEGER NOT NULL DEFAULT 5,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL
             );
@@ -260,7 +260,7 @@ public sealed partial class LocalSqliteStorageTests
                 payload_json TEXT NOT NULL DEFAULT '{}',
                 error TEXT NULL,
                 retry_count INTEGER NOT NULL DEFAULT 0,
-                max_retries INTEGER NOT NULL DEFAULT 3,
+                max_retries INTEGER NOT NULL DEFAULT 5,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL
             );

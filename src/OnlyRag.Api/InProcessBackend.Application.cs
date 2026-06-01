@@ -97,6 +97,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<ILocalJobHandler, DocumentIngestionJobHandler>();
         builder.Services.AddSingleton<ILocalJobHandler, DocumentEmbeddingJobHandler>();
         builder.Services.AddSingleton<ILocalJobHandler, DocumentTranslationJobHandler>();
+        builder.Services.AddSingleton<ILocalJobHandler, OllamaModelPullJobHandler>();
         builder.Services.AddSingleton<RunningJobCancellationRegistry>();
         builder.Services.AddSingleton<ApplicationShutdownService>();
         builder.Services.AddHostedService<LocalJobWorkerService>();

@@ -11,7 +11,9 @@ public sealed record DiagnosticsResponse(
     bool OcrIsConfigured,
     string OcrEngineName,
     OcrGpuCapabilityResponse OcrGpuCapability,
-    SystemTelemetryResponse SystemTelemetry);
+    SystemTelemetryResponse SystemTelemetry,
+    string? OllamaVersion = null,
+    IReadOnlyList<OllamaRunningModelResponse>? OllamaRunningModels = null);
 
 public sealed record OcrGpuCapabilityResponse(
     bool IsUsable,
@@ -24,7 +26,8 @@ public sealed record OcrGpuCapabilityResponse(
     bool? CompiledWithCuda,
     int? CudaDeviceCount,
     string? ActiveDevice,
-    IReadOnlyDictionary<string, string> PackageVersions);
+    IReadOnlyDictionary<string, string> PackageVersions,
+    string CapabilityStatus = "unknown");
 
 public sealed record SystemTelemetryResponse(
     CpuTelemetryResponse Cpu,

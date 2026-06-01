@@ -29,7 +29,8 @@ describe("SettingsSection OCR provisioning", () => {
       compiledWithCuda: true,
       cudaDeviceCount: 1,
       activeDevice: "gpu:0",
-      packageVersions: {}
+      packageVersions: {},
+      capabilityStatus: "usable"
     };
     const api = mockApi([
       { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   OcrRangeField,
   OcrSelectField,
@@ -22,8 +23,15 @@ export function OcrEngineSettingsPanel() {
   } = useSettingsSectionContext();
   const gpuCapability = diagnostics?.ocrGpuCapability ?? null;
   const isGpuUsable = Boolean(gpuCapability?.isUsable);
+  const hasNvidiaGpu = gpuCapability?.capabilityStatus !== "no_nvidia_gpu";
   const isDiagnosticsLoading = diagnosticsStatus === "loading";
   const gpuBlockReason = gpuCapability?.blockReason ?? "GPU OCR non disponibile.";
+
+  useEffect(() => {
+    if (!hasNvidiaGpu && ocrFormState.device === "gpu") {
+      updateOcrSettings({ device: "cpu" });
+    }
+  }, [hasNvidiaGpu, ocrFormState.device, updateOcrSettings]);
 
   return (
         <div className="settings-card settings-card--wide">
@@ -53,7 +61,7 @@ export function OcrEngineSettingsPanel() {
                 value={ocrFormState.device}
                 options={[
                   { value: "cpu", label: "CPU" },
-                  { value: "gpu", label: "GPU", disabled: !isGpuUsable }
+                  ...(hasNvidiaGpu ? [{ value: "gpu", label: "GPU", disabled: !isGpuUsable }] : [])
                 ]}
                 onChange={(value) => updateOcrSettings({ device: value })}
               />
@@ -198,7 +206,7 @@ export function OcrEngineSettingsPanel() {
                 <p>Verifica diagnostica OCR GPU in corso.</p>
               </div>
             )}
-            {!isDiagnosticsLoading && !isGpuUsable && (
+            {!isDiagnosticsLoading && hasNvidiaGpu && !isGpuUsable && (
               <div className="panel-note panel-note--warning" role="status">
                 <p>GPU OCR non selezionabile: {gpuBlockReason}</p>
               </div>

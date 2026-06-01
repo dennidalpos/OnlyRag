@@ -144,6 +144,13 @@ export function AdjustableModelContextBar({
         />
         <span>Automatico</span>
       </label>
+      <div className="panel-note panel-note--compact">
+        <p>
+          {value == null
+            ? "Automatico: OnlyRag non invia num_ctx e lascia scegliere a Ollama la finestra effettiva."
+            : "Manuale avanzato: OnlyRag invia num_ctx a Ollama. Valori alti possono aumentare RAM/VRAM, ridurre offload GPU e sono da verificare con ollama ps."}
+        </p>
+      </div>
       {value != null && (
         <SettingsRangeField
           id={sliderLabel.replaceAll(" ", "-")}

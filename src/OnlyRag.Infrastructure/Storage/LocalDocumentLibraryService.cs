@@ -265,8 +265,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
             new CreateLocalJobRequest(
                 DocumentIngestionJobType,
                 payloadJson,
-                Priority: 20,
-                MaxRetries: 0),
+                Priority: 20),
             cancellationToken);
 
         return (await documents.UpdateStatusAsync(

@@ -6,5 +6,5 @@ public sealed record LocalJobQueueDescriptor(string QueueName, bool Persistent, 
         "default",
         Persistent: true,
         MaxParallelJobs: 1,
-        MaxRetries: 3);
+        MaxRetries: 5);
 }

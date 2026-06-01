@@ -35,6 +35,7 @@ export function DiagnosticsPanel() {
     diagnostics?.systemTelemetry.gpu?.driverVersion ??
     null;
   const gpuDetected = Boolean(detectedGpuName || detectedGpuDriver);
+  const noNvidiaGpu = diagnostics?.ocrGpuCapability.capabilityStatus === "no_nvidia_gpu";
   const shouldShowOcrProvisionStatus = Boolean(
     ocrProvisionStatus?.isRunning ||
     ocrProvisionStatus?.lastError ||
@@ -67,7 +68,25 @@ export function DiagnosticsPanel() {
                   >
                     {diagnostics.ollamaStatus}
                   </span>
+                  {diagnostics.ollamaVersion && (
+                    <span className="diagnostic-value">v{diagnostics.ollamaVersion}</span>
+                  )}
                 </div>
+                {diagnostics.ollamaRunningModels && diagnostics.ollamaRunningModels.length > 0 && (
+                  <div className="panel-note">
+                    <p>
+                      Modelli caricati: {diagnostics.ollamaRunningModels.map((model) => {
+                        const context = model.contextLength
+                          ? `${model.contextLength.toLocaleString("it-IT")} ctx`
+                          : "ctx n/d";
+                        const vram = model.sizeVram
+                          ? `${Math.round(model.sizeVram / 1024 / 1024).toLocaleString("it-IT")} MB VRAM`
+                          : "VRAM n/d";
+                        return `${model.name} (${context}, ${vram})`;
+                      }).join("; ")}. Per dettagli esegui ollama ps.
+                    </p>
+                  </div>
+                )}
                 <div className="diagnostic-row">
                   <span className="diagnostic-label">Qdrant</span>
                   <span
@@ -108,19 +127,21 @@ export function DiagnosticsPanel() {
                     </span>
                   )}
                 </div>
-                <div className="diagnostic-row">
-                  <span className="diagnostic-label">Supporto OCR GPU</span>
-                  <span
-                    className={`status-chip status-chip--${diagnostics.ocrGpuCapability.isUsable ? "online" : "offline"}`}
-                  >
-                    {diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile"}
-                  </span>
-                  <span className="diagnostic-value">
-                    {diagnostics.ocrGpuCapability.isUsable
-                      ? diagnostics.ocrGpuCapability.runtimeDetail ?? diagnostics.ocrGpuCapability.status
-                      : diagnostics.ocrGpuCapability.blockReason ?? diagnostics.ocrGpuCapability.status}
-                  </span>
-                </div>
+                {!noNvidiaGpu && (
+                  <div className="diagnostic-row">
+                    <span className="diagnostic-label">Supporto OCR GPU</span>
+                    <span
+                      className={`status-chip status-chip--${diagnostics.ocrGpuCapability.isUsable ? "online" : "offline"}`}
+                    >
+                      {diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile"}
+                    </span>
+                    <span className="diagnostic-value">
+                      {diagnostics.ocrGpuCapability.isUsable
+                        ? diagnostics.ocrGpuCapability.runtimeDetail ?? diagnostics.ocrGpuCapability.status
+                        : diagnostics.ocrGpuCapability.blockReason ?? diagnostics.ocrGpuCapability.status}
+                    </span>
+                  </div>
+                )}
                 {shouldShowOcrProvisionStatus && (
                   <div
                     className={`panel-note${ocrProvisionStatus?.lastError ? " panel-note--warning" : ""}`}

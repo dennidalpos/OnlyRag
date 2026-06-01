@@ -466,11 +466,21 @@ h2 {
 .workspace-content--chat {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
-.workspace-content--chat > .chat-layout {
+.workspace-content--chat > div:not([hidden]) {
   flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.workspace-content--chat > .chat-layout,
+.workspace-content--chat > div:not([hidden]) > .chat-layout {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .section-layout {

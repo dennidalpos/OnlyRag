@@ -2,6 +2,7 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Worker;
+using Microsoft.Data.Sqlite;
 
 namespace OnlyRag.Infrastructure.Tests;
 
@@ -22,6 +23,7 @@ public sealed class SqliteLocalJobQueueTests
         Assert.Equal(5, stored.Priority);
         Assert.Equal("{\"documentId\":42}", stored.PayloadJson);
         Assert.Equal("{}", stored.CheckpointJson);
+        Assert.Equal(5, stored.MaxRetries);
     }
 
     [Fact]
@@ -121,6 +123,30 @@ public sealed class SqliteLocalJobQueueTests
         Assert.Equal(JobStatus.Paused, recoveredJob.Status);
     }
 
+    [Fact]
+    public async Task FailAsync_SchedulesRetryAndLeasesOnlyWhenDue()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        SqliteLocalJobQueue queue = await tempStorage.CreateInitializedQueueAsync();
+        LocalJob job = await queue.CreateAsync(new CreateLocalJobRequest("embedding", "{}", MaxRetries: 2));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+
+        LocalJob? retry = await queue.FailAsync(leased.Id, "Ollama timeout", retryable: true);
+        LocalJob? immediateLease = await queue.TryLeaseNextAsync();
+
+        Assert.NotNull(retry);
+        Assert.Equal(JobStatus.Pending, retry.Status);
+        Assert.Equal(1, retry.RetryCount);
+        Assert.NotNull(retry.NextAttemptAtUtc);
+        Assert.Null(immediateLease);
+
+        await MarkRetryDueAsync(tempStorage, job.Id);
+        LocalJob? dueLease = await queue.TryLeaseNextAsync();
+
+        Assert.NotNull(dueLease);
+        Assert.Equal(JobStatus.Running, dueLease.Status);
+    }
+
     private sealed class TempStorage : IDisposable
     {
         private TempStorage(string root)
@@ -156,7 +182,7 @@ public sealed class SqliteLocalJobQueueTests
             return new SqliteLocalJobQueue(CreateConnectionFactory(), LocalJobQueueDescriptor.Default);
         }
 
-        private LocalSqliteConnectionFactory CreateConnectionFactory()
+        public LocalSqliteConnectionFactory CreateConnectionFactory()
         {
             return new LocalSqliteConnectionFactory(Descriptor);
         }
@@ -168,5 +194,20 @@ public sealed class SqliteLocalJobQueueTests
                 Directory.Delete(Root, recursive: true);
             }
         }
+    }
+
+    private static async Task MarkRetryDueAsync(TempStorage tempStorage, string jobId)
+    {
+        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE jobs
+            SET next_attempt_at_utc = $due
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$due", DateTimeOffset.UtcNow.AddSeconds(-1).ToString("O"));
+        command.Parameters.AddWithValue("$id", jobId);
+        await command.ExecuteNonQueryAsync();
     }
 }

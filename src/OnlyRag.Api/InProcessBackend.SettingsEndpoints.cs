@@ -5,6 +5,7 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Vector;
+using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
 
@@ -242,6 +243,9 @@ public static partial class InProcessBackend
             try
             {
                 IReadOnlyList<OllamaModelSummary> models = await ollamaClient.ListModelsAsync(cancellationToken);
+                string? version = await TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
+                IReadOnlyList<OllamaRunningModelResponse> runningModels =
+                    await TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
                 return Results.Ok(new OllamaStatusResponse(
                     "Online",
                     true,
@@ -249,10 +253,12 @@ public static partial class InProcessBackend
                     models.Count,
                     models.Count == 0
                         ? "Connessione riuscita. Ollama e disponibile ma non ci sono modelli installati."
-                        : $"Connessione riuscita. Modelli disponibili: {models.Count}.",
+                        : BuildOllamaOnlineMessage(models.Count, version, runningModels.Count),
                     models.Count == 0
                         ? "Apri Impostazioni e installa almeno un modello prima di usare Chat o Traduzione."
-                        : null));
+                        : BuildOllamaStatusSuggestion(runningModels),
+                    version,
+                    runningModels));
             }
             catch (OllamaApiException ex)
             {
@@ -276,13 +282,45 @@ public static partial class InProcessBackend
         app.MapPost("/api/ollama/models/pull", async (
             PullOllamaModelRequest request,
             IOllamaClient ollamaClient,
+            ILocalJobQueue jobs,
             CancellationToken cancellationToken) =>
         {
             try
             {
                 string modelName = OllamaSettingsService.NormalizeRequiredModelName(request.Name);
-                await ollamaClient.PullModelAsync(modelName, cancellationToken);
-                return Results.Ok(new OperationMessageResponse($"Modello {modelName} installato."));
+                IReadOnlyList<OllamaModelSummary> models = await ollamaClient.ListModelsAsync(cancellationToken);
+                if (models.Any(model =>
+                    string.Equals(model.Name, modelName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(model.Model, modelName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return Results.Ok(new OllamaModelPullStartResponse(
+                        string.Empty,
+                        modelName,
+                        "Installed",
+                        $"Il modello {modelName} e gia installato."));
+                }
+
+                LocalJob? existing = await FindActiveModelPullJobAsync(jobs, modelName, cancellationToken);
+                if (existing is not null)
+                {
+                    return Results.Ok(new OllamaModelPullStartResponse(
+                        existing.Id,
+                        modelName,
+                        existing.Status.ToString(),
+                        $"Installazione modello {modelName} gia in corso."));
+                }
+
+                LocalJob created = await jobs.CreateAsync(
+                    new CreateLocalJobRequest(
+                        OllamaModelPullJobHandler.JobType,
+                        System.Text.Json.JsonSerializer.Serialize(new OllamaModelPullJobPayload(modelName)),
+                        Priority: 10),
+                    cancellationToken);
+                return Results.Ok(new OllamaModelPullStartResponse(
+                    created.Id,
+                    modelName,
+                    created.Status.ToString(),
+                    $"Installazione modello {modelName} avviata."));
             }
             catch (OllamaApiException ex)
             {
@@ -349,5 +387,92 @@ public static partial class InProcessBackend
             settings.UseLocalBundledServer,
             settings.LocalGrpcPort,
             settings.RequestTimeoutSeconds);
+    }
+
+    private static async Task<LocalJob?> FindActiveModelPullJobAsync(
+        ILocalJobQueue jobs,
+        string modelName,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<LocalJob> currentJobs = await jobs.ListAsync(limit: 500, cancellationToken);
+        foreach (LocalJob job in currentJobs)
+        {
+            if (job.Type != OllamaModelPullJobHandler.JobType
+                || job.Status is not (JobStatus.Pending or JobStatus.Running or JobStatus.Pausing or JobStatus.Paused))
+            {
+                continue;
+            }
+
+            try
+            {
+                OllamaModelPullJobPayload? payload =
+                    System.Text.Json.JsonSerializer.Deserialize<OllamaModelPullJobPayload>(job.PayloadJson);
+                if (payload is not null
+                    && string.Equals(payload.ModelName, modelName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return job;
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task<string?> TryGetOllamaVersionAsync(
+        IOllamaClient ollamaClient,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ollamaClient.GetVersionAsync(cancellationToken);
+        }
+        catch (OllamaApiException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<IReadOnlyList<OllamaRunningModelResponse>> TryListRunningOllamaModelsAsync(
+        IOllamaClient ollamaClient,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ollamaClient.ListRunningModelsAsync(cancellationToken);
+        }
+        catch (OllamaApiException)
+        {
+            return [];
+        }
+    }
+
+    private static string BuildOllamaOnlineMessage(
+        int modelCount,
+        string? version,
+        int runningModelCount)
+    {
+        string versionText = string.IsNullOrWhiteSpace(version) ? string.Empty : $" Versione: {version}.";
+        string psText = runningModelCount == 0
+            ? " Nessun modello risulta caricato in memoria."
+            : $" Modelli caricati in memoria: {runningModelCount}.";
+        return $"Connessione riuscita. Modelli disponibili: {modelCount}.{versionText}{psText}";
+    }
+
+    private static string? BuildOllamaStatusSuggestion(IReadOnlyList<OllamaRunningModelResponse> runningModels)
+    {
+        if (runningModels.Count == 0)
+        {
+            return "Se una richiesta sembra lenta, usa 'ollama ps' per verificare caricamento, contesto e offload dei modelli.";
+        }
+
+        if (runningModels.Any(model => model.SizeVram is > 0 || model.ContextLength is > 0))
+        {
+            return "Per problemi di contesto, VRAM o offload confronta questi dati con 'ollama ps' e riduci num_ctx o batch se necessario.";
+        }
+
+        return null;
     }
 }

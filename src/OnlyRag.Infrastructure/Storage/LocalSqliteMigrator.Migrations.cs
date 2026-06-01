@@ -173,6 +173,23 @@ public sealed partial class LocalSqliteMigrator
         }
     }
 
+    private static async Task ApplySchemaVersion14Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await AddColumnIfMissingAsync(connection, transaction, "jobs", "next_attempt_at_utc", "TEXT NULL", cancellationToken);
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            """
+            CREATE INDEX IF NOT EXISTS idx_jobs_pending_due
+            ON jobs(status, next_attempt_at_utc, priority DESC, created_at_utc);
+            """,
+            cancellationToken);
+    }
+
     private static async Task EnsureNoDuplicateDocumentHashesAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,

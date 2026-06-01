@@ -320,6 +320,8 @@ public sealed class OllamaClientTests
             Assert.Equal(JsonValueKind.Array, input.ValueKind);
             Assert.Equal("chunk one", input[0].GetString());
             Assert.Equal("chunk two", input[1].GetString());
+            Assert.False(body.RootElement.GetProperty("truncate").GetBoolean());
+            Assert.False(body.RootElement.TryGetProperty("options", out _));
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -343,6 +345,82 @@ public sealed class OllamaClientTests
         Assert.Equal(2, embeddings.Count);
         Assert.Equal(3, embeddings[0].Count);
         Assert.Equal(1f, embeddings[0][0]);
+    }
+
+    [Fact]
+    public async Task GenerateEmbeddingsAsync_SendsManualNumCtxOnlyWhenConfigured()
+    {
+        StubHttpMessageHandler handler = new(async (request, cancellationToken) =>
+        {
+            JsonDocument body = await JsonDocument.ParseAsync(
+                await request.Content!.ReadAsStreamAsync(cancellationToken),
+                cancellationToken: cancellationToken);
+            Assert.False(body.RootElement.GetProperty("truncate").GetBoolean());
+            Assert.Equal(4096, body.RootElement.GetProperty("options").GetProperty("num_ctx").GetInt32());
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { embeddings = new[] { new[] { 1f } } })
+            };
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        IReadOnlyList<IReadOnlyList<float>> embeddings = await client.GenerateEmbeddingsAsync(
+            "nomic-embed-text:latest",
+            ["chunk"],
+            numCtx: 4096);
+
+        Assert.Single(embeddings);
+    }
+
+    [Fact]
+    public async Task GetVersionAndListRunningModels_ParseOllamaDiagnostics()
+    {
+        StubHttpMessageHandler handler = new((request, cancellationToken) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/version")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { version = "0.6.8" })
+                });
+            }
+
+            Assert.Equal("/api/ps", request.RequestUri?.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    models = new[]
+                    {
+                        new
+                        {
+                            name = "gemma3:4b",
+                            model = "gemma3:4b",
+                            size = 3338801804L,
+                            size_vram = 2147483648L,
+                            digest = "sha256",
+                            model_info = new Dictionary<string, object>
+                            {
+                                ["gemma3.context_length"] = 8192
+                            }
+                        }
+                    }
+                })
+            });
+        });
+
+        OllamaClient client = CreateClient(handler);
+
+        string? version = await client.GetVersionAsync();
+        IReadOnlyList<OllamaRunningModelResponse> running = await client.ListRunningModelsAsync();
+
+        Assert.Equal("0.6.8", version);
+        Assert.Single(running);
+        Assert.Equal("gemma3:4b", running[0].Name);
+        Assert.Equal(8192, running[0].ContextLength);
+        Assert.Equal(2147483648L, running[0].SizeVram);
     }
 
     private static OllamaClient CreateClient(

@@ -25,11 +25,11 @@ For RAG answers, OnlyRag sends retrieved snippets to the model, not full source 
 - Chat with selected documents and show source snippets for grounded answers.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
-- Configure Ollama endpoint, chat/embedding/translation models, `num_ctx` behavior, ingestion,
+- Configure Ollama endpoint, chat/embedding/translation models, automatic or manual `num_ctx` behavior, ingestion,
   OCR, Office conversion, and performance settings from the desktop UI.
 - Restore balanced default settings without deleting data, or schedule a confirmed full local data
   reset for the next app startup.
-- Track ingestion, embedding, OCR, and translation jobs in the desktop UI.
+- Track ingestion, embedding, OCR, translation, and Ollama model-install jobs in the desktop UI.
 - Confirm app exit when local jobs or unsaved UI work exist; confirmed exit saves available work,
   cancels active local jobs, and stops the in-process backend.
 - Build, test, publish, sign, and package Windows installer candidates with repository scripts.

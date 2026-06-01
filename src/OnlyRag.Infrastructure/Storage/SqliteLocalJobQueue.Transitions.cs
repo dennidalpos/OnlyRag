@@ -61,6 +61,7 @@ public sealed partial class SqliteLocalJobQueue
                     WHEN {runningStatusPredicate} THEN 'Pausa in corso'
                     ELSE $pausedStatus
                 END,
+                next_attempt_at_utc = NULL,
                 updated_at_utc = $now
             WHERE id = $id
               AND {pauseRequestStatusPredicate};
@@ -91,6 +92,7 @@ public sealed partial class SqliteLocalJobQueue
             UPDATE jobs
             SET status = $status,
                 error = $error,
+                next_attempt_at_utc = NULL,
                 progress_percent = CASE WHEN $status = $completedStatus THEN 100 ELSE progress_percent END,
                 current_step = $currentStep,
                 updated_at_utc = $now

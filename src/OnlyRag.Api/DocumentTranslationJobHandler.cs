@@ -10,6 +10,13 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
 {
     public const string DocumentTranslationJobType = "document-translation";
 
+    private static readonly TimeSpan[] UnitRetryDelays =
+    [
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromMilliseconds(1000),
+        TimeSpan.FromMilliseconds(2000)
+    ];
+
     private readonly ITranslationRepository translations;
     private readonly IOllamaClient ollamaClient;
     private readonly IPerformanceSettingsService performanceSettings;
@@ -56,7 +63,11 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
             await EnsureModelIsInstalledAsync(model, cancellationToken);
             await translations.UpdateTranslationJobAsync(payload.TranslationId, job.Id, "Running", null, cancellationToken);
             await TranslateFromCheckpointAsync(payload, model, batchSize, translationNumCtx, checkpoint, job, queue, cancellationToken);
-            await translations.RefreshProgressAsync(payload.TranslationId, "Completed", null, cancellationToken);
+            StoredTranslation? final = await translations.GetAsync(payload.TranslationId, cancellationToken);
+            if (final?.Status != "Failed")
+            {
+                await translations.RefreshProgressAsync(payload.TranslationId, "Completed", null, cancellationToken);
+            }
         }
         catch (OllamaApiException ex)
         {
@@ -125,23 +136,46 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
 
                 if (unit is null)
                 {
+                    IReadOnlyList<StoredTranslationUnit> units = await translations.ListUnitsAsync(payload.TranslationId, cancellationToken);
+                    StoredTranslationUnit? failedUnit = units.FirstOrDefault(item => item.Status == "Failed");
+                    if (failedUnit is not null)
+                    {
+                        string error = failedUnit.Error ?? "Una o piu unita non sono state tradotte.";
+                        await translations.RefreshProgressAsync(payload.TranslationId, "Failed", error, cancellationToken);
+                        current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
+                    }
+
                     await SaveCheckpointAsync(job, queue, current, int.MaxValue, "completed", cancellationToken);
                     return;
                 }
 
-                IReadOnlyList<OllamaChatMessage> messages = DocumentTranslationPromptBuilder.BuildMessages(
+                UnitTranslationResult unitResult = await TranslateUnitWithRepairAsync(
                     payload.TargetLanguage,
-                    unit);
-                string translatedText = StripDelimiters(await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken));
-                TranslationValidationResult validation = TranslationOutputValidator.Validate(unit.SourceText, translatedText);
-                if (!validation.IsValid)
-                {
-                    await translations.SaveUnitFailureAsync(unit.Id, validation.Warnings ?? "Validazione traduzione fallita.", cancellationToken);
-                    throw new InvalidOperationException(validation.Warnings ?? "Validazione traduzione fallita.");
-                }
+                    unit,
+                    model,
+                    translationNumCtx,
+                    cancellationToken);
 
-                await translations.SaveUnitSuccessAsync(unit.Id, translatedText.Trim(), validation.Warnings, cancellationToken);
-                await translations.RefreshProgressAsync(payload.TranslationId, "Running", null, cancellationToken);
+                if (unitResult.IsFailure)
+                {
+                    await translations.SaveUnitFailureAsync(
+                        unit.Id,
+                        unitResult.ValidationWarnings ?? "Validazione traduzione fallita.",
+                        cancellationToken);
+                    await translations.RefreshProgressAsync(payload.TranslationId, "Running", unitResult.ValidationWarnings, cancellationToken);
+                    throw new TranslationValidationException(
+                        "Validazione traduzione fallita",
+                        unitResult.ValidationWarnings ?? "Validazione traduzione fallita dopo retry locali.");
+                }
+                else
+                {
+                    await translations.SaveUnitSuccessAsync(
+                        unit.Id,
+                        unitResult.TranslatedText.Trim(),
+                        unitResult.ValidationWarnings,
+                        cancellationToken);
+                    await translations.RefreshProgressAsync(payload.TranslationId, "Running", null, cancellationToken);
+                }
                 current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
                 nextUnitIndex = unit.UnitIndex + 1;
                 await SaveCheckpointAsync(job, queue, current, nextUnitIndex, "running", cancellationToken);
@@ -203,6 +237,57 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         }
     }
 
+    private async Task<UnitTranslationResult> TranslateUnitWithRepairAsync(
+        string targetLanguage,
+        StoredTranslationUnit unit,
+        string model,
+        int? translationNumCtx,
+        CancellationToken cancellationToken)
+    {
+        OllamaApiException? lastRetryableOllamaError = null;
+        string? lastValidationWarning = null;
+
+        for (int attempt = 0; attempt <= UnitRetryDelays.Length; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                IReadOnlyList<OllamaChatMessage> messages = DocumentTranslationPromptBuilder.BuildMessages(
+                    targetLanguage,
+                    unit);
+                string translatedText = StripDelimiters(
+                    await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken));
+                TranslationValidationResult validation = TranslationOutputValidator.Validate(unit.SourceText, translatedText);
+                if (validation.IsValid)
+                {
+                    return new UnitTranslationResult(translatedText, validation.Warnings);
+                }
+
+                lastValidationWarning = BuildUnitRetryValidationWarning(unit.SourceText, validation.Warnings);
+            }
+            catch (OllamaApiException ex) when (IsLocalRetryable(ex))
+            {
+                lastRetryableOllamaError = ex;
+                lastValidationWarning = null;
+            }
+
+            if (attempt < UnitRetryDelays.Length)
+            {
+                await Task.Delay(UnitRetryDelays[attempt], cancellationToken);
+            }
+        }
+
+        if (lastRetryableOllamaError is not null && lastValidationWarning is null)
+        {
+            throw lastRetryableOllamaError;
+        }
+
+        return new UnitTranslationResult(
+            string.Empty,
+            lastValidationWarning ?? "Validazione traduzione fallita dopo retry locali.",
+            IsFailure: true);
+    }
+
     private static TranslationCheckpoint ReadCheckpoint(
         string checkpointJson,
         long translationId,
@@ -235,6 +320,26 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         int NextUnitIndex,
         int CompletedUnitCount,
         string Mode);
+
+    private sealed record UnitTranslationResult(string TranslatedText, string? ValidationWarnings, bool IsFailure = false);
+
+    private static bool IsLocalRetryable(OllamaApiException exception)
+    {
+        return exception.Kind is OllamaErrorKind.Timeout
+            or OllamaErrorKind.Unreachable
+            or OllamaErrorKind.UnexpectedResponse;
+    }
+
+    private static string BuildUnitRetryValidationWarning(string sourceText, string? validationWarnings)
+    {
+        string normalizedSource = sourceText.Length > 240
+            ? $"{sourceText[..240]}..."
+            : sourceText;
+        return "Validazione traduzione fallita dopo retry locali: "
+            + $"{validationWarnings ?? "output temporaneamente non valido"}. "
+            + "L'unita e stata ritentata dal testo sorgente originale: "
+            + normalizedSource;
+    }
 
     private static string StripDelimiters(string text)
     {

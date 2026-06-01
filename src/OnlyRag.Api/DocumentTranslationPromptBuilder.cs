@@ -36,6 +36,43 @@ internal static class DocumentTranslationPromptBuilder
         ];
     }
 
+    public static IReadOnlyList<OllamaChatMessage> BuildRepairMessages(
+        string targetLanguage,
+        StoredTranslationUnit unit,
+        string failedOutput,
+        string validationWarnings)
+    {
+        string language = NormalizeLanguage(targetLanguage);
+        return
+        [
+            new OllamaChatMessage(
+                "system",
+                $"""
+                You are repairing a failed document translation unit.
+                Return only the corrected translation in {language}.
+                Preserve every placeholder, code token, number, date, line break, indentation, and list marker exactly as in the source.
+                Do not add explanations, comments, markdown fences, XML tags, headings, or wrappers.
+                """),
+            new OllamaChatMessage(
+                "user",
+                $"""
+                Validation failure: {validationWarnings}
+                Unit kind: {unit.UnitKind}
+                Page/unit: {unit.PageNumber?.ToString() ?? "n/a"}
+
+                Source text:
+                <source_text>
+                {unit.SourceText}
+                </source_text>
+
+                Previous failed output:
+                <failed_output>
+                {failedOutput}
+                </failed_output>
+                """)
+        ];
+    }
+
     private static string GetUnitKindInstruction(string? unitKind) => unitKind switch
     {
         "table-cell" => "This is a single table cell: translate the content only, preserve short values like numbers or codes verbatim, do not add surrounding punctuation or sentence structure.",

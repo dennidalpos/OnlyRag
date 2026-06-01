@@ -50,4 +50,26 @@ describe("JobsSection", () => {
       expect(screen.getByRole("alert")).toHaveTextContent("Operazione non riuscita.");
     });
   });
+
+  it("labels Ollama model installation jobs", async () => {
+    mockApi([
+      {
+        path: "/api/jobs?limit=100",
+        response: [
+          createJob({
+            id: "pull-1",
+            type: "ollama-model-pull",
+            status: "Running",
+            currentStep: "downloading",
+            progressPercent: 42
+          })
+        ]
+      }
+    ]);
+
+    render(<JobsSection />);
+
+    expect(await screen.findByText("Installazione modello Ollama")).toBeInTheDocument();
+    expect(screen.getByLabelText("Avanzamento 42%")).toBeInTheDocument();
+  });
 });

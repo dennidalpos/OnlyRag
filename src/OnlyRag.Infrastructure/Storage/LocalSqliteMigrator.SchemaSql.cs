@@ -91,7 +91,8 @@ public sealed partial class LocalSqliteMigrator
                 checkpoint_json TEXT NOT NULL DEFAULT '{}',
                 error TEXT NULL,
                 retry_count INTEGER NOT NULL DEFAULT 0,
-                max_retries INTEGER NOT NULL DEFAULT 3,
+                max_retries INTEGER NOT NULL DEFAULT 5,
+                next_attempt_at_utc TEXT NULL,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL
             );
@@ -189,6 +190,7 @@ public sealed partial class LocalSqliteMigrator
             CREATE INDEX idx_chunk_vector_index_status_content_hash ON chunk_vector_index_status(content_hash);
             CREATE INDEX idx_chunk_vector_index_status_collection ON chunk_vector_index_status(qdrant_collection);
             CREATE INDEX idx_jobs_status_priority ON jobs(status, priority DESC, created_at_utc);
+            CREATE INDEX idx_jobs_pending_due ON jobs(status, next_attempt_at_utc, priority DESC, created_at_utc);
             CREATE INDEX idx_jobs_updated_at ON jobs(updated_at_utc);
             CREATE INDEX idx_chat_messages_conversation ON chat_messages(conversation_id, id);
             CREATE INDEX idx_translations_document ON translations(document_id, created_at_utc DESC);
@@ -200,7 +202,7 @@ public sealed partial class LocalSqliteMigrator
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (13, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (14, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 

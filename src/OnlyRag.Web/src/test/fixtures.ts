@@ -74,6 +74,8 @@ export function createOllamaStatus(overrides: Partial<OllamaStatusResponse> = {}
     installedModelCount: 1,
     message: "Ollama raggiungibile.",
     suggestion: null,
+    version: null,
+    runningModels: [],
     ...overrides
   };
 }
@@ -127,7 +129,13 @@ export function createJob(overrides: Partial<LocalJob> = {}): LocalJob {
     priority: 0,
     progressPercent: 45,
     currentStep: "Importazione in corso",
+    payloadJson: "{}",
+    checkpointJson: "{}",
     error: null,
+    retryCount: 0,
+    maxRetries: 3,
+    nextAttemptAtUtc: null,
+    createdAt: "2026-05-21T12:00:00Z",
     updatedAt: "2026-05-21T12:10:00Z",
     ...overrides
   };
@@ -191,6 +199,8 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
     logsDirectory: "C:\\OnlyRag\\logs",
     ollamaStatus: "Ready",
     ollamaIsReachable: true,
+    ollamaVersion: null,
+    ollamaRunningModels: [],
     qdrant: createQdrantStatus(),
     ocrStatus: "Configured",
     ocrIsConfigured: true,
@@ -206,7 +216,8 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
       compiledWithCuda: null,
       cudaDeviceCount: null,
       activeDevice: null,
-      packageVersions: {}
+      packageVersions: {},
+      capabilityStatus: "no_nvidia_gpu"
     },
     systemTelemetry: {
       cpu: {

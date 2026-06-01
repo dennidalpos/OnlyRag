@@ -69,6 +69,7 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
 
   const telemetry = diagnostics.systemTelemetry;
   const gpu = telemetry.gpu;
+  const hasNvidiaContext = diagnostics.ocrGpuCapability.capabilityStatus !== "no_nvidia_gpu" || Boolean(gpu);
   const cudaValue = diagnostics.ocrGpuCapability.compiledWithCuda === null
     ? "n/d"
     : diagnostics.ocrGpuCapability.compiledWithCuda ? "Sì" : "No";
@@ -95,21 +96,25 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
           value={formatTelemetryBytes(telemetry.systemDisk.availableBytes)}
           detail={`liberi di ${formatTelemetryBytes(telemetry.systemDisk.totalBytes)}`}
         />
-        <MetricRow
-          label="GPU"
-          value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
-          detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non rilevata"}
-        />
-        <MetricRow
-          label="VRAM"
-          value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
-          detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
-        />
-        <MetricRow
-          label="CUDA Paddle"
-          value={cudaValue}
-          detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
-        />
+        {hasNvidiaContext && (
+          <>
+            <MetricRow
+              label="GPU"
+              value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
+              detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non disponibile"}
+            />
+            <MetricRow
+              label="VRAM"
+              value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
+              detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
+            />
+            <MetricRow
+              label="CUDA Paddle"
+              value={cudaValue}
+              detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
+            />
+          </>
+        )}
       </div>
     </section>
   );

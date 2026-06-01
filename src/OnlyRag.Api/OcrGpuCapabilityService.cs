@@ -20,7 +20,43 @@ public sealed class OcrGpuCapabilityService
 
         if (!OperatingSystem.IsWindows())
         {
-            return Blocked("Non disponibile", "OCR GPU e supportato solo su Windows.");
+            return Blocked("non_windows", "Non disponibile", "OCR GPU e supportato solo su Windows.");
+        }
+
+        NvidiaHardwareProbe hardwareProbe = await DetectNvidiaHardwareAsync(cancellationToken);
+        if (hardwareProbe.Completed && !hardwareProbe.HasNvidiaHardware)
+        {
+            return new OcrGpuCapabilityResponse(
+                false,
+                "CPU",
+                null,
+                "Nessuna GPU NVIDIA rilevata. OCR CPU disponibile.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new Dictionary<string, string>(),
+                "no_nvidia_gpu");
+        }
+
+        if (hardwareProbe.Completed && hardwareProbe.HasNvidiaHardware
+            && OcrProvisionRuntimeResolver.ResolveExecutable("nvidia-smi") is null)
+        {
+            return new OcrGpuCapabilityResponse(
+                false,
+                "Driver NVIDIA da riparare",
+                "GPU NVIDIA rilevata, ma nvidia-smi non e disponibile. Installa o ripara il driver NVIDIA ufficiale, riavvia Windows e riprova.",
+                null,
+                null,
+                hardwareProbe.DisplayName,
+                null,
+                null,
+                null,
+                null,
+                new Dictionary<string, string>(),
+                "nvidia_tool_missing");
         }
 
         OcrProvisionRuntime runtime;
@@ -31,11 +67,23 @@ public sealed class OcrGpuCapabilityService
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)
         {
-            return Blocked(
+            return new OcrGpuCapabilityResponse(
+                false,
                 "NVIDIA non disponibile",
                 UserFacingErrorText.FromExternalDetail(
                     ex.Message,
-                    "Rilevazione NVIDIA non completata. Dettagli tecnici disponibili nei log locali."));
+                    hardwareProbe.HasNvidiaHardware
+                        ? "GPU NVIDIA rilevata, ma il driver o nvidia-smi non completano la verifica. Ripara il driver NVIDIA e riavvia Windows."
+                        : "Rilevazione NVIDIA non completata. Dettagli tecnici disponibili nei log locali."),
+                null,
+                null,
+                hardwareProbe.DisplayName,
+                null,
+                null,
+                null,
+                null,
+                new Dictionary<string, string>(),
+                hardwareProbe.HasNvidiaHardware ? "nvidia_tool_failed" : "runtime_failed");
         }
 
         OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync("gpu", cancellationToken);
@@ -56,7 +104,8 @@ public sealed class OcrGpuCapabilityService
                 availability.CompiledWithCuda,
                 availability.CudaDeviceCount,
                 availability.ActiveDevice,
-                packageVersions);
+                packageVersions,
+                "runtime_missing");
         }
 
         if (availability.CompiledWithCuda is false)
@@ -72,7 +121,8 @@ public sealed class OcrGpuCapabilityService
                 availability.CompiledWithCuda,
                 availability.CudaDeviceCount,
                 availability.ActiveDevice,
-                packageVersions);
+                packageVersions,
+                "runtime_failed");
         }
 
         if (availability.CudaDeviceCount is int count && count < 1)
@@ -88,7 +138,8 @@ public sealed class OcrGpuCapabilityService
                 availability.CompiledWithCuda,
                 availability.CudaDeviceCount,
                 availability.ActiveDevice,
-                packageVersions);
+                packageVersions,
+                "runtime_failed");
         }
 
         return new OcrGpuCapabilityResponse(
@@ -102,10 +153,11 @@ public sealed class OcrGpuCapabilityService
             availability.CompiledWithCuda,
             availability.CudaDeviceCount,
             availability.ActiveDevice,
-            packageVersions);
+            packageVersions,
+            "usable");
     }
 
-    private static OcrGpuCapabilityResponse Blocked(string status, string blockReason)
+    private static OcrGpuCapabilityResponse Blocked(string capabilityStatus, string status, string blockReason)
     {
         return new OcrGpuCapabilityResponse(
             false,
@@ -118,11 +170,46 @@ public sealed class OcrGpuCapabilityService
             null,
             null,
             null,
-            new Dictionary<string, string>());
+            new Dictionary<string, string>(),
+            capabilityStatus);
     }
 
     private static bool IsRepairableOcrRuntimeIssue(string message)
     {
         return message.StartsWith("Runtime OCR locale incompleto o danneggiato.", StringComparison.OrdinalIgnoreCase);
     }
+
+    private async Task<NvidiaHardwareProbe> DetectNvidiaHardwareAsync(CancellationToken cancellationToken)
+    {
+        string? shell = OcrProvisionRuntimeResolver.ResolveExecutable("pwsh")
+            ?? OcrProvisionRuntimeResolver.ResolveExecutable("powershell");
+        if (shell is null)
+        {
+            return new NvidiaHardwareProbe(false, false, null);
+        }
+
+        LocalProcessResult result = await processLauncher.RunAsync(
+            shell,
+            [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }"
+            ],
+            null,
+            cancellationToken);
+        if (result.ExitCode != 0)
+        {
+            return new NvidiaHardwareProbe(false, false, null);
+        }
+
+        string? nvidiaName = result.StandardOutput
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault(line => line.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
+
+        return new NvidiaHardwareProbe(true, nvidiaName is not null, nvidiaName);
+    }
+
+    private sealed record NvidiaHardwareProbe(bool Completed, bool HasNvidiaHardware, string? DisplayName);
 }

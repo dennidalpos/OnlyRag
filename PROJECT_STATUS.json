@@ -1,146 +1,104 @@
 {
   "project_name": "OnlyRag",
   "status": "active",
-  "current_phase": "production_readiness_manual_release_verification",
-  "last_updated": "2026-05-26T02:33:50+02:00",
+  "current_phase": "residual_validation",
+  "last_updated": "2026-06-01T09:09:10+02:00",
   "production_target": true,
-  "summary": "Windows + PowerShell readiness tracker for backend API, local SQLite persistence, frontend build, installer packaging, performance, logging, and observability.",
-  "active_objective": "Keep the local Windows desktop app production-ready; automated Release verification is passing, Diagnostics polling cost is mitigated, and only manual desktop plus release-signing environment checks remain open.",
+  "summary": "Local Ollama resilience residuals are implemented and the canonical Release gate passes. Remaining work is external validation and optional structure cleanup.",
+  "active_objective": "Validate the completed Ollama resilience work in real runtime environments and address structure cleanup when scoped.",
   "assumptions": [
-    "Primary local environment is Windows with PowerShell 7.",
-    "Backend API is the loopback-only in-process HTTP server under src\\OnlyRag.Api.",
-    "Local persistence is SQLite under src\\OnlyRag.Infrastructure\\Storage.",
-    "Frontend is the Vite/React WebView app under src\\OnlyRag.Web.",
-    "Canonical local readiness command is pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release.",
-    "Required environment variables are currently none; optional variables are ONLYRAG_WEB_DEV_SERVER and ONLYRAG_LIBREOFFICE_PATH."
+    "Existing in-flight jobs keep their persisted max_retries; newly created jobs use the queue default of 5.",
+    "Automatic num_ctx means OnlyRag omits options.num_ctx and lets Ollama decide the effective context."
   ],
   "decisions": [
-    "Keep API binding restricted to loopback with session-token protection for /api/* endpoints.",
-    "Keep local backend logs sanitized and bounded by file rotation.",
-    "Cache expensive Diagnostics probes briefly instead of adding telemetry backends or broad instrumentation without defined production requirements.",
-    "Do not introduce new dependencies, telemetry backends, metrics exporters, schema changes, or public API changes without explicit production requirements."
+    "Keep endpoint and model choices primary; keep manual num_ctx, batch, timeout, and parallelism as advanced/custom controls with warning copy.",
+    "Fail exhausted translation placeholder validation non-retryably after local retries from the original source text.",
+    "Treat missing Ollama ps/version endpoints as degraded diagnostics, not as Ollama offline."
   ],
   "current_tasks": [
-    "Manually launch dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug and verify WebView2, loopback API, Qdrant startup, document import, job progress, diagnostics, and logs.",
-    "Install Inno Setup 6, Windows SDK signing tools, and a trusted code-signing certificate before signed installer verification.",
-    "Run installer build and signed installer lifecycle verification after the packaging/signing tools are available."
+    "Validate live Ollama offline/restart behavior, interrupted model pulls, and large-context failures on a machine with representative models.",
+    "Validate long chat layout in the Windows WPF WebView shell at desktop and narrow widths.",
+    "Validate OCR GPU diagnostics on representative CPU-only, NVIDIA-driver-missing, runtime-missing, and runtime-ready Windows machines.",
+    "Review oversized files and split only where responsibility boundaries are clear."
   ],
   "next_tasks": [
-    "Profile ingestion, embedding, and retrieval with representative local documents before changing batching, caching, or concurrency defaults.",
-    "Define production observability requirements before adding structured metrics, retention policy changes, external telemetry, or traffic-level performance targets.",
-    "Resolve existing full-solution dotnet format CRLF/whitespace drift before making dotnet format a release gate."
+    "Run signed installer lifecycle validation on a clean Windows verification machine when packaging is in scope."
   ],
   "blockers": [
-    "Traffic, log retention, and metrics backend requirements are not defined.",
-    "Installer packaging is blocked locally because ISCC.exe from Inno Setup 6 was not found on PATH.",
-    "Signed release verification is blocked because signtool.exe was not found on PATH and a trusted code-signing certificate is not configured.",
-    "Interactive desktop startup and installer lifecycle verification require manual Windows execution."
+    "Live Ollama resilience validation requires a local Ollama instance and enough disk/network capacity for representative model pulls.",
+    "NVIDIA/OCR validation requires representative Windows hardware or reliable mocked process/WMI outputs.",
+    "Signed installer lifecycle validation requires Inno Setup, signtool, a signing certificate, and a clean Windows verification machine."
   ],
   "risks": [
-    "Diagnostics live Ollama and Qdrant checks still run per request; OCR and system telemetry probes are cached for 10 seconds, but realistic polling targets should still be measured before adding more instrumentation.",
-    "Local file logging is intentionally simple and sanitized; it is not a substitute for centralized production telemetry if fleet observability is required.",
-    "Ingestion, OCR, embedding, and translation throughput depend on local hardware, Ollama model choice, Qdrant state, LibreOffice, Python OCR packages, and document mix.",
-    "Full-solution dotnet format currently reports pre-existing CRLF/whitespace drift outside the Diagnostics change scope; the touched files pass targeted dotnet format verification.",
-    "Parallel dotnet test runs can contend for shared obj outputs; run project-level backend tests serially when verifying locally.",
-    "Generated build outputs under bin, obj, dist, artifacts, and package caches must remain ignored and out of source changes."
+    "External/manual acceptance criteria cannot be proven from this workspace alone.",
+    "Local translation retries add up to 3.5 seconds per persistently invalid unit before non-retryable failure.",
+    "Existing queued jobs may retain older persisted retry limits until recreated."
   ],
-  "oversized_files": [],
-  "critical_files": [
-    "src\\OnlyRag.Api\\BackendLog.cs",
-    "src\\OnlyRag.Api\\DiagnosticsProbeCacheService.cs",
-    "src\\OnlyRag.Api\\InProcessBackend.cs",
-    "src\\OnlyRag.Api\\InProcessBackend.Application.cs",
-    "src\\OnlyRag.Api\\InProcessBackend.AppEndpoints.cs",
-    "src\\OnlyRag.Api\\LocalJobWorkerService.cs",
-    "src\\OnlyRag.Api\\QdrantLocalRuntimeService.cs",
-    "src\\OnlyRag.Api\\SystemTelemetryService.cs",
-    "src\\OnlyRag.Infrastructure\\Storage",
-    "src\\OnlyRag.Web\\package.json",
-    "scripts\\Invoke-Gate.ps1"
+  "oversized_files": [
+    "src/OnlyRag.Api/DependencyProvisioningService.Ocr.cs",
+    "src/OnlyRag.Web/src/App.tsx",
+    "src/OnlyRag.Web/src/components/useDocumentsSectionController.ts",
+    "src/OnlyRag.Web/src/components/useSettingsSectionController.actions.ts",
+    "tests/OnlyRag.Api.Tests/InProcessBackendDocumentTests.cs",
+    "several long PowerShell scripts under scripts/"
   ],
   "structure_notes": [
-    "Backend API source is under src\\OnlyRag.Api.",
-    "SQLite storage, migrations, repositories, and ingestion persistence are under src\\OnlyRag.Infrastructure\\Storage.",
-    "Frontend source is under src\\OnlyRag.Web\\src; production output is generated under src\\OnlyRag.Web\\dist.",
-    "Backend and storage tests are under tests\\OnlyRag.Api.Tests and tests\\OnlyRag.Infrastructure.Tests.",
-    "Installer and release evidence outputs are expected under artifacts."
+    "No structural split was performed in this pass; behavior changes stayed scoped to existing modules."
   ],
   "dependencies": {
     "runtime": [
-      ".NET self-contained Windows desktop payload",
-      "Microsoft Edge WebView2 Runtime",
-      "Bundled Qdrant runtime payload",
-      "SQLite via Microsoft.Data.Sqlite",
-      "External Ollama endpoint configured by the user",
-      "Optional LibreOffice",
-      "Optional Python 3.10-3.13 for OCR provisioning"
+      ".NET 10",
+      "Ollama",
+      "Qdrant",
+      "WebView2",
+      "Node.js/npm"
     ],
     "development": [
       "PowerShell 7",
-      ".NET 10 SDK",
-      "Node.js ^20.19.0 or >=22.12.0 with npm",
-      "Inno Setup 6 for installer packaging",
-      "Windows SDK signtool.exe for signed releases"
+      "xUnit",
+      "Vitest",
+      "Playwright",
+      "ESLint",
+      "Prettier"
     ],
     "external_services": [
-      "Ollama local or trusted LAN endpoint",
-      "GitHub Actions Windows runner for CI"
+      "Optional local or LAN Ollama endpoint"
     ]
   },
   "quality_gates": {
-    "canonical_gate": "passed",
     "format": "passed",
-    "dotnet_format": "failed",
     "lint": "passed",
     "typecheck": "passed",
-    "frontend_build": "passed",
-    "backend_api_tests": "passed",
-    "backend_storage_tests": "passed",
-    "database_migration_review": "not_run",
-    "auth_review": "not_run",
+    "tests": "passed",
     "build": "passed",
-    "installer_build": "not_run",
-    "installer_lifecycle": "not_run",
     "security_review": "passed",
-    "structure_review": "passed",
-    "local_start": "not_run"
+    "structure_review": "failed",
+    "external_ollama_validation": "not_run",
+    "webview_manual_validation": "not_run",
+    "nvidia_ocr_validation": "not_run",
+    "installer_lifecycle": "not_run"
   },
   "commands": {
     "install": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev",
+    "dev": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
     "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
     "format": "Set-Location .\\src\\OnlyRag.Web; npm run format:check",
     "lint": "Set-Location .\\src\\OnlyRag.Web; npm run lint",
     "typecheck": "Set-Location .\\src\\OnlyRag.Web; npm run typecheck",
-    "test": "dotnet test .\\OnlyRag.sln --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "backend_api_test": "dotnet test .\\tests\\OnlyRag.Api.Tests\\OnlyRag.Api.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
-    "backend_storage_test": "dotnet test .\\tests\\OnlyRag.Infrastructure.Tests\\OnlyRag.Infrastructure.Tests.csproj --configuration Release --no-restore --logger \"console;verbosity=minimal\"",
+    "test": "dotnet test .\\OnlyRag.sln --no-restore; Set-Location .\\src\\OnlyRag.Web; npm run test -- --run",
     "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
     "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "release_verify": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
-    "clean": "pwsh .\\scripts\\Clean.ps1"
+    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug"
   },
   "environment": {
-    "os_target": "Windows 10 1809+ or Windows 11",
-    "shell": "PowerShell 7",
-    "observed_tools": [
-      ".NET 10 SDK",
-      "Node.js and npm",
-      "PowerShell 7"
-    ],
+    "os_target": "Windows",
+    "shell": "PowerShell",
     "required_env_vars": [],
-    "env_files": [],
-    "optional_env_vars": [
-      "ONLYRAG_WEB_DEV_SERVER",
-      "ONLYRAG_LIBREOFFICE_PATH"
-    ]
+    "env_files": []
   },
-  "last_completed_work": "Added short-lived caching for expensive Diagnostics probes and passed the full Release repository gate.",
+  "last_completed_work": "Implemented local Ollama resilience residuals, added audit artifact, and passed the canonical Release gate.",
   "open_questions": [
-    "What production polling interval is expected for diagnostics and status views?",
-    "Should production observability remain local-file-only, or integrate with a specific metrics/log collector?",
-    "What document sizes, model choices, and concurrent job counts define the immediate production performance target?"
+    "Should oversized-file cleanup be handled now as a separate refactor task or deferred until after external runtime validation?"
   ],
-  "handoff_notes": "Keep this tracker current-only. Do not store prompt history, transcripts, secrets, stale completed task lists, or report-style logs."
+  "handoff_notes": "Start external validation with live Ollama model pulls and interruption/retry scenarios, then verify WebView chat layout and representative OCR GPU states."
 }

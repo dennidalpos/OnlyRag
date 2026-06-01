@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text;
 using OnlyRag.Core;
 
 namespace OnlyRag.Api.Ollama;
@@ -55,6 +56,41 @@ internal sealed partial class OllamaClient : IOllamaClient
             .ToArray();
     }
 
+    public async Task<string?> GetVersionAsync(CancellationToken cancellationToken = default)
+    {
+        OllamaRequestContext context = await BuildContextAsync(cancellationToken);
+        OllamaVersionResponse response = await SendAsync<OllamaVersionResponse>(
+            HttpMethod.Get,
+            context,
+            "api/version",
+            body: null,
+            cancellationToken);
+
+        return string.IsNullOrWhiteSpace(response.Version) ? null : response.Version.Trim();
+    }
+
+    public async Task<IReadOnlyList<OllamaRunningModelResponse>> ListRunningModelsAsync(CancellationToken cancellationToken = default)
+    {
+        OllamaRequestContext context = await BuildContextAsync(cancellationToken);
+        OllamaPsResponse response = await SendAsync<OllamaPsResponse>(
+            HttpMethod.Get,
+            context,
+            "api/ps",
+            body: null,
+            cancellationToken);
+
+        return response.Models
+            .Select(model => new OllamaRunningModelResponse(
+                model.Name,
+                model.Model,
+                model.Size,
+                model.SizeVram,
+                model.Digest,
+                model.ContextLength ?? ExtractContextLength(model.ModelInfo)))
+            .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public async Task PullModelAsync(string modelName, CancellationToken cancellationToken = default)
     {
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
@@ -70,6 +106,110 @@ internal sealed partial class OllamaClient : IOllamaClient
                 stream = false
             },
             cancellationToken);
+    }
+
+    public async Task PullModelAsync(
+        string modelName,
+        Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onProgress);
+
+        OllamaRequestContext context = await BuildContextAsync(cancellationToken);
+        string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
+
+        using HttpRequestMessage request = new(HttpMethod.Post, new Uri(context.BaseUri, "api/pull"))
+        {
+            Content = JsonContent.Create(new
+            {
+                model = normalizedModelName,
+                stream = true
+            })
+        };
+
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(context.Timeout);
+
+        try
+        {
+            using HttpResponseMessage response = await httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                timeoutSource.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                string error = await ReadErrorMessageAsync(response, timeoutSource.Token);
+                throw CreateApiException(response.StatusCode, error);
+            }
+
+            await using Stream stream = await response.Content.ReadAsStreamAsync(timeoutSource.Token);
+            using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            bool sawDone = false;
+            while (true)
+            {
+                string? line = await reader.ReadLineAsync(timeoutSource.Token);
+                if (line is null)
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                PullResponse? chunk;
+                try
+                {
+                    chunk = JsonSerializer.Deserialize<PullResponse>(line, JsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new OllamaApiException(
+                        OllamaErrorKind.UnexpectedResponse,
+                        "Ollama ha restituito avanzamento installazione modello non valido.",
+                        innerException: ex);
+                }
+
+                if (chunk is null || string.IsNullOrWhiteSpace(chunk.Status))
+                {
+                    throw new OllamaApiException(
+                        OllamaErrorKind.UnexpectedResponse,
+                        "Ollama ha restituito avanzamento installazione modello vuoto.");
+                }
+
+                int? percent = ComputePullProgressPercent(chunk);
+                await onProgress(
+                    new OllamaModelPullProgress(
+                        chunk.Status,
+                        chunk.Total,
+                        chunk.Completed,
+                        percent,
+                        chunk.Digest,
+                        chunk.Layer),
+                    timeoutSource.Token);
+                sawDone = sawDone || string.Equals(chunk.Status, "success", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (!sawDone)
+            {
+                await onProgress(new OllamaModelPullProgress("Installazione modello completata", null, null, 100), timeoutSource.Token);
+            }
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new OllamaApiException(
+                OllamaErrorKind.Timeout,
+                $"Ollama non ha risposto entro {context.Timeout.TotalSeconds:0} secondi.",
+                innerException: ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new OllamaApiException(
+                OllamaErrorKind.Unreachable,
+                $"Non riesco a raggiungere Ollama su {context.BaseUri}. Controlla l'indirizzo e verifica che il servizio sia in esecuzione.",
+                innerException: ex);
+        }
     }
 
     public async Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default)
@@ -252,8 +392,8 @@ internal sealed partial class OllamaClient : IOllamaClient
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
         object inputPayload = inputs.Count == 1 ? inputs[0] : inputs;
         object requestBody = numCtx.HasValue
-            ? new { model = normalizedModelName, input = inputPayload, options = new { num_ctx = numCtx.Value } }
-            : (object)new { model = normalizedModelName, input = inputPayload };
+            ? new { model = normalizedModelName, input = inputPayload, truncate = false, options = new { num_ctx = numCtx.Value } }
+            : (object)new { model = normalizedModelName, input = inputPayload, truncate = false };
 
         EmbeddingResponse response = await generationCoordinator.RunAsync(
             ct => SendAsync<EmbeddingResponse>(
@@ -340,6 +480,43 @@ internal sealed partial class OllamaClient : IOllamaClient
         return new OllamaRequestContext(
             new Uri($"{normalizedBaseUrl.TrimEnd('/')}/", UriKind.Absolute),
             TimeSpan.FromSeconds(OllamaSettingsService.ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds)));
+    }
+
+    private static int? ComputePullProgressPercent(PullResponse chunk)
+    {
+        if (chunk.Total is not > 0 || chunk.Completed is not >= 0)
+        {
+            return string.Equals(chunk.Status, "success", StringComparison.OrdinalIgnoreCase)
+                ? 100
+                : null;
+        }
+
+        return (int)Math.Clamp(Math.Round(chunk.Completed.Value * 100d / chunk.Total.Value), 0d, 100d);
+    }
+
+    private static int? ExtractContextLength(IReadOnlyDictionary<string, System.Text.Json.JsonElement>? modelInfo)
+    {
+        if (modelInfo is null)
+        {
+            return null;
+        }
+
+        foreach (KeyValuePair<string, System.Text.Json.JsonElement> kv in modelInfo)
+        {
+            if (!kv.Key.EndsWith(".context_length", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(kv.Key, "context_length", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (kv.Value.ValueKind == System.Text.Json.JsonValueKind.Number
+                && kv.Value.TryGetInt32(out int value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
 }

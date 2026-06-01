@@ -242,6 +242,34 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task OllamaModelPull_DoesNotQueueAlreadyInstalledModel()
+    {
+        await using FakeOllamaServer ollama = await FakeOllamaServer.StartAsync();
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        await httpClient.PutAsJsonAsync(
+            "/api/settings/ollama",
+            new OllamaSettings(ollama.BaseUrl, "chat-model", "embed-model", "translation-model", 180, 2),
+            JsonOptions);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            "/api/ollama/models/pull",
+            new PullOllamaModelRequest("chat-model"),
+            JsonOptions);
+        OllamaModelPullStartResponse? body =
+            await response.Content.ReadFromJsonAsync<OllamaModelPullStartResponse>(JsonOptions);
+        IReadOnlyList<LocalJob>? jobs = await httpClient.GetFromJsonAsync<IReadOnlyList<LocalJob>>("/api/jobs", JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal("Installed", body.Status);
+        Assert.Equal(string.Empty, body.JobId);
+        Assert.DoesNotContain(jobs ?? [], job => job.Type == OllamaModelPullJobHandler.JobType);
+    }
+
+    [Fact]
     public async Task OcrSettings_CanBeSavedAndReadBackNormalized()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();

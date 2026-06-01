@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  apiRequest,
   type DiagnosticsResponse,
   type IngestionSettings,
+  type LocalJob,
   type OfficeConversionSettings,
   type OfficeConverterStatusResponse,
   type OcrLanguage,
@@ -75,6 +77,7 @@ export function useSettingsSectionController({
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ocrProvisionStatus, setOcrProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
+  const [modelPullJobs, setModelPullJobs] = useState<LocalJob[]>([]);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -257,6 +260,42 @@ export function useSettingsSectionController({
     return () => window.clearInterval(interval);
   }, [ocrProvisionStatus?.isRunning]);
 
+  useEffect(() => {
+    let isCancelled = false;
+    let sawActivePull = false;
+
+    async function pollModelPullJobs() {
+      try {
+        const jobs = await apiRequest<LocalJob[]>("/api/jobs?limit=100");
+        if (isCancelled) {
+          return;
+        }
+
+        const pullJobs = jobs.filter((job) => job.type === "ollama-model-pull");
+        const hasActivePull = pullJobs.some((job) =>
+          job.status === "Pending" || job.status === "Running" || job.status === "Pausing" || job.status === "Paused"
+        );
+        if (sawActivePull && !hasActivePull) {
+          void onDataChanged();
+        }
+
+        sawActivePull = hasActivePull;
+        setModelPullJobs(pullJobs);
+      } catch {
+        if (!isCancelled) {
+          setModelPullJobs([]);
+        }
+      }
+    }
+
+    void pollModelPullJobs();
+    const interval = window.setInterval(() => void pollModelPullJobs(), 3000);
+    return () => {
+      isCancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [onDataChanged]);
+
   return {
     settings,
     status,
@@ -275,6 +314,7 @@ export function useSettingsSectionController({
     ocrFormState,
     modelToInstall,
     setModelToInstall,
+    modelPullJobs,
     officeStatus,
     diagnostics,
     diagnosticsStatus,

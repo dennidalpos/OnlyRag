@@ -29,7 +29,7 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
     buildQdrantBadge(diagnostics, backendStatus.backendTone),
     buildOcrBadge(diagnostics, backendStatus.backendTone),
     buildOcrGpuBadge(diagnostics, backendStatus.backendTone)
-  ];
+  ].filter((badge): badge is StatusBadge => badge !== null);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setCurrentTime(new Date()), 1000);
@@ -111,13 +111,17 @@ function buildOcrBadge(
 function buildOcrGpuBadge(
   diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
-): StatusBadge {
+): StatusBadge | null {
   if (!diagnostics) {
     return {
       label: "OCR GPU",
       value: backendTone === "offline" ? "Offline" : "In lettura",
       tone: backendTone === "offline" ? "offline" : "neutral"
     };
+  }
+
+  if (diagnostics.ocrGpuCapability.capabilityStatus === "no_nvidia_gpu") {
+    return null;
   }
 
   return {

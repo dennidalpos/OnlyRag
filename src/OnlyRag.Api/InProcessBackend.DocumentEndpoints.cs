@@ -148,8 +148,7 @@ public static partial class InProcessBackend
                 new CreateLocalJobRequest(
                     LocalDocumentLibraryService.DocumentIngestionJobType,
                     payloadJson,
-                    Priority: 30,
-                    MaxRetries: 0),
+                    Priority: 30),
                 cancellationToken);
             ImportedDocument? queued = await documents.SetStatusAsync(id, DocumentStatus.Queued, job.Id, lastError: null, cancellationToken);
             return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
@@ -224,8 +223,7 @@ public static partial class InProcessBackend
                 new CreateLocalJobRequest(
                     DocumentEmbeddingJobHandler.DocumentEmbeddingJobType,
                     payloadJson,
-                    Priority: 10,
-                    MaxRetries: 2),
+                    Priority: 10),
                 cancellationToken);
             await documents.SetStatusAsync(id, DocumentStatus.Processing, job.Id, lastError: null, cancellationToken);
 

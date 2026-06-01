@@ -59,8 +59,7 @@ public static partial class InProcessBackend
                     new CreateLocalJobRequest(
                         DocumentTranslationJobHandler.DocumentTranslationJobType,
                         payloadJson,
-                        Priority: 20,
-                        MaxRetries: 2),
+                        Priority: 20),
                     cancellationToken);
                 await translations.UpdateTranslationJobAsync(translation.Id, job.Id, "Queued", null, cancellationToken);
 

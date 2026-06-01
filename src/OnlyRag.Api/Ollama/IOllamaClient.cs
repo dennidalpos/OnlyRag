@@ -8,7 +8,22 @@ internal interface IOllamaClient
 
     Task<IReadOnlyList<OllamaModelSummary>> ListModelsAsync(CancellationToken cancellationToken = default);
 
+    Task<string?> GetVersionAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<string?>(null);
+    }
+
+    Task<IReadOnlyList<OllamaRunningModelResponse>> ListRunningModelsAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<OllamaRunningModelResponse>>([]);
+    }
+
     Task PullModelAsync(string modelName, CancellationToken cancellationToken = default);
+
+    Task PullModelAsync(
+        string modelName,
+        Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+        CancellationToken cancellationToken = default);
 
     Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default);
 

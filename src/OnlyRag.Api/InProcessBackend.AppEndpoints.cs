@@ -100,9 +100,13 @@ public static partial class InProcessBackend
         {
             string ollamaStatus;
             bool ollamaReachable;
+            string? ollamaVersion = null;
+            IReadOnlyList<OllamaRunningModelResponse> ollamaRunningModels = [];
             try
             {
                 await ollamaClient.ListModelsAsync(cancellationToken);
+                ollamaVersion = await TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
+                ollamaRunningModels = await TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
                 ollamaStatus = "Online";
                 ollamaReachable = true;
             }
@@ -130,7 +134,9 @@ public static partial class InProcessBackend
                 ocrAvailability.IsConfigured,
                 ocrAvailability.EngineName,
                 gpuCapability,
-                telemetry));
+                telemetry,
+                ollamaVersion,
+                ollamaRunningModels));
         });
 
         app.MapPost("/api/diagnostics/open-logs-folder", (

@@ -24,7 +24,8 @@ const statusLabels: Record<JobStatus, string> = {
 const typeLabels: Record<string, string> = {
   "document-ingestion": "Importazione documento",
   "document-embedding": "Indicizzazione documento",
-  "document-translation": "Traduzione documento"
+  "document-translation": "Traduzione documento",
+  "ollama-model-pull": "Installazione modello Ollama"
 };
 
 const jobsRefreshErrorMessage = "Impossibile leggere la coda job locale.";

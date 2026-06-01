@@ -7,7 +7,7 @@ const profileOptions: Array<{ value: PerformanceProfile; label: string; detail: 
   { value: "auto", label: "Auto", detail: "Selezione automatica da RAM e CPU locali." },
   { value: "eco", label: "Eco", detail: "1 job, batch minimi e timeout piu lungo." },
   { value: "balanced", label: "Bilanciato", detail: "2 job e batch moderati per uso quotidiano." },
-  { value: "power", label: "Potente", detail: "4 job e batch piu ampi per workstation." },
+  { value: "power", label: "Potente", detail: "4 job e batch ampi: usa piu RAM/VRAM, CPU e carico Ollama." },
   { value: "custom", label: "Personalizzato", detail: "Valori manuali salvati dagli slider." }
 ];
 
@@ -158,6 +158,13 @@ export function PerformanceSettingsPanel() {
                 }
               />
             </div>
+            {(performanceFormState.profile === "power" || performanceFormState.profile === "custom") && (
+              <div className="panel-note panel-note--warning">
+                <p>
+                  Impostazioni avanzate: parallelismo, batch e timeout possono saturare RAM/VRAM o mantenere modelli caricati piu a lungo. Per problemi di contesto o offload verifica con ollama ps.
+                </p>
+              </div>
+            )}
             {(chatModelDetailsLoading || embeddingModelDetailsLoading) && (
               <div className="panel-note">
                 <p>Lettura dettagli modello in corso.</p>

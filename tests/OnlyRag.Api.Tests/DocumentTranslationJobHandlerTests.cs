@@ -123,6 +123,132 @@ public sealed class DocumentTranslationJobHandlerTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RepairsMissingPlaceholderBeforeSavingUnit()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteDocumentRepository documentRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteTranslationRepository translationRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempStorage.Root);
+        StoredTranslation translation = await translationRepository.CreateAsync(
+            document.Id,
+            "English",
+            "llama-test",
+            jobId: null,
+            await translationRepository.BuildSourceUnitsAsync(document.Id),
+            CancellationToken.None);
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest(
+            DocumentTranslationJobHandler.DocumentTranslationJobType,
+            JsonSerializer.Serialize(new DocumentTranslationJobPayload(
+                translation.Id,
+                document.Id,
+                "English",
+                "llama-test"))));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+        RepairingTranslationClient ollamaClient = new();
+        DocumentTranslationJobHandler handler = new(
+            translationRepository,
+            ollamaClient,
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 1, 1, 8, 60, false)),
+            new StubOllamaSettingsService());
+
+        await handler.ExecuteAsync(leased, queue, CancellationToken.None);
+
+        IReadOnlyList<StoredTranslationUnit> translatedUnits = await translationRepository.ListUnitsAsync(translation.Id);
+
+        Assert.Equal(3, ollamaClient.CallCount);
+        Assert.All(translatedUnits, unit => Assert.Equal("Completed", unit.Status));
+        Assert.Contains("{name}", translatedUnits[0].TranslatedText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RetriesTimeoutBeforeSavingUnit()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteDocumentRepository documentRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteTranslationRepository translationRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempStorage.Root);
+        StoredTranslation translation = await translationRepository.CreateAsync(
+            document.Id,
+            "English",
+            "llama-test",
+            jobId: null,
+            await translationRepository.BuildSourceUnitsAsync(document.Id),
+            CancellationToken.None);
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest(
+            DocumentTranslationJobHandler.DocumentTranslationJobType,
+            JsonSerializer.Serialize(new DocumentTranslationJobPayload(
+                translation.Id,
+                document.Id,
+                "English",
+                "llama-test"))));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+        TimeoutThenSuccessTranslationClient ollamaClient = new();
+        DocumentTranslationJobHandler handler = new(
+            translationRepository,
+            ollamaClient,
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 1, 1, 8, 60, false)),
+            new StubOllamaSettingsService());
+
+        await handler.ExecuteAsync(leased, queue, CancellationToken.None);
+
+        LocalJob stored = (await queue.GetAsync(created.Id))!;
+        StoredTranslation completed = (await translationRepository.GetAsync(translation.Id))!;
+
+        Assert.Equal(JobStatus.Running, stored.Status);
+        Assert.Equal("Completed", completed.Status);
+        Assert.Equal(3, ollamaClient.CallCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FailsValidationWithoutGlobalRetryAfterLocalExhaustion()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteDocumentRepository documentRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteTranslationRepository translationRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempStorage.Root);
+        StoredTranslation translation = await translationRepository.CreateAsync(
+            document.Id,
+            "English",
+            "llama-test",
+            jobId: null,
+            await translationRepository.BuildSourceUnitsAsync(document.Id),
+            CancellationToken.None);
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest(
+            DocumentTranslationJobHandler.DocumentTranslationJobType,
+            JsonSerializer.Serialize(new DocumentTranslationJobPayload(
+                translation.Id,
+                document.Id,
+                "English",
+                "llama-test"))));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+        AlwaysInvalidPlaceholderTranslationClient ollamaClient = new();
+        DocumentTranslationJobHandler handler = new(
+            translationRepository,
+            ollamaClient,
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 1, 1, 8, 60, false)),
+            new StubOllamaSettingsService());
+
+        await handler.ExecuteAsync(leased, queue, CancellationToken.None);
+
+        LocalJob stored = (await queue.GetAsync(created.Id))!;
+        StoredTranslation failed = (await translationRepository.GetAsync(translation.Id))!;
+        IReadOnlyList<StoredTranslationUnit> units = await translationRepository.ListUnitsAsync(translation.Id);
+
+        Assert.Equal(JobStatus.Failed, stored.Status);
+        Assert.Null(stored.NextAttemptAtUtc);
+        Assert.Equal("Failed", failed.Status);
+        Assert.Equal("Failed", units[0].Status);
+        Assert.Contains("testo sorgente originale", units[0].Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(4, ollamaClient.CallCount);
+    }
+
+    [Fact]
     public async Task Repository_UpdateUnitText_SavesManualCorrection()
     {
         using TempStorage tempStorage = TempStorage.Create();
@@ -189,7 +315,7 @@ public sealed class DocumentTranslationJobHandlerTests
         return document;
     }
 
-    private sealed class EchoTranslationClient : IOllamaClient
+    private class EchoTranslationClient : IOllamaClient
     {
         public int CallCount { get; private set; }
 
@@ -209,6 +335,14 @@ public sealed class DocumentTranslationJobHandlerTests
             return Task.CompletedTask;
         }
 
+        public Task PullModelAsync(
+            string modelName,
+            Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+            CancellationToken cancellationToken = default)
+        {
+            return onProgress(new OllamaModelPullProgress("success", null, null, 100), cancellationToken);
+        }
+
         public Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
@@ -224,13 +358,13 @@ public sealed class DocumentTranslationJobHandlerTests
             return Task.CompletedTask;
         }
 
-        public Task<string> GenerateChatAsync(
+        public virtual Task<string> GenerateChatAsync(
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             CancellationToken cancellationToken = default)
         {
-            CallCount++;
+            IncrementCallCount();
             string source = ExtractSource(messages[^1].Content);
             return Task.FromResult($"Translated: {source}");
         }
@@ -249,7 +383,12 @@ public sealed class DocumentTranslationJobHandlerTests
             throw new NotSupportedException();
         }
 
-        private static string ExtractSource(string prompt)
+        protected void IncrementCallCount()
+        {
+            CallCount++;
+        }
+
+        protected static string ExtractSource(string prompt)
         {
             const string startMarker = "<<<ONLYRAG_TRANSLATION_UNIT";
             const string endMarker = "ONLYRAG_TRANSLATION_UNIT";
@@ -267,6 +406,115 @@ public sealed class DocumentTranslationJobHandlerTests
             }
 
             return prompt[(start + 1)..end].Trim();
+        }
+    }
+
+    private sealed class RepairingTranslationClient : IOllamaClient
+    {
+        public int CallCount { get; private set; }
+
+        public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<OllamaModelSummary>> ListModelsAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<OllamaModelSummary>>(
+                [new OllamaModelSummary("llama-test", "llama-test", null, 0, null, null, null, null)]);
+        }
+
+        public Task PullModelAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task PullModelAsync(
+            string modelName,
+            Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+            CancellationToken cancellationToken = default)
+        {
+            return onProgress(new OllamaModelPullProgress("success", null, null, 100), cancellationToken);
+        }
+
+        public Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ChatSmokeAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task EmbeddingsSmokeAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<string> GenerateChatAsync(
+            string modelName,
+            IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            string prompt = messages[^1].Content;
+            string source = ExtractTaggedSource(prompt);
+            if (CallCount > 1)
+            {
+                return Task.FromResult($"Translated: {source}");
+            }
+
+            return source.Contains("{name}", StringComparison.Ordinal)
+                ? Task.FromResult("Translated: Ciao 123")
+                : Task.FromResult($"Translated: {source}");
+        }
+
+        public Task<OllamaModelDetails> ShowModelAsync(string modelName, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new OllamaModelDetails(modelName, null));
+        }
+
+        public Task<IReadOnlyList<IReadOnlyList<float>>> GenerateEmbeddingsAsync(
+            string modelName,
+            IReadOnlyList<string> inputs,
+            int? numCtx = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        private static string ExtractTaggedSource(string prompt)
+        {
+            const string startTag = "<source_text>";
+            const string endTag = "</source_text>";
+            int start = prompt.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+            int end = prompt.IndexOf(endTag, StringComparison.OrdinalIgnoreCase);
+            if (start < 0 || end <= start)
+            {
+                return prompt.Trim();
+            }
+
+            start += startTag.Length;
+            return prompt[start..end].Trim();
+        }
+    }
+
+    private sealed class TimeoutThenSuccessTranslationClient : EchoTranslationClient
+    {
+        public override Task<string> GenerateChatAsync(
+            string modelName,
+            IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCallCount();
+            if (CallCount == 1)
+            {
+                throw new OllamaApiException(OllamaErrorKind.Timeout, "timeout");
+            }
+
+            string source = ExtractSource(messages[^1].Content);
+            return Task.FromResult($"Translated: {source}");
+        }
+    }
+
+    private sealed class AlwaysInvalidPlaceholderTranslationClient : EchoTranslationClient
+    {
+        public override Task<string> GenerateChatAsync(
+            string modelName,
+            IReadOnlyList<OllamaChatMessage> messages,
+            int? numCtx = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCallCount();
+            return Task.FromResult("Translated without placeholder");
         }
     }
 

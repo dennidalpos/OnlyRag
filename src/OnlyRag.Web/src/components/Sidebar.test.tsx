@@ -28,7 +28,8 @@ describe("Sidebar", () => {
             compiledWithCuda: true,
             cudaDeviceCount: 1,
             activeDevice: "gpu:0",
-            packageVersions: {}
+            packageVersions: {},
+            capabilityStatus: "usable"
           }
         })}
       />

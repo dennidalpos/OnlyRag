@@ -144,7 +144,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                 return;
             }
 
-            int numCtx = ComputeNumCtx(chunks, configuredNumCtx);
+            int? numCtx = ComputeNumCtx(chunks, configuredNumCtx);
             IReadOnlyList<IReadOnlyList<float>> vectors = await ollamaClient.GenerateEmbeddingsAsync(
                 model,
                 chunks.Select(chunk => chunk.Content).ToArray(),
@@ -202,26 +202,25 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         }
     }
 
-    private static int ComputeNumCtx(IReadOnlyList<DocumentChunkForEmbedding> chunks, int? configuredNumCtx)
+    private static int? ComputeNumCtx(IReadOnlyList<DocumentChunkForEmbedding> chunks, int? configuredNumCtx)
     {
+        if (!configuredNumCtx.HasValue)
+        {
+            return null;
+        }
+
         int maxChars = chunks.Max(c => c.Content.Length);
         // chars/3 + 256 head-room gives a safe token estimate for multilingual text
         int needed = (int)Math.Ceiling(maxChars / 3.0) + 256;
-
-        if (configuredNumCtx.HasValue)
+        if (needed > configuredNumCtx.Value)
         {
-            if (needed > configuredNumCtx.Value)
-            {
-                throw new OllamaApiException(
-                    OllamaErrorKind.ContextLengthExceeded,
-                    $"Un chunk richiede almeno {needed} token di contesto, ma la finestra configurata è {configuredNumCtx.Value}. "
-                    + "Aumenta num_ctx nelle impostazioni oppure imposta la modalità Automatica.");
-            }
-
-            return configuredNumCtx.Value;
+            throw new OllamaApiException(
+                OllamaErrorKind.ContextLengthExceeded,
+                $"Un chunk richiede almeno {needed} token di contesto, ma la finestra configurata è {configuredNumCtx.Value}. "
+                + "Aumenta num_ctx nelle impostazioni oppure imposta la modalità Automatica.");
         }
 
-        return Math.Max(needed, 512);
+        return configuredNumCtx.Value;
     }
 
     private static DocumentEmbeddingCheckpoint ReadCheckpoint(

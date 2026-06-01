@@ -72,6 +72,37 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public async Task OllamaStatus_IncludesVersionAndRunningModelDetailsWhenAvailable()
+    {
+        await using FakeOllamaServer ollama = await FakeOllamaServer.StartAsync();
+        using TempDiagDescriptor temp = TempDiagDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(temp.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        await httpClient.PutAsJsonAsync(
+            "/api/settings/ollama",
+            new OllamaSettings(ollama.BaseUrl, "chat-model", "embed-model", "translation-model", 5, 1),
+            JsonOptions);
+
+        OllamaStatusResponse? status = await httpClient.GetFromJsonAsync<OllamaStatusResponse>(
+            "/api/ollama/status",
+            JsonOptions);
+        DiagnosticsResponse? diag = await httpClient.GetFromJsonAsync<DiagnosticsResponse>(
+            "/api/diagnostics",
+            JsonOptions);
+
+        Assert.NotNull(status);
+        Assert.Equal("0.6.8", status.Version);
+        Assert.NotNull(status.RunningModels);
+        Assert.Single(status.RunningModels);
+        Assert.Equal(4096, status.RunningModels[0].ContextLength);
+        Assert.NotNull(diag);
+        Assert.Equal("0.6.8", diag.OllamaVersion);
+        Assert.NotNull(diag.OllamaRunningModels);
+        Assert.Single(diag.OllamaRunningModels);
+    }
+
+    [Fact]
     public async Task OllamaModels_ErrorResponse_DoesNotContainStackTrace()
     {
         using TempDiagDescriptor temp = TempDiagDescriptor.Create();

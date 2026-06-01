@@ -227,7 +227,8 @@ describe("SettingsSection", () => {
             compiledWithCuda: false,
             cudaDeviceCount: 0,
             activeDevice: null,
-            packageVersions: {}
+            packageVersions: {},
+            capabilityStatus: "runtime_missing"
           }
         })
       },
@@ -465,7 +466,8 @@ describe("SettingsSection", () => {
             compiledWithCuda: true,
             cudaDeviceCount: 1,
             activeDevice: "gpu:0",
-            packageVersions: {}
+            packageVersions: {},
+            capabilityStatus: "usable"
           }
         })
       },

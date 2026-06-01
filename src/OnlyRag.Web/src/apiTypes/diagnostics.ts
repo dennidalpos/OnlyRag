@@ -1,9 +1,13 @@
+import type { OllamaRunningModel } from "./settings";
+
 export type DiagnosticsResponse = {
   appVersion: string;
   databasePath: string;
   logsDirectory: string;
   ollamaStatus: string;
   ollamaIsReachable: boolean;
+  ollamaVersion: string | null;
+  ollamaRunningModels: OllamaRunningModel[] | null;
   qdrant: QdrantStatusResponse;
   ocrStatus: string;
   ocrIsConfigured: boolean;
@@ -40,6 +44,7 @@ export type OcrGpuCapability = {
   cudaDeviceCount: number | null;
   activeDevice: string | null;
   packageVersions: Record<string, string>;
+  capabilityStatus: string;
 };
 
 export type SystemTelemetry = {

@@ -171,7 +171,9 @@
   display: grid;
   align-content: start;
   gap: 10px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: 2px;
 }
 

@@ -6,6 +6,7 @@ import {
   type OcrSettings,
   type OllamaSettings,
   type OllamaStatusResponse,
+  type OllamaModelPullStartResponse,
   type OperationMessageResponse,
   type PerformanceSettings
 } from "../api";
@@ -143,14 +144,13 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     setInfoMessage(null);
 
     try {
-      const response = await apiRequest<OperationMessageResponse>("/api/ollama/models/pull", {
+      const response = await apiRequest<OllamaModelPullStartResponse>("/api/ollama/models/pull", {
         method: "POST",
         body: JSON.stringify({ name: modelToInstall })
       });
 
       setInfoMessage(response.message);
       setModelToInstall("");
-      await onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Installazione modello non riuscita.");
     } finally {

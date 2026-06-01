@@ -127,8 +127,7 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
                 new CreateLocalJobRequest(
                     DocumentEmbeddingJobHandler.DocumentEmbeddingJobType,
                     payloadJson,
-                    Priority: 10,
-                    MaxRetries: 2),
+                    Priority: 10),
                 cancellationToken);
         }
         catch (Exception ex)

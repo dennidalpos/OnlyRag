@@ -343,6 +343,14 @@ public sealed class ChatServiceQdrantIntegrationTests
             return Task.CompletedTask;
         }
 
+        public Task PullModelAsync(
+            string modelName,
+            Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+            CancellationToken cancellationToken = default)
+        {
+            return onProgress(new OllamaModelPullProgress("success", null, null, 100), cancellationToken);
+        }
+
         public Task TestConnectionAsync(CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;

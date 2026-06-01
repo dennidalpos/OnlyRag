@@ -13,6 +13,6 @@ test("real backend contract: app status, settings, and empty document list reach
   await page.getByRole("button", { name: "Documenti" }).click();
   await expect(page.getByText("Nessun documento presente. Importa un file per iniziare.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Impostazioni" }).click();
+  await page.getByRole("button", { name: "Apri Impostazioni" }).click();
   await expect(page.getByLabel("URL Ollama")).toHaveValue("http://localhost:11434");
 });

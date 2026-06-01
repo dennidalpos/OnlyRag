@@ -47,6 +47,25 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
         WebApplication app = builder.Build();
 
         app.MapGet("/api/tags", () => Results.Json(TagsPayload(), JsonOptions));
+        app.MapGet("/api/version", () => Results.Json(new { version = "0.6.8" }, JsonOptions));
+        app.MapGet("/api/ps", () => Results.Json(new
+        {
+            models = new[]
+            {
+                new
+                {
+                    name = "chat-model",
+                    model = "chat-model",
+                    size = 1L,
+                    size_vram = 1L,
+                    digest = "sha256",
+                    model_info = new Dictionary<string, int>
+                    {
+                        ["llama.context_length"] = 4096
+                    }
+                }
+            }
+        }, JsonOptions));
         app.MapPost("/api/embed", async (HttpRequest request) =>
             Results.Json(EmbedPayload(await ReadBodyAsync(request)), JsonOptions));
         app.MapPost("/api/chat", async (HttpRequest request) =>

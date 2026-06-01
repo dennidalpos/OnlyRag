@@ -6,4 +6,14 @@ public sealed record OllamaStatusResponse(
     string BaseUrl,
     int InstalledModelCount,
     string Message,
-    string? Suggestion);
+    string? Suggestion,
+    string? Version = null,
+    IReadOnlyList<OllamaRunningModelResponse>? RunningModels = null);
+
+public sealed record OllamaRunningModelResponse(
+    string Name,
+    string Model,
+    long? Size,
+    long? SizeVram,
+    string? Digest,
+    int? ContextLength);

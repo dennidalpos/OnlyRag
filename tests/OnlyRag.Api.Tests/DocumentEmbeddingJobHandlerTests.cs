@@ -51,6 +51,82 @@ public sealed class DocumentEmbeddingJobHandlerTests
         LocalJob stored = (await queue.GetAsync(created.Id))!;
         Assert.Equal(JobStatus.Running, stored.Status);
         Assert.Equal(new[] { 2 }, ollamaClient.BatchSizes);
+        Assert.Equal([null], ollamaClient.NumCtxValues);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UsesManualEmbeddingNumCtxWhenConfigured()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteDocumentRepository documentRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteEmbeddingRepository embeddingRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempStorage.Root);
+        CapturingEmbeddingClient ollamaClient = new();
+        DocumentEmbeddingJobHandler handler = new(
+            new StubDocumentLibraryService(documentRepository),
+            embeddingRepository,
+            new FakeQdrantVectorStore(),
+            ollamaClient,
+            new StubOllamaSettingsService(new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                "embed-a",
+                null,
+                60,
+                1,
+                EmbeddingNumCtx: 2048)),
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 2, 1, 8, 60, false)));
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest(
+            DocumentEmbeddingJobHandler.DocumentEmbeddingJobType,
+            JsonSerializer.Serialize(new DocumentEmbeddingJobPayload(document.Id, "embed-a"))));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+
+        await handler.ExecuteAsync(leased, queue, CancellationToken.None);
+
+        LocalJob stored = (await queue.GetAsync(created.Id))!;
+        Assert.Equal(JobStatus.Running, stored.Status);
+        Assert.Equal([2048], ollamaClient.NumCtxValues);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FailsWhenManualEmbeddingNumCtxIsTooSmall()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        SqliteDocumentRepository documentRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteEmbeddingRepository embeddingRepository = new(tempStorage.CreateConnectionFactory());
+        SqliteLocalJobQueue queue = tempStorage.CreateQueue();
+        ImportedDocument document = await CreateIndexedDocumentAsync(documentRepository, tempStorage.Root);
+        CapturingEmbeddingClient ollamaClient = new();
+        DocumentEmbeddingJobHandler handler = new(
+            new StubDocumentLibraryService(documentRepository),
+            embeddingRepository,
+            new FakeQdrantVectorStore(),
+            ollamaClient,
+            new StubOllamaSettingsService(new OllamaSettings(
+                OllamaEndpointOptions.DefaultBaseUrl,
+                null,
+                "embed-a",
+                null,
+                60,
+                1,
+                EmbeddingNumCtx: 64)),
+            new StubPerformanceSettingsService(new PerformanceSettings(1, 1, 2, 1, 8, 60, false)));
+        LocalJob created = await queue.CreateAsync(new CreateLocalJobRequest(
+            DocumentEmbeddingJobHandler.DocumentEmbeddingJobType,
+            JsonSerializer.Serialize(new DocumentEmbeddingJobPayload(document.Id, "embed-a"))));
+        LocalJob leased = (await queue.TryLeaseNextAsync())!;
+
+        await handler.ExecuteAsync(leased, queue, CancellationToken.None);
+
+        LocalJob stored = (await queue.GetAsync(created.Id))!;
+        ImportedDocument failedDocument = (await documentRepository.GetAsync(document.Id))!;
+        Assert.Equal(JobStatus.Failed, stored.Status);
+        Assert.Equal(DocumentStatus.Failed, failedDocument.Status);
+        Assert.Contains("num_ctx", stored.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(ollamaClient.NumCtxValues);
     }
 
     [Fact]
@@ -300,6 +376,14 @@ public sealed class DocumentEmbeddingJobHandlerTests
             return Task.CompletedTask;
         }
 
+        public Task PullModelAsync(
+            string modelName,
+            Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+            CancellationToken cancellationToken = default)
+        {
+            return onProgress(new OllamaModelPullProgress("success", null, null, 100), cancellationToken);
+        }
+
         public Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
@@ -348,6 +432,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
     private sealed class CapturingEmbeddingClient : IOllamaClient
     {
         public List<int> BatchSizes { get; } = [];
+        public List<int?> NumCtxValues { get; } = [];
 
         public Task TestConnectionAsync(CancellationToken cancellationToken = default)
         {
@@ -362,6 +447,14 @@ public sealed class DocumentEmbeddingJobHandlerTests
         public Task PullModelAsync(string modelName, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
+        }
+
+        public Task PullModelAsync(
+            string modelName,
+            Func<OllamaModelPullProgress, CancellationToken, Task> onProgress,
+            CancellationToken cancellationToken = default)
+        {
+            return onProgress(new OllamaModelPullProgress("success", null, null, 100), cancellationToken);
         }
 
         public Task DeleteModelAsync(string modelName, CancellationToken cancellationToken = default)
@@ -400,6 +493,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
             CancellationToken cancellationToken = default)
         {
             BatchSizes.Add(inputs.Count);
+            NumCtxValues.Add(numCtx);
             IReadOnlyList<IReadOnlyList<float>> vectors = inputs
                 .Select(_ => (IReadOnlyList<float>)new[] { 1f, 0f, 0f })
                 .ToArray();

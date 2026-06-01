@@ -7,6 +7,12 @@ export type LocalJob = {
   priority: number;
   progressPercent: number;
   currentStep: string;
+  payloadJson: string;
+  checkpointJson: string;
   error: string | null;
+  retryCount: number;
+  maxRetries: number;
+  nextAttemptAtUtc: string | null;
+  createdAt: string;
   updatedAt: string;
 };

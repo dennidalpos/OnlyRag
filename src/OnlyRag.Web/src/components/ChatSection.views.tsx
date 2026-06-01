@@ -1,4 +1,4 @@
-import type { FormEvent, KeyboardEvent } from "react";
+import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import type { ImportedDocument, OllamaModel, OllamaStatusResponse } from "../api";
 import { formatPageRange } from "./ChatSection.helpers";
 import type { ChatMessage } from "./ChatSection.storage";
@@ -124,6 +124,28 @@ export function ChatMainPanel({
   onInputKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+
+  useEffect(() => {
+    const element = messagesRef.current;
+    if (!element || !shouldStickToBottomRef.current) {
+      return;
+    }
+
+    element.scrollTop = element.scrollHeight;
+  }, [messages.length, isGenerating, feedback, notices.length]);
+
+  function handleMessagesScroll() {
+    const element = messagesRef.current;
+    if (!element) {
+      return;
+    }
+
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 80;
+  }
+
   return (
     <section className="chat-main" aria-label="Chat RAG">
       <div className="chat-toolbar">
@@ -171,7 +193,7 @@ export function ChatMainPanel({
         )}
       </div>
 
-      <div className="chat-messages" aria-live="polite">
+      <div className="chat-messages" aria-live="polite" ref={messagesRef} onScroll={handleMessagesScroll}>
         {messages.length === 0 ? (
           <div className="empty-state chat-empty-state" role="status">
             <p>Inizia una conversazione.</p>

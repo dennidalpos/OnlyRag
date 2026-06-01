@@ -165,7 +165,8 @@ describe("SettingsSection dependency actions", () => {
             compiledWithCuda: true,
             cudaDeviceCount: 1,
             activeDevice: "gpu:0",
-            packageVersions: {}
+            packageVersions: {},
+            capabilityStatus: "usable"
           },
           systemTelemetry: {
             cpu: { logicalProcessorCount: 8, usagePercent: 12.5 },
