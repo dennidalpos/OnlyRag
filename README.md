@@ -6,65 +6,60 @@
 
 [![CI](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml/badge.svg)](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml)
 
-OnlyRag is a Windows desktop app for building a local document library and using it with
-Ollama-backed search, chat, OCR, and translation workflows.
+OnlyRag is a Windows desktop app for a local document library with Ollama-backed search, chat,
+OCR, and translation workflows.
 
-The app is local-first: documents, indexes, jobs, settings, chat history, OCR cache, logs,
+The app is local-first. Documents, indexes, jobs, settings, chat history, OCR cache, logs,
 WebView2 profile data, and exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or
-on a trusted LAN endpoint.
-For RAG answers, OnlyRag sends retrieved snippets to the model, not full source documents.
+on a trusted LAN endpoint. RAG answers send retrieved snippets to the model, not full source
+documents.
 
-## What Works
+## Supported Capabilities
 
-- Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, and image files into a local library.
-- Convert `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
+- Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, and image files.
+- Convert legacy `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
-  are prepared.
+  are available.
 - Generate embeddings through a configured Ollama endpoint and store vectors in Qdrant.
-- Search selected documents with hybrid SQLite FTS keyword and Qdrant vector retrieval.
-- Chat with selected documents and show source snippets for grounded answers.
+- Search selected documents with SQLite FTS plus Qdrant vector retrieval.
+- Chat with selected documents and show grounded source snippets.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
-- Configure Ollama endpoint, chat/embedding/translation models, automatic or manual `num_ctx` behavior, ingestion,
-  OCR, Office conversion, and performance settings from the desktop UI.
-- Restore balanced default settings without deleting data, or schedule a confirmed full local data
-  reset for the next app startup.
-- Track ingestion, embedding, OCR, translation, and Ollama model-install jobs in the desktop UI.
-- Confirm app exit when local jobs or unsaved UI work exist; confirmed exit saves available work,
-  cancels active local jobs, and stops the in-process backend.
-- Build, test, publish, sign, and package Windows installer candidates with repository scripts.
+- Configure Ollama, Qdrant, OCR, Office conversion, ingestion, models, `num_ctx`, and performance
+  from the desktop UI.
+- Track ingestion, embedding, OCR, translation, and Ollama model-install jobs.
+- Confirm app exit when local jobs or unsaved UI work exist.
+- Build, test, package, sign, and verify Windows installer candidates with repository scripts.
 
 ## Requirements
 
-Development:
+Development machine:
 
-- Windows 10 1809 or newer.
+- Windows 10 version 1809/build 17763 or newer, or Windows 11.
 - PowerShell 7 (`pwsh`).
-- .NET 10 SDK; `global.json` pins repository SDK selection with .NET 10 feature roll-forward.
+- .NET 10 SDK. `global.json` pins SDK selection with .NET 10 feature roll-forward.
 - Node.js `^20.19.0 || >=22.12.0` with npm.
 - Microsoft Edge WebView2 Runtime.
 
-Model features:
+Optional development/runtime tools:
 
-- Ollama, reachable locally or on a trusted LAN endpoint.
-
-Optional features:
-
+- Ollama for model features.
 - LibreOffice for legacy Office conversion and PDF export.
-- Python 3.10 through 3.13 for the PaddleOCR bridge. Python 3.14 is not supported by the pinned PaddlePaddle runtime.
-- Optional NVIDIA GPU OCR acceleration through PaddlePaddle GPU wheels when a compatible Windows NVIDIA driver is available. CPU OCR remains the fallback.
+- Python 3.10 through 3.13 for PaddleOCR provisioning. Python 3.14 is not supported by the pinned
+  PaddlePaddle runtime.
 - Inno Setup 6 for installer generation.
-- Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed release candidates.
+- Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed installers.
 
 Installed app:
 
-- Windows 10 1809 or newer, or Windows 11.
-- Microsoft Edge WebView2 Runtime. The installer blocks before copying the app when WebView2 is missing and shows the official Microsoft install/verify instructions. Direct app launch also checks this before loading the UI.
-- The installer package is self-contained for the required .NET runtime components and includes the bundled Qdrant runtime; end users do not need to install .NET separately.
+- Windows 10 version 1809/build 17763 or newer, or Windows 11.
+- Microsoft Edge WebView2 Runtime.
+- No separate .NET install is required; the installer is self-contained for required .NET runtime
+  components and includes the bundled Qdrant runtime.
 
 ## Fresh Checkout
 
-From a clean checkout on Windows, run PowerShell 7 from the repository root:
+Run PowerShell 7 from the repository root:
 
 ```powershell
 pwsh .\scripts\Bootstrap-Prerequisites.ps1
@@ -72,135 +67,95 @@ pwsh .\scripts\Build-Web.ps1
 dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
-The bootstrap verifies prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
-installs web dependencies with `npm ci`, and prepares the optional OCR Python environment when
-Python is available. `Build-Web.ps1` produces the static UI consumed by the WPF app when the Vite
-development server is not running.
-When a blocking prerequisite is missing, bootstrap/build/package scripts stop with the software
-name, supported version, reason, official install action, and verification command instead of
-continuing to a generic tool failure.
-The repository gate performs the same early checks for .NET 10 SDK, supported Node.js/npm, and
-Windows host compatibility before restore, tests, build, or packaging steps run.
+`Bootstrap-Prerequisites.ps1` verifies Windows, PowerShell, .NET, WebView2, Node/npm, optional
+Ollama, optional LibreOffice, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages, installs
+web dependencies, and prepares OCR when supported Python is available.
 
-In Debug builds the WPF shell can use the Vite dev server on loopback. If `ONLYRAG_WEB_DEV_SERVER`
-is set, it must be an `http` or `https` loopback URL without embedded credentials; other URLs are
-ignored before the backend bridge is injected into WebView2.
+`Build-Web.ps1` creates `src\OnlyRag.Web\dist`, which the WPF shell uses when no Vite development
+server is configured.
 
-To verify a fresh checkout before packaging or handoff:
+For frontend development with the Vite dev server:
 
 ```powershell
-pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+Set-Location .\src\OnlyRag.Web
+npm run dev
 ```
 
-End users configure optional dependencies from **Settings** in the app:
+In another PowerShell session, set `ONLYRAG_WEB_DEV_SERVER` to the loopback Vite URL and start the
+desktop app:
 
-- **Ollama**: if missing, the UI opens the official download page for manual installation.
-  OnlyRag does not execute remote PowerShell installer scripts.
-- **LibreOffice**: if missing, the UI opens the LibreOffice download page.
-- **OCR**: when Python 3.10 through 3.13 and Internet access are available, setup automatically
-  prepares the PaddleOCR runtime under `%LOCALAPPDATA%\OnlyRag\ocr-python` before first launch.
-  The installer and **Configura OCR** use automatic runtime selection from the OCR manifest:
-  NVIDIA is prepared only when a compatible local driver and compute capability are detected,
-  otherwise CPU is used. At startup OnlyRag selects GPU automatically after Diagnostics proves OCR
-  GPU usable, unless the user saved CPU manually.
+```powershell
+$env:ONLYRAG_WEB_DEV_SERVER = "http://127.0.0.1:5173"
+dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
+```
+
+Only loopback `http` or `https` URLs without embedded credentials are accepted.
 
 ## Commands
 
-Run commands from the repository root with PowerShell 7 unless a command explicitly changes into
-`src\OnlyRag.Web`.
+Run from the repository root with PowerShell 7 unless the command explicitly changes directory.
 
 | task | command |
 |---|---|
 | Setup dependencies | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` |
 | Start desktop app | `dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug` |
 | Start Vite dev server | `Set-Location .\src\OnlyRag.Web; npm run dev` |
-| Check repository | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
-| Build app | `pwsh .\scripts\Build-App.ps1 -Configuration Release` |
-| Build installer | `pwsh .\scripts\Build-Installer.ps1 -Configuration Release` |
-| Sign release installer | `pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>` |
+| Check application readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Check package build readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` |
+| Build web UI | `pwsh .\scripts\Build-Web.ps1` |
+| Build desktop app | `pwsh .\scripts\Build-App.ps1 -Configuration Release` |
+| Build unsigned installer | `pwsh .\scripts\Build-Installer.ps1 -Configuration Release` |
+| Sign installer | `pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>` |
 | Verify signed installer lifecycle | `pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle` |
 | Clean generated outputs | `pwsh .\scripts\Clean.ps1` |
 
-Build the web UI:
+Direct frontend checks:
 
 ```powershell
-pwsh .\scripts\Build-Web.ps1
+Set-Location .\src\OnlyRag.Web
+npm run typecheck
+npm run lint
+npm run format:check
+npm run test
 ```
 
-Build the .NET solution:
+Direct .NET tests:
 
 ```powershell
-pwsh .\scripts\Build-App.ps1 -Configuration Release
+dotnet test .\OnlyRag.sln --configuration Release
 ```
 
-`Build-App.ps1` builds the web UI first and then the .NET solution, so the desktop output includes
-the static assets required at runtime. Use `-SkipWebBuild` only after `Build-Web.ps1` has already
-produced `src\OnlyRag.Web\dist\index.html`.
+## Readiness Gates
 
-Run the canonical repository gate:
+Application readiness:
 
 ```powershell
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
-The gate includes npm production dependency audit, NuGet transitive vulnerability audit, frontend
-typecheck/lint/format/test, .NET tests, installer prerequisite self-test, web build, and .NET build.
-Use `-ContinueOnError` when diagnosing a failing checkout and you want the gate to keep running
-independent checks before printing a consolidated failure summary.
-CI runs the same Release gate on `windows-latest`.
+This gate runs preflight checks, web dependency restore, .NET restore, npm production dependency
+audit, NuGet transitive vulnerability audit, frontend typecheck/lint/format/tests, .NET tests,
+installer prerequisite self-test, OCR runtime manifest checks, web build, and .NET build. CI runs
+this same gate on `windows-latest`.
 
-Run web tests, lint, and formatter checks directly:
-
-```powershell
-Set-Location .\src\OnlyRag.Web
-npm run test
-npm run typecheck
-npm run lint
-npm run format:check
-```
-
-`npm run test:e2e` starts Vite plus a temporary .NET backend host under
-`tests\OnlyRag.PlaywrightBackendHost`, so the Playwright suite covers both mocked UI smoke paths
-and a real UI/backend contract path.
-
-Run the desktop app:
+Package build readiness:
 
 ```powershell
-dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
 ```
 
-Build an unsigned installer:
+This requires Inno Setup 6 and compiles the installer.
 
-```powershell
-pwsh .\scripts\Build-Installer.ps1 -Configuration Release
-```
+Production release readiness requires all of these:
 
-Check installer prerequisite messaging:
+- `Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` passed.
+- Installer is signed with `Sign-Release.ps1` or `Build-Installer.ps1 -SigningCertificateThumbprint`.
+- `Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle` passed on a clean representative
+  Windows profile or verification machine.
+- Representative Ollama, OCR, LibreOffice, and Qdrant runtime behavior was checked for the target
+  deployment scope.
 
-```powershell
-pwsh .\scripts\Test-InstallerPrerequisites.ps1 -SelfTest
-```
-
-Troubleshoot prerequisite failures:
-
-- **.NET SDK**: install the official .NET 10 SDK for Windows, then verify with
-  `dotnet --list-sdks`.
-- **Node.js/npm**: install official Node.js 20.19.x or 22.12+ for Windows with npm, then verify
-  with `node --version` and `npm --version`.
-- **WebView2 Runtime**: install the official Microsoft Edge WebView2 Evergreen Runtime, then
-  verify from Settings > Apps or by locating `msedgewebview2.exe` under
-  `Program Files\Microsoft\EdgeWebView\Application`.
-- **Inno Setup**: install official Inno Setup 6, then verify with `ISCC.exe /?`.
-- **Windows SDK signing tools**: install the official Microsoft Windows 10/11 SDK or pass
-  `-SignToolPath`, then verify with `signtool.exe /?`.
-- **Python OCR**: install Python 3.10, 3.11, 3.12, or 3.13 for Windows when OCR provisioning is
-  needed, then verify with `python --version` or `py -3.13 --version`.
-
-Create installer evidence without installing:
-
-```powershell
-pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe
-```
+An unsigned installer, or a signed installer without lifecycle evidence, is not production-ready.
 
 ## Runtime Configuration
 
@@ -209,38 +164,48 @@ Required environment variables: none.
 Supported optional environment variables:
 
 - `ONLYRAG_WEB_DEV_SERVER`: Debug-only WebView2 source override. Must be a loopback `http` or
-  `https` URL without credentials.
+  `https` URL without embedded credentials.
 - `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice is installed outside
-  the standard locations.
+  standard Windows locations.
 
-Generated local outputs:
+User data:
 
-- `src\OnlyRag.Web\dist`: bundled production web UI.
-- `src\OnlyRag.Web\node_modules`: npm dependencies.
-- `bin` and `obj` folders under .NET projects.
-- `packaging\qdrant\payload`: verified Qdrant runtime payload.
-- `artifacts\publish`, `artifacts\installer`, and `artifacts\release-verification`: packaging
-  and release evidence outputs.
+- `%LOCALAPPDATA%\OnlyRag`: documents, SQLite data, Qdrant data, jobs, settings, logs, OCR cache,
+  WebView2 profile data, and exports.
+- `%LOCALAPPDATA%\Programs\OnlyRag`: default installed application path.
 
-These paths are ignored by Git. Use `pwsh .\scripts\Clean.ps1` to remove generated outputs.
+Generated repository outputs ignored by Git:
 
-## Project Status
+- `src\OnlyRag.Web\dist`
+- `src\OnlyRag.Web\node_modules`
+- project `bin` and `obj` folders
+- `packaging\qdrant\payload`
+- `artifacts`
+- frontend and Playwright test output folders
 
-OnlyRag is an implementation-stage Windows desktop application. The repository supports setup,
-dependency install, web build, .NET build, tests, local run, unsigned installer packaging, scripted
-release signing, and non-invasive installer evidence generation.
+Use `pwsh .\scripts\Clean.ps1` when generated outputs are no longer needed. Build and gate
+commands recreate required ignored outputs.
 
-The canonical application readiness check is:
+## Troubleshooting
 
-```powershell
-pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
-```
-
-Release/package readiness additionally requires `Invoke-Gate.ps1 -IncludeInstaller` or
-`Build-Installer.ps1` on a machine with Inno Setup 6, a signed installer, and
-`Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle` on a clean Windows verification
-machine. An unsigned installer or an installer without lifecycle evidence is not release-ready.
-Current operational residuals are tracked in [PROJECT_STATUS.json](PROJECT_STATUS.json).
+- Missing .NET SDK: install the official .NET 10 SDK for Windows and verify with
+  `dotnet --list-sdks`.
+- Missing Node/npm: install official Node.js 20.19.x or 22.12+ for Windows and verify with
+  `node --version` and `npm --version`.
+- Missing WebView2 Runtime: install Microsoft Edge WebView2 Evergreen Runtime and verify from
+  Windows Settings > Apps or by locating `msedgewebview2.exe` under
+  `Program Files\Microsoft\EdgeWebView\Application`.
+- Missing Inno Setup: install Inno Setup 6 and verify with `ISCC.exe /?`, or pass
+  `-InnoSetupCompiler` where supported.
+- Missing signing tools: install Windows 10/11 SDK and verify with `signtool.exe /?`, or pass
+  `-SignToolPath` where supported.
+- Installer lifecycle blocked: rerun verification on a clean Windows profile or machine with
+  WebView2 installed and pass the exact signed installer path to `Test-InstallerRelease.ps1`.
+- OCR unavailable: install Python 3.10, 3.11, 3.12, or 3.13, then rerun bootstrap or use the OCR
+  action in Settings.
+- Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
+- LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` for legacy
+  `.doc`, `.xls`, and `.ppt` ingestion.
 
 ## Documentation
 
@@ -256,3 +221,4 @@ Current operational residuals are tracked in [PROJECT_STATUS.json](PROJECT_STATU
 - [Translation pipeline](docs/TRANSLATION_PIPELINE.md)
 - [Signing](docs/SIGNING.md)
 - [Packaging](packaging/README.md)
+- [Operational tracker](PROJECT_STATUS.json)

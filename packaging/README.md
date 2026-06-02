@@ -1,6 +1,6 @@
 # Packaging
 
-OnlyRag uses Inno Setup 6 to package the self-contained Windows desktop app.
+OnlyRag uses Inno Setup 6 on Windows to package the self-contained desktop app.
 
 ## Inputs
 
@@ -38,9 +38,14 @@ pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>
 
 See [Signing](../docs/SIGNING.md) for certificate handling.
 
-The normal CI workflow does not compile the installer. Package readiness requires
-`pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` or
-`pwsh .\scripts\Build-Installer.ps1 -Configuration Release` on a Windows machine with Inno Setup 6.
+The normal CI workflow does not compile the installer. Package build readiness requires:
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
+```
+
+Use `Build-Installer.ps1` directly only for focused packaging work. Neither command makes an
+unsigned installer production-ready.
 
 ## Installer Behavior
 
@@ -75,3 +80,6 @@ pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\On
 ```
 
 Evidence JSON and installer logs are written under `artifacts\release-verification`.
+
+Production release readiness requires package gate success, a valid signed installer, lifecycle
+evidence, and representative checks for the target OCR/Ollama/LibreOffice/Qdrant runtime scope.

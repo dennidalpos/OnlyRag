@@ -1,7 +1,7 @@
 # Signing
 
-OnlyRag release signing is handled by repository PowerShell scripts. Private signing material must
-not be stored in the repository.
+OnlyRag installer signing is handled by repository PowerShell scripts on Windows. Private signing
+material must not be stored in the repository.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ not be stored in the repository.
 Using an external PFX:
 
 ```powershell
-pwsh .\scripts\Sign-Release.ps1 -CertificatePath C:\Path\To\OnlyRag-CodeSigning.pfx
+pwsh .\scripts\Sign-Release.ps1 -CertificatePath "C:\Path\To\OnlyRag-CodeSigning.pfx"
 ```
 
 Using an installed certificate:
@@ -24,10 +24,17 @@ Using an installed certificate:
 pwsh .\scripts\Sign-Release.ps1 -CertificateThumbprint <thumbprint>
 ```
 
-The script builds the installer through [`scripts/Build-Installer.ps1`](../scripts/Build-Installer.ps1),
-signs it, and runs signed release verification unless `-SkipReleaseVerification` is supplied.
-Temporarily imported certificates are removed from `CurrentUser\My` unless
-`-KeepImportedCertificate` is supplied.
+`Sign-Release.ps1` builds the installer through
+[`scripts/Build-Installer.ps1`](../scripts/Build-Installer.ps1), signs it, and runs non-invasive
+signed release verification unless `-SkipReleaseVerification` is supplied. Temporarily imported
+certificates are removed from `CurrentUser\My` unless `-KeepImportedCertificate` is supplied.
+
+The script does not run the full install/launch/uninstall lifecycle. Run that separately on a
+clean Windows verification machine:
+
+```powershell
+pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle
+```
 
 ## Certificate Export For Enterprise Trust
 
@@ -50,4 +57,5 @@ This checks certificate store availability and installer signature/trust signals
 
 ## Release Limit
 
-An unsigned installer is a packaging artifact only. It should not be presented as release-ready.
+An unsigned installer is a packaging artifact only. A signed installer is not production-ready
+until full lifecycle verification passes on the target Windows verification environment.

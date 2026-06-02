@@ -1,22 +1,27 @@
 # OnlyRag Documentation
 
-This directory contains technical and operational notes for the current repository state.
-The root [README](../README.md) remains the quick start; these pages expand the setup,
-pipeline, packaging, and handoff details without acting as a changelog.
+The root [README](../README.md) is the quick start and command map. This directory contains
+current technical and operational documentation. Do not use these pages as changelogs.
 
-## Start Here
+## Operations
 
-- [Operations and handoff](OPERATIONS.md): fresh-install setup, verification, release handoff,
-  troubleshooting, and current blockers.
-- [Architecture](ARCHITECTURE.md): source layout, runtime boundaries, storage, dependencies,
-  and test surfaces.
+- [Operations and handoff](OPERATIONS.md): Windows prerequisites, setup, dev/start, readiness
+  gates, packaging, signing handoff, runtime paths, environment variables, and troubleshooting.
+- [Scripts](../scripts/README.md): public PowerShell script inventory and canonical command flows.
+- [Signing](SIGNING.md): certificate handling and release signing commands.
+- [Packaging](../packaging/README.md): installer inputs, outputs, behavior, and release evidence.
+
+## Architecture And Flow
+
+- [Architecture](ARCHITECTURE.md): source layout, runtime boundaries, storage, dependencies, and
+  test surfaces.
 - [Application flow](APP_FLOW.md): desktop startup, backend bridge, job flow, shutdown, and the
   editable draw.io diagram.
 
-## Pipelines
+## Feature Pipelines
 
-- [RAG pipeline](RAG_PIPELINE.md): ingestion, embeddings, Qdrant indexing, hybrid search, and
-  chat grounding.
+- [RAG pipeline](RAG_PIPELINE.md): ingestion, embeddings, Qdrant indexing, hybrid search, and chat
+  grounding.
 - [OCR pipeline](OCR_PIPELINE.md): PaddleOCR bridge, runtime manifest, CPU/GPU selection, and
   operational limits.
 - [Office ingestion](OFFICE_INGESTION.md): native OpenXML extraction and optional LibreOffice
@@ -24,15 +29,11 @@ pipeline, packaging, and handoff details without acting as a changelog.
 - [Translation pipeline](TRANSLATION_PIPELINE.md): page-based translation jobs, editing, and
   export formats.
 
-## Release And Assets
+## Assets
 
-- [Signing](SIGNING.md): signing certificate handling and release signing commands.
 - [Brand assets](BRAND_ASSETS.md): generated asset locations and regeneration command.
-- [Packaging](../packaging/README.md): installer payload, Inno Setup script, outputs, and
-  verification evidence.
-- [Scripts](../scripts/README.md): repository script inventory.
 
-## Related Tracked Files
+## Tracked Files
 
 - [Operational tracker](../PROJECT_STATUS.json)
 - [Solution file](../OnlyRag.sln)
