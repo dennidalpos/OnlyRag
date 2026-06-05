@@ -263,10 +263,10 @@ public sealed class LocalJobWorkerServiceTests
 
         private static void DeleteDirectoryWithRetry(string path)
         {
-            const int maxAttempts = 10;
-            SqliteConnection.ClearAllPools();
+            const int maxAttempts = 20;
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
+                ReleaseSqliteFileHandles();
                 try
                 {
                     Directory.Delete(path, recursive: true);
@@ -274,15 +274,26 @@ public sealed class LocalJobWorkerServiceTests
                 }
                 catch (IOException) when (attempt < maxAttempts)
                 {
-                    SqliteConnection.ClearAllPools();
                     Thread.Sleep(100 * attempt);
                 }
                 catch (UnauthorizedAccessException) when (attempt < maxAttempts)
                 {
-                    SqliteConnection.ClearAllPools();
                     Thread.Sleep(100 * attempt);
                 }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not delete temporary worker storage after {maxAttempts} attempts. Path: {path}",
+                        ex);
+                }
             }
+        }
+
+        private static void ReleaseSqliteFileHandles()
+        {
+            SqliteConnection.ClearAllPools();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
     }
 }

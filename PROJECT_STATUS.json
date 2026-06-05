@@ -1,57 +1,6 @@
 {
-  "project_name": "OnlyRag",
-  "status": "active",
-  "last_updated": "2026-06-02T10:11:54+02:00",
-  "active_objective": "Keep Windows + PowerShell production-readiness documentation aligned with real repository scripts and confirm release-only commands on a packaging-capable Windows machine.",
-  "current_tasks": [
-    {
-      "priority": 1,
-      "task": "Confirm package gate and signed installer lifecycle on a clean Windows verification profile or machine.",
-      "status": "blocked",
-      "blocked_by": "Requires Inno Setup 6, signtool/signing certificate where applicable, a signed installer artifact, and a clean representative Windows profile or machine."
-    },
-    {
-      "priority": 2,
-      "task": "Keep README, docs/OPERATIONS.md, docs/SIGNING.md, packaging/README.md, and scripts/README.md synchronized when script parameters, prerequisites, or release flow change.",
-      "status": "pending",
-      "blocked_by": null
-    }
-  ],
-  "commands_to_confirm": [
-    "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller",
-    "pwsh .\\scripts\\Sign-Release.ps1 -CertificateThumbprint <thumbprint>",
-    "pwsh .\\scripts\\Sign-Release.ps1 -CertificatePath \"C:\\Path\\To\\OnlyRag-CodeSigning.pfx\"",
-    "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle"
-  ],
-  "risks": [
-    "Documentation and script references are aligned to the current repository, but production release readiness still depends on signed installer lifecycle evidence.",
-    "Release readiness depends on representative Ollama, OCR, LibreOffice, Qdrant, WebView2, and Windows profile validation outside the normal CI gate.",
-    "Build and gate commands recreate ignored outputs after cleanup, including node_modules, dist, bin/obj, artifacts, and packaging\\qdrant\\payload."
-  ],
-  "blockers": [
-    "Signed installer lifecycle and representative runtime checks require a packaging-capable Windows environment with Inno Setup 6, Windows SDK signtool.exe or configured -SignToolPath, signing certificate access, WebView2 Runtime, and a clean verification profile or machine."
-  ],
-  "quality_gates": {
-    "documentation_review": "passed",
-    "script_reference_review": "passed",
-    "json_validation": "passed",
-    "repository_cleanliness": "passed",
-    "release_gate": "not_run",
-    "package_gate": "not_run",
-    "release_runtime_validation": "not_run"
-  },
-  "commands": {
-    "setup": "pwsh .\\scripts\\Bootstrap-Prerequisites.ps1",
-    "dev": "Set-Location .\\src\\OnlyRag.Web; npm run dev",
-    "check": "pwsh .\\scripts\\Invoke-Gate.ps1 -Configuration Release",
-    "test": "dotnet test .\\OnlyRag.sln --configuration Release",
-    "build": "pwsh .\\scripts\\Build-App.ps1 -Configuration Release",
-    "start": "dotnet run --project .\\src\\OnlyRag.App\\OnlyRag.App.csproj --configuration Debug",
-    "package": "pwsh .\\scripts\\Build-Installer.ps1 -Configuration Release",
-    "sign": "pwsh .\\scripts\\Sign-Release.ps1 -CertificateThumbprint <thumbprint>",
-    "verify_release": "pwsh .\\scripts\\Test-InstallerRelease.ps1 -InstallerPath .\\artifacts\\installer\\OnlyRag-Setup-0.1.0-win-x64.exe -RequireSigned -RunInstallLifecycle",
-    "clean": "pwsh .\\scripts\\Clean.ps1"
-  },
-  "open_questions": [],
-  "handoff_notes": "Do not mark the project production-ready until the package gate, signing, signed installer lifecycle, and representative runtime checks pass on the target Windows verification environment."
+  "todos": [
+    "Sign the installer and verify the signed install-launch-uninstall lifecycle on a clean Windows profile or verification machine.",
+    "Verify representative Ollama, OCR, LibreOffice, and Qdrant runtime behavior for the target deployment scope."
+  ]
 }
