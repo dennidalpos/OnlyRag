@@ -108,7 +108,8 @@
 }
 
 .field-group input,
-.field-group select {
+.field-group select,
+.field-group textarea {
   width: 100%;
   min-height: 32px;
   padding: 6px 8px;
@@ -119,9 +120,14 @@
 }
 
 .field-group input:focus,
-.field-group select:focus {
+.field-group select:focus,
+.field-group textarea:focus {
   outline: 2px solid #2d6f8f;
   border-color: #2d6f8f;
+}
+
+.field-group textarea {
+  resize: vertical;
 }
 
 .ocr-field-label {

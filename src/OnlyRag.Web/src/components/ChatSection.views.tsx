@@ -1,5 +1,5 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
-import type { ImportedDocument, OllamaModel, OllamaStatusResponse } from "../api";
+import type { ChatSource, ImportedDocument, OllamaModel, OllamaStatusResponse } from "../api";
 import { formatPageRange } from "./ChatSection.helpers";
 import type { ChatMessage } from "./ChatSection.storage";
 
@@ -104,6 +104,7 @@ export function ChatMainPanel({
   onCancel,
   onInputChange,
   onInputKeyDown,
+  onOpenSource,
   onSubmit
 }: {
   models: OllamaModel[];
@@ -122,6 +123,7 @@ export function ChatMainPanel({
   onCancel: () => void;
   onInputChange: (value: string) => void;
   onInputKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onOpenSource: (source: ChatSource) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -211,6 +213,13 @@ export function ChatMainPanel({
                         <summary>
                           {source.documentName} - {formatPageRange(source.pageStart, source.pageEnd)}
                         </summary>
+                        <button
+                          className="button-secondary chat-source__open"
+                          type="button"
+                          onClick={() => onOpenSource(source)}
+                        >
+                          Apri pagina
+                        </button>
                         <p>{source.snippet}</p>
                       </details>
                     ))}

@@ -5,8 +5,8 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed partial class LocalSqliteMigrator
 {
-    public const int TargetSchemaVersion = 14;
-    private const string InitialSchemaName = "014_fresh_local_storage";
+    public const int TargetSchemaVersion = 15;
+    private const string InitialSchemaName = "015_fresh_local_storage";
     private const string BackupDirectoryName = "backups";
     private const string FtsUnavailableNote = "No SQLite FTS module is available in the active SQLite provider; keyword search is disabled until FTS5 or FTS4 is available.";
 
@@ -17,7 +17,8 @@ public sealed partial class LocalSqliteMigrator
         new(11, "011_enforce_unique_document_hashes", ApplySchemaVersion11Async),
         new(12, "012_add_status_constraints", ApplySchemaVersion12Async),
         new(13, "013_move_vectors_to_qdrant_status", ApplySchemaVersion13Async),
-        new(14, "014_add_job_retry_schedule", ApplySchemaVersion14Async)
+        new(14, "014_add_job_retry_schedule", ApplySchemaVersion14Async),
+        new(15, "015_add_generated_images", ApplySchemaVersion15Async)
     ];
 
     private readonly LocalSqliteStoreDescriptor descriptor;

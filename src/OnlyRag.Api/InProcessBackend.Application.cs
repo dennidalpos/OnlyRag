@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
@@ -69,6 +70,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IChatHistoryRepository, SqliteChatHistoryRepository>();
         builder.Services.AddSingleton<ChatService>();
         builder.Services.AddSingleton<ITranslationRepository, SqliteTranslationRepository>();
+        builder.Services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
         builder.Services.AddSingleton<TranslationExportService>();
         builder.Services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
         builder.Services.AddSingleton<LocalDocumentStorageGuard>();
@@ -82,6 +84,8 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<OfficeConversionSettingsStore>();
         builder.Services.AddSingleton<IOfficeConversionService, LibreOfficeConversionService>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
+        builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
+        builder.Services.AddSingleton<ImageGenerationService>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         builder.Services.AddSingleton<OllamaGenerationCoordinator>();
         builder.Services.AddSingleton<DependencyProvisioningService>();
@@ -90,6 +94,12 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<DiagnosticsProbeCacheService>();
         builder.Services.AddSingleton<SystemTelemetryService>();
         builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
+        builder.Services.AddHttpClient<Automatic1111ImageGenerationClient>();
+        builder.Services.AddHttpClient<ComfyUiImageGenerationClient>();
+        builder.Services.AddSingleton<IImageGenerationClient>(services =>
+            services.GetRequiredService<Automatic1111ImageGenerationClient>());
+        builder.Services.AddSingleton<IImageGenerationClient>(services =>
+            services.GetRequiredService<ComfyUiImageGenerationClient>());
         builder.Services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         builder.Services.AddSingleton<DocumentTextChunker>();
         builder.Services.AddSingleton<OfficeOpenXmlTextExtractor>();
@@ -172,6 +182,7 @@ public static partial class InProcessBackend
         MapJobEndpoints(app);
         MapDocumentEndpoints(app);
         MapTranslationEndpoints(app);
+        MapImageEndpoints(app);
     }
 
     private static Uri ResolveBaseUri(IHost app)

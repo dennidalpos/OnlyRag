@@ -18,6 +18,7 @@ import { AppHeader } from "./components/AppHeader";
 import { ChatSection } from "./components/ChatSection";
 import { DocumentsSection } from "./components/DocumentsSection";
 import { InitialSetupWizard } from "./components/InitialSetupWizard";
+import { ImagesSection } from "./components/ImagesSection";
 import { JobsSection } from "./components/JobsSection";
 import { SectionId, Sidebar } from "./components/Sidebar";
 import { SettingsSection } from "./components/SettingsSection";
@@ -57,6 +58,7 @@ export type BackendStatus = {
 const sectionLabels: Record<SectionId, string> = {
   chat: "Chat",
   documents: "Documenti",
+  images: "Immagini",
   jobs: "Operazioni",
   translation: "Traduzione",
   settings: "Impostazioni"
@@ -339,6 +341,7 @@ export default function App() {
             />
           </div>
           {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
+          {activeSection === "images" && <ImagesSection />}
           {activeSection === "jobs" && (
             <JobsSection onJobsChanged={() => void refreshBackendStatus()} />
           )}

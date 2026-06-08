@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import {
   apiRequest,
+  type ChatSource,
   type ChatResponse,
   type ImportedDocument,
   type OllamaModel,
@@ -21,6 +22,8 @@ import {
   type ChatMessage
 } from "./ChatSection.storage";
 import { ChatDocumentsPanel, ChatMainPanel, ChatResizeHandle } from "./ChatSection.views";
+import { DocumentPreviewModal } from "./DocumentPreviewModal";
+import { useDocumentPreviewController } from "./useDocumentPreviewController";
 
 type ChatSectionProps = {
   models: OllamaModel[];
@@ -60,6 +63,7 @@ export function ChatSection({
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [notices, setNotices] = useState<string[]>([]);
+  const preview = useDocumentPreviewController();
 
   useEffect(() => {
     setInput(loadChatDraft());
@@ -335,6 +339,16 @@ export function ChatSection({
     clearChatDraft();
   }
 
+  async function handleOpenSource(source: ChatSource) {
+    try {
+      const document = documents.find((candidate) => candidate.id === source.documentId)
+        ?? await apiRequest<ImportedDocument>(`/api/documents/${source.documentId}`);
+      await preview.loadPreviewPage(document, source.pageStart ?? 1);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Fonte non apribile.");
+    }
+  }
+
   const canSend = Boolean(ollamaStatus?.isReachable && models.length > 0 && selectedModel && !isGenerating);
 
   return (
@@ -376,8 +390,19 @@ export function ChatSection({
         onCancel={handleCancel}
         onInputChange={setInput}
         onInputKeyDown={handleInputKeyDown}
+        onOpenSource={(source) => void handleOpenSource(source)}
         onSubmit={handleSubmit}
       />
+
+      {preview.previewDocument && (
+        <DocumentPreviewModal
+          document={preview.previewDocument}
+          preview={preview.previewData}
+          isLoading={preview.isLoadingPreview}
+          onClose={preview.handleClosePreview}
+          onPageChange={(page) => void preview.loadPreviewPage(preview.previewDocument!, page)}
+        />
+      )}
     </div>
   );
 }

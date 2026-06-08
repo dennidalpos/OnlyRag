@@ -252,6 +252,11 @@
   background: #edf8f1;
 }
 
+.feedback-banner--success {
+  border-color: #b9d8c5;
+  background: #edf8f1;
+}
+
 .feedback-banner--error {
   border-color: #e7c9c9;
   background: #fff4f3;

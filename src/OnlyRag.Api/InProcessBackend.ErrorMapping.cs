@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
@@ -87,6 +88,55 @@ public static partial class InProcessBackend
             "La configurazione del convertitore Office non e valida. Controlla il percorso e i permessi nelle impostazioni.",
             StatusCodes.Status400BadRequest,
             "office_conversion_invalid_configuration");
+    }
+
+    private static IResult MapImageGenerationException(
+        ImageGenerationException exception,
+        IServiceProvider? services = null,
+        string? operation = null)
+    {
+        if (exception.Kind == ImageGenerationErrorKind.UnexpectedResponse && services is not null)
+        {
+            InProcessBackendDescriptor descriptor = services.GetRequiredService<InProcessBackendDescriptor>();
+            string context = string.IsNullOrWhiteSpace(operation)
+                ? "Image generation unexpected response."
+                : $"Image generation unexpected response during {operation}.";
+            BackendLog.WriteException(descriptor.StoragePaths, null, context, exception);
+        }
+
+        return exception.Kind switch
+        {
+            ImageGenerationErrorKind.InvalidConfiguration => CreateProblem(
+                "Configurazione immagini non valida",
+                exception.Message,
+                StatusCodes.Status400BadRequest,
+                "image_generation_invalid_configuration"),
+            ImageGenerationErrorKind.InvalidRequest => CreateProblem(
+                "Richiesta immagini non valida",
+                exception.Message,
+                StatusCodes.Status400BadRequest,
+                "image_generation_invalid_request"),
+            ImageGenerationErrorKind.Timeout => CreateProblem(
+                "Timeout generazione immagini",
+                exception.Message,
+                StatusCodes.Status408RequestTimeout,
+                "image_generation_timeout"),
+            ImageGenerationErrorKind.Unreachable => CreateProblem(
+                "Provider immagini non raggiungibile",
+                exception.Message,
+                StatusCodes.Status503ServiceUnavailable,
+                "image_generation_unreachable"),
+            ImageGenerationErrorKind.NotFound => CreateProblem(
+                "Risorsa immagini non trovata",
+                exception.Message,
+                StatusCodes.Status404NotFound,
+                "image_generation_not_found"),
+            _ => CreateProblem(
+                "Errore generazione immagini",
+                "Il provider immagini ha restituito una risposta inattesa. I dettagli tecnici sono nei log locali.",
+                StatusCodes.Status502BadGateway,
+                "image_generation_unexpected_response")
+        };
     }
 
     private static IResult CreateUnexpectedErrorProblem(string title, string? correlationId = null)

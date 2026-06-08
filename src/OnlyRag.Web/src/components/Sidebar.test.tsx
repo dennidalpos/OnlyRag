@@ -11,6 +11,7 @@ describe("Sidebar", () => {
         sections={{
           chat: "Chat",
           documents: "Documenti",
+          images: "Immagini",
           jobs: "Operazioni",
           translation: "Traduzione",
           settings: "Impostazioni"

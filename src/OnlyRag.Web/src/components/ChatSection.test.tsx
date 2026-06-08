@@ -41,6 +41,32 @@ describe("ChatSection", () => {
             }
           ]
         }
+      },
+      {
+        path: "/api/documents/1/preview?page=1&pageSize=1",
+        response: {
+          documentId: 1,
+          originalFileName: "manuale.pdf",
+          mimeType: "application/pdf",
+          fileExtension: ".pdf",
+          fileSizeBytes: 2048,
+          pageCount: 2,
+          chunkCount: 4,
+          status: "Indexed",
+          pageStart: 1,
+          pageSize: 1,
+          returnedPageCount: 1,
+          pages: [
+            {
+              pageNumber: 1,
+              textContent: "Pagina originale della fonte",
+              ocrStatus: null,
+              ocrEngine: null,
+              ocrConfidence: null,
+              ocrError: null
+            }
+          ]
+        }
       }
     ]);
 
@@ -63,6 +89,11 @@ describe("ChatSection", () => {
     expect(await screen.findByText("Il manuale descrive il flusso RAG locale.")).toBeInTheDocument();
     expect(screen.getByText("Contesto limitato ai documenti selezionati.")).toBeInTheDocument();
     expect(screen.getByText("Flusso RAG locale")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("manuale.pdf - Pagina 1"));
+    await userEvent.click(screen.getByRole("button", { name: "Apri pagina" }));
+
+    expect(await screen.findByRole("dialog", { name: "Anteprima documento" })).toBeInTheDocument();
+    expect(screen.getByText("Pagina originale della fonte")).toBeInTheDocument();
 
     const chatCall = api.calls.find((call) => call.path === "/api/chat");
     expect(JSON.parse(String(chatCall?.body))).toMatchObject({

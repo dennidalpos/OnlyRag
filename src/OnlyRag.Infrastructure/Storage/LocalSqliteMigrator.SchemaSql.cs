@@ -163,6 +163,24 @@ public sealed partial class LocalSqliteMigrator
                 updated_at_utc TEXT NOT NULL
             );
 
+            CREATE TABLE generated_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                negative_prompt TEXT NULL,
+                model TEXT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                steps INTEGER NOT NULL,
+                batch_size INTEGER NOT NULL,
+                seed INTEGER NULL,
+                file_name TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                file_size_bytes INTEGER NOT NULL,
+                created_at_utc TEXT NOT NULL
+            );
+
             CREATE TABLE ocr_cache (
                 cache_key TEXT PRIMARY KEY,
                 page_hash TEXT NOT NULL,
@@ -197,12 +215,13 @@ public sealed partial class LocalSqliteMigrator
             CREATE INDEX idx_translations_job ON translations(job_id);
             CREATE INDEX idx_translation_units_translation ON translation_units(translation_id, unit_index);
             CREATE INDEX idx_translation_units_status ON translation_units(translation_id, status, unit_index);
+            CREATE INDEX idx_generated_images_created_at ON generated_images(created_at_utc DESC, id DESC);
             CREATE INDEX idx_ocr_cache_lookup
             ON ocr_cache(page_hash, engine_name, engine_version, language, preprocess_version);
             {{ftsSql}}
 
             INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (14, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            VALUES (15, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
             """;
     }
 

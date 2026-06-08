@@ -190,6 +190,40 @@ public sealed partial class LocalSqliteMigrator
             cancellationToken);
     }
 
+    private static async Task ApplySchemaVersion15Async(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteTextSearchBackend textSearchBackend,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteInTransactionAsync(
+            connection,
+            transaction,
+            """
+            CREATE TABLE IF NOT EXISTS generated_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                negative_prompt TEXT NULL,
+                model TEXT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                steps INTEGER NOT NULL,
+                batch_size INTEGER NOT NULL,
+                seed INTEGER NULL,
+                file_name TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                file_size_bytes INTEGER NOT NULL,
+                created_at_utc TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_generated_images_created_at
+            ON generated_images(created_at_utc DESC, id DESC);
+            """,
+            cancellationToken);
+    }
+
     private static async Task EnsureNoDuplicateDocumentHashesAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,

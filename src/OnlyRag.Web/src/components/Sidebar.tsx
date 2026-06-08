@@ -4,7 +4,7 @@ import {
   formatTelemetryPercent
 } from "./SettingsSection.formatting";
 
-export type SectionId = "chat" | "documents" | "jobs" | "translation" | "settings";
+export type SectionId = "chat" | "documents" | "images" | "jobs" | "translation" | "settings";
 
 type SidebarProps = {
   activeSection: SectionId;
@@ -14,7 +14,7 @@ type SidebarProps = {
   diagnostics?: DiagnosticsResponse | null;
 };
 
-const sectionOrder: SectionId[] = ["chat", "documents", "jobs", "translation", "settings"];
+const sectionOrder: SectionId[] = ["chat", "documents", "images", "jobs", "translation", "settings"];
 
 export function Sidebar({
   activeSection,

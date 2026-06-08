@@ -1,6 +1,7 @@
 {
   "todos": [
     "Sign the installer and verify the signed install-launch-uninstall lifecycle on a clean Windows profile or verification machine.",
-    "Verify representative Ollama, OCR, LibreOffice, and Qdrant runtime behavior for the target deployment scope."
+    "Verify representative Ollama, OCR, LibreOffice, and Qdrant runtime behavior for the target deployment scope.",
+    "Verify image generation against real local Automatic1111 and ComfyUI instances, including provider status, generation, saved gallery entries, and generated file retrieval."
   ]
 }
