@@ -1,5 +1,5 @@
 namespace OnlyRag.Core;
 
-public sealed record OfficeConversionSettings(
+public sealed record PdfExportSettings(
     string? LibreOfficePath,
     int ConversionTimeoutSeconds);

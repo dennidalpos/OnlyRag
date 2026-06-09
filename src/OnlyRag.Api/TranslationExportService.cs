@@ -14,16 +14,16 @@ public sealed partial class TranslationExportService
     private static readonly Regex UnsafeSegmentCharacters = new(@"[^A-Za-z0-9._ -]+", RegexOptions.Compiled);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly ITranslationRepository translations;
-    private readonly IOfficeConversionService officeConverter;
+    private readonly IPdfExportConverter pdfExportConverter;
 
     public TranslationExportService(
         InProcessBackendDescriptor descriptor,
         ITranslationRepository translations,
-        IOfficeConversionService officeConverter)
+        IPdfExportConverter pdfExportConverter)
     {
         this.descriptor = descriptor;
         this.translations = translations;
-        this.officeConverter = officeConverter;
+        this.pdfExportConverter = pdfExportConverter;
     }
 
     public async Task<TranslationExportResponse?> ExportAsync(
@@ -261,14 +261,14 @@ public sealed partial class TranslationExportService
     {
         string tempDir = Path.Combine(descriptor.StoragePaths.TempDirectory, "translation-export", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
-        OfficeConversionResult? conversion = null;
+        PdfExportConversionResult? conversion = null;
         try
         {
             string tempDocx = Path.Combine(tempDir, "export.docx");
             WriteDocx(tempDocx, translation, units);
 
-            conversion = await officeConverter.ConvertToPdfAsync(
-                new OfficeConversionRequest(
+            conversion = await pdfExportConverter.ConvertToPdfAsync(
+                new PdfExportConversionRequest(
                     translation.Id,
                     tempDocx,
                     "export.docx",
@@ -277,7 +277,7 @@ public sealed partial class TranslationExportService
 
             File.Move(conversion.PdfPath, outputPath, overwrite: false);
         }
-        catch (OfficeConversionUnavailableException ex)
+        catch (PdfExportConversionUnavailableException ex)
         {
             string detail = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
@@ -286,7 +286,7 @@ public sealed partial class TranslationExportService
                 "LibreOffice non disponibile",
                 $"L'export PDF richiede LibreOffice. Configura il percorso LibreOffice nelle impostazioni. Dettaglio: {detail}");
         }
-        catch (OfficeConversionException ex)
+        catch (PdfExportConversionException ex)
         {
             string detail = UserFacingErrorText.FromExternalDetail(
                 ex.Message,

@@ -399,7 +399,7 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task OfficeConversionSettings_NonLibreOfficeExecutableIsRejected()
+    public async Task PdfExportSettings_NonLibreOfficeExecutableIsRejected()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
@@ -408,19 +408,19 @@ public sealed partial class InProcessBackendTests
         Directory.CreateDirectory(Path.GetDirectoryName(executablePath)!);
         await File.WriteAllTextAsync(executablePath, "not libreoffice");
 
-        OfficeConversionSettings request = new(
+        PdfExportSettings request = new(
             executablePath,
             30);
 
-        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/office-conversion", request);
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/pdf-export", request);
         string body = await putResponse.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.BadRequest, putResponse.StatusCode);
-        Assert.Contains("office_conversion_invalid_configuration", body, StringComparison.Ordinal);
+        Assert.Contains("pdf_export_invalid_configuration", body, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task OfficeConversionSettings_ValidSofficePathCanBeSavedAndReadBack()
+    public async Task PdfExportSettings_ValidSofficePathCanBeSavedAndReadBack()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
@@ -429,12 +429,12 @@ public sealed partial class InProcessBackendTests
         Directory.CreateDirectory(Path.GetDirectoryName(executablePath)!);
         await File.WriteAllTextAsync(executablePath, "fake soffice");
 
-        OfficeConversionSettings request = new(executablePath, 30);
+        PdfExportSettings request = new(executablePath, 30);
 
-        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/office-conversion", request);
-        OfficeConversionSettings? saved = await putResponse.Content.ReadFromJsonAsync<OfficeConversionSettings>();
-        OfficeConversionSettings? current = await httpClient.GetFromJsonAsync<OfficeConversionSettings>("/api/settings/office-conversion");
-        OfficeConverterStatusResponse? status = await httpClient.GetFromJsonAsync<OfficeConverterStatusResponse>("/api/office-converter/status");
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/pdf-export", request);
+        PdfExportSettings? saved = await putResponse.Content.ReadFromJsonAsync<PdfExportSettings>();
+        PdfExportSettings? current = await httpClient.GetFromJsonAsync<PdfExportSettings>("/api/settings/pdf-export");
+        PdfExportConverterStatusResponse? status = await httpClient.GetFromJsonAsync<PdfExportConverterStatusResponse>("/api/pdf-export/status");
 
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
         Assert.NotNull(saved);

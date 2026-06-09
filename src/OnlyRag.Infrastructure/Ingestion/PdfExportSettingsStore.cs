@@ -3,34 +3,34 @@ using OnlyRag.Infrastructure.Storage;
 
 namespace OnlyRag.Infrastructure.Ingestion;
 
-public sealed class OfficeConversionSettingsStore
+public sealed class PdfExportSettingsStore
 {
     public const int DefaultConversionTimeoutSeconds = 120;
     public const int MinimumConversionTimeoutSeconds = 10;
     public const int MaximumConversionTimeoutSeconds = 900;
 
-    private const string LibreOfficePathKey = "office.libreOfficePath";
-    private const string ConversionTimeoutSecondsKey = "office.conversionTimeoutSeconds";
+    private const string LibreOfficePathKey = "pdfExport.libreOfficePath";
+    private const string ConversionTimeoutSecondsKey = "pdfExport.conversionTimeoutSeconds";
 
     private readonly ISettingsRepository settings;
 
-    public OfficeConversionSettingsStore(ISettingsRepository settings)
+    public PdfExportSettingsStore(ISettingsRepository settings)
     {
         this.settings = settings;
     }
 
-    public async Task<OfficeConversionSettings> GetAsync(CancellationToken cancellationToken = default)
+    public async Task<PdfExportSettings> GetAsync(CancellationToken cancellationToken = default)
     {
         string? path = NormalizeOptionalPath(await settings.GetValueAsync(LibreOfficePathKey, cancellationToken));
         string? timeoutValue = await settings.GetValueAsync(ConversionTimeoutSecondsKey, cancellationToken);
 
-        return new OfficeConversionSettings(
+        return new PdfExportSettings(
             path,
             ParseTimeoutSeconds(timeoutValue));
     }
 
-    public async Task<OfficeConversionSettings> UpdateAsync(
-        OfficeConversionSettings request,
+    public async Task<PdfExportSettings> UpdateAsync(
+        PdfExportSettings request,
         CancellationToken cancellationToken = default)
     {
         string? path = NormalizeLibreOfficePath(request.LibreOfficePath);
@@ -39,7 +39,7 @@ public sealed class OfficeConversionSettingsStore
         await settings.UpsertAsync(LibreOfficePathKey, path ?? string.Empty, cancellationToken);
         await settings.UpsertAsync(ConversionTimeoutSecondsKey, timeout.ToString(), cancellationToken);
 
-        return new OfficeConversionSettings(path, timeout);
+        return new PdfExportSettings(path, timeout);
     }
 
     public static string? NormalizeLibreOfficePath(string? path)
@@ -53,8 +53,8 @@ public sealed class OfficeConversionSettingsStore
         string? executable = TryResolveLibreOfficeExecutable(normalized);
         if (executable is null)
         {
-            throw new OfficeConversionException(
-                "Il percorso LibreOffice deve puntare a soffice.exe o a una cartella di installazione LibreOffice che contiene soffice.exe.");
+            throw new PdfExportConversionException(
+                "Il percorso LibreOffice per export PDF deve puntare a soffice.exe o a una cartella di installazione LibreOffice che contiene soffice.exe.");
         }
 
         return executable;
@@ -95,8 +95,8 @@ public sealed class OfficeConversionSettingsStore
     {
         if (timeoutSeconds < MinimumConversionTimeoutSeconds || timeoutSeconds > MaximumConversionTimeoutSeconds)
         {
-            throw new OfficeConversionException(
-                $"Il timeout conversione Office deve essere compreso tra {MinimumConversionTimeoutSeconds} e {MaximumConversionTimeoutSeconds} secondi.");
+            throw new PdfExportConversionException(
+                $"Il timeout export PDF deve essere compreso tra {MinimumConversionTimeoutSeconds} e {MaximumConversionTimeoutSeconds} secondi.");
         }
 
         return timeoutSeconds;

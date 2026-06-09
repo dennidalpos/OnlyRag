@@ -287,64 +287,29 @@ public sealed partial class DocumentIngestionServiceTests
             Encoding.UTF8.GetBytes("not an Open XML package"));
         DocumentIngestionService service = tempStorage.CreateIngestionService();
 
-        OfficeConversionUnavailableException error = await Assert.ThrowsAsync<OfficeConversionUnavailableException>(() =>
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask));
 
-        Assert.Contains("LibreOffice", error.Message, StringComparison.Ordinal);
+        Assert.Contains("DOCX", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("LibreOffice", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public async Task IngestAsync_LegacyDoc_UsesOfficeConverterAndCleansTemporaryDirectory()
+    [Theory]
+    [InlineData("unsupported.doc")]
+    [InlineData("unsupported.xls")]
+    [InlineData("unsupported.ppt")]
+    public async Task IngestAsync_BinaryOfficeFormat_IsNotSupported(string fileName)
     {
         using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
         ImportedDocument document = await tempStorage.CreateBinaryDocumentAsync(
-            "legacy.doc",
-            Encoding.UTF8.GetBytes("legacy-office-placeholder"));
-        FakeOfficeConverter converter = new(tempStorage.Root, CreateSinglePageTextPdf("Converted legacy text"));
-        DocumentIngestionService service = tempStorage.CreateIngestionService(converter);
+            fileName,
+            Encoding.UTF8.GetBytes("binary-office-placeholder"));
+        DocumentIngestionService service = tempStorage.CreateIngestionService();
 
-        DocumentIngestionResult result = await service.IngestAsync(
-            document,
-            checkpoint: null,
-            (_, _) => Task.CompletedTask);
-
-        IReadOnlyList<string> pages = await tempStorage.ReadPageTextsAsync(document.Id);
-        Assert.Equal(1, result.PageCount);
-        Assert.Single(pages);
-        Assert.Contains("Converted legacy text", pages[0], StringComparison.Ordinal);
-        Assert.NotNull(converter.LastTemporaryDirectory);
-        Assert.False(Directory.Exists(converter.LastTemporaryDirectory));
-    }
-
-    [Fact]
-    public async Task IngestAsync_LegacyXls_WhenConverterUnavailableReturnsAdditionalComponentError()
-    {
-        using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
-        ImportedDocument document = await tempStorage.CreateBinaryDocumentAsync(
-            "legacy.xls",
-            Encoding.UTF8.GetBytes("legacy-office-placeholder"));
-        DocumentIngestionService service = tempStorage.CreateIngestionService(new UnavailableOfficeConversionService());
-
-        OfficeConversionUnavailableException error = await Assert.ThrowsAsync<OfficeConversionUnavailableException>(() =>
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask));
 
-        Assert.Contains("LibreOffice", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task IngestAsync_LegacyPpt_WhenConverterTimesOutReturnsReadableError()
-    {
-        using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
-        ImportedDocument document = await tempStorage.CreateBinaryDocumentAsync(
-            "legacy.ppt",
-            Encoding.UTF8.GetBytes("legacy-office-placeholder"));
-        DocumentIngestionService service = tempStorage.CreateIngestionService(
-            new ThrowingOfficeConverter(new OfficeConversionException("Timeout conversione Office dopo 1 secondi.")));
-
-        OfficeConversionException error = await Assert.ThrowsAsync<OfficeConversionException>(() =>
-            service.IngestAsync(document, checkpoint: null, (_, _) => Task.CompletedTask));
-
-        Assert.Contains("Timeout conversione Office", error.Message, StringComparison.Ordinal);
+        Assert.Contains("non supportato", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

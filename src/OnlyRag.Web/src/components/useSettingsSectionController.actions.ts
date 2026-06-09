@@ -1,7 +1,7 @@
 import {
   apiRequest,
   type IngestionSettings,
-  type OfficeConversionSettings,
+  type PdfExportSettings,
   type OcrProcessingSettings,
   type OcrSettings,
   type OllamaSettings,
@@ -14,11 +14,11 @@ import {
   buildIngestionSettingsPayload,
   buildOcrProcessingSettingsPayload,
   buildOcrSettingsPayload,
-  buildOfficeSettingsPayload,
+  buildPdfExportSettingsPayload,
   buildOllamaSettingsPayload,
   buildPerformanceSettingsPayload,
   normalizeIngestionSettings,
-  normalizeOfficeSettings,
+  normalizePdfExportSettings,
   normalizeOcrProcessingSettings,
   normalizeOcrSettings,
   normalizeOllamaSettings,
@@ -36,14 +36,14 @@ type SettingsSectionActionParams = SettingsSectionDependencyActionParams & {
   onDataChanged: () => Promise<void>;
   modelToInstall: string;
   formState: OllamaSettings;
-  officeFormState: OfficeConversionSettings;
+  pdfExportFormState: PdfExportSettings;
   performanceFormState: PerformanceSettings;
   ingestionFormState: IngestionSettings;
   ocrProcessingFormState: OcrProcessingSettings;
   ocrFormState: OcrSettings;
   hasDirtyPerformanceSettings: boolean;
   hasDirtyOllamaSettings: boolean;
-  hasDirtyOfficeSettings: boolean;
+  hasDirtyPdfExportSettings: boolean;
   hasDirtyIngestionSettings: boolean;
   hasDirtyOcrProcessingSettings: boolean;
   hasDirtyOcrSettings: boolean;
@@ -57,21 +57,21 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     onDataChanged,
     modelToInstall,
     formState,
-    officeFormState,
+    pdfExportFormState,
     performanceFormState,
     ingestionFormState,
     ocrProcessingFormState,
     ocrFormState,
     hasDirtyPerformanceSettings,
     hasDirtyOllamaSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyIngestionSettings,
     hasDirtyOcrProcessingSettings,
     hasDirtyOcrSettings,
     setFormState,
     setSavedFormState,
-    setOfficeFormState,
-    setSavedOfficeFormState,
+    setPdfExportFormState,
+    setSavedPdfExportFormState,
     setPerformanceFormState,
     setSavedPerformanceFormState,
     setIngestionFormState,
@@ -181,13 +181,13 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
   }
 
   const dependencyActions = createSettingsSectionDependencyActions(params);
-  const { refreshDependencyStatus, refreshOfficeConverter } = dependencyActions;
+  const { refreshDependencyStatus, refreshPdfExportConverter } = dependencyActions;
   const resetActions = createSettingsSectionResetActions({
     onDataChanged,
     setFormState,
     setSavedFormState,
-    setOfficeFormState,
-    setSavedOfficeFormState,
+    setPdfExportFormState,
+    setSavedPdfExportFormState,
     setPerformanceFormState,
     setSavedPerformanceFormState,
     setIngestionFormState,
@@ -199,7 +199,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     setInfoMessage,
     setErrorMessage,
     setIsBusy,
-    refreshOfficeConverter,
+    refreshPdfExportConverter,
     refreshDependencyStatus
   });
 
@@ -316,30 +316,30 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     setOcrFormState((current: OcrSettings) => ({ ...current, ...patch, profile: "custom" }));
   }
 
-  async function saveOfficeSettings() {
+  async function savePdfExportSettings() {
     setIsBusy(true);
     setErrorMessage(null);
     setInfoMessage(null);
 
     try {
-      const saved = await persistOfficeSettings();
-      setOfficeFormState(saved);
-      setSavedOfficeFormState(saved);
-      setInfoMessage("Impostazioni convertitore Office salvate.");
-      await refreshOfficeConverter();
+      const saved = await persistPdfExportSettings();
+      setPdfExportFormState(saved);
+      setSavedPdfExportFormState(saved);
+      setInfoMessage("Impostazioni export PDF salvate.");
+      await refreshPdfExportConverter();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare il convertitore Office.");
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni export PDF.");
     } finally {
       setIsBusy(false);
     }
   }
 
-  async function persistOfficeSettings(): Promise<OfficeConversionSettings> {
-    const saved = await apiRequest<OfficeConversionSettings>("/api/settings/office-conversion", {
+  async function persistPdfExportSettings(): Promise<PdfExportSettings> {
+    const saved = await apiRequest<PdfExportSettings>("/api/settings/pdf-export", {
       method: "PUT",
-      body: JSON.stringify(buildOfficeSettingsPayload(officeFormState))
+      body: JSON.stringify(buildPdfExportSettingsPayload(pdfExportFormState))
     });
-    return normalizeOfficeSettings(saved);
+    return normalizePdfExportSettings(saved);
   }
 
   async function persistAllDirtyChanges() {
@@ -375,10 +375,10 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setSavedFormState(savedSettings);
     }
 
-    if (hasDirtyOfficeSettings) {
-      const savedOffice = await persistOfficeSettings();
-      setOfficeFormState(savedOffice);
-      setSavedOfficeFormState(savedOffice);
+    if (hasDirtyPdfExportSettings) {
+      const savedPdfExport = await persistPdfExportSettings();
+      setPdfExportFormState(savedPdfExport);
+      setSavedPdfExportFormState(savedPdfExport);
     }
 
     if (hasDirtyIngestionSettings) {
@@ -427,7 +427,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     saveOcrSettings,
     applyOcrProfile,
     updateOcrSettings,
-    saveOfficeSettings,
+    savePdfExportSettings,
     restoreBalancedDefaults: resetActions.restoreBalancedDefaults,
     requestAppDataReset: resetActions.requestAppDataReset,
     persistAllDirtyChanges

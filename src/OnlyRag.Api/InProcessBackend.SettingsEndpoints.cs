@@ -199,39 +199,39 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
 
-        app.MapGet("/api/settings/office-conversion", async (
-            OfficeConversionSettingsStore settings,
+        app.MapGet("/api/settings/pdf-export", async (
+            PdfExportSettingsStore settings,
             CancellationToken cancellationToken) =>
             Results.Ok(await settings.GetAsync(cancellationToken)));
 
         app.MapGet("/api/ocr/languages", () => Results.Ok(OcrLanguages.All));
 
-        app.MapPut("/api/settings/office-conversion", async (
-            OfficeConversionSettings request,
-            OfficeConversionSettingsStore settings,
+        app.MapPut("/api/settings/pdf-export", async (
+            PdfExportSettings request,
+            PdfExportSettingsStore settings,
             CancellationToken cancellationToken) =>
         {
             try
             {
                 return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
             }
-            catch (OfficeConversionException ex)
+            catch (PdfExportConversionException ex)
             {
-                return MapOfficeConversionException(ex);
+                return MapPdfExportConversionException(ex);
             }
         });
 
-        app.MapGet("/api/office-converter/status", async (
-            IOfficeConversionService converter,
-            OfficeConversionSettingsStore settings,
+        app.MapGet("/api/pdf-export/status", async (
+            IPdfExportConverter converter,
+            PdfExportSettingsStore settings,
             CancellationToken cancellationToken) =>
-            Results.Ok(await BuildOfficeConverterStatusAsync(converter, settings, cancellationToken)));
+            Results.Ok(await BuildPdfExportConverterStatusAsync(converter, settings, cancellationToken)));
 
-        app.MapPost("/api/office-converter/test", async (
-            IOfficeConversionService converter,
-            OfficeConversionSettingsStore settings,
+        app.MapPost("/api/pdf-export/test", async (
+            IPdfExportConverter converter,
+            PdfExportSettingsStore settings,
             CancellationToken cancellationToken) =>
-            Results.Ok(await BuildOfficeConverterStatusAsync(converter, settings, cancellationToken)));
+            Results.Ok(await BuildPdfExportConverterStatusAsync(converter, settings, cancellationToken)));
 
         app.MapGet("/api/ollama/status", async (
             IOllamaClient ollamaClient,

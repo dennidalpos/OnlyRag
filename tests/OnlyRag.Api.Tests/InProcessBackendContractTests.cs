@@ -165,12 +165,12 @@ public sealed partial class InProcessBackendTests
 
         AssertTypeScriptContractMatchesDto<OllamaSettings>(apiSource, "OllamaSettings");
         AssertTypeScriptContractMatchesDto<OllamaModelDetails>(apiSource, "OllamaModelDetails");
-        AssertTypeScriptContractMatchesDto<OfficeConversionSettings>(apiSource, "OfficeConversionSettings");
+        AssertTypeScriptContractMatchesDto<PdfExportSettings>(apiSource, "PdfExportSettings");
         AssertTypeScriptContractMatchesDto<IngestionSettings>(apiSource, "IngestionSettings");
         AssertTypeScriptContractMatchesDto<OcrProcessingSettings>(apiSource, "OcrProcessingSettings");
         AssertTypeScriptContractMatchesDto<PerformanceSettings>(apiSource, "PerformanceSettings");
         AssertTypeScriptContractMatchesDto<OcrSettings>(apiSource, "OcrSettings");
-        AssertTypeScriptContractMatchesDto<OfficeConverterStatusResponse>(apiSource, "OfficeConverterStatusResponse");
+        AssertTypeScriptContractMatchesDto<PdfExportConverterStatusResponse>(apiSource, "PdfExportConverterStatusResponse");
         AssertTypeScriptContractMatchesDto<OllamaStatusResponse>(apiSource, "OllamaStatusResponse");
         AssertTypeScriptContractMatchesDto<OllamaModelSummary>(apiSource, "OllamaModel");
         AssertTypeScriptContractMatchesDto<OllamaModelsResponse>(apiSource, "OllamaModelsResponse");

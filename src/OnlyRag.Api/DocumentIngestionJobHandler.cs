@@ -85,21 +85,6 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
                 await TryQueueEmbeddingAsync(document.Id, queue, cancellationToken);
             }
         }
-        catch (OfficeConversionUnavailableException ex)
-        {
-            BackendLog.WriteException(descriptor.StoragePaths, job.Id, $"Office conversion unavailable for document {document.Id}.", ex);
-            await documents.SetStatusAsync(document.Id, DocumentStatus.RequiresAdditionalComponent, job.Id, ex.Message, cancellationToken);
-            await queue.FailAsync(job.Id, ex.Message, retryable: false, cancellationToken);
-        }
-        catch (OfficeConversionException ex)
-        {
-            BackendLog.WriteException(descriptor.StoragePaths, job.Id, $"Office conversion failed for document {document.Id}.", ex);
-            string message = UserFacingErrorText.FromExternalDetail(
-                ex.Message,
-                "Conversione Office non completata. Dettagli tecnici disponibili nei log locali.");
-            await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
-            await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
-        }
         catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException or NotSupportedException)
         {
             string message = UserFacingErrorText.FromExternalDetail(

@@ -17,9 +17,9 @@ describe("SettingsSection", () => {
   it("saves trusted non-local Ollama settings and reports success", async () => {
     const onDataChanged = vi.fn(async () => {});
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -110,8 +110,8 @@ describe("SettingsSection", () => {
 
   it("keeps settings usable when diagnostics are unavailable", async () => {
     mockApi([
-      { path: "/api/settings/office-conversion", status: 500, response: { detail: "Office non disponibile." } },
-      { path: "/api/office-converter/status", status: 500, response: { detail: "Office non disponibile." } },
+      { path: "/api/settings/pdf-export", status: 500, response: { detail: "Export PDF non disponibile." } },
+      { path: "/api/pdf-export/status", status: 500, response: { detail: "Export PDF non disponibile." } },
       { path: "/api/settings/performance", response: createPerformanceSettings() },
       { path: "/api/settings/ingestion", response: { chunkSizeTokens: 800, overlapTokens: 120 } },
       {
@@ -166,14 +166,14 @@ describe("SettingsSection", () => {
     );
 
     expect(await screen.findByText("Dati diagnostici non disponibili.")).toBeInTheDocument();
-    expect(await screen.findByText("Office non disponibile.")).toBeInTheDocument();
+    expect(await screen.findByText("Export PDF non disponibile.")).toBeInTheDocument();
   });
 
   it("shows a repair action when the OCR runtime is damaged", async () => {
     mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -265,9 +265,9 @@ describe("SettingsSection", () => {
 
   it("renders bounded settings sections and saves a performance preset", async () => {
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -385,7 +385,7 @@ describe("SettingsSection", () => {
     fireEvent.change(screen.getByRole("slider", { name: /Dimensione chunk/ }), { target: { value: "850" } });
     expect(screen.getByRole("button", { name: "Salva ingestione" })).toBeEnabled();
 
-    fireEvent.change(screen.getByRole("slider", { name: /Timeout conversione/ }), { target: { value: "130" } });
+    fireEvent.change(screen.getByRole("slider", { name: /Timeout export/ }), { target: { value: "130" } });
     expect(screen.getByRole("button", { name: "Salva" })).toBeEnabled();
 
     fireEvent.click(screen.getByLabelText("Orientamento righe testo"));
@@ -413,9 +413,9 @@ describe("SettingsSection", () => {
 
   it("preserves the selected OCR device when applying a profile preset", async () => {
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,

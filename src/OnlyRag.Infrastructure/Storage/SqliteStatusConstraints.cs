@@ -68,7 +68,7 @@ internal static class SqliteStatusConstraints
         if (invalidStatusGroups.Count > 0)
         {
             throw new InvalidOperationException(
-                "Database SQLite contiene valori status non validi. Correggere gli status prima della migrazione: "
+                "Database SQLite contiene valori status non validi: "
                 + string.Join("; ", invalidStatusGroups));
         }
     }

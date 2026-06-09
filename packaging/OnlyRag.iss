@@ -184,7 +184,7 @@ begin
     BulletLine('Install', 'Download and install the official Microsoft Edge WebView2 Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/') + #13#10 +
     BulletLine('Verify', 'Open Settings > Apps and confirm Microsoft Edge WebView2 Runtime is listed, or check for msedgewebview2.exe under Program Files\Microsoft\EdgeWebView\Application') + #13#10 + #13#10 +
     ParagraphLine('After installing WebView2, run this {#AppName} setup again.') + #13#10 + #13#10 +
-    ParagraphLine('The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama and LibreOffice remain user-confirmed external/manual installs.');
+    ParagraphLine('The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama remains a user-confirmed external/manual install. LibreOffice is optional for translation PDF export. Image generation requires a local Automatic1111 or ComfyUI provider configured after install.');
 end;
 
 function FindNvidiaSmiPath(): String;
@@ -213,6 +213,12 @@ begin
     Result :=
       BulletLine('NVIDIA OCR', 'NVIDIA management tools were not detected. OCR provisioning will use the CPU runtime unless a compatible NVIDIA driver is installed later.');
   end;
+end;
+
+function ImageGenerationMemo(): String;
+begin
+  Result :=
+    BulletLine('Image generation', 'Automatic1111 and ComfyUI are optional external providers. Start Automatic1111 with --api on http://127.0.0.1:7860 or ComfyUI on http://127.0.0.1:8188, then verify them from OnlyRag Images.');
 end;
 
 function IsSupportedWindowsVersion(): Boolean;
@@ -275,5 +281,5 @@ begin
   if MemoTasksInfo <> '' then
     Result := Result + MemoTasksInfo + NewLine + NewLine;
 
-  Result := Result + 'Optional feature dependencies:' + NewLine + NvidiaGpuOcrMemo();
+  Result := Result + 'Optional feature dependencies:' + NewLine + NvidiaGpuOcrMemo() + NewLine + ImageGenerationMemo();
 end;

@@ -228,7 +228,7 @@ public sealed partial class InProcessBackendTests
         SeededTranslation seeded = await CreateCompletedTranslationAsync(tempDescriptor, "pdf-source.docx");
         LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
         SqliteTranslationRepository translationRepository = new(connectionFactory);
-        FakePdfOfficeConverter converter = new(tempDescriptor.Descriptor.StoragePaths.TempDirectory);
+        FakePdfExportConverter converter = new(tempDescriptor.Descriptor.StoragePaths.TempDirectory);
         TranslationExportService service = new(tempDescriptor.Descriptor, translationRepository, converter);
 
         TranslationExportResponse? exported = await service.ExportAsync(
@@ -251,24 +251,24 @@ public sealed partial class InProcessBackendTests
             Path.Combine(tempDescriptor.Descriptor.StoragePaths.TempDirectory, "translation-export")));
     }
 
-    private sealed class FakePdfOfficeConverter : IOfficeConversionService
+    private sealed class FakePdfExportConverter : IPdfExportConverter
     {
         private readonly string tempRoot;
 
-        public FakePdfOfficeConverter(string tempRoot)
+        public FakePdfExportConverter(string tempRoot)
         {
             this.tempRoot = tempRoot;
         }
 
         public string? LastSourcePath { get; private set; }
 
-        public Task<OfficeConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
+        public Task<PdfExportConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new OfficeConverterAvailability(true, "fake-soffice.exe", "Fake converter available.", null));
+            return Task.FromResult(new PdfExportConverterAvailability(true, "fake-soffice.exe", "Fake converter available.", null));
         }
 
-        public async Task<OfficeConversionResult> ConvertToPdfAsync(
-            OfficeConversionRequest request,
+        public async Task<PdfExportConversionResult> ConvertToPdfAsync(
+            PdfExportConversionRequest request,
             CancellationToken cancellationToken = default)
         {
             LastSourcePath = request.SourcePath;
@@ -276,7 +276,7 @@ public sealed partial class InProcessBackendTests
             Directory.CreateDirectory(directory);
             string pdfPath = Path.Combine(directory, "export.pdf");
             await File.WriteAllBytesAsync(pdfPath, Encoding.ASCII.GetBytes("%PDF-1.4 fake"), cancellationToken);
-            return new OfficeConversionResult(pdfPath, directory);
+            return new PdfExportConversionResult(pdfPath, directory);
         }
     }
 }

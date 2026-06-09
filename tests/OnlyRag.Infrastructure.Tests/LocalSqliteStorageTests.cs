@@ -17,8 +17,8 @@ public sealed partial class LocalSqliteStorageTests
         StorageStatusResponse status = await storage.InitializeAsync();
 
         Assert.True(File.Exists(tempStorage.Paths.DatabasePath));
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.TargetSchemaVersion);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.TargetSchemaVersion);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal("Current", status.MigrationStatus);
         Assert.True(status.Fts5Available || status.TechnicalNote is not null);
         if (status.Fts5Available || status.TechnicalNote?.Contains("FTS4", StringComparison.OrdinalIgnoreCase) == true)
@@ -41,13 +41,8 @@ public sealed partial class LocalSqliteStorageTests
         await storage.InitializeAsync();
         await storage.InitializeAsync();
 
-        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version = $version;";
-        command.Parameters.AddWithValue("$version", LocalSqliteMigrator.TargetSchemaVersion);
-        object? count = await command.ExecuteScalarAsync();
-
-        Assert.Equal(1L, count);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
+        Assert.False(await tempStorage.TableExistsAsync("schema_migrations"));
     }
 
     [Fact]
@@ -58,8 +53,9 @@ public sealed partial class LocalSqliteStorageTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
-        Assert.Equal(1L, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", LocalSqliteMigrator.TargetSchemaVersion));
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
+        Assert.False(await tempStorage.TableExistsAsync("schema_migrations"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
         Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
@@ -71,133 +67,52 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task InitializeAsync_MigratesVersion8SchemaAndCreatesBackup()
+    public async Task InitializeAsync_ResetsIncompatibleVersionedSchemaAndDeletesDataRootContents()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion8SchemaAsync(tempStorage);
+        Directory.CreateDirectory(tempStorage.Paths.LogsDirectory);
+        string staleLogPath = Path.Combine(tempStorage.Paths.LogsDirectory, "stale.log");
+        await File.WriteAllTextAsync(staleLogPath, "old data");
 
         LocalSqliteStorageService storage = tempStorage.CreateStorageService();
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
         Assert.Equal("Current", status.MigrationStatus);
-        Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
-        Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
-        Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
-        Assert.True(await tempStorage.ColumnExistsAsync("chunk_vector_index_status", "qdrant_collection"));
-        Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
-        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
-        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
-
-        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
-        await using (SqliteConnection backupConnection = new($"Data Source={backupPath};Mode=ReadOnly;Pooling=False"))
-        {
-            await backupConnection.OpenAsync();
-            await using SqliteCommand backupCommand = backupConnection.CreateCommand();
-            backupCommand.CommandText = "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
-            Assert.Equal(8, Convert.ToInt32(await backupCommand.ExecuteScalarAsync()));
-        }
+        Assert.False(File.Exists(staleLogPath));
+        Assert.True(await tempStorage.TableExistsAsync("documents"));
+        Assert.False(await tempStorage.TableExistsAsync("schema_migrations"));
     }
 
     [Fact]
-    public async Task InitializeAsync_RepairsCurrentSchemaMissingVersion9ColumnsAndCreatesBackup()
+    public async Task InitializeAsync_ResetsPreexistingUnversionedSchema()
     {
         using TempStorage tempStorage = TempStorage.Create();
-        await CreateVersion12SchemaMissingVersion9ColumnsAsync(tempStorage);
+        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE obsolete_data (id INTEGER PRIMARY KEY);";
+            await command.ExecuteNonQueryAsync();
+        }
 
         LocalSqliteStorageService storage = tempStorage.CreateStorageService();
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal("Current", status.MigrationStatus);
-        Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
-        Assert.True(await tempStorage.ColumnExistsAsync("documents", "current_job_id"));
-        Assert.True(await tempStorage.ColumnExistsAsync("chunks", "content_hash"));
-        Assert.True(await tempStorage.ColumnExistsAsync("chunk_vector_index_status", "qdrant_collection"));
-        Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
-        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
-        Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
-
-        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
-        await using SqliteConnection backupConnection = new($"Data Source={backupPath};Mode=ReadOnly;Pooling=False");
-        await backupConnection.OpenAsync();
-        await using SqliteCommand backupCommand = backupConnection.CreateCommand();
-        backupCommand.CommandText = "PRAGMA table_info(translation_units);";
-        bool backupHadLayoutMetadata = false;
-        await using SqliteDataReader reader = await backupCommand.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            backupHadLayoutMetadata |= string.Equals(reader.GetString(1), "layout_metadata_json", StringComparison.OrdinalIgnoreCase);
-        }
-
-        Assert.False(backupHadLayoutMetadata);
+        Assert.True(await tempStorage.TableExistsAsync("documents"));
+        Assert.False(await tempStorage.TableExistsAsync("obsolete_data"));
     }
 
-    [Fact]
-    public async Task InitializeAsync_CreatesBackupBeforeFailedSupportedMigration()
+    private static async Task<int> ReadUserVersionAsync(TempStorage tempStorage)
     {
-        using TempStorage tempStorage = TempStorage.Create();
-        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
-        {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText =
-                """
-                CREATE TABLE schema_migrations (
-                    version INTEGER PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    applied_at_utc TEXT NOT NULL
-                );
-
-                INSERT INTO schema_migrations(version, name, applied_at_utc)
-                VALUES (8, '008_incomplete_fixture', '2026-05-12T00:00:00.000Z');
-                """;
-            await command.ExecuteNonQueryAsync();
-        }
-
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-
-        await Assert.ThrowsAsync<SqliteException>(() => storage.InitializeAsync());
-
-        string backupPath = Assert.Single(Directory.GetFiles(tempStorage.BackupDirectory, "*.db"));
-        Assert.True(File.Exists(backupPath));
-        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 8));
-    }
-
-    [Fact]
-    public async Task InitializeAsync_RejectsExistingDuplicateDocumentHashesBeforeUniqueIndex()
-    {
-        using TempStorage tempStorage = TempStorage.Create();
-        await CreateVersion10SchemaWithDuplicateDocumentHashesAsync(tempStorage);
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.InitializeAsync());
-
-        Assert.Contains("documenti duplicati", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("duplicate-sha", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.False(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
-        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 10));
-    }
-
-    [Fact]
-    public async Task InitializeAsync_RejectsPreexistingUnversionedSchema()
-    {
-        using TempStorage tempStorage = TempStorage.Create();
-        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
-        {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE legacy_data (id INTEGER PRIMARY KEY);";
-            await command.ExecuteNonQueryAsync();
-        }
-
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.InitializeAsync());
-
-        Assert.Contains("non esegue migrazioni dati", ex.Message, StringComparison.OrdinalIgnoreCase);
+        await using SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync();
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        return Convert.ToInt32(await command.ExecuteScalarAsync());
     }
 
     [Fact]

@@ -39,7 +39,7 @@ export type OllamaRunningModel = {
   contextLength: number | null;
 };
 
-export type OfficeConversionSettings = {
+export type PdfExportSettings = {
   libreOfficePath: string | null;
   conversionTimeoutSeconds: number;
 };
@@ -94,7 +94,7 @@ export type OcrAutoGpuEnableResponse = {
   settings: OcrSettings;
 };
 
-export type OfficeConverterStatusResponse = {
+export type PdfExportConverterStatusResponse = {
   state: string;
   isAvailable: boolean;
   executablePath: string | null;

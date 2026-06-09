@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace OnlyRag.Infrastructure.Storage;
 
-public sealed partial class LocalSqliteMigrator
+public sealed partial class LocalSqliteSchemaInitializer
 {
     private static string BuildFreshSchemaSql(SqliteTextSearchBackend textSearchBackend)
     {
@@ -220,8 +220,7 @@ public sealed partial class LocalSqliteMigrator
             ON ocr_cache(page_hash, engine_name, engine_version, language, preprocess_version);
             {{ftsSql}}
 
-            INSERT INTO schema_migrations(version, name, applied_at_utc)
-            VALUES (15, '{{InitialSchemaName}}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            PRAGMA user_version = 1;
             """;
     }
 

@@ -3,7 +3,7 @@ import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { IngestionSettingsPanel } from "./settings/IngestionSettingsPanel";
 import { ModelManagementPanel } from "./settings/ModelManagementPanel";
 import { OcrRuntimeSettingsPanel } from "./settings/OcrRuntimeSettingsPanel";
-import { OfficeConversionPanel } from "./settings/OfficeConversionPanel";
+import { PdfExportPanel } from "./settings/PdfExportPanel";
 import { OllamaConnectionPanel } from "./settings/OllamaConnectionPanel";
 import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
 import { PerformanceSettingsPanel } from "./settings/PerformanceSettingsPanel";
@@ -45,7 +45,12 @@ export function SettingsSectionPanels() {
           <h3 id="settings-ingestion-title">Ingestione</h3>
           <div className="settings-section__grid">
             <IngestionSettingsPanel />
-            <OfficeConversionPanel />
+          </div>
+        </section>
+        <section className="settings-section" aria-labelledby="settings-export-title">
+          <h3 id="settings-export-title">Export</h3>
+          <div className="settings-section__grid">
+            <PdfExportPanel />
           </div>
         </section>
         <section className="settings-section" aria-labelledby="settings-diagnostics-title">

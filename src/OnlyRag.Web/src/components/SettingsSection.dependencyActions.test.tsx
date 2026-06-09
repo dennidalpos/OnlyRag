@@ -17,9 +17,9 @@ describe("SettingsSection dependency actions", () => {
   it("allows cancelling a running OCR runtime configuration", async () => {
     let ocrStatusReads = 0;
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -110,9 +110,9 @@ describe("SettingsSection dependency actions", () => {
 
   it("uses automatic OCR provisioning from a single Settings action", async () => {
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -223,9 +223,9 @@ describe("SettingsSection dependency actions", () => {
 
   it("renders cached diagnostics while Settings refreshes fresh diagnostics", async () => {
     mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,
@@ -297,9 +297,9 @@ describe("SettingsSection dependency actions", () => {
   it("requests app data reset only after explicit UI confirmation", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,

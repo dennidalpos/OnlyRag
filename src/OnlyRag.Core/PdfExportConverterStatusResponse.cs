@@ -1,6 +1,6 @@
 namespace OnlyRag.Core;
 
-public sealed record OfficeConverterStatusResponse(
+public sealed record PdfExportConverterStatusResponse(
     string State,
     bool IsAvailable,
     string? ExecutablePath,

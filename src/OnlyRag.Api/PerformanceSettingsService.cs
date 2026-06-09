@@ -40,9 +40,9 @@ internal sealed class PerformanceSettingsService : IPerformanceSettingsService
 
     public async Task<PerformanceSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        bool legacyLowResource = await ReadBoolAsync(EnableLowResourceModeKey, cancellationToken);
+        bool lowResourceMode = await ReadBoolAsync(EnableLowResourceModeKey, cancellationToken);
         string profile = NormalizeProfile(await settingsRepository.GetValueAsync(ProfileKey, cancellationToken));
-        if (legacyLowResource && profile == PerformanceProfileNames.Auto)
+        if (lowResourceMode && profile == PerformanceProfileNames.Auto)
         {
             profile = PerformanceProfileNames.Eco;
         }
@@ -54,7 +54,7 @@ internal sealed class PerformanceSettingsService : IPerformanceSettingsService
             await ReadIntAsync(TranslationBatchSizeKey, DefaultTranslationBatchSize, MinParallelism, MaxTranslationBatchSize, cancellationToken),
             await ReadIntAsync(MaxContextChunksKey, DefaultMaxContextChunks, MinMaxContextChunks, MaxMaxContextChunks, cancellationToken),
             await ReadIntAsync(RequestTimeoutSecondsKey, DefaultRequestTimeoutSeconds, 5, 600, cancellationToken),
-            legacyLowResource,
+            lowResourceMode,
             profile);
 
         return await ApplyProfileAsync(stored, cancellationToken);

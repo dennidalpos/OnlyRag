@@ -104,8 +104,8 @@ public sealed partial class OcrPipelineTests
         {
             string root = Path.Combine(Path.GetTempPath(), "OnlyRag.Ocr.Tests", Guid.NewGuid().ToString("N"));
             TempStorage storage = new(root);
-            LocalSqliteMigrator migrator = new(storage.Descriptor, storage.ConnectionFactory);
-            LocalSqliteStorageService service = new(storage.Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(storage.Descriptor, storage.ConnectionFactory);
+            LocalSqliteStorageService service = new(storage.Descriptor, initializer);
             await service.InitializeAsync();
             return storage;
         }

@@ -1,6 +1,6 @@
 import type {
   IngestionSettings,
-  OfficeConversionSettings,
+  PdfExportSettings,
   OcrProcessingSettings,
   OcrSettings,
   OllamaSettings,
@@ -8,7 +8,7 @@ import type {
 } from "../api";
 import {
   areIngestionSettingsEqual,
-  areOfficeSettingsEqual,
+  arePdfExportSettingsEqual,
   areOcrProcessingSettingsEqual,
   areOcrSettingsEqual,
   areOllamaSettingsEqual,
@@ -18,8 +18,8 @@ import {
 type SettingsDirtyStateParams = {
   formState: OllamaSettings;
   savedFormState: OllamaSettings;
-  officeFormState: OfficeConversionSettings;
-  savedOfficeFormState: OfficeConversionSettings;
+  pdfExportFormState: PdfExportSettings;
+  savedPdfExportFormState: PdfExportSettings;
   performanceFormState: PerformanceSettings;
   savedPerformanceFormState: PerformanceSettings;
   ingestionFormState: IngestionSettings;
@@ -33,8 +33,8 @@ type SettingsDirtyStateParams = {
 export function useSettingsDirtyState({
   formState,
   savedFormState,
-  officeFormState,
-  savedOfficeFormState,
+  pdfExportFormState,
+  savedPdfExportFormState,
   performanceFormState,
   savedPerformanceFormState,
   ingestionFormState,
@@ -45,7 +45,7 @@ export function useSettingsDirtyState({
   savedOcrFormState
 }: SettingsDirtyStateParams) {
   const hasDirtyOllamaSettings = !areOllamaSettingsEqual(formState, savedFormState);
-  const hasDirtyOfficeSettings = !areOfficeSettingsEqual(officeFormState, savedOfficeFormState);
+  const hasDirtyPdfExportSettings = !arePdfExportSettingsEqual(pdfExportFormState, savedPdfExportFormState);
   const hasDirtyPerformanceSettings = !arePerformanceSettingsEqual(performanceFormState, savedPerformanceFormState);
   const hasDirtyIngestionSettings = !areIngestionSettingsEqual(ingestionFormState, savedIngestionFormState);
   const hasDirtyOcrProcessingSettings = !areOcrProcessingSettingsEqual(
@@ -55,7 +55,7 @@ export function useSettingsDirtyState({
   const hasDirtyOcrSettings = !areOcrSettingsEqual(ocrFormState, savedOcrFormState);
   const hasPendingChanges =
     hasDirtyOllamaSettings ||
-    hasDirtyOfficeSettings ||
+    hasDirtyPdfExportSettings ||
     hasDirtyPerformanceSettings ||
     hasDirtyIngestionSettings ||
     hasDirtyOcrProcessingSettings ||
@@ -63,7 +63,7 @@ export function useSettingsDirtyState({
 
   return {
     hasDirtyOllamaSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyPerformanceSettings,
     hasDirtyIngestionSettings,
     hasDirtyOcrProcessingSettings,

@@ -64,7 +64,7 @@ public static partial class InProcessBackend
             {
                 return CreateBadRequestProblem(
                     "Conferma richiesta",
-                    "L'apertura del download LibreOffice richiede una conferma esplicita dalla UI.",
+                    "L'apertura del download LibreOffice per export PDF richiede una conferma esplicita dalla UI.",
                     "confirmation_required");
             }
 
@@ -74,7 +74,7 @@ public static partial class InProcessBackend
             }
             catch (InvalidOperationException ex)
             {
-                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open LibreOffice download failed.", ex);
+                BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open LibreOffice PDF export download failed.", ex);
                 return CreateUnexpectedErrorProblem("Download LibreOffice non aperto", httpContext.TraceIdentifier);
             }
         });

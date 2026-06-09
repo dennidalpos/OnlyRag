@@ -6,8 +6,7 @@ calls for retrieval-augmented chat.
 ## Ingestion
 
 Supported import formats documented by the current app are TXT, Markdown, CSV, PDF, DOCX, XLSX,
-PPTX, and image files. Legacy `.doc`, `.xls`, and `.ppt` files require optional LibreOffice
-conversion before extraction.
+PPTX, and image files. Binary Office formats such as `.doc`, `.xls`, and `.ppt` are not imported.
 
 The ingestion layer lives under [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion).
 Document records, chunks, pages, job state, and indexing metadata are stored in SQLite through

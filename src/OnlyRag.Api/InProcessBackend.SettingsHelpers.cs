@@ -7,14 +7,14 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static async Task<OfficeConverterStatusResponse> BuildOfficeConverterStatusAsync(
-        IOfficeConversionService converter,
-        OfficeConversionSettingsStore settings,
+    private static async Task<PdfExportConverterStatusResponse> BuildPdfExportConverterStatusAsync(
+        IPdfExportConverter converter,
+        PdfExportSettingsStore settings,
         CancellationToken cancellationToken)
     {
-        OfficeConversionSettings currentSettings = await settings.GetAsync(cancellationToken);
-        OfficeConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
-        return CreateOfficeConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds);
+        PdfExportSettings currentSettings = await settings.GetAsync(cancellationToken);
+        PdfExportConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
+        return CreatePdfExportConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds);
     }
 
     private static async Task<IResult> DeleteOllamaModelAsync(

@@ -1,6 +1,6 @@
 import type {
   IngestionSettings,
-  OfficeConversionSettings,
+  PdfExportSettings,
   OcrProcessingSettings,
   OcrSettings,
   OllamaSettings,
@@ -23,7 +23,7 @@ export const emptySettings: OllamaSettings = {
 
 export const OLLAMA_MODEL_LIBRARY_URL = "https://ollama.com/library";
 
-export const emptyOfficeSettings: OfficeConversionSettings = {
+export const emptyPdfExportSettings: PdfExportSettings = {
   libreOfficePath: null,
   conversionTimeoutSeconds: 120
 };

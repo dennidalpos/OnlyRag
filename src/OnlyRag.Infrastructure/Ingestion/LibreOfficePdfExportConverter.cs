@@ -4,7 +4,7 @@ using OnlyRag.Infrastructure.Storage;
 
 namespace OnlyRag.Infrastructure.Ingestion;
 
-public sealed class LibreOfficeConversionService : IOfficeConversionService
+public sealed class LibreOfficePdfExportConverter : IPdfExportConverter
 {
     private static readonly string[] CandidateExecutablePaths =
     [
@@ -13,26 +13,26 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
     ];
 
     private readonly LocalSqliteStoreDescriptor descriptor;
-    private readonly OfficeConversionSettingsStore settingsStore;
+    private readonly PdfExportSettingsStore settingsStore;
 
-    public LibreOfficeConversionService(
+    public LibreOfficePdfExportConverter(
         LocalSqliteStoreDescriptor descriptor,
-        OfficeConversionSettingsStore settingsStore)
+        PdfExportSettingsStore settingsStore)
     {
         this.descriptor = descriptor;
         this.settingsStore = settingsStore;
     }
 
-    public async Task<OfficeConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
+    public async Task<PdfExportConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
     {
-        OnlyRag.Core.OfficeConversionSettings settings = await settingsStore.GetAsync(cancellationToken);
+        OnlyRag.Core.PdfExportSettings settings = await settingsStore.GetAsync(cancellationToken);
         string? configuredPath = ResolveConfiguredExecutable(settings.LibreOfficePath);
         if (!string.IsNullOrWhiteSpace(settings.LibreOfficePath) && configuredPath is null)
         {
-            return new OfficeConverterAvailability(
+            return new PdfExportConverterAvailability(
                 false,
                 null,
-                "LibreOffice non trovato nel path configurato.",
+                "LibreOffice non trovato nel path configurato per export PDF.",
                 "Imposta il path di soffice.exe oppure lascia vuoto per usare il rilevamento automatico.");
         }
 
@@ -42,34 +42,34 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
             ?? ResolvePathExecutable();
 
         return executable is null
-            ? new OfficeConverterAvailability(
+            ? new PdfExportConverterAvailability(
                 false,
                 null,
-                "Convertitore Office legacy non disponibile.",
-                "Installa LibreOffice per Windows oppure configura il path di soffice.exe in Impostazioni.")
-            : new OfficeConverterAvailability(
+                "Convertitore PDF non disponibile.",
+                "Installa LibreOffice per Windows oppure configura il path di soffice.exe in Impostazioni per abilitare l'export PDF.")
+            : new PdfExportConverterAvailability(
                 true,
                 executable,
                 "LibreOffice rilevato.",
                 null);
     }
 
-    public async Task<OfficeConversionResult> ConvertToPdfAsync(
-        OfficeConversionRequest request,
+    public async Task<PdfExportConversionResult> ConvertToPdfAsync(
+        PdfExportConversionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        OfficeConverterAvailability availability = await CheckAvailabilityAsync(cancellationToken);
+        PdfExportConverterAvailability availability = await CheckAvailabilityAsync(cancellationToken);
         if (!availability.IsAvailable || string.IsNullOrWhiteSpace(availability.ExecutablePath))
         {
-            throw new OfficeConversionUnavailableException(
+            throw new PdfExportConversionUnavailableException(
                 availability.Suggestion ?? availability.Message);
         }
 
-        OnlyRag.Core.OfficeConversionSettings settings = await settingsStore.GetAsync(cancellationToken);
-        int timeoutSeconds = OfficeConversionSettingsStore.ValidateTimeoutSeconds(settings.ConversionTimeoutSeconds);
-        string tempRoot = Path.Combine(descriptor.Paths.TempDirectory, "office-conversion");
+        OnlyRag.Core.PdfExportSettings settings = await settingsStore.GetAsync(cancellationToken);
+        int timeoutSeconds = PdfExportSettingsStore.ValidateTimeoutSeconds(settings.ConversionTimeoutSeconds);
+        string tempRoot = Path.Combine(descriptor.Paths.TempDirectory, "pdf-export");
         string workDirectory = Path.Combine(tempRoot, $"{request.DocumentId}-{Guid.NewGuid():N}");
 
         try
@@ -93,10 +93,10 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
 
             if (pdfPath is null || !File.Exists(pdfPath))
             {
-                throw new OfficeConversionException("LibreOffice non ha prodotto un PDF per il documento Office.");
+                throw new PdfExportConversionException("LibreOffice non ha prodotto un PDF per l'export.");
             }
 
-            return new OfficeConversionResult(pdfPath, workDirectory);
+            return new PdfExportConversionResult(pdfPath, workDirectory);
         }
         catch
         {
@@ -112,8 +112,8 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        string trustedExecutablePath = OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(executablePath)
-            ?? throw new OfficeConversionException("Percorso LibreOffice non valido: usa soffice.exe.");
+        string trustedExecutablePath = PdfExportSettingsStore.TryResolveLibreOfficeExecutable(executablePath)
+            ?? throw new PdfExportConversionException("Percorso LibreOffice non valido: usa soffice.exe.");
         using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -160,7 +160,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         {
             if (!process.Start())
             {
-                throw new OfficeConversionException("Impossibile avviare LibreOffice.");
+                throw new PdfExportConversionException("Impossibile avviare LibreOffice.");
             }
 
             process.BeginOutputReadLine();
@@ -170,7 +170,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             TryKill(process);
-            throw new OfficeConversionException($"Timeout conversione Office dopo {timeout.TotalSeconds:0} secondi.");
+            throw new PdfExportConversionException($"Timeout export PDF dopo {timeout.TotalSeconds:0} secondi.");
         }
         catch (OperationCanceledException)
         {
@@ -181,7 +181,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
         if (process.ExitCode != 0)
         {
             string details = output.ToString().Trim();
-            throw new OfficeConversionException(
+            throw new PdfExportConversionException(
                 details.Length == 0
                     ? $"LibreOffice ha terminato con exit code {process.ExitCode}."
                     : $"LibreOffice ha terminato con exit code {process.ExitCode}: {details}");
@@ -195,12 +195,12 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
             return null;
         }
 
-        return OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(configuredPath);
+        return PdfExportSettingsStore.TryResolveLibreOfficeExecutable(configuredPath);
     }
 
     private static string? ResolveEnvironmentExecutable()
     {
-        return OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(Environment.GetEnvironmentVariable("ONLYRAG_LIBREOFFICE_PATH"));
+        return PdfExportSettingsStore.TryResolveLibreOfficeExecutable(Environment.GetEnvironmentVariable("ONLYRAG_LIBREOFFICE_PATH"));
     }
 
     private static string? ResolveKnownInstallExecutable()
@@ -218,7 +218,7 @@ public sealed class LibreOfficeConversionService : IOfficeConversionService
 
         foreach (string directory in pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            string? candidate = OfficeConversionSettingsStore.TryResolveLibreOfficeExecutable(
+            string? candidate = PdfExportSettingsStore.TryResolveLibreOfficeExecutable(
                 Path.Combine(directory.Trim(), "soffice.exe"));
             if (candidate is not null)
             {

@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import {
   apiRequest,
   type IngestionSettings,
-  type OfficeConversionSettings,
+  type PdfExportSettings,
   type OcrProcessingSettings,
   type OcrSettings,
   type OllamaSettings,
@@ -13,13 +13,13 @@ import {
   buildIngestionSettingsPayload,
   buildOcrProcessingSettingsPayload,
   buildOcrSettingsPayload,
-  buildOfficeSettingsPayload,
+  buildPdfExportSettingsPayload,
   buildOllamaSettingsPayload,
   buildPerformanceSettingsPayload,
   normalizeIngestionSettings,
   normalizeOcrProcessingSettings,
   normalizeOcrSettings,
-  normalizeOfficeSettings,
+  normalizePdfExportSettings,
   normalizeOllamaSettings,
   normalizePerformanceSettings
 } from "./SettingsSection.helpers";
@@ -27,7 +27,7 @@ import {
   emptyIngestionSettings,
   emptyOcrProcessingSettings,
   emptyOcrSettings,
-  emptyOfficeSettings,
+  emptyPdfExportSettings,
   emptySettings,
   performanceProfilePresets
 } from "./SettingsSection.defaults";
@@ -36,8 +36,8 @@ type SettingsSectionResetActionParams = {
   onDataChanged: () => Promise<void>;
   setFormState: Dispatch<SetStateAction<OllamaSettings>>;
   setSavedFormState: Dispatch<SetStateAction<OllamaSettings>>;
-  setOfficeFormState: Dispatch<SetStateAction<OfficeConversionSettings>>;
-  setSavedOfficeFormState: Dispatch<SetStateAction<OfficeConversionSettings>>;
+  setPdfExportFormState: Dispatch<SetStateAction<PdfExportSettings>>;
+  setSavedPdfExportFormState: Dispatch<SetStateAction<PdfExportSettings>>;
   setPerformanceFormState: Dispatch<SetStateAction<PerformanceSettings>>;
   setSavedPerformanceFormState: Dispatch<SetStateAction<PerformanceSettings>>;
   setIngestionFormState: Dispatch<SetStateAction<IngestionSettings>>;
@@ -49,7 +49,7 @@ type SettingsSectionResetActionParams = {
   setInfoMessage: Dispatch<SetStateAction<string | null>>;
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
-  refreshOfficeConverter: () => Promise<void>;
+  refreshPdfExportConverter: () => Promise<void>;
   refreshDependencyStatus: () => Promise<void>;
 };
 
@@ -58,8 +58,8 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
     onDataChanged,
     setFormState,
     setSavedFormState,
-    setOfficeFormState,
-    setSavedOfficeFormState,
+    setPdfExportFormState,
+    setSavedPdfExportFormState,
     setPerformanceFormState,
     setSavedPerformanceFormState,
     setIngestionFormState,
@@ -71,7 +71,7 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
     setInfoMessage,
     setErrorMessage,
     setIsBusy,
-    refreshOfficeConverter,
+    refreshPdfExportConverter,
     refreshDependencyStatus
   } = params;
 
@@ -89,7 +89,7 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
       const [
         savedPerformance,
         savedOllama,
-        savedOffice,
+        savedPdfExport,
         savedIngestion,
         savedOcrProcessing,
         savedOcr
@@ -102,9 +102,9 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
           method: "PUT",
           body: JSON.stringify(buildOllamaSettingsPayload(emptySettings, defaultPerformance))
         }),
-        apiRequest<OfficeConversionSettings>("/api/settings/office-conversion", {
+        apiRequest<PdfExportSettings>("/api/settings/pdf-export", {
           method: "PUT",
-          body: JSON.stringify(buildOfficeSettingsPayload(emptyOfficeSettings))
+          body: JSON.stringify(buildPdfExportSettingsPayload(emptyPdfExportSettings))
         }),
         apiRequest<IngestionSettings>("/api/settings/ingestion", {
           method: "PUT",
@@ -122,7 +122,7 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
 
       const normalizedPerformance = normalizePerformanceSettings(savedPerformance);
       const normalizedOllama = normalizeOllamaSettings(savedOllama);
-      const normalizedOffice = normalizeOfficeSettings(savedOffice);
+      const normalizedPdfExport = normalizePdfExportSettings(savedPdfExport);
       const normalizedIngestion = normalizeIngestionSettings(savedIngestion);
       const normalizedOcrProcessing = normalizeOcrProcessingSettings(savedOcrProcessing);
       const normalizedOcr = normalizeOcrSettings(savedOcr);
@@ -131,8 +131,8 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
       setSavedPerformanceFormState(normalizedPerformance);
       setFormState(normalizedOllama);
       setSavedFormState(normalizedOllama);
-      setOfficeFormState(normalizedOffice);
-      setSavedOfficeFormState(normalizedOffice);
+      setPdfExportFormState(normalizedPdfExport);
+      setSavedPdfExportFormState(normalizedPdfExport);
       setIngestionFormState(normalizedIngestion);
       setSavedIngestionFormState(normalizedIngestion);
       setOcrProcessingFormState(normalizedOcrProcessing);
@@ -140,7 +140,7 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
       setOcrFormState(normalizedOcr);
       setSavedOcrFormState(normalizedOcr);
       setInfoMessage("Impostazioni iniziali bilanciate ripristinate. I dati locali non sono stati eliminati.");
-      await refreshOfficeConverter();
+      await refreshPdfExportConverter();
       await refreshDependencyStatus();
       await onDataChanged();
     } catch (error) {

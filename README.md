@@ -17,7 +17,6 @@ documents.
 ## Supported Capabilities
 
 - Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, and image files.
-- Convert legacy `.doc`, `.xls`, and `.ppt` files through optional LibreOffice.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
   are available.
 - Generate embeddings through a configured Ollama endpoint and store vectors in Qdrant.
@@ -25,7 +24,7 @@ documents.
 - Chat with selected documents and show grounded source snippets.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
-- Configure Ollama, Qdrant, OCR, Office conversion, ingestion, models, `num_ctx`, and performance
+- Configure Ollama, Qdrant, OCR, PDF export, ingestion, models, `num_ctx`, and performance
   from the desktop UI.
 - Track ingestion, embedding, OCR, translation, and Ollama model-install jobs.
 - Confirm app exit when local jobs or unsaved UI work exist.
@@ -44,9 +43,10 @@ Development machine:
 Optional development/runtime tools:
 
 - Ollama for model features.
-- LibreOffice for legacy Office conversion and PDF export.
+- LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for PaddleOCR provisioning. Python 3.14 is not supported by the pinned
   PaddlePaddle runtime.
+- Automatic1111 or ComfyUI for image generation.
 - Inno Setup 6 for installer generation.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed installers.
 
@@ -68,8 +68,9 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
 `Bootstrap-Prerequisites.ps1` verifies Windows, PowerShell, .NET, WebView2, Node/npm, optional
-Ollama, optional LibreOffice, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages, installs
-web dependencies, and prepares OCR when supported Python is available.
+Ollama, optional LibreOffice, optional Automatic1111/ComfyUI endpoints, creates
+`%LOCALAPPDATA%\OnlyRag`, restores .NET packages, installs web dependencies, and prepares OCR when
+supported Python is available.
 
 `Build-Web.ps1` creates `src\OnlyRag.Web\dist`, which the WPF shell uses when no Vite development
 server is configured.
@@ -152,8 +153,8 @@ Production release readiness requires all of these:
 - Installer is signed with `Sign-Release.ps1` or `Build-Installer.ps1 -SigningCertificateThumbprint`.
 - `Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle` passed on a clean representative
   Windows profile or verification machine.
-- Representative Ollama, OCR, LibreOffice, and Qdrant runtime behavior was checked for the target
-  deployment scope.
+- Representative Ollama, OCR, Qdrant, image generation provider endpoints, and translation PDF
+  export through LibreOffice runtime behavior were checked for the target deployment scope.
 
 An unsigned installer, or a signed installer without lifecycle evidence, is not production-ready.
 
@@ -165,8 +166,8 @@ Supported optional environment variables:
 
 - `ONLYRAG_WEB_DEV_SERVER`: Debug-only WebView2 source override. Must be a loopback `http` or
   `https` URL without embedded credentials.
-- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice is installed outside
-  standard Windows locations.
+- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice for translation PDF
+  export is installed outside standard Windows locations.
 
 User data:
 
@@ -204,8 +205,10 @@ commands recreate required ignored outputs.
 - OCR unavailable: install Python 3.10, 3.11, 3.12, or 3.13, then rerun bootstrap or use the OCR
   action in Settings.
 - Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
-- LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` for legacy
-  `.doc`, `.xls`, and `.ppt` ingestion.
+- Image generation unavailable: start Automatic1111 with `--api` on `http://127.0.0.1:7860` or
+  ComfyUI on `http://127.0.0.1:8188`, then verify provider status from Images.
+- LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` to enable
+  translation PDF export.
 
 ## Documentation
 
@@ -217,6 +220,7 @@ commands recreate required ignored outputs.
 - [Brand assets](docs/BRAND_ASSETS.md)
 - [RAG pipeline](docs/RAG_PIPELINE.md)
 - [OCR pipeline](docs/OCR_PIPELINE.md)
+- [Image generation](docs/IMAGE_GENERATION.md)
 - [Office ingestion](docs/OFFICE_INGESTION.md)
 - [Translation pipeline](docs/TRANSLATION_PIPELINE.md)
 - [Signing](docs/SIGNING.md)

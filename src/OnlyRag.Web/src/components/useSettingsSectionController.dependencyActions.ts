@@ -4,8 +4,8 @@ import {
   type DependencyActionResponse,
   type DiagnosticsResponse,
   type IngestionSettings,
-  type OfficeConversionSettings,
-  type OfficeConverterStatusResponse,
+  type PdfExportSettings,
+  type PdfExportConverterStatusResponse,
   type OcrLanguage,
   type OcrAutoGpuEnableResponse,
   type OcrProcessingSettings,
@@ -18,7 +18,7 @@ import {
 } from "../api";
 import {
   normalizeIngestionSettings,
-  normalizeOfficeSettings,
+  normalizePdfExportSettings,
   normalizeOcrProcessingSettings,
   normalizeOcrSettings,
   normalizePerformanceSettings
@@ -26,8 +26,8 @@ import {
 import { OLLAMA_MODEL_LIBRARY_URL } from "./SettingsSection.defaults";
 
 export type SettingsSectionDependencyActionParams = {
-  setOfficeFormState: Dispatch<SetStateAction<OfficeConversionSettings>>;
-  setSavedOfficeFormState: Dispatch<SetStateAction<OfficeConversionSettings>>;
+  setPdfExportFormState: Dispatch<SetStateAction<PdfExportSettings>>;
+  setSavedPdfExportFormState: Dispatch<SetStateAction<PdfExportSettings>>;
   setPerformanceFormState: Dispatch<SetStateAction<PerformanceSettings>>;
   setSavedPerformanceFormState: Dispatch<SetStateAction<PerformanceSettings>>;
   setIngestionFormState: Dispatch<SetStateAction<IngestionSettings>>;
@@ -37,7 +37,7 @@ export type SettingsSectionDependencyActionParams = {
   setOcrFormState: Dispatch<SetStateAction<OcrSettings>>;
   setSavedOcrFormState: Dispatch<SetStateAction<OcrSettings>>;
   setOcrLanguages: Dispatch<SetStateAction<OcrLanguage[]>>;
-  setOfficeStatus: Dispatch<SetStateAction<OfficeConverterStatusResponse | null>>;
+  setPdfExportStatus: Dispatch<SetStateAction<PdfExportConverterStatusResponse | null>>;
   setDiagnostics: Dispatch<SetStateAction<DiagnosticsResponse | null>>;
   setDiagnosticsStatus: Dispatch<SetStateAction<"loading" | "ready" | "unavailable">>;
   setOllamaInstallStatus: Dispatch<SetStateAction<OllamaInstallStatus | null>>;
@@ -49,8 +49,8 @@ export type SettingsSectionDependencyActionParams = {
 
 export function createSettingsSectionDependencyActions(params: SettingsSectionDependencyActionParams) {
   const {
-    setOfficeFormState,
-    setSavedOfficeFormState,
+    setPdfExportFormState,
+    setSavedPdfExportFormState,
     setPerformanceFormState,
     setSavedPerformanceFormState,
     setIngestionFormState,
@@ -60,7 +60,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     setOcrFormState,
     setSavedOcrFormState,
     setOcrLanguages,
-    setOfficeStatus,
+    setPdfExportStatus,
     setDiagnostics,
     setDiagnosticsStatus,
     setOllamaInstallStatus,
@@ -74,18 +74,18 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
     window.open(OLLAMA_MODEL_LIBRARY_URL, "_blank", "noopener,noreferrer");
   }
 
-  async function refreshOfficeConverter() {
+  async function refreshPdfExportConverter() {
     try {
-      const [officeSettings, converterStatus] = await Promise.all([
-        apiRequest<OfficeConversionSettings>("/api/settings/office-conversion"),
-        apiRequest<OfficeConverterStatusResponse>("/api/office-converter/status")
+      const [pdfExportSettings, converterStatus] = await Promise.all([
+        apiRequest<PdfExportSettings>("/api/settings/pdf-export"),
+        apiRequest<PdfExportConverterStatusResponse>("/api/pdf-export/status")
       ]);
-      const normalizedOfficeSettings = normalizeOfficeSettings(officeSettings);
-      setOfficeFormState(normalizedOfficeSettings);
-      setSavedOfficeFormState(normalizedOfficeSettings);
-      setOfficeStatus(converterStatus);
+      const normalizedPdfExportSettings = normalizePdfExportSettings(pdfExportSettings);
+      setPdfExportFormState(normalizedPdfExportSettings);
+      setSavedPdfExportFormState(normalizedPdfExportSettings);
+      setPdfExportStatus(converterStatus);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere il convertitore Office.");
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni export PDF.");
     }
   }
 
@@ -288,7 +288,7 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
 
   return {
     openOllamaModelLibrary,
-    refreshOfficeConverter,
+    refreshPdfExportConverter,
     refreshPerformanceSettings,
     refreshIngestionSettings,
     refreshOcrProcessingSettings,

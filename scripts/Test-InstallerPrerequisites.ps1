@@ -190,7 +190,7 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         ""
         New-OnlyRagInstallerParagraph "After installing WebView2, run this $AppName setup again."
         ""
-        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama and LibreOffice remain user-confirmed external/manual installs."
+        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama remains a user-confirmed external/manual install. LibreOffice is optional for translation PDF export. Image generation requires a local Automatic1111 or ComfyUI provider configured after install."
     ) -join [Environment]::NewLine
 
     return [pscustomobject]@{
@@ -215,6 +215,16 @@ function Get-OnlyRagNvidiaGpuOcrMemo {
         "- NVIDIA OCR: NVIDIA management tools were not detected. OCR provisioning will"
         "              use the CPU runtime unless a compatible NVIDIA driver is"
         "              installed later."
+    ) -join [Environment]::NewLine
+}
+
+function Get-OnlyRagImageGenerationMemo {
+    return @(
+        "- Image generation: Automatic1111 and ComfyUI are optional external"
+        "                    providers. Start Automatic1111 with --api on"
+        "                    http://127.0.0.1:7860 or ComfyUI on"
+        "                    http://127.0.0.1:8188, then verify them from"
+        "                    OnlyRag Images."
     ) -join [Environment]::NewLine
 }
 
@@ -272,6 +282,9 @@ if ($SelfTest) {
     Assert-InstallerMessageLayout -Message $missing.Message -Scenario "missing WebView2"
     Assert-Condition -Condition ($missing.Message -like "*OCR CPU/NVIDIA*") -Message "Expected WebView2 message to mention OCR NVIDIA."
     Assert-Condition -Condition ($missing.Message -like "*provisioning manifests*") -Message "Expected WebView2 message to mention provisioning manifests."
+    foreach ($expected in @("Image", "generation", "Automatic1111", "ComfyUI")) {
+        Assert-Condition -Condition ($missing.Message -like "*$expected*") -Message "Expected WebView2 message to mention image generation '$expected'."
+    }
 
     $nvidiaPresentMemo = Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent $true
     Assert-Condition -Condition ($nvidiaPresentMemo -like "*NVIDIA management tools were detected*") -Message "Expected NVIDIA-present memo."
@@ -280,6 +293,12 @@ if ($SelfTest) {
     $nvidiaMissingMemo = Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent $false
     Assert-Condition -Condition ($nvidiaMissingMemo -like "*CPU runtime*") -Message "Expected NVIDIA-missing CPU fallback memo."
     Assert-InstallerMessageLayout -Message $nvidiaMissingMemo -Scenario "NVIDIA missing memo"
+
+    $imageGenerationMemo = Get-OnlyRagImageGenerationMemo
+    foreach ($expected in @("Automatic1111", "ComfyUI", "--api", "127.0.0.1:7860", "127.0.0.1:8188")) {
+        Assert-Condition -Condition ($imageGenerationMemo -like "*$expected*") -Message "Expected image generation memo to contain '$expected'."
+    }
+    Assert-InstallerMessageLayout -Message $imageGenerationMemo -Scenario "image generation memo"
 
     $unsupportedWindows = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $false -WebView2Present $true
     Assert-Condition -Condition (-not $unsupportedWindows.CanInstall) -Message "Expected simulated unsupported Windows to block setup."
@@ -319,6 +338,7 @@ $status = Get-OnlyRagInstallerPrerequisiteStatus -WindowsSupported $windowsSuppo
 if ($status.CanInstall) {
     Write-Host $status.Message -ForegroundColor Green
     Write-Host (Get-OnlyRagNvidiaGpuOcrMemo -NvidiaToolsPresent (Test-OnlyRagNvidiaManagementTools)) -ForegroundColor Cyan
+    Write-Host (Get-OnlyRagImageGenerationMemo) -ForegroundColor Cyan
     exit 0
 }
 

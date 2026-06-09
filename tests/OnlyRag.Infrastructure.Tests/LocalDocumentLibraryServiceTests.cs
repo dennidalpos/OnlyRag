@@ -212,8 +212,8 @@ public sealed class LocalDocumentLibraryServiceTests
         public async Task<LocalDocumentLibraryService> CreateLibraryAsync()
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
-            LocalSqliteMigrator migrator = new(Descriptor, connectionFactory);
-            LocalSqliteStorageService storage = new(Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(Descriptor, connectionFactory);
+            LocalSqliteStorageService storage = new(Descriptor, initializer);
             await storage.InitializeAsync();
             return new LocalDocumentLibraryService(
                 Descriptor,

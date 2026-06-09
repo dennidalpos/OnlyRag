@@ -81,13 +81,13 @@ public static partial class InProcessBackend
         };
     }
 
-    private static IResult MapOfficeConversionException(OfficeConversionException _)
+    private static IResult MapPdfExportConversionException(PdfExportConversionException _)
     {
         return CreateProblem(
-            "Configurazione convertitore Office non valida",
-            "La configurazione del convertitore Office non e valida. Controlla il percorso e i permessi nelle impostazioni.",
+            "Configurazione export PDF non valida",
+            "La configurazione dell'export PDF non e valida. Controlla il percorso LibreOffice e i permessi nelle impostazioni.",
             StatusCodes.Status400BadRequest,
-            "office_conversion_invalid_configuration");
+            "pdf_export_invalid_configuration");
     }
 
     private static IResult MapImageGenerationException(
@@ -209,11 +209,11 @@ public static partial class InProcessBackend
             : $"Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali con riferimento {correlationId}.";
     }
 
-    private static OfficeConverterStatusResponse CreateOfficeConverterStatusResponse(
-        OfficeConverterAvailability availability,
+    private static PdfExportConverterStatusResponse CreatePdfExportConverterStatusResponse(
+        PdfExportConverterAvailability availability,
         int timeoutSeconds)
     {
-        return new OfficeConverterStatusResponse(
+        return new PdfExportConverterStatusResponse(
             availability.IsAvailable ? "Available" : "RequiresAdditionalComponent",
             availability.IsAvailable,
             availability.ExecutablePath,

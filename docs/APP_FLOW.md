@@ -8,21 +8,21 @@ flowchart TD
     A["User launches OnlyRag.App.exe"] --> B["WPF shell starts"]
     B --> C["Windows/WebView2 prerequisites checked"]
     C --> D["%LOCALAPPDATA%\\OnlyRag paths prepared"]
-    D --> E["SQLite migrated and persistent jobs recovered"]
+    D --> E["SQLite schema initialized and persistent jobs recovered"]
     E --> F["In-process backend starts on dynamic loopback port"]
     F --> G["WebView2 loads React UI from Vite dev server or bundled static assets"]
     G --> H["Backend bridge injects base URL and session token"]
     H --> I["Initial polling: app, diagnostics, settings, dependencies, OCR languages, Qdrant, Ollama"]
     I --> J["User works in Chat, Documents, Jobs, Translation, Settings"]
 
-    J --> K["Settings: configure Ollama, Qdrant, OCR, Office, models, ingestion, performance, reset"]
+    J --> K["Settings: configure Ollama, Qdrant, OCR, PDF export, models, ingestion, performance, reset"]
     K --> L["External tools: Ollama, Qdrant, PaddleOCR Python, LibreOffice, official download pages"]
 
     J --> M["Documents: import files with OCR policy and document language"]
     M --> N["Validate upload limits, storage quota, file names, dedupe hash, local copy"]
     N --> O["Create document row and enqueue document-ingestion job"]
     O --> P["Worker extracts TXT/MD/CSV/OpenXML/PDF/image content"]
-    P --> Q["Optional LibreOffice conversion and optional PaddleOCR with cache/retry/timeout"]
+    P --> Q["Optional PaddleOCR with cache/retry/timeout"]
     Q --> R["Persist pages, chunks, OCR status, preview/pipeline state in SQLite"]
     R --> S["If embedding model exists, enqueue document-embedding"]
     S --> T["Ollama embeds chunks; Qdrant stores vectors by model/vector shape"]
@@ -49,16 +49,16 @@ flowchart TD
 ## Startup
 
 The WPF app validates Windows and WebView2, prepares app directories, starts the backend,
-migrates SQLite, recovers local job state, initializes WebView2, and loads either bundled static
+initializes the current SQLite schema, recovers local job state, initializes WebView2, and loads either bundled static
 web assets or the loopback Vite development server in Debug builds. Non-loopback or
 credential-bearing `ONLYRAG_WEB_DEV_SERVER` URLs are ignored.
 
 ## Initial Setup
 
-The UI exposes dependency status and setup actions for Ollama, Qdrant, OCR, and LibreOffice. The
-app opens official install pages for manual external installs where appropriate. OCR provisioning
-uses repository runtime manifests and local Python when available. Qdrant settings distinguish
-the bundled local runtime from trusted remote endpoints.
+The UI exposes dependency status and setup actions for Ollama, Qdrant, OCR, and LibreOffice for
+PDF export. The app opens official install pages for manual external installs where appropriate.
+OCR provisioning uses repository runtime manifests and local Python when available. Qdrant
+settings distinguish the bundled local runtime from trusted remote endpoints.
 
 ## Workflows
 

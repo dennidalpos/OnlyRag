@@ -16,8 +16,9 @@ Required for development:
 Optional by feature:
 
 - Ollama for chat, embeddings, and translation.
-- LibreOffice for legacy Office conversion and PDF export.
+- LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for OCR provisioning.
+- Automatic1111 or ComfyUI for image generation.
 - Inno Setup 6 for installer builds.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed release
   candidates.
@@ -29,16 +30,19 @@ pwsh .\scripts\Bootstrap-Prerequisites.ps1
 ```
 
 Bootstrap verifies host prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
-installs frontend dependencies, checks optional Ollama/LibreOffice availability, and prepares OCR
-when supported Python is available. It does not build, package, sign, install, or release.
+installs frontend dependencies, checks optional Ollama/LibreOffice/image generation availability,
+and prepares OCR when supported Python is available. LibreOffice is checked only for translation PDF
+export, and image generation checks only probe local Automatic1111/ComfyUI endpoints. It does not
+build, package, sign, install, or release.
 
 Use these options only when intentionally narrowing setup:
 
 - `-SkipNode`: skip Node/npm checks and frontend dependency install.
 - `-SkipOcr`: skip OCR provisioning.
 - `-SkipOllamaCheck`: skip Ollama CLI and endpoint checks.
+- `-SkipImageGenerationCheck`: skip Automatic1111 and ComfyUI endpoint checks.
 - `-NonInteractive`: avoid prompts and system-level installer actions.
-- `-LibreOfficePath <path>`: check a specific `soffice.exe`.
+- `-LibreOfficePath <path>`: check a specific `soffice.exe` for PDF export.
 
 ## Develop And Start
 
@@ -165,7 +169,8 @@ Before publishing an installer:
    ```
 
 Production release readiness requires package gate success, a valid signed installer, lifecycle
-evidence, and representative checks for the target OCR/Ollama/LibreOffice/Qdrant runtime scope.
+evidence, and representative checks for the target OCR/Ollama/Qdrant/image generation runtime scope
+plus translation PDF export through LibreOffice.
 
 ## Runtime Configuration
 
@@ -175,8 +180,8 @@ Optional environment variables:
 
 - `ONLYRAG_WEB_DEV_SERVER`: Debug-only WebView2 source override. Only loopback `http` or `https`
   URLs without embedded credentials are accepted.
-- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice is outside standard
-  Windows install locations.
+- `ONLYRAG_LIBREOFFICE_PATH`: full path to `soffice.exe` when LibreOffice for translation PDF
+  export is outside standard Windows install locations.
 
 ## Local Paths
 
@@ -219,4 +224,7 @@ revert tracked source changes.
 - OCR provisioning skipped or unavailable: install Python 3.10, 3.11, 3.12, or 3.13, then rerun
   bootstrap or use the OCR action in Settings.
 - Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
-- LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH`.
+- Image generation unavailable: start Automatic1111 with `--api` on `http://127.0.0.1:7860` or
+  ComfyUI on `http://127.0.0.1:8188`, then verify provider status from Images.
+- LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` to enable
+  translation PDF export.

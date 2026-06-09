@@ -11,7 +11,6 @@ public sealed partial class DocumentIngestionService : IDocumentIngestionService
     private readonly ISettingsRepository settings;
     private readonly DocumentTextChunker chunker;
     private readonly OfficeOpenXmlTextExtractor officeExtractor;
-    private readonly IOfficeConversionService officeConversion;
     private readonly IOcrEngine ocrEngine;
     private readonly IOcrCacheRepository? ocrCache;
     private readonly OcrRetryPolicy ocrRetryPolicy;
@@ -29,7 +28,6 @@ public sealed partial class DocumentIngestionService : IDocumentIngestionService
         IOcrCacheRepository? ocrCache = null,
         OcrRetryPolicy? ocrRetryPolicy = null,
         LocalSqliteStoreDescriptor? descriptor = null,
-        IOfficeConversionService? officeConversion = null,
         OcrSettingsStore? ocrSettingsStore = null,
         IngestionSettingsStore? ingestionSettingsStore = null,
         OcrProcessingSettingsStore? ocrProcessingSettingsStore = null)
@@ -38,7 +36,6 @@ public sealed partial class DocumentIngestionService : IDocumentIngestionService
         this.settings = settings;
         this.chunker = chunker;
         this.officeExtractor = officeExtractor;
-        this.officeConversion = officeConversion ?? new UnavailableOfficeConversionService();
         this.ocrEngine = ocrEngine ?? new UnavailableOcrEngine();
         this.ocrCache = ocrCache;
         this.ocrRetryPolicy = ocrRetryPolicy ?? new OcrRetryPolicy();
@@ -74,7 +71,6 @@ public sealed partial class DocumentIngestionService : IDocumentIngestionService
             ".pdf" => await IngestPdfAsync(document, checkpoint, options, saveProgressAsync, forceOcr, ocrLanguage, cancellationToken),
             ".png" or ".jpg" or ".jpeg" or ".tif" or ".tiff" or ".bmp" or ".gif" or ".webp" => await IngestImageAsync(document, checkpoint, options, saveProgressAsync, forceOcr, ocrLanguage, cancellationToken),
             ".docx" or ".xlsx" or ".pptx" => await IngestOfficeOpenXmlAsync(document, checkpoint, options, extension, saveProgressAsync, cancellationToken),
-            ".doc" or ".xls" or ".ppt" => await IngestOfficeThroughPdfAsync(document, checkpoint, options, extension, saveProgressAsync, cancellationToken),
             _ => throw new InvalidOperationException($"Formato documento non supportato per ingestion iniziale: {extension}.")
         };
     }

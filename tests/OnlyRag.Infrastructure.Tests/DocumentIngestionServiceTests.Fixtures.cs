@@ -43,20 +43,19 @@ public sealed partial class DocumentIngestionServiceTests
         {
             string root = Path.Combine(Path.GetTempPath(), "OnlyRag.Ingestion.Tests", Guid.NewGuid().ToString("N"));
             TempStorage storage = new(root);
-            LocalSqliteMigrator migrator = new(storage.Descriptor, storage.ConnectionFactory);
-            LocalSqliteStorageService service = new(storage.Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(storage.Descriptor, storage.ConnectionFactory);
+            LocalSqliteStorageService service = new(storage.Descriptor, initializer);
             await service.InitializeAsync();
             return storage;
         }
 
-        public DocumentIngestionService CreateIngestionService(IOfficeConversionService? officeConverter = null)
+        public DocumentIngestionService CreateIngestionService()
         {
             return new DocumentIngestionService(
                 Documents,
                 Settings,
                 new DocumentTextChunker(),
-                new OfficeOpenXmlTextExtractor(),
-                officeConversion: officeConverter);
+                new OfficeOpenXmlTextExtractor());
         }
 
         public async Task<ImportedDocument> CreateDocumentAsync(string fileName, string content)
@@ -209,58 +208,6 @@ public sealed partial class DocumentIngestionServiceTests
         builder.Append("trailer\n<< /Size ").Append(objects.Length + 1).Append(" /Root 1 0 R >>\n")
             .Append("startxref\n").Append(xrefOffset).Append("\n%%EOF\n");
         return Encoding.ASCII.GetBytes(builder.ToString());
-    }
-
-    private sealed class FakeOfficeConverter : IOfficeConversionService
-    {
-        private readonly string root;
-        private readonly byte[] pdfBytes;
-
-        public FakeOfficeConverter(string root, byte[] pdfBytes)
-        {
-            this.root = root;
-            this.pdfBytes = pdfBytes;
-        }
-
-        public string? LastTemporaryDirectory { get; private set; }
-
-        public Task<OfficeConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new OfficeConverterAvailability(true, "fake-soffice.exe", "Fake converter available.", null));
-        }
-
-        public async Task<OfficeConversionResult> ConvertToPdfAsync(
-            OfficeConversionRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            LastTemporaryDirectory = Path.Combine(root, "temp", "office-conversion", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(LastTemporaryDirectory);
-            string pdfPath = Path.Combine(LastTemporaryDirectory, Path.ChangeExtension(request.OriginalFileName, ".pdf"));
-            await File.WriteAllBytesAsync(pdfPath, pdfBytes, cancellationToken);
-            return new OfficeConversionResult(pdfPath, LastTemporaryDirectory);
-        }
-    }
-
-    private sealed class ThrowingOfficeConverter : IOfficeConversionService
-    {
-        private readonly Exception exception;
-
-        public ThrowingOfficeConverter(Exception exception)
-        {
-            this.exception = exception;
-        }
-
-        public Task<OfficeConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new OfficeConverterAvailability(true, "fake-soffice.exe", "Fake converter available.", null));
-        }
-
-        public Task<OfficeConversionResult> ConvertToPdfAsync(
-            OfficeConversionRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromException<OfficeConversionResult>(exception);
-        }
     }
 
     private static byte[] CreateDocxFixture()

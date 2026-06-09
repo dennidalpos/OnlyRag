@@ -171,8 +171,8 @@ public sealed class SqliteLocalJobQueueTests
         public async Task<SqliteLocalJobQueue> CreateInitializedQueueAsync()
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
-            LocalSqliteMigrator migrator = new(Descriptor, connectionFactory);
-            LocalSqliteStorageService storage = new(Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(Descriptor, connectionFactory);
+            LocalSqliteStorageService storage = new(Descriptor, initializer);
             await storage.InitializeAsync();
             return CreateQueue();
         }

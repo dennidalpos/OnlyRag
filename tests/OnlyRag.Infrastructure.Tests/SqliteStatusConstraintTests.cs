@@ -83,24 +83,29 @@ public sealed class SqliteStatusConstraintTests
     }
 
     [Fact]
-    public async Task InitializeAsync_RejectsExistingInvalidStatusesBeforeStatusConstraintMigration()
+    public async Task InitializeAsync_ResetsExistingVersionedSchemaWithInvalidStatuses()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion11SchemaWithInvalidStatusesAsync(tempStorage);
         LocalSqliteStorageService storage = tempStorage.CreateStorageService();
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.InitializeAsync());
+        StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Contains("status non validi", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("jobs.status='NotAStatus'", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("translations.status='NotAStatus'", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("translation_units.status='NotAStatus'", ex.Message, StringComparison.Ordinal);
-        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", 11));
+        Assert.Equal("Current", status.MigrationStatus);
+        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
+            tempStorage,
+            """
+            INSERT INTO jobs (
+                id, type, status, created_at_utc, updated_at_utc
+            )
+            VALUES (
+                'job-invalid-after-reset', 'test', 'NotAStatus', '2026-05-22T00:00:00.000Z', '2026-05-22T00:00:00.000Z'
+            );
+            """));
     }
 
     [Fact]
-    public async Task InitializeAsync_MigratesVersion11SchemaAndRejectsFutureInvalidStatuses()
+    public async Task InitializeAsync_ResetsExistingVersionedSchemaWithValidStatuses()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion11SchemaWithValidStatusesAsync(tempStorage);
@@ -108,17 +113,9 @@ public sealed class SqliteStatusConstraintTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal(LocalSqliteMigrator.TargetSchemaVersion, status.CurrentSchemaVersion);
-        Assert.Equal(1, await CountRowsAsync(tempStorage, "schema_migrations", "version = $value", LocalSqliteMigrator.TargetSchemaVersion));
-        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
-            tempStorage,
-            "UPDATE jobs SET status = 'NotAStatus' WHERE id = 'job-valid';"));
-        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
-            tempStorage,
-            "UPDATE translations SET status = 'NotAStatus' WHERE id = 1;"));
-        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
-            tempStorage,
-            "UPDATE translation_units SET status = 'NotAStatus' WHERE id = 1;"));
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal(0, await CountRowsAsync(tempStorage, "jobs", "1 = $value", 1));
     }
 
     private sealed class TempStorage : IDisposable
@@ -145,8 +142,8 @@ public sealed class SqliteStatusConstraintTests
         public LocalSqliteStorageService CreateStorageService()
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
-            LocalSqliteMigrator migrator = new(Descriptor, connectionFactory);
-            return new LocalSqliteStorageService(Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(Descriptor, connectionFactory);
+            return new LocalSqliteStorageService(Descriptor, initializer);
         }
 
         public LocalSqliteConnectionFactory CreateConnectionFactory()

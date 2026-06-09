@@ -26,13 +26,7 @@ public sealed partial class DocumentIngestionService
         }
         catch (Exception ex) when (ex is OpenXmlPackageException or FileFormatException or InvalidDataException or IOException)
         {
-            return await IngestOfficeThroughPdfAsync(
-                document,
-                checkpoint with { Mode = $"{extension}-fallback" },
-                options,
-                extension,
-                saveProgressAsync,
-                cancellationToken);
+            throw new InvalidOperationException($"{DescribeOfficeFormat(extension)} non leggibile o non valido.", ex);
         }
 
         int totalUnits = units.Count;
@@ -84,84 +78,6 @@ public sealed partial class DocumentIngestionService
         return new DocumentIngestionResult(totalUnits, chunkCount);
     }
 
-    private async Task<DocumentIngestionResult> IngestOfficeThroughPdfAsync(
-        ImportedDocument document,
-        DocumentIngestionCheckpoint checkpoint,
-        DocumentIngestionOptions options,
-        string extension,
-        Func<DocumentIngestionProgress, CancellationToken, Task> saveProgressAsync,
-        CancellationToken cancellationToken)
-    {
-        if (!File.Exists(document.OriginalPath))
-        {
-            throw new FileNotFoundException("File originale documento non trovato.", document.OriginalPath);
-        }
-
-        await saveProgressAsync(
-            new DocumentIngestionProgress(
-                Math.Max(1, CalculateProgress(Math.Max(0, checkpoint.NextBlock - 1), Math.Max(1, checkpoint.PageCount))),
-                $"Conversione {DescribeOfficeFormat(extension)} richiesta",
-                checkpoint with { Mode = $"{extension}-conversion" }),
-            cancellationToken);
-
-        OfficeConversionResult? conversion = null;
-        try
-        {
-            conversion = await officeConversion.ConvertToPdfAsync(
-                new OfficeConversionRequest(
-                    document.Id,
-                    document.OriginalPath,
-                    document.OriginalFileName,
-                    extension),
-                cancellationToken);
-
-            ImportedDocument convertedDocument = document with
-            {
-                OriginalFileName = Path.ChangeExtension(document.OriginalFileName, ".pdf"),
-                OriginalPath = conversion.PdfPath,
-                MimeType = "application/pdf",
-                FileExtension = ".pdf"
-            };
-
-            return await IngestPdfAsync(
-                convertedDocument,
-                checkpoint with { Mode = $"{extension}-pdf" },
-                options,
-                saveProgressAsync,
-                forceOcr: false,
-                ocrLanguage: null,
-                cancellationToken);
-        }
-        catch (OfficeConversionUnavailableException)
-        {
-            throw;
-        }
-        catch (OfficeConversionException)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            throw new OfficeConversionException(
-                $"Conversione {DescribeOfficeFormat(extension)} non riuscita: {ex.Message}",
-                ex);
-        }
-        finally
-        {
-            if (conversion is not null && Directory.Exists(conversion.TemporaryDirectory))
-            {
-                try
-                {
-                    Directory.Delete(conversion.TemporaryDirectory, recursive: true);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Il job ha gia prodotto un risultato; il cleanup residuo verra ritentato al prossimo avvio o manualmente.
-                }
-            }
-        }
-    }
-
     private static string DescribeOfficeFormat(string extension)
     {
         return extension.ToLowerInvariant() switch
@@ -169,9 +85,6 @@ public sealed partial class DocumentIngestionService
             ".docx" => "DOCX",
             ".xlsx" => "XLSX",
             ".pptx" => "PPTX",
-            ".doc" => "DOC legacy",
-            ".xls" => "XLS legacy",
-            ".ppt" => "PPT legacy",
             _ => "Office Open XML"
         };
     }

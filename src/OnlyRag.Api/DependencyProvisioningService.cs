@@ -76,7 +76,7 @@ public sealed partial class DependencyProvisioningService
             throw new InvalidOperationException(errorMessage ?? "Impossibile aprire la pagina di download LibreOffice.");
         }
 
-        return new DependencyActionResponse(true, "Pagina download LibreOffice aperta.");
+        return new DependencyActionResponse(true, "Pagina download LibreOffice per export PDF aperta.");
     }
 
     internal static string? ResolveExecutable(string executableName)

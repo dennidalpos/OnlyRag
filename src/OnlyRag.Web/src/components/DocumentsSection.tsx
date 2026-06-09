@@ -112,7 +112,7 @@ export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
           hidden
           multiple
           type="file"
-          accept=".txt,.md,.markdown,.csv,.pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.docx,.xlsx,.pptx,.doc,.xls,.ppt"
+          accept=".txt,.md,.markdown,.csv,.pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.docx,.xlsx,.pptx"
           onChange={handleInputChange}
         />
       </div>

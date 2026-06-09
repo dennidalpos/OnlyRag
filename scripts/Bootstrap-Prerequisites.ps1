@@ -4,6 +4,7 @@ param(
     [switch]$SkipNode,
     [switch]$SkipOcr,
     [switch]$SkipOllamaCheck,
+    [switch]$SkipImageGenerationCheck,
     [switch]$NonInteractive,
     [string]$LibreOfficePath
 )
@@ -224,13 +225,48 @@ else {
     }
 }
 
-$libreOfficeExe = Get-LibreOfficeExecutable -RequestedPath $LibreOfficePath
-if ($libreOfficeExe) {
-    Add-Verified "LibreOffice converter detected: $libreOfficeExe."
+if ($SkipImageGenerationCheck) {
+    Write-Result -Status "SKIP" -Message "Image generation provider checks skipped by -SkipImageGenerationCheck."
 }
 else {
-    Add-Warning "LibreOffice was not found. Legacy Office ingestion remains optional and manual."
-    Add-Manual "Install LibreOffice for Windows or set ONLYRAG_LIBREOFFICE_PATH for .doc, .xls, and .ppt ingestion."
+    $imageProviders = @(
+        [pscustomobject]@{
+            Name = "Automatic1111"
+            Uri = "http://127.0.0.1:7860/sdapi/v1/sd-models"
+            Manual = "Install and start Automatic1111 with --api enabled, then verify http://127.0.0.1:7860 from the Images section."
+        },
+        [pscustomobject]@{
+            Name = "ComfyUI"
+            Uri = "http://127.0.0.1:8188/system_stats"
+            Manual = "Install and start ComfyUI, then verify http://127.0.0.1:8188 from the Images section."
+        }
+    )
+
+    foreach ($provider in $imageProviders) {
+        try {
+            $imageProviderResponse = Invoke-WebRequest -Uri $provider.Uri -UseBasicParsing -TimeoutSec 5
+            if ($imageProviderResponse.StatusCode -ge 200 -and $imageProviderResponse.StatusCode -lt 300) {
+                Add-Verified "$($provider.Name) image generation endpoint reachable at $($provider.Uri)."
+            }
+            else {
+                Add-Warning "$($provider.Name) image generation endpoint returned HTTP $($imageProviderResponse.StatusCode) at $($provider.Uri)."
+                Add-Manual $provider.Manual
+            }
+        }
+        catch {
+            Add-Warning "$($provider.Name) image generation endpoint was not reachable at $($provider.Uri)."
+            Add-Manual $provider.Manual
+        }
+    }
+}
+
+$libreOfficeExe = Get-LibreOfficeExecutable -RequestedPath $LibreOfficePath
+if ($libreOfficeExe) {
+    Add-Verified "LibreOffice PDF export converter detected: $libreOfficeExe."
+}
+else {
+    Add-Warning "LibreOffice was not found. Translation PDF export remains optional and manual."
+    Add-Manual "Install LibreOffice for Windows or set ONLYRAG_LIBREOFFICE_PATH to enable translation PDF export."
 }
 
 try {

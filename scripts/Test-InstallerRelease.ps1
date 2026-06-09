@@ -124,6 +124,33 @@ function Test-PathExpectation {
     }
 }
 
+function Test-OptionalImageGenerationProvider {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Id,
+
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter(Mandatory)]
+        [string]$Uri,
+
+        [Parameter(Mandatory)]
+        [string]$UnavailableMessage
+    )
+
+    try {
+        $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 5
+        Add-Check -Id $Id -Status "pass" -Message "$Name image generation endpoint reachable." -Data @{
+            uri = $Uri
+            statusCode = $response.StatusCode
+        }
+    }
+    catch {
+        Add-Check -Id $Id -Status "warn" -Message $UnavailableMessage -Data @{ uri = $Uri }
+    }
+}
+
 function Test-InstallerSignature {
     param(
         [Parameter(Mandatory)]
@@ -169,7 +196,7 @@ function Test-OptionalComponents {
         Add-Check -Id "optional-libreoffice" -Status "pass" -Message "LibreOffice found." -Data @{ path = $libreOffice }
     }
     else {
-        Add-Check -Id "optional-libreoffice" -Status "warn" -Message "LibreOffice not found; legacy Office conversion should remain optional."
+        Add-Check -Id "optional-libreoffice" -Status "warn" -Message "LibreOffice not found; translation PDF export should remain optional."
     }
 
     try {
@@ -179,6 +206,18 @@ function Test-OptionalComponents {
     catch {
         Add-Check -Id "optional-ollama" -Status "warn" -Message "Ollama endpoint not reachable; model features should remain configurable."
     }
+
+    Test-OptionalImageGenerationProvider `
+        -Id "optional-image-automatic1111" `
+        -Name "Automatic1111" `
+        -Uri "http://127.0.0.1:7860/sdapi/v1/sd-models" `
+        -UnavailableMessage "Automatic1111 endpoint not reachable; image generation should remain configurable."
+
+    Test-OptionalImageGenerationProvider `
+        -Id "optional-image-comfyui" `
+        -Name "ComfyUI" `
+        -Uri "http://127.0.0.1:8188/system_stats" `
+        -UnavailableMessage "ComfyUI endpoint not reachable; image generation should remain configurable."
 }
 
 function Test-AppLaunch {

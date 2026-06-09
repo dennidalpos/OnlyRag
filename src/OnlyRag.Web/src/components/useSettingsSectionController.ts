@@ -4,8 +4,8 @@ import {
   type DiagnosticsResponse,
   type IngestionSettings,
   type LocalJob,
-  type OfficeConversionSettings,
-  type OfficeConverterStatusResponse,
+  type PdfExportSettings,
+  type PdfExportConverterStatusResponse,
   type OcrLanguage,
   type OcrProcessingSettings,
   type OcrProvisionStatus,
@@ -28,7 +28,7 @@ import {
   emptyIngestionSettings,
   emptyOcrProcessingSettings,
   emptyOcrSettings,
-  emptyOfficeSettings,
+  emptyPdfExportSettings,
   emptyPerformanceSettings,
   emptySettings
 } from "./SettingsSection.defaults";
@@ -55,8 +55,8 @@ export function useSettingsSectionController({
 }: SettingsSectionProps) {
   const [formState, setFormState] = useState<OllamaSettings>(emptySettings);
   const [savedFormState, setSavedFormState] = useState<OllamaSettings>(emptySettings);
-  const [officeFormState, setOfficeFormState] = useState<OfficeConversionSettings>(emptyOfficeSettings);
-  const [savedOfficeFormState, setSavedOfficeFormState] = useState<OfficeConversionSettings>(emptyOfficeSettings);
+  const [pdfExportFormState, setPdfExportFormState] = useState<PdfExportSettings>(emptyPdfExportSettings);
+  const [savedPdfExportFormState, setSavedPdfExportFormState] = useState<PdfExportSettings>(emptyPdfExportSettings);
   const [performanceFormState, setPerformanceFormState] = useState<PerformanceSettings>(emptyPerformanceSettings);
   const [savedPerformanceFormState, setSavedPerformanceFormState] =
     useState<PerformanceSettings>(emptyPerformanceSettings);
@@ -69,7 +69,7 @@ export function useSettingsSectionController({
   const [ocrFormState, setOcrFormState] = useState<OcrSettings>(emptyOcrSettings);
   const [savedOcrFormState, setSavedOcrFormState] = useState<OcrSettings>(emptyOcrSettings);
   const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>([]);
-  const [officeStatus, setOfficeStatus] = useState<OfficeConverterStatusResponse | null>(null);
+  const [pdfExportStatus, setPdfExportStatus] = useState<PdfExportConverterStatusResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(initialDiagnostics);
   const [diagnosticsStatus, setDiagnosticsStatus] = useState<"loading" | "ready" | "unavailable">(
     initialDiagnostics ? "ready" : "loading"
@@ -117,7 +117,7 @@ export function useSettingsSectionController({
   }, [initialDiagnostics]);
 
   useEffect(() => {
-    void actions.refreshOfficeConverter();
+    void actions.refreshPdfExportConverter();
     void actions.refreshPerformanceSettings();
     void actions.refreshIngestionSettings();
     void actions.refreshOcrProcessingSettings();
@@ -159,7 +159,7 @@ export function useSettingsSectionController({
   );
   const {
     hasDirtyOllamaSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyPerformanceSettings,
     hasDirtyIngestionSettings,
     hasDirtyOcrProcessingSettings,
@@ -168,8 +168,8 @@ export function useSettingsSectionController({
   } = useSettingsDirtyState({
     formState,
     savedFormState,
-    officeFormState,
-    savedOfficeFormState,
+    pdfExportFormState,
+    savedPdfExportFormState,
     performanceFormState,
     savedPerformanceFormState,
     ingestionFormState,
@@ -184,21 +184,21 @@ export function useSettingsSectionController({
     onDataChanged,
     modelToInstall,
     formState,
-    officeFormState,
+    pdfExportFormState,
     performanceFormState,
     ingestionFormState,
     ocrProcessingFormState,
     ocrFormState,
     hasDirtyPerformanceSettings,
     hasDirtyOllamaSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyIngestionSettings,
     hasDirtyOcrProcessingSettings,
     hasDirtyOcrSettings,
     setFormState,
     setSavedFormState,
-    setOfficeFormState,
-    setSavedOfficeFormState,
+    setPdfExportFormState,
+    setSavedPdfExportFormState,
     setPerformanceFormState,
     setSavedPerformanceFormState,
     setIngestionFormState,
@@ -208,7 +208,7 @@ export function useSettingsSectionController({
     setOcrFormState,
     setSavedOcrFormState,
     setOcrLanguages,
-    setOfficeStatus,
+    setPdfExportStatus,
     setDiagnostics,
     setDiagnosticsStatus,
     setOllamaInstallStatus,
@@ -233,7 +233,7 @@ export function useSettingsSectionController({
   }, [
     formState,
     hasDirtyIngestionSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyOllamaSettings,
     hasDirtyOcrProcessingSettings,
     hasDirtyOcrSettings,
@@ -243,7 +243,7 @@ export function useSettingsSectionController({
     ingestionFormState,
     ocrFormState,
     ocrProcessingFormState,
-    officeFormState,
+    pdfExportFormState,
     performanceFormState
   ]);
 
@@ -303,8 +303,8 @@ export function useSettingsSectionController({
     loadError,
     formState,
     setFormState,
-    officeFormState,
-    setOfficeFormState,
+    pdfExportFormState,
+    setPdfExportFormState,
     performanceFormState,
     setPerformanceFormState,
     ingestionFormState,
@@ -315,7 +315,7 @@ export function useSettingsSectionController({
     modelToInstall,
     setModelToInstall,
     modelPullJobs,
-    officeStatus,
+    pdfExportStatus,
     diagnostics,
     diagnosticsStatus,
     ollamaInstallStatus,
@@ -334,7 +334,7 @@ export function useSettingsSectionController({
     translationNumCtxRecommendation,
     recommendedMaxContextChunks,
     hasDirtyOllamaSettings,
-    hasDirtyOfficeSettings,
+    hasDirtyPdfExportSettings,
     hasDirtyPerformanceSettings,
     hasDirtyIngestionSettings,
     hasDirtyOcrProcessingSettings,
@@ -348,7 +348,7 @@ export function useSettingsSectionController({
     installModel: actions.installModel,
     removeModel: actions.removeModel,
     openOllamaModelLibrary: actions.openOllamaModelLibrary,
-    refreshOfficeConverter: actions.refreshOfficeConverter,
+    refreshPdfExportConverter: actions.refreshPdfExportConverter,
     refreshPerformanceSettings: actions.refreshPerformanceSettings,
     refreshIngestionSettings: actions.refreshIngestionSettings,
     refreshOcrProcessingSettings: actions.refreshOcrProcessingSettings,
@@ -361,7 +361,7 @@ export function useSettingsSectionController({
     configureOcrRuntime: actions.configureOcrRuntime,
     cancelOcrRuntimeConfiguration: actions.cancelOcrRuntimeConfiguration,
     openLogsFolder: actions.openLogsFolder,
-    saveOfficeSettings: actions.saveOfficeSettings,
+    savePdfExportSettings: actions.savePdfExportSettings,
     savePerformanceSettings: actions.savePerformanceSettings,
     saveIngestionSettings: actions.saveIngestionSettings,
     saveOcrProcessingSettings: actions.saveOcrProcessingSettings,

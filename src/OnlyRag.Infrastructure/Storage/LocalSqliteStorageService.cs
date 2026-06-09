@@ -5,14 +5,14 @@ namespace OnlyRag.Infrastructure.Storage;
 public sealed class LocalSqliteStorageService : ILocalStorageService
 {
     private readonly LocalSqliteStoreDescriptor descriptor;
-    private readonly LocalSqliteMigrator migrator;
+    private readonly LocalSqliteSchemaInitializer schemaInitializer;
 
     public LocalSqliteStorageService(
         LocalSqliteStoreDescriptor descriptor,
-        LocalSqliteMigrator migrator)
+        LocalSqliteSchemaInitializer schemaInitializer)
     {
         this.descriptor = descriptor;
-        this.migrator = migrator;
+        this.schemaInitializer = schemaInitializer;
     }
 
     public async Task<StorageStatusResponse> InitializeAsync(CancellationToken cancellationToken = default)
@@ -22,11 +22,11 @@ public sealed class LocalSqliteStorageService : ILocalStorageService
             LocalRuntimeDirectoryPreparer.EnsureDirectory(directory);
         }
 
-        return await migrator.MigrateAsync(cancellationToken);
+        return await schemaInitializer.InitializeAsync(cancellationToken);
     }
 
     public Task<StorageStatusResponse> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        return migrator.GetStatusAsync(cancellationToken);
+        return schemaInitializer.GetStatusAsync(cancellationToken);
     }
 }

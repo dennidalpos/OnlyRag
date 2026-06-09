@@ -1,6 +1,6 @@
 import type {
   IngestionSettings,
-  OfficeConversionSettings,
+  PdfExportSettings,
   OcrLanguage,
   OcrProcessingSettings,
   OcrSettings,
@@ -56,7 +56,7 @@ export function normalizeOllamaSettings(settings: OllamaSettings): OllamaSetting
   };
 }
 
-export function normalizeOfficeSettings(settings: OfficeConversionSettings): OfficeConversionSettings {
+export function normalizePdfExportSettings(settings: PdfExportSettings): PdfExportSettings {
   return {
     libreOfficePath: normalizeOptionalValue(settings.libreOfficePath),
     conversionTimeoutSeconds: Number(settings.conversionTimeoutSeconds)
@@ -81,9 +81,9 @@ export function normalizePerformanceSettings(settings: PerformanceSettings): Per
 
 export function normalizePerformanceProfile(
   value: string | null | undefined,
-  legacyLowResourceMode: boolean
+  lowResourceMode: boolean
 ): PerformanceProfile {
-  if (legacyLowResourceMode && (!value || value === "auto")) {
+  if (lowResourceMode && (!value || value === "auto")) {
     return "eco";
   }
 
@@ -152,10 +152,10 @@ export function buildOllamaSettingsPayload(
   });
 }
 
-export function buildOfficeSettingsPayload(
-  officeFormState: OfficeConversionSettings
-): OfficeConversionSettings {
-  return normalizeOfficeSettings(officeFormState);
+export function buildPdfExportSettingsPayload(
+  pdfExportFormState: PdfExportSettings
+): PdfExportSettings {
+  return normalizePdfExportSettings(pdfExportFormState);
 }
 
 export function buildPerformanceSettingsPayload(
@@ -196,11 +196,11 @@ export function isNonLocalUrl(value: string): boolean {
   }
 }
 
-export function areOfficeSettingsEqual(
-  left: OfficeConversionSettings,
-  right: OfficeConversionSettings
+export function arePdfExportSettingsEqual(
+  left: PdfExportSettings,
+  right: PdfExportSettings
 ): boolean {
-  return JSON.stringify(normalizeOfficeSettings(left)) === JSON.stringify(normalizeOfficeSettings(right));
+  return JSON.stringify(normalizePdfExportSettings(left)) === JSON.stringify(normalizePdfExportSettings(right));
 }
 
 export function arePerformanceSettingsEqual(left: PerformanceSettings, right: PerformanceSettings): boolean {

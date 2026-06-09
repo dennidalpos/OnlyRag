@@ -33,9 +33,9 @@ describe("SettingsSection OCR provisioning", () => {
       capabilityStatus: "usable"
     };
     const api = mockApi([
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,

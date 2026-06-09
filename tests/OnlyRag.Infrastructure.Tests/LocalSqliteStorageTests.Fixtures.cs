@@ -33,8 +33,8 @@ public sealed partial class LocalSqliteStorageTests
         public LocalSqliteStorageService CreateStorageService()
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
-            LocalSqliteMigrator migrator = new(Descriptor, connectionFactory);
-            return new LocalSqliteStorageService(Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(Descriptor, connectionFactory);
+            return new LocalSqliteStorageService(Descriptor, initializer);
         }
 
         public LocalSqliteConnectionFactory CreateConnectionFactory()

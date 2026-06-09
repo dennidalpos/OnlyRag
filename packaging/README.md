@@ -82,4 +82,5 @@ pwsh .\scripts\Test-InstallerRelease.ps1 -InstallerPath .\artifacts\installer\On
 Evidence JSON and installer logs are written under `artifacts\release-verification`.
 
 Production release readiness requires package gate success, a valid signed installer, lifecycle
-evidence, and representative checks for the target OCR/Ollama/LibreOffice/Qdrant runtime scope.
+evidence, and representative checks for the target OCR/Ollama/Qdrant runtime scope plus
+translation PDF export through LibreOffice.

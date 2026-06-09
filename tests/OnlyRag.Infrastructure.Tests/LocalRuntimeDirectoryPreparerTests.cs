@@ -19,7 +19,7 @@ public sealed class LocalRuntimeDirectoryPreparerTests
             AppStoragePaths paths = AppStoragePaths.FromRoot(fileRoot);
             LocalSqliteStoreDescriptor descriptor = new(paths);
             LocalSqliteConnectionFactory connectionFactory = new(descriptor);
-            LocalSqliteStorageService storage = new(descriptor, new LocalSqliteMigrator(descriptor, connectionFactory));
+            LocalSqliteStorageService storage = new(descriptor, new LocalSqliteSchemaInitializer(descriptor, connectionFactory));
 
             InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => storage.InitializeAsync());

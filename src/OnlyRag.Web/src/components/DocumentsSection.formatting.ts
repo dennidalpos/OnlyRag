@@ -38,16 +38,10 @@ export function formatDocumentType(document: ImportedDocument): string {
   switch (document.fileExtension?.toLowerCase()) {
     case ".docx":
       return "Word Open XML";
-    case ".doc":
-      return "Word legacy";
     case ".xlsx":
       return "Excel Open XML";
-    case ".xls":
-      return "Excel legacy";
     case ".pptx":
       return "PowerPoint Open XML";
-    case ".ppt":
-      return "PowerPoint legacy";
     case ".pdf":
       return "PDF";
     case ".md":

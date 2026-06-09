@@ -213,9 +213,9 @@ describe("App initial setup model residual checks", () => {
           body: needsSetup ? createOcrProvisionStatus({ isConfigured: false, message: "OCR non configurato." }) : createOcrProvisionStatus()
         })
       },
-      { path: "/api/settings/office-conversion", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
+      { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
-        path: "/api/office-converter/status",
+        path: "/api/pdf-export/status",
         response: {
           state: "Missing",
           isAvailable: false,

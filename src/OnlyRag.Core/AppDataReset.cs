@@ -25,6 +25,13 @@ public static class AppDataReset
         return true;
     }
 
+    public static void ResetNow(AppStoragePaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        DeleteDirectoryContents(paths.DataRoot);
+    }
+
     private static void DeleteDirectoryContents(string dataRoot)
     {
         string fullRoot = Path.GetFullPath(dataRoot);

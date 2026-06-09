@@ -121,8 +121,8 @@ public sealed class ChatServiceQdrantIntegrationTests
         public async Task InitializeAsync()
         {
             LocalSqliteConnectionFactory connectionFactory = CreateConnectionFactory();
-            LocalSqliteMigrator migrator = new(Descriptor, connectionFactory);
-            LocalSqliteStorageService storage = new(Descriptor, migrator);
+            LocalSqliteSchemaInitializer initializer = new(Descriptor, connectionFactory);
+            LocalSqliteStorageService storage = new(Descriptor, initializer);
             await storage.InitializeAsync();
         }
 

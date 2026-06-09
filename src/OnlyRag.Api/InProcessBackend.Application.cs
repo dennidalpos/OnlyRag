@@ -48,7 +48,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<ILocalProcessLauncher>(options.ProcessLauncher ?? new LocalProcessLauncher());
         builder.Services.AddSingleton(runtimeState);
         builder.Services.AddSingleton<ISqliteConnectionFactory, LocalSqliteConnectionFactory>();
-        builder.Services.AddSingleton<LocalSqliteMigrator>();
+        builder.Services.AddSingleton<LocalSqliteSchemaInitializer>();
         builder.Services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();
         builder.Services.AddSingleton<IDocumentRepository, SqliteDocumentRepository>();
         builder.Services.AddSingleton<IEmbeddingRepository, SqliteEmbeddingRepository>();
@@ -81,8 +81,8 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
         builder.Services.AddSingleton<OcrRetryPolicy>();
         builder.Services.AddSingleton<IngestionSettingsStore>();
-        builder.Services.AddSingleton<OfficeConversionSettingsStore>();
-        builder.Services.AddSingleton<IOfficeConversionService, LibreOfficeConversionService>();
+        builder.Services.AddSingleton<PdfExportSettingsStore>();
+        builder.Services.AddSingleton<IPdfExportConverter, LibreOfficePdfExportConverter>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
         builder.Services.AddSingleton<ImageGenerationService>();
