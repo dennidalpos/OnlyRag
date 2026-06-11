@@ -190,7 +190,7 @@ function Get-OnlyRagInstallerPrerequisiteStatus {
         ""
         New-OnlyRagInstallerParagraph "After installing WebView2, run this $AppName setup again."
         ""
-        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama remains a user-confirmed external/manual install. LibreOffice is optional for translation PDF export. Image generation requires a local Automatic1111 or ComfyUI provider configured after install."
+        New-OnlyRagInstallerParagraph "The installer includes the required .NET runtime components and OCR CPU/NVIDIA provisioning manifests. Setup automatically prepares PaddleOCR packages when compatible Python and Internet access are available. Ollama remains a user-confirmed external/manual install. LibreOffice is optional for translation PDF export. Image generation uses integrated models downloaded later from OnlyRag Images with explicit consent."
     ) -join [Environment]::NewLine
 
     return [pscustomobject]@{
@@ -220,11 +220,10 @@ function Get-OnlyRagNvidiaGpuOcrMemo {
 
 function Get-OnlyRagImageGenerationMemo {
     return @(
-        "- Image generation: Automatic1111 and ComfyUI are optional external"
-        "                    providers. Start Automatic1111 with --api on"
-        "                    http://127.0.0.1:7860 or ComfyUI on"
-        "                    http://127.0.0.1:8188, then verify them from"
-        "                    OnlyRag Images."
+        "- Image generation: integrated models are downloaded from OnlyRag Images"
+        "                    after explicit consent. Model files stay under"
+        "                    %LOCALAPPDATA%\OnlyRag\models\images and are"
+        "                    verified with SHA256 before generation."
     ) -join [Environment]::NewLine
 }
 
@@ -282,7 +281,7 @@ if ($SelfTest) {
     Assert-InstallerMessageLayout -Message $missing.Message -Scenario "missing WebView2"
     Assert-Condition -Condition ($missing.Message -like "*OCR CPU/NVIDIA*") -Message "Expected WebView2 message to mention OCR NVIDIA."
     Assert-Condition -Condition ($missing.Message -like "*provisioning manifests*") -Message "Expected WebView2 message to mention provisioning manifests."
-    foreach ($expected in @("Image", "generation", "Automatic1111", "ComfyUI")) {
+    foreach ($expected in @("Image", "generation", "integrated", "models")) {
         Assert-Condition -Condition ($missing.Message -like "*$expected*") -Message "Expected WebView2 message to mention image generation '$expected'."
     }
 
@@ -295,7 +294,7 @@ if ($SelfTest) {
     Assert-InstallerMessageLayout -Message $nvidiaMissingMemo -Scenario "NVIDIA missing memo"
 
     $imageGenerationMemo = Get-OnlyRagImageGenerationMemo
-    foreach ($expected in @("Automatic1111", "ComfyUI", "--api", "127.0.0.1:7860", "127.0.0.1:8188")) {
+    foreach ($expected in @("integrated", "OnlyRag Images", "models\images", "SHA256")) {
         Assert-Condition -Condition ($imageGenerationMemo -like "*$expected*") -Message "Expected image generation memo to contain '$expected'."
     }
     Assert-InstallerMessageLayout -Message $imageGenerationMemo -Scenario "image generation memo"

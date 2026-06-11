@@ -46,7 +46,6 @@ Optional development/runtime tools:
 - LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for PaddleOCR provisioning. Python 3.14 is not supported by the pinned
   PaddlePaddle runtime.
-- Automatic1111 or ComfyUI for image generation.
 - Inno Setup 6 for installer generation.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed installers.
 
@@ -68,7 +67,7 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
 `Bootstrap-Prerequisites.ps1` verifies Windows, PowerShell, .NET, WebView2, Node/npm, optional
-Ollama, optional LibreOffice, optional Automatic1111/ComfyUI endpoints, creates
+Ollama, optional LibreOffice, integrated image model storage, creates
 `%LOCALAPPDATA%\OnlyRag`, restores .NET packages, installs web dependencies, and prepares OCR when
 supported Python is available.
 
@@ -153,8 +152,8 @@ Production release readiness requires all of these:
 - Installer is signed with `Sign-Release.ps1` or `Build-Installer.ps1 -SigningCertificateThumbprint`.
 - `Test-InstallerRelease.ps1 -RequireSigned -RunInstallLifecycle` passed on a clean representative
   Windows profile or verification machine.
-- Representative Ollama, OCR, Qdrant, image generation provider endpoints, and translation PDF
-  export through LibreOffice runtime behavior were checked for the target deployment scope.
+- Representative Ollama, OCR, Qdrant, integrated image model download/generation, and translation
+  PDF export through LibreOffice runtime behavior were checked for the target deployment scope.
 
 An unsigned installer, or a signed installer without lifecycle evidence, is not production-ready.
 
@@ -205,8 +204,8 @@ commands recreate required ignored outputs.
 - OCR unavailable: install Python 3.10, 3.11, 3.12, or 3.13, then rerun bootstrap or use the OCR
   action in Settings.
 - Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
-- Image generation unavailable: start Automatic1111 with `--api` on `http://127.0.0.1:7860` or
-  ComfyUI on `http://127.0.0.1:8188`, then verify provider status from Images.
+- Image generation unavailable: open Images, download the selected integrated model, verify the
+  SHA256 status, and retry. DirectML GPU is preferred when available; CPU fallback is supported.
 - LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` to enable
   translation PDF export.
 

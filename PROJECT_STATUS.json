@@ -1,8 +1,8 @@
 {
   "todos": [
     "Sign the installer and verify the signed install-launch-uninstall lifecycle on a clean Windows profile or verification machine.",
-    "Verify representative Ollama, OCR, Qdrant, and translation PDF export via LibreOffice runtime behavior for the target deployment scope.",
-    "Rename the remaining storage status contract and UI wording away from MigrationStatus to schema/reset status terminology.",
-    "Verify image generation against real local Automatic1111 and ComfyUI instances, including provider status, generation, saved gallery entries, and generated file retrieval."
+    "Verify representative Ollama, OCR, Qdrant, integrated image generation, and translation PDF export via LibreOffice runtime behavior for the target deployment scope.",
+    "Replace the current integrated placeholder image renderer with real ONNX Runtime text-to-image inference using DirectML GPU acceleration on Windows and CPU fallback when GPU acceleration is unavailable.",
+    "Verify integrated image generation manually on Windows with DirectML GPU acceleration available and again with CPU fallback, including model download, SHA256 verification, prompt generation, saved gallery entries, and generated file retrieval."
   ]
 }

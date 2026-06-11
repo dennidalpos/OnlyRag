@@ -35,8 +35,8 @@ public static partial class InProcessBackend
             StorageStatusResponse storageStatus = await app.Services
                 .GetRequiredService<ILocalStorageService>()
                 .InitializeAsync(cancellationToken);
-            runtimeState.DatabaseStatus = storageStatus.MigrationStatus;
-            BackendLog.Write(descriptor.StoragePaths, $"Local SQLite schema version {storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion}: {storageStatus.MigrationStatus}.");
+            runtimeState.DatabaseStatus = storageStatus.SchemaStatus;
+            BackendLog.Write(descriptor.StoragePaths, $"Local SQLite schema version {storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion}: {storageStatus.SchemaStatus}.");
 
             int recoveredJobs = await app.Services
                 .GetRequiredService<ILocalJobQueue>()

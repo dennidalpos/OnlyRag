@@ -178,7 +178,10 @@ public sealed partial class InProcessBackendTests
         AssertTypeScriptContractMatchesDto<OllamaInstallStatus>(apiSource, "OllamaInstallStatus");
         AssertTypeScriptContractMatchesDto<DependencyActionResponse>(apiSource, "DependencyActionResponse");
         AssertTypeScriptContractMatchesDto<ImageGenerationSettings>(apiSource, "ImageGenerationSettings");
-        AssertTypeScriptContractMatchesDto<ImageGenerationProviderStatus>(apiSource, "ImageGenerationProviderStatus");
+        AssertTypeScriptContractMatchesDto<ImageGenerationRuntimeStatus>(apiSource, "ImageGenerationRuntimeStatus");
+        AssertTypeScriptContractMatchesDto<ImageModelCatalogEntry>(apiSource, "ImageModelCatalogEntry");
+        AssertTypeScriptContractMatchesDto<ImageModelLocalState>(apiSource, "ImageModelLocalState");
+        AssertTypeScriptContractMatchesDto<ImageModelDownloadResponse>(apiSource, "ImageModelDownloadResponse");
         AssertTypeScriptContractMatchesDto<ImageGenerationRequest>(apiSource, "ImageGenerationRequest");
         AssertTypeScriptContractMatchesDto<ImageGenerationResponse>(apiSource, "ImageGenerationResponse");
         AssertTypeScriptContractMatchesDto<GeneratedImage>(apiSource, "GeneratedImage");

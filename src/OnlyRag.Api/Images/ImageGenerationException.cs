@@ -6,6 +6,7 @@ internal enum ImageGenerationErrorKind
     InvalidRequest,
     Timeout,
     Unreachable,
+    ModelNotReady,
     UnexpectedResponse,
     NotFound
 }
@@ -23,4 +24,3 @@ internal sealed class ImageGenerationException : Exception
 
     public ImageGenerationErrorKind Kind { get; }
 }
-

@@ -6,7 +6,6 @@ internal static class ImageGenerationRequestValidator
 {
     public static ImageGenerationRequest Normalize(ImageGenerationRequest request)
     {
-        string provider = ImageGenerationProviderNames.Normalize(request.Provider);
         string prompt = string.IsNullOrWhiteSpace(request.Prompt)
             ? throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidRequest,
@@ -16,7 +15,7 @@ internal static class ImageGenerationRequestValidator
         string? negativePrompt = string.IsNullOrWhiteSpace(request.NegativePrompt)
             ? null
             : request.NegativePrompt.Trim();
-        string? model = string.IsNullOrWhiteSpace(request.Model) ? null : request.Model.Trim();
+        string? modelId = string.IsNullOrWhiteSpace(request.ModelId) ? null : request.ModelId.Trim();
         int width = ClampToMultipleOfEight(request.Width, 256, 2048);
         int height = ClampToMultipleOfEight(request.Height, 256, 2048);
         int steps = Math.Clamp(request.Steps, 1, 150);
@@ -24,10 +23,9 @@ internal static class ImageGenerationRequestValidator
         long? seed = request.Seed is < 0 ? null : request.Seed;
 
         return new ImageGenerationRequest(
-            provider,
             prompt,
             negativePrompt,
-            model,
+            modelId,
             width,
             height,
             steps,
@@ -41,4 +39,3 @@ internal static class ImageGenerationRequestValidator
         return Math.Max(min, clamped - (clamped % 8));
     }
 }
-

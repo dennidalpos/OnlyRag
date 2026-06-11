@@ -63,7 +63,7 @@ public sealed partial class LocalSqliteSchemaInitializer
                 DatabaseExists: false,
                 CurrentSchemaVersion: 0,
                 TargetSchemaVersion: CurrentSchemaVersion,
-                MigrationStatus: "NotInitialized",
+                SchemaStatus: "NotInitialized",
                 Fts5Available: false,
                 TechnicalNote: null);
         }
@@ -84,7 +84,7 @@ public sealed partial class LocalSqliteSchemaInitializer
                 DatabaseExists: true,
                 CurrentSchemaVersion: currentVersion,
                 TargetSchemaVersion: CurrentSchemaVersion,
-                MigrationStatus: "ResetRequired",
+                SchemaStatus: "ResetRequired",
                 Fts5Available: textSearchBackend == SqliteTextSearchBackend.Fts5,
                 TechnicalNote: "Lo schema locale non appartiene alla app fresh corrente e verra ricreato all'avvio.");
     }

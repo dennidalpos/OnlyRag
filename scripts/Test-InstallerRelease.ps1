@@ -124,33 +124,6 @@ function Test-PathExpectation {
     }
 }
 
-function Test-OptionalImageGenerationProvider {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Id,
-
-        [Parameter(Mandatory)]
-        [string]$Name,
-
-        [Parameter(Mandatory)]
-        [string]$Uri,
-
-        [Parameter(Mandatory)]
-        [string]$UnavailableMessage
-    )
-
-    try {
-        $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 5
-        Add-Check -Id $Id -Status "pass" -Message "$Name image generation endpoint reachable." -Data @{
-            uri = $Uri
-            statusCode = $response.StatusCode
-        }
-    }
-    catch {
-        Add-Check -Id $Id -Status "warn" -Message $UnavailableMessage -Data @{ uri = $Uri }
-    }
-}
-
 function Test-InstallerSignature {
     param(
         [Parameter(Mandatory)]
@@ -207,17 +180,17 @@ function Test-OptionalComponents {
         Add-Check -Id "optional-ollama" -Status "warn" -Message "Ollama endpoint not reachable; model features should remain configurable."
     }
 
-    Test-OptionalImageGenerationProvider `
-        -Id "optional-image-automatic1111" `
-        -Name "Automatic1111" `
-        -Uri "http://127.0.0.1:7860/sdapi/v1/sd-models" `
-        -UnavailableMessage "Automatic1111 endpoint not reachable; image generation should remain configurable."
-
-    Test-OptionalImageGenerationProvider `
-        -Id "optional-image-comfyui" `
-        -Name "ComfyUI" `
-        -Uri "http://127.0.0.1:8188/system_stats" `
-        -UnavailableMessage "ComfyUI endpoint not reachable; image generation should remain configurable."
+    $imageModelsDir = Join-Path $dataDir "models\images"
+    if (Test-Path -LiteralPath $imageModelsDir -PathType Container) {
+        Add-Check -Id "optional-image-model-storage" -Status "pass" -Message "Integrated image model storage directory found." -Data @{
+            path = $imageModelsDir
+        }
+    }
+    else {
+        Add-Check -Id "optional-image-model-storage" -Status "warn" -Message "Integrated image model storage was not created before image model activity." -Data @{
+            path = $imageModelsDir
+        }
+    }
 }
 
 function Test-AppLaunch {

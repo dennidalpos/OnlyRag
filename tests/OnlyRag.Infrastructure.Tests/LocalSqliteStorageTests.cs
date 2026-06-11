@@ -19,7 +19,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.True(File.Exists(tempStorage.Paths.DatabasePath));
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.TargetSchemaVersion);
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         Assert.True(status.Fts5Available || status.TechnicalNote is not null);
         if (status.Fts5Available || status.TechnicalNote?.Contains("FTS4", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -81,7 +81,7 @@ public sealed partial class LocalSqliteStorageTests
 
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         Assert.False(File.Exists(staleLogPath));
         Assert.True(await tempStorage.TableExistsAsync("documents"));
         Assert.False(await tempStorage.TableExistsAsync("schema_migrations"));
@@ -102,7 +102,7 @@ public sealed partial class LocalSqliteStorageTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         Assert.True(await tempStorage.TableExistsAsync("documents"));
         Assert.False(await tempStorage.TableExistsAsync("obsolete_data"));
     }

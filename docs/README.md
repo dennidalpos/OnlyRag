@@ -24,8 +24,8 @@ current technical and operational documentation. Do not use these pages as chang
   grounding.
 - [OCR pipeline](OCR_PIPELINE.md): PaddleOCR bridge, runtime manifest, CPU/GPU selection, and
   operational limits.
-- [Image generation](IMAGE_GENERATION.md): Automatic1111 and ComfyUI endpoint setup, bootstrap
-  checks, and release verification behavior.
+- [Image generation](IMAGE_GENERATION.md): integrated local model catalog, download consent,
+  verification, GPU/CPU runtime behavior, and release checks.
 - [Office ingestion](OFFICE_INGESTION.md): native OpenXML extraction for DOCX, XLSX, and PPTX.
 - [Translation pipeline](TRANSLATION_PIPELINE.md): page-based translation jobs, editing, and
   export formats.

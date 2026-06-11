@@ -1,27 +1,49 @@
 export type ImageGenerationSettings = {
-  provider: string;
-  automatic1111BaseUrl: string;
-  comfyUiBaseUrl: string;
+  selectedModelId: string;
   requestTimeoutSeconds: number;
-  trustNonLocalEndpoint: boolean;
-  automatic1111Model: string | null;
-  comfyUiWorkflowJson: string | null;
+  preferGpu: boolean;
+  activeExecutionProvider: string;
 };
 
-export type ImageGenerationProviderStatus = {
-  provider: string;
+export type ImageGenerationRuntimeStatus = {
   state: string;
-  isReachable: boolean;
-  baseUrl: string;
+  isReady: boolean;
+  executionProvider: string;
   message: string;
   suggestion: string | null;
 };
 
+export type ImageModelCatalogEntry = {
+  id: string;
+  displayName: string;
+  recommendedProfile: string;
+  downloadUrl: string;
+  licenseLabel: string;
+  expectedSizeBytes: number;
+  requiredFiles: string[];
+  sha256: string;
+};
+
+export type ImageModelLocalState = {
+  modelId: string;
+  state: string;
+  isDownloaded: boolean;
+  isVerified: boolean;
+  localSizeBytes: number;
+  localDirectory: string;
+  verificationError: string | null;
+};
+
+export type ImageModelDownloadResponse = {
+  modelId: string;
+  state: string;
+  message: string;
+};
+
 export type ImageGenerationRequest = {
-  provider: string;
   prompt: string;
   negativePrompt: string | null;
-  model: string | null;
+  modelId: string | null;
   width: number;
   height: number;
   steps: number;
@@ -51,4 +73,3 @@ export type GeneratedImage = {
   fileSizeBytes: number;
   createdAtUtc: string;
 };
-

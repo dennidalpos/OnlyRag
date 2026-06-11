@@ -91,7 +91,7 @@ public sealed class SqliteStatusConstraintTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
             tempStorage,
             """
@@ -114,7 +114,7 @@ public sealed class SqliteStatusConstraintTests
         StorageStatusResponse status = await storage.InitializeAsync();
 
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         Assert.Equal(0, await CountRowsAsync(tempStorage, "jobs", "1 = $value", 1));
     }
 

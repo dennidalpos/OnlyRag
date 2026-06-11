@@ -262,7 +262,7 @@ public sealed partial class InProcessBackendTests
 
         Assert.NotNull(status);
         Assert.Equal(tempDescriptor.Descriptor.StoragePaths.DatabasePath, status.DatabasePath);
-        Assert.Equal("Current", status.MigrationStatus);
+        Assert.Equal("Current", status.SchemaStatus);
         Assert.Equal(status.CurrentSchemaVersion, status.CurrentSchemaVersion);
     }
 }

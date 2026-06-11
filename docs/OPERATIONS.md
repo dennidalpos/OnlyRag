@@ -18,7 +18,7 @@ Optional by feature:
 - Ollama for chat, embeddings, and translation.
 - LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for OCR provisioning.
-- Automatic1111 or ComfyUI for image generation.
+- Integrated image model download from the Images section for image generation.
 - Inno Setup 6 for installer builds.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed release
   candidates.
@@ -30,17 +30,16 @@ pwsh .\scripts\Bootstrap-Prerequisites.ps1
 ```
 
 Bootstrap verifies host prerequisites, creates `%LOCALAPPDATA%\OnlyRag`, restores .NET packages,
-installs frontend dependencies, checks optional Ollama/LibreOffice/image generation availability,
-and prepares OCR when supported Python is available. LibreOffice is checked only for translation PDF
-export, and image generation checks only probe local Automatic1111/ComfyUI endpoints. It does not
-build, package, sign, install, or release.
+installs frontend dependencies, checks optional Ollama/LibreOffice availability, prepares integrated
+image model storage, and prepares OCR when supported Python is available. It does not build, package,
+sign, install, or release.
 
 Use these options only when intentionally narrowing setup:
 
 - `-SkipNode`: skip Node/npm checks and frontend dependency install.
 - `-SkipOcr`: skip OCR provisioning.
 - `-SkipOllamaCheck`: skip Ollama CLI and endpoint checks.
-- `-SkipImageGenerationCheck`: skip Automatic1111 and ComfyUI endpoint checks.
+- `-SkipImageGenerationCheck`: skip integrated image model storage checks.
 - `-NonInteractive`: avoid prompts and system-level installer actions.
 - `-LibreOfficePath <path>`: check a specific `soffice.exe` for PDF export.
 
@@ -224,7 +223,7 @@ revert tracked source changes.
 - OCR provisioning skipped or unavailable: install Python 3.10, 3.11, 3.12, or 3.13, then rerun
   bootstrap or use the OCR action in Settings.
 - Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
-- Image generation unavailable: start Automatic1111 with `--api` on `http://127.0.0.1:7860` or
-  ComfyUI on `http://127.0.0.1:8188`, then verify provider status from Images.
+- Image generation unavailable: download the selected integrated model from Images, confirm SHA256
+  verification, and retry. DirectML GPU is preferred when available; CPU fallback is supported.
 - LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` to enable
   translation PDF export.

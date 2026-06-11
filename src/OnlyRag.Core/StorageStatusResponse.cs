@@ -6,6 +6,6 @@ public sealed record StorageStatusResponse(
     bool DatabaseExists,
     int CurrentSchemaVersion,
     int TargetSchemaVersion,
-    string MigrationStatus,
+    string SchemaStatus,
     bool Fts5Available,
     string? TechnicalNote);

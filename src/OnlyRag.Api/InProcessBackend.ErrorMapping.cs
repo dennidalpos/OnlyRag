@@ -121,8 +121,13 @@ public static partial class InProcessBackend
                 exception.Message,
                 StatusCodes.Status408RequestTimeout,
                 "image_generation_timeout"),
+            ImageGenerationErrorKind.ModelNotReady => CreateProblem(
+                "Modello immagini non pronto",
+                exception.Message,
+                StatusCodes.Status409Conflict,
+                "image_generation_model_not_ready"),
             ImageGenerationErrorKind.Unreachable => CreateProblem(
-                "Provider immagini non raggiungibile",
+                "Download modello immagini non raggiungibile",
                 exception.Message,
                 StatusCodes.Status503ServiceUnavailable,
                 "image_generation_unreachable"),
@@ -133,7 +138,7 @@ public static partial class InProcessBackend
                 "image_generation_not_found"),
             _ => CreateProblem(
                 "Errore generazione immagini",
-                "Il provider immagini ha restituito una risposta inattesa. I dettagli tecnici sono nei log locali.",
+                "Il generatore immagini integrato ha restituito una risposta inattesa. I dettagli tecnici sono nei log locali.",
                 StatusCodes.Status502BadGateway,
                 "image_generation_unexpected_response")
         };

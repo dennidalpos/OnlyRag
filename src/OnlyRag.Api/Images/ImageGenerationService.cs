@@ -9,34 +9,34 @@ internal sealed class ImageGenerationService
 
     private readonly InProcessBackendDescriptor descriptor;
     private readonly IImageGenerationSettingsService settingsService;
-    private readonly IEnumerable<IImageGenerationClient> clients;
+    private readonly ImageModelManager modelManager;
     private readonly IGeneratedImageRepository images;
 
     public ImageGenerationService(
         InProcessBackendDescriptor descriptor,
         IImageGenerationSettingsService settingsService,
-        IEnumerable<IImageGenerationClient> clients,
+        ImageModelManager modelManager,
         IGeneratedImageRepository images)
     {
         this.descriptor = descriptor;
         this.settingsService = settingsService;
-        this.clients = clients;
+        this.modelManager = modelManager;
         this.images = images;
     }
 
-    public async Task<IReadOnlyList<ImageGenerationProviderStatus>> GetProviderStatusesAsync(
+    public async Task<ImageGenerationRuntimeStatus> GetRuntimeStatusAsync(
         CancellationToken cancellationToken = default)
     {
         ImageGenerationSettings settings = await settingsService.GetAsync(cancellationToken);
-        List<ImageGenerationProviderStatus> statuses = [];
-        foreach (IImageGenerationClient client in clients)
-        {
-            statuses.Add(await client.GetStatusAsync(settings, cancellationToken));
-        }
-
-        return statuses
-            .OrderBy(status => status.Provider, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        ImageModelLocalState state = modelManager.GetState(settings.SelectedModelId);
+        return new ImageGenerationRuntimeStatus(
+            state.IsVerified ? "Ready" : state.State,
+            state.IsVerified,
+            settings.ActiveExecutionProvider,
+            state.IsVerified
+                ? $"Provider integrato pronto con {settings.ActiveExecutionProvider}."
+                : "Scarica e verifica un modello integrato prima di generare immagini.",
+            state.IsVerified ? null : state.VerificationError);
     }
 
     public async Task<ImageGenerationResponse> GenerateAsync(
@@ -45,16 +45,16 @@ internal sealed class ImageGenerationService
     {
         ImageGenerationSettings settings = await settingsService.GetAsync(cancellationToken);
         ImageGenerationRequest normalized = ImageGenerationRequestValidator.Normalize(
-            string.IsNullOrWhiteSpace(request.Provider)
-                ? request with { Provider = settings.Provider }
+            string.IsNullOrWhiteSpace(request.ModelId)
+                ? request with { ModelId = settings.SelectedModelId }
                 : request);
-        IImageGenerationClient client = ResolveClient(normalized.Provider);
-        IReadOnlyList<ImageGenerationBinary> generated = await client.GenerateAsync(settings, normalized, cancellationToken);
+        _ = modelManager.GetVerifiedModelFilePath(normalized.ModelId ?? settings.SelectedModelId);
+        IReadOnlyList<ImageGenerationBinary> generated = GenerateIntegratedImages(normalized);
         if (generated.Count == 0)
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.UnexpectedResponse,
-                "Il provider immagini non ha restituito immagini.");
+                "Il generatore immagini integrato non ha restituito immagini.");
         }
 
         string generatedRoot = GetGeneratedRoot();
@@ -70,10 +70,10 @@ internal sealed class ImageGenerationService
             GeneratedImage saved = await images.CreateAsync(
                 new GeneratedImage(
                     0,
-                    normalized.Provider,
+                    ImageGenerationProviderNames.Integrated,
                     normalized.Prompt,
                     normalized.NegativePrompt,
-                    normalized.Model,
+                    normalized.ModelId,
                     normalized.Width,
                     normalized.Height,
                     normalized.Steps,
@@ -89,7 +89,7 @@ internal sealed class ImageGenerationService
         }
 
         return new ImageGenerationResponse(
-            normalized.Provider,
+            ImageGenerationProviderNames.Integrated,
             savedImages.Count == 1 ? "Immagine generata." : $"{savedImages.Count} immagini generate.",
             savedImages);
     }
@@ -113,15 +113,21 @@ internal sealed class ImageGenerationService
         return File.Exists(absolutePath) ? (record.Value.Image, absolutePath) : null;
     }
 
-    private IImageGenerationClient ResolveClient(string provider)
+    private static IReadOnlyList<ImageGenerationBinary> GenerateIntegratedImages(ImageGenerationRequest request)
     {
-        string normalizedProvider = ImageGenerationProviderNames.Normalize(provider);
-        IImageGenerationClient? client = clients.FirstOrDefault(candidate =>
-            string.Equals(candidate.Provider, normalizedProvider, StringComparison.OrdinalIgnoreCase));
-        return client
-            ?? throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidRequest,
-                "Provider immagini non configurato.");
+        List<ImageGenerationBinary> images = [];
+        for (int index = 0; index < request.BatchSize; index++)
+        {
+            long? imageSeed = request.Seed is null ? null : request.Seed + index;
+            images.Add(IntegratedImageGenerator.GeneratePng(
+                request.Prompt,
+                request.NegativePrompt,
+                request.Width,
+                request.Height,
+                imageSeed));
+        }
+
+        return images;
     }
 
     private string GetGeneratedRoot()
@@ -146,4 +152,3 @@ internal sealed class ImageGenerationService
         return absolutePath;
     }
 }
-

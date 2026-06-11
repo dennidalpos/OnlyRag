@@ -5,13 +5,11 @@ namespace OnlyRag.Api.Images;
 
 internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsService
 {
-    private const string ProviderKey = "imageGeneration.provider";
-    private const string Automatic1111BaseUrlKey = "imageGeneration.automatic1111BaseUrl";
-    private const string ComfyUiBaseUrlKey = "imageGeneration.comfyUiBaseUrl";
+    private const string SelectedModelIdKey = "imageGeneration.selectedModelId";
     private const string RequestTimeoutSecondsKey = "imageGeneration.requestTimeoutSeconds";
-    private const string TrustNonLocalEndpointKey = "imageGeneration.trustNonLocalEndpoint";
-    private const string Automatic1111ModelKey = "imageGeneration.automatic1111Model";
-    private const string ComfyUiWorkflowJsonKey = "imageGeneration.comfyUiWorkflowJson";
+    private const string PreferGpuKey = "imageGeneration.preferGpu";
+    private const string ActiveExecutionProviderKey = "imageGeneration.activeExecutionProvider";
+    private const string DefaultSelectedModelId = ImageModelCatalog.DefaultModelId;
     private const int DefaultRequestTimeoutSeconds = 300;
     private const int MinRequestTimeoutSeconds = 10;
     private const int MaxRequestTimeoutSeconds = 1800;
@@ -25,117 +23,38 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
 
     public async Task<ImageGenerationSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        string provider = ImageGenerationProviderNames.Normalize(
-            await settingsRepository.GetValueAsync(ProviderKey, cancellationToken));
-        string automatic1111BaseUrl = await settingsRepository.GetValueAsync(Automatic1111BaseUrlKey, cancellationToken)
-            ?? "http://127.0.0.1:7860";
-        string comfyUiBaseUrl = await settingsRepository.GetValueAsync(ComfyUiBaseUrlKey, cancellationToken)
-            ?? "http://127.0.0.1:8188";
+        string selectedModelId = NormalizeModelId(
+            await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken));
         string? timeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
-        string? trustValue = await settingsRepository.GetValueAsync(TrustNonLocalEndpointKey, cancellationToken);
+        string? preferGpuValue = await settingsRepository.GetValueAsync(PreferGpuKey, cancellationToken);
+        string activeExecutionProvider = NormalizeExecutionProvider(
+            await settingsRepository.GetValueAsync(ActiveExecutionProviderKey, cancellationToken));
 
         return new ImageGenerationSettings(
-            provider,
-            automatic1111BaseUrl,
-            comfyUiBaseUrl,
+            selectedModelId,
             ParseRequestTimeoutSeconds(timeoutValue),
-            bool.TryParse(trustValue, out bool trust) && trust,
-            NormalizeOptional(await settingsRepository.GetValueAsync(Automatic1111ModelKey, cancellationToken)),
-            NormalizeOptional(await settingsRepository.GetValueAsync(ComfyUiWorkflowJsonKey, cancellationToken)));
+            !bool.TryParse(preferGpuValue, out bool preferGpu) || preferGpu,
+            activeExecutionProvider);
     }
 
     public async Task<ImageGenerationSettings> UpdateAsync(
         ImageGenerationSettings settings,
         CancellationToken cancellationToken = default)
     {
-        string provider = ImageGenerationProviderNames.Normalize(settings.Provider);
-        string automatic1111BaseUrl = NormalizeAndValidateBaseUrl(
-            settings.Automatic1111BaseUrl,
-            settings.TrustNonLocalEndpoint,
-            "Automatic1111");
-        string comfyUiBaseUrl = NormalizeAndValidateBaseUrl(
-            settings.ComfyUiBaseUrl,
-            settings.TrustNonLocalEndpoint,
-            "ComfyUI");
+        string selectedModelId = NormalizeModelId(settings.SelectedModelId);
         int timeout = ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds);
-        string? automatic1111Model = NormalizeOptional(settings.Automatic1111Model);
-        string? comfyUiWorkflowJson = NormalizeOptional(settings.ComfyUiWorkflowJson);
+        string activeExecutionProvider = NormalizeExecutionProvider(settings.ActiveExecutionProvider);
 
-        await settingsRepository.UpsertAsync(ProviderKey, provider, cancellationToken);
-        await settingsRepository.UpsertAsync(Automatic1111BaseUrlKey, automatic1111BaseUrl, cancellationToken);
-        await settingsRepository.UpsertAsync(ComfyUiBaseUrlKey, comfyUiBaseUrl, cancellationToken);
+        await settingsRepository.UpsertAsync(SelectedModelIdKey, selectedModelId, cancellationToken);
         await settingsRepository.UpsertAsync(RequestTimeoutSecondsKey, timeout.ToString(), cancellationToken);
-        await settingsRepository.UpsertAsync(
-            TrustNonLocalEndpointKey,
-            settings.TrustNonLocalEndpoint ? bool.TrueString : bool.FalseString,
-            cancellationToken);
-        await settingsRepository.UpsertAsync(Automatic1111ModelKey, automatic1111Model ?? string.Empty, cancellationToken);
-        await settingsRepository.UpsertAsync(ComfyUiWorkflowJsonKey, comfyUiWorkflowJson ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(PreferGpuKey, settings.PreferGpu ? bool.TrueString : bool.FalseString, cancellationToken);
+        await settingsRepository.UpsertAsync(ActiveExecutionProviderKey, activeExecutionProvider, cancellationToken);
 
         return new ImageGenerationSettings(
-            provider,
-            automatic1111BaseUrl,
-            comfyUiBaseUrl,
+            selectedModelId,
             timeout,
-            settings.TrustNonLocalEndpoint,
-            automatic1111Model,
-            comfyUiWorkflowJson);
-    }
-
-    public static string ResolveBaseUrl(ImageGenerationSettings settings, string provider)
-    {
-        return provider == ImageGenerationProviderNames.ComfyUi
-            ? settings.ComfyUiBaseUrl
-            : settings.Automatic1111BaseUrl;
-    }
-
-    public static string NormalizeAndValidateBaseUrl(
-        string? baseUrl,
-        bool trustNonLocalEndpoint,
-        string providerLabel)
-    {
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidConfiguration,
-                $"Inserisci un URL valido per {providerLabel}.");
-        }
-
-        string trimmed = baseUrl.Trim();
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri))
-        {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidConfiguration,
-                $"L'URL di {providerLabel} non e valido.");
-        }
-
-        if (uri.Scheme is not ("http" or "https"))
-        {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidConfiguration,
-                $"L'URL di {providerLabel} deve iniziare con http:// oppure https://.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(uri.Query) || !string.IsNullOrWhiteSpace(uri.Fragment))
-        {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidConfiguration,
-                $"L'URL di {providerLabel} non deve includere query string o frammenti.");
-        }
-
-        if (!uri.IsLoopback && !trustNonLocalEndpoint)
-        {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.InvalidConfiguration,
-                $"Gli endpoint immagini non locali richiedono conferma esplicita perche i prompt vengono inviati a {providerLabel}.");
-        }
-
-        UriBuilder builder = new(uri)
-        {
-            Query = string.Empty,
-            Fragment = string.Empty
-        };
-        return builder.Uri.ToString().TrimEnd('/');
+            settings.PreferGpu,
+            activeExecutionProvider);
     }
 
     public static int ValidateRequestTimeoutSeconds(int requestTimeoutSeconds)
@@ -159,9 +78,22 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
             : DefaultRequestTimeoutSeconds;
     }
 
-    private static string? NormalizeOptional(string? value)
+    private static string NormalizeModelId(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        string modelId = string.IsNullOrWhiteSpace(value) ? DefaultSelectedModelId : value.Trim();
+        if (!ImageModelCatalog.Contains(modelId))
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidConfiguration,
+                "Il modello immagini selezionato non fa parte del catalogo integrato.");
+        }
+
+        return modelId;
+    }
+
+    private static string NormalizeExecutionProvider(string? value)
+    {
+        string provider = string.IsNullOrWhiteSpace(value) ? "CPU" : value.Trim();
+        return provider.Equals("DirectML", StringComparison.OrdinalIgnoreCase) ? "DirectML" : "CPU";
     }
 }
-

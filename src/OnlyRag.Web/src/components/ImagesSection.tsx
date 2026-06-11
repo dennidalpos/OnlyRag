@@ -4,20 +4,22 @@ import {
   resolveBackendBaseUrl,
   resolveBackendSessionToken,
   type GeneratedImage,
-  type ImageGenerationProviderStatus,
   type ImageGenerationResponse,
-  type ImageGenerationSettings
+  type ImageGenerationRuntimeStatus,
+  type ImageGenerationSettings,
+  type ImageModelCatalogEntry,
+  type ImageModelDownloadResponse,
+  type ImageModelLocalState
 } from "../api";
 import { formatFileSize } from "./DocumentsSection.formatting";
 
+const defaultModelId = "onlyrag-sdxl-turbo-directml";
+
 const defaultSettings: ImageGenerationSettings = {
-  provider: "automatic1111",
-  automatic1111BaseUrl: "http://127.0.0.1:7860",
-  comfyUiBaseUrl: "http://127.0.0.1:8188",
+  selectedModelId: defaultModelId,
   requestTimeoutSeconds: 300,
-  trustNonLocalEndpoint: false,
-  automatic1111Model: null,
-  comfyUiWorkflowJson: null
+  preferGpu: true,
+  activeExecutionProvider: "CPU"
 };
 
 type Feedback = {
@@ -28,11 +30,13 @@ type Feedback = {
 export function ImagesSection() {
   const [settings, setSettings] = useState<ImageGenerationSettings>(defaultSettings);
   const [savedSettings, setSavedSettings] = useState<ImageGenerationSettings>(defaultSettings);
-  const [statuses, setStatuses] = useState<ImageGenerationProviderStatus[]>([]);
+  const [runtimeStatus, setRuntimeStatus] = useState<ImageGenerationRuntimeStatus | null>(null);
+  const [catalog, setCatalog] = useState<ImageModelCatalogEntry[]>([]);
+  const [modelStates, setModelStates] = useState<ImageModelLocalState[]>([]);
+  const [pendingConsentModelId, setPendingConsentModelId] = useState<string | null>(null);
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [model, setModel] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
   const [steps, setSteps] = useState(30);
@@ -41,13 +45,23 @@ export function ImagesSection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isModelActionRunning, setIsModelActionRunning] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const activeStatus = useMemo(
-    () => statuses.find((status) => status.provider === settings.provider) ?? null,
-    [settings.provider, statuses]
+  const selectedModel = useMemo(
+    () => catalog.find((model) => model.id === settings.selectedModelId) ?? null,
+    [catalog, settings.selectedModelId]
+  );
+  const selectedModelState = useMemo(
+    () => modelStates.find((state) => state.modelId === settings.selectedModelId) ?? null,
+    [modelStates, settings.selectedModelId]
+  );
+  const consentModel = useMemo(
+    () => catalog.find((model) => model.id === pendingConsentModelId) ?? null,
+    [catalog, pendingConsentModelId]
   );
   const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  const canGenerate = Boolean(prompt.trim()) && Boolean(selectedModelState?.isVerified);
 
   useEffect(() => {
     let isCancelled = false;
@@ -55,16 +69,20 @@ export function ImagesSection() {
     async function load() {
       setIsLoading(true);
       try {
-        const [loadedSettings, providerStatuses, generatedImages] = await Promise.all([
-          apiRequest<ImageGenerationSettings>("/api/settings/image-generation"),
-          apiRequest<ImageGenerationProviderStatus[]>("/api/images/providers/status"),
-          apiRequest<GeneratedImage[]>("/api/images")
-        ]);
+        const [loadedSettings, loadedRuntimeStatus, loadedCatalog, loadedModelStates, generatedImages] =
+          await Promise.all([
+            apiRequest<ImageGenerationSettings>("/api/settings/image-generation"),
+            apiRequest<ImageGenerationRuntimeStatus>("/api/images/runtime/status"),
+            apiRequest<ImageModelCatalogEntry[]>("/api/images/models/catalog"),
+            apiRequest<ImageModelLocalState[]>("/api/images/models"),
+            apiRequest<GeneratedImage[]>("/api/images")
+          ]);
         if (isCancelled) return;
         setSettings(loadedSettings);
         setSavedSettings(loadedSettings);
-        setModel(loadedSettings.provider === "automatic1111" ? loadedSettings.automatic1111Model ?? "" : "");
-        setStatuses(providerStatuses);
+        setRuntimeStatus(loadedRuntimeStatus);
+        setCatalog(loadedCatalog);
+        setModelStates(loadedModelStates);
         setImages(generatedImages);
         setFeedback(null);
       } catch (error) {
@@ -84,9 +102,13 @@ export function ImagesSection() {
     };
   }, []);
 
-  async function refreshStatuses() {
-    const providerStatuses = await apiRequest<ImageGenerationProviderStatus[]>("/api/images/providers/status");
-    setStatuses(providerStatuses);
+  async function refreshImageState() {
+    const [loadedRuntimeStatus, loadedModelStates] = await Promise.all([
+      apiRequest<ImageGenerationRuntimeStatus>("/api/images/runtime/status"),
+      apiRequest<ImageModelLocalState[]>("/api/images/models")
+    ]);
+    setRuntimeStatus(loadedRuntimeStatus);
+    setModelStates(loadedModelStates);
   }
 
   async function handleSaveSettings() {
@@ -99,12 +121,44 @@ export function ImagesSection() {
       });
       setSettings(saved);
       setSavedSettings(saved);
-      await refreshStatuses();
+      await refreshImageState();
       setFeedback({ tone: "success", message: "Impostazioni immagini salvate." });
     } catch (error) {
       setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Salvataggio non riuscito." });
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleDownloadConfirmed(modelId: string) {
+    setIsModelActionRunning(true);
+    setFeedback(null);
+    try {
+      const response = await apiRequest<ImageModelDownloadResponse>(`/api/images/models/${modelId}/download`, {
+        method: "POST",
+        body: JSON.stringify({ consentConfirmed: true })
+      });
+      setPendingConsentModelId(null);
+      await refreshImageState();
+      setFeedback({ tone: "success", message: response.message });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Download modello non riuscito." });
+    } finally {
+      setIsModelActionRunning(false);
+    }
+  }
+
+  async function handleDeleteModel(modelId: string) {
+    setIsModelActionRunning(true);
+    setFeedback(null);
+    try {
+      const response = await apiRequest<ImageModelDownloadResponse>(`/api/images/models/${modelId}`, { method: "DELETE" });
+      await refreshImageState();
+      setFeedback({ tone: "success", message: response.message });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Rimozione modello non riuscita." });
+    } finally {
+      setIsModelActionRunning(false);
     }
   }
 
@@ -114,6 +168,10 @@ export function ImagesSection() {
       setFeedback({ tone: "error", message: "Inserisci un prompt per generare immagini." });
       return;
     }
+    if (!selectedModelState?.isVerified) {
+      setFeedback({ tone: "error", message: "Scarica e verifica il modello selezionato prima di generare." });
+      return;
+    }
 
     setIsGenerating(true);
     setFeedback(null);
@@ -121,10 +179,9 @@ export function ImagesSection() {
       const response = await apiRequest<ImageGenerationResponse>("/api/images/generate", {
         method: "POST",
         body: JSON.stringify({
-          provider: settings.provider,
           prompt,
           negativePrompt: negativePrompt.trim() || null,
-          model: model.trim() || null,
+          modelId: settings.selectedModelId,
           width,
           height,
           steps,
@@ -134,16 +191,12 @@ export function ImagesSection() {
       });
       setImages((current) => [...response.images, ...current]);
       setFeedback({ tone: "success", message: response.message });
+      await refreshImageState();
     } catch (error) {
       setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Generazione non riuscita." });
     } finally {
       setIsGenerating(false);
     }
-  }
-
-  function updateProvider(provider: string) {
-    setSettings((current) => ({ ...current, provider }));
-    setModel(provider === "automatic1111" ? settings.automatic1111Model ?? "" : "");
   }
 
   return (
@@ -153,10 +206,10 @@ export function ImagesSection() {
           <div className="settings-card__header">
             <div>
               <h2 id="images-title">Generazione immagini</h2>
-              <p>Automatic1111 e ComfyUI locali. Fooocus non è supportato nella v1 operativa.</p>
+              <p>Provider integrato locale con modelli scaricati nella cartella dati dell'app.</p>
             </div>
-            <button className="button-secondary" type="button" onClick={() => void refreshStatuses()} disabled={isLoading}>
-              Verifica
+            <button className="button-secondary" type="button" onClick={() => void refreshImageState()} disabled={isLoading}>
+              Aggiorna
             </button>
           </div>
 
@@ -166,25 +219,25 @@ export function ImagesSection() {
             </div>
           )}
 
-          <div className="image-status-grid">
-            {statuses.map((status) => (
-              <div
-                className={status.isReachable ? "image-status image-status--online" : "image-status image-status--offline"}
-                key={status.provider}
-              >
-                <strong>{formatProvider(status.provider)}</strong>
-                <span>{status.state}</span>
-                <small>{status.message}</small>
-              </div>
-            ))}
+          <div className={runtimeStatus?.isReady ? "image-status image-status--online" : "image-status image-status--offline"}>
+            <strong>{runtimeStatus?.state ?? "Caricamento"}</strong>
+            <span>{runtimeStatus?.executionProvider ?? settings.activeExecutionProvider}</span>
+            <small>{runtimeStatus?.message ?? "Lettura stato immagini..."}</small>
           </div>
 
           <div className="settings-grid settings-grid--two">
-            <label className="field-group" htmlFor="image-provider">
-              <span>Provider</span>
-              <select id="image-provider" value={settings.provider} onChange={(event) => updateProvider(event.target.value)}>
-                <option value="automatic1111">Automatic1111</option>
-                <option value="comfyui">ComfyUI</option>
+            <label className="field-group" htmlFor="image-model">
+              <span>Modello integrato</span>
+              <select
+                id="image-model"
+                value={settings.selectedModelId}
+                onChange={(event) => setSettings((current) => ({ ...current, selectedModelId: event.target.value }))}
+              >
+                {catalog.map((model) => (
+                  <option value={model.id} key={model.id}>
+                    {model.displayName}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="field-group" htmlFor="image-timeout">
@@ -198,53 +251,14 @@ export function ImagesSection() {
                 onChange={(event) => setSettings((current) => ({ ...current, requestTimeoutSeconds: Number(event.target.value) }))}
               />
             </label>
-            <label className="field-group" htmlFor="automatic1111-url">
-              <span>Automatic1111 URL</span>
+            <label className="toggle-row images-trust-row" htmlFor="image-prefer-gpu">
               <input
-                id="automatic1111-url"
-                value={settings.automatic1111BaseUrl}
-                onChange={(event) => setSettings((current) => ({ ...current, automatic1111BaseUrl: event.target.value }))}
-              />
-            </label>
-            <label className="field-group" htmlFor="comfy-url">
-              <span>ComfyUI URL</span>
-              <input
-                id="comfy-url"
-                value={settings.comfyUiBaseUrl}
-                onChange={(event) => setSettings((current) => ({ ...current, comfyUiBaseUrl: event.target.value }))}
-              />
-            </label>
-            <label className="field-group" htmlFor="automatic1111-model">
-              <span>Checkpoint Automatic1111</span>
-              <input
-                id="automatic1111-model"
-                value={settings.automatic1111Model ?? ""}
-                placeholder="Opzionale"
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, automatic1111Model: event.target.value || null }))
-                }
-              />
-            </label>
-            <label className="toggle-row images-trust-row" htmlFor="image-trust-remote">
-              <input
-                id="image-trust-remote"
+                id="image-prefer-gpu"
                 type="checkbox"
-                checked={settings.trustNonLocalEndpoint}
-                onChange={(event) => setSettings((current) => ({ ...current, trustNonLocalEndpoint: event.target.checked }))}
+                checked={settings.preferGpu}
+                onChange={(event) => setSettings((current) => ({ ...current, preferGpu: event.target.checked }))}
               />
-              <span>Consenti endpoint immagini non locali</span>
-            </label>
-            <label className="field-group images-workflow-field" htmlFor="comfy-workflow">
-              <span>Workflow ComfyUI JSON</span>
-              <textarea
-                id="comfy-workflow"
-                rows={5}
-                value={settings.comfyUiWorkflowJson ?? ""}
-                placeholder="Opzionale. Placeholder supportati: {{prompt}}, {{negative_prompt}}, {{model}}, {{width}}, {{height}}, {{steps}}, {{batch_size}}, {{seed}}"
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, comfyUiWorkflowJson: event.target.value || null }))
-                }
-              />
+              <span>Preferisci GPU DirectML quando disponibile</span>
             </label>
           </div>
 
@@ -253,6 +267,34 @@ export function ImagesSection() {
               {isSaving ? "Salvataggio..." : "Salva impostazioni"}
             </button>
           </div>
+
+          {selectedModel && (
+            <ModelReadiness
+              model={selectedModel}
+              state={selectedModelState}
+              onAskConsent={() => setPendingConsentModelId(selectedModel.id)}
+              onDelete={() => void handleDeleteModel(selectedModel.id)}
+              disabled={isModelActionRunning}
+            />
+          )}
+
+          {consentModel && (
+            <div className="panel-note panel-note--warning" role="dialog" aria-labelledby="image-model-consent-title">
+              <h3 id="image-model-consent-title">Conferma download modello</h3>
+              <p>{consentModel.displayName}</p>
+              <p>Licenza: {consentModel.licenseLabel}</p>
+              <p>Dimensione prevista: {formatFileSize(consentModel.expectedSizeBytes)}</p>
+              <p>Destinazione: {selectedModelState?.localDirectory ?? "%LOCALAPPDATA%\\OnlyRag\\models\\images"}</p>
+              <div className="settings-actions">
+                <button type="button" onClick={() => void handleDownloadConfirmed(consentModel.id)} disabled={isModelActionRunning}>
+                  Conferma e scarica
+                </button>
+                <button className="button-secondary" type="button" onClick={() => setPendingConsentModelId(null)} disabled={isModelActionRunning}>
+                  Annulla
+                </button>
+              </div>
+            </div>
+          )}
 
           <form className="images-generate-form" onSubmit={handleGenerate}>
             <label className="field-group" htmlFor="image-prompt">
@@ -269,10 +311,6 @@ export function ImagesSection() {
               />
             </label>
             <div className="settings-grid settings-grid--four">
-              <label className="field-group" htmlFor="image-model">
-                <span>{settings.provider === "comfyui" ? "Checkpoint/Modello" : "Modello richiesta"}</span>
-                <input id="image-model" value={model} onChange={(event) => setModel(event.target.value)} />
-              </label>
               <label className="field-group" htmlFor="image-width">
                 <span>Larghezza</span>
                 <input id="image-width" min={256} max={2048} step={8} type="number" value={width} onChange={(event) => setWidth(Number(event.target.value))} />
@@ -294,13 +332,13 @@ export function ImagesSection() {
                 <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => setSeed(event.target.value)} />
               </label>
             </div>
-            {activeStatus && !activeStatus.isReachable && (
+            {!selectedModelState?.isVerified && (
               <div className="panel-note panel-note--warning" role="status">
-                <p>{activeStatus.suggestion ?? activeStatus.message}</p>
+                <p>Scarica e verifica il modello selezionato prima di generare.</p>
               </div>
             )}
             <div className="settings-actions">
-              <button type="submit" disabled={isGenerating || !prompt.trim()}>
+              <button type="submit" disabled={isGenerating || !canGenerate}>
                 {isGenerating ? "Generazione..." : "Genera"}
               </button>
             </div>
@@ -324,6 +362,44 @@ export function ImagesSection() {
             </div>
           )}
         </section>
+      </div>
+    </div>
+  );
+}
+
+function ModelReadiness({
+  model,
+  state,
+  onAskConsent,
+  onDelete,
+  disabled
+}: {
+  model: ImageModelCatalogEntry;
+  state: ImageModelLocalState | null;
+  onAskConsent: () => void;
+  onDelete: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className={state?.isVerified ? "image-status image-status--online" : "image-status image-status--offline"}>
+      <strong>{model.displayName}</strong>
+      <span>{state?.state ?? "NotDownloaded"}</span>
+      <small>
+        {state?.isVerified
+          ? `${formatFileSize(state.localSizeBytes)} verificati in ${state.localDirectory}`
+          : state?.verificationError ?? model.recommendedProfile}
+      </small>
+      <div className="settings-actions">
+        {!state?.isVerified && (
+          <button type="button" onClick={onAskConsent} disabled={disabled}>
+            Scarica modello
+          </button>
+        )}
+        {state?.isDownloaded && (
+          <button className="button-secondary" type="button" onClick={onDelete} disabled={disabled}>
+            Elimina modello
+          </button>
+        )}
       </div>
     </div>
   );
@@ -368,7 +444,7 @@ function GeneratedImageCard({ image }: { image: GeneratedImage }) {
         <div className="generated-image-card__placeholder" role="status">Caricamento...</div>
       )}
       <div className="generated-image-card__body">
-        <strong>{formatProvider(image.provider)}</strong>
+        <strong>Integrato</strong>
         <p>{image.prompt}</p>
         <small>
           {image.width}x{image.height} · {image.steps} step · {formatFileSize(image.fileSizeBytes)}
@@ -394,8 +470,3 @@ async function fetchImageObjectUrl(imageId: number): Promise<string> {
 
   return URL.createObjectURL(await response.blob());
 }
-
-function formatProvider(provider: string): string {
-  return provider === "comfyui" ? "ComfyUI" : "Automatic1111";
-}
-

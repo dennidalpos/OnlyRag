@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using OnlyRag.Api.Images;
 using OnlyRag.Core;
 using OnlyRag.Worker;
 
@@ -8,26 +9,72 @@ namespace OnlyRag.Api.Tests;
 public sealed partial class InProcessBackendTests
 {
     [Fact]
-    public async Task ImageGeneration_Automatic1111GeneratesAndServesLocalFile()
+    public async Task ImageModelCatalog_ReturnsCuratedModelState()
     {
-        await using FakeImageGenerationServer imageServer = await FakeImageGenerationServer.StartAsync();
-        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-a1111-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-catalog-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
-        await SaveImageSettingsAsync(httpClient, imageServer.BaseUrl, imageServer.BaseUrl, "automatic1111");
+
+        ImageModelCatalogEntry[]? catalog = await httpClient.GetFromJsonAsync<ImageModelCatalogEntry[]>("/api/images/models/catalog", JsonOptions);
+        ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
+
+        Assert.NotNull(catalog);
+        ImageModelCatalogEntry model = Assert.Single(catalog);
+        Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
+        Assert.Equal(ImageModelCatalog.RequiredModelFileName, Assert.Single(model.RequiredFiles));
+        Assert.NotNull(states);
+        ImageModelLocalState state = Assert.Single(states);
+        Assert.Equal(model.Id, state.ModelId);
+        Assert.False(state.IsVerified);
+        Assert.Equal("NotDownloaded", state.State);
+    }
+
+    [Fact]
+    public async Task ImageGeneration_MissingModelReturnsClearError()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-missing-model-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
             "/api/images/generate",
-            new ImageGenerationRequest("automatic1111", "A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.Conflict,
+            "Modello immagini non pronto",
+            "image_generation_model_not_ready");
+    }
+
+    [Fact]
+    public async Task ImageGeneration_IntegratedModelGeneratesAndServesLocalFile()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-integrated-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SeedVerifiedImageModel(tempDescriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await SaveImageSettingsAsync(httpClient);
+
+        ImageGenerationRuntimeStatus? runtimeStatus =
+            await httpClient.GetFromJsonAsync<ImageGenerationRuntimeStatus>("/api/images/runtime/status", JsonOptions);
+        Assert.NotNull(runtimeStatus);
+        Assert.True(runtimeStatus.IsReady);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
             JsonOptions);
         ImageGenerationResponse? payload = await generateResponse.Content.ReadFromJsonAsync<ImageGenerationResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
         Assert.NotNull(payload);
         GeneratedImage image = Assert.Single(payload.Images);
-        Assert.Equal("automatic1111", image.Provider);
+        Assert.Equal("integrated", image.Provider);
         Assert.Equal("A local-first document desk", image.Prompt);
         Assert.Equal("image/png", image.MimeType);
+        Assert.Equal(ImageModelCatalog.DefaultModelId, image.Model);
 
         GeneratedImage[]? listed = await httpClient.GetFromJsonAsync<GeneratedImage[]>("/api/images", JsonOptions);
         Assert.NotNull(listed);
@@ -41,72 +88,75 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task ImageGeneration_ComfyUiGeneratesWithDefaultWorkflow()
+    public async Task ImageModelDownload_RejectsMissingConsent()
     {
-        await using FakeImageGenerationServer imageServer = await FakeImageGenerationServer.StartAsync();
-        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-comfy-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
-        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
-        using HttpClient httpClient = CreateAuthenticatedClient(backend);
-        await SaveImageSettingsAsync(httpClient, imageServer.BaseUrl, imageServer.BaseUrl, "comfyui");
-
-        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
-            "/api/images/generate",
-            new ImageGenerationRequest("comfyui", "A glass archive", null, "test-model.safetensors", 512, 512, 8, 1, 42),
-            JsonOptions);
-        ImageGenerationResponse? payload = await generateResponse.Content.ReadFromJsonAsync<ImageGenerationResponse>(JsonOptions);
-
-        Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
-        Assert.NotNull(payload);
-        GeneratedImage image = Assert.Single(payload.Images);
-        Assert.Equal("comfyui", image.Provider);
-        Assert.Equal("A glass archive", image.Prompt);
-        Assert.Equal("image/png", image.MimeType);
-    }
-
-    [Fact]
-    public async Task ImageGenerationSettings_RejectsRemoteEndpointWithoutTrust()
-    {
-        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-remote-settings-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-consent-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
-        using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
-            "/api/settings/image-generation",
-            new ImageGenerationSettings(
-                "automatic1111",
-                "http://192.0.2.10:7860",
-                "http://127.0.0.1:8188",
-                300,
-                TrustNonLocalEndpoint: false,
-                Automatic1111Model: null,
-                ComfyUiWorkflowJson: null),
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"/api/images/models/{ImageModelCatalog.DefaultModelId}/download",
+            new ImageModelDownloadRequest(ConsentConfirmed: false),
             JsonOptions);
 
         await AssertProblemAsync(
             response,
             HttpStatusCode.BadRequest,
-            "Configurazione immagini non valida",
-            "image_generation_invalid_configuration");
+            "Richiesta immagini non valida",
+            "image_generation_invalid_request");
     }
 
-    private static async Task SaveImageSettingsAsync(
-        HttpClient httpClient,
-        string automatic1111BaseUrl,
-        string comfyUiBaseUrl,
-        string provider)
+    [Fact]
+    public async Task ImageModelDownload_WritesAndVerifiesEmbeddedModel()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"/api/images/models/{ImageModelCatalog.DefaultModelId}/download",
+            new ImageModelDownloadRequest(ConsentConfirmed: true),
+            JsonOptions);
+        ImageModelDownloadResponse? payload = await response.Content.ReadFromJsonAsync<ImageModelDownloadResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("Verified", payload.State);
+
+        string modelPath = Path.Combine(
+            tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
+            ImageModelCatalog.DefaultModelId,
+            ImageModelCatalog.RequiredModelFileName);
+        Assert.True(File.Exists(modelPath));
+
+        ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
+        Assert.NotNull(states);
+        ImageModelLocalState state = Assert.Single(states);
+        Assert.True(state.IsVerified);
+        Assert.Equal(46, state.LocalSizeBytes);
+    }
+
+    private static async Task SaveImageSettingsAsync(HttpClient httpClient)
     {
         using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
             "/api/settings/image-generation",
             new ImageGenerationSettings(
-                provider,
-                automatic1111BaseUrl,
-                comfyUiBaseUrl,
+                ImageModelCatalog.DefaultModelId,
                 60,
-                TrustNonLocalEndpoint: false,
-                Automatic1111Model: null,
-                ComfyUiWorkflowJson: null),
+                PreferGpu: true,
+                ActiveExecutionProvider: "CPU"),
             JsonOptions);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
-}
 
+    private static void SeedVerifiedImageModel(TempBackendDescriptor tempDescriptor)
+    {
+        string modelDirectory = Path.Combine(
+            tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
+            ImageModelCatalog.DefaultModelId);
+        Directory.CreateDirectory(modelDirectory);
+        File.WriteAllBytes(
+            Path.Combine(modelDirectory, ImageModelCatalog.RequiredModelFileName),
+            System.Text.Encoding.UTF8.GetBytes(ImageModelCatalog.PlaceholderModelContent));
+    }
+}

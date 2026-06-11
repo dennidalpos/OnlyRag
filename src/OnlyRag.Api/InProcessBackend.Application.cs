@@ -86,6 +86,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
         builder.Services.AddSingleton<ImageGenerationService>();
+        builder.Services.AddHttpClient<ImageModelManager>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         builder.Services.AddSingleton<OllamaGenerationCoordinator>();
         builder.Services.AddSingleton<DependencyProvisioningService>();
@@ -94,12 +95,6 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<DiagnosticsProbeCacheService>();
         builder.Services.AddSingleton<SystemTelemetryService>();
         builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
-        builder.Services.AddHttpClient<Automatic1111ImageGenerationClient>();
-        builder.Services.AddHttpClient<ComfyUiImageGenerationClient>();
-        builder.Services.AddSingleton<IImageGenerationClient>(services =>
-            services.GetRequiredService<Automatic1111ImageGenerationClient>());
-        builder.Services.AddSingleton<IImageGenerationClient>(services =>
-            services.GetRequiredService<ComfyUiImageGenerationClient>());
         builder.Services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         builder.Services.AddSingleton<DocumentTextChunker>();
         builder.Services.AddSingleton<OfficeOpenXmlTextExtractor>();

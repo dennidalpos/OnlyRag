@@ -226,37 +226,17 @@ else {
 }
 
 if ($SkipImageGenerationCheck) {
-    Write-Result -Status "SKIP" -Message "Image generation provider checks skipped by -SkipImageGenerationCheck."
+    Write-Result -Status "SKIP" -Message "Integrated image model storage check skipped by -SkipImageGenerationCheck."
 }
 else {
-    $imageProviders = @(
-        [pscustomobject]@{
-            Name = "Automatic1111"
-            Uri = "http://127.0.0.1:7860/sdapi/v1/sd-models"
-            Manual = "Install and start Automatic1111 with --api enabled, then verify http://127.0.0.1:7860 from the Images section."
-        },
-        [pscustomobject]@{
-            Name = "ComfyUI"
-            Uri = "http://127.0.0.1:8188/system_stats"
-            Manual = "Install and start ComfyUI, then verify http://127.0.0.1:8188 from the Images section."
-        }
-    )
-
-    foreach ($provider in $imageProviders) {
-        try {
-            $imageProviderResponse = Invoke-WebRequest -Uri $provider.Uri -UseBasicParsing -TimeoutSec 5
-            if ($imageProviderResponse.StatusCode -ge 200 -and $imageProviderResponse.StatusCode -lt 300) {
-                Add-Verified "$($provider.Name) image generation endpoint reachable at $($provider.Uri)."
-            }
-            else {
-                Add-Warning "$($provider.Name) image generation endpoint returned HTTP $($imageProviderResponse.StatusCode) at $($provider.Uri)."
-                Add-Manual $provider.Manual
-            }
-        }
-        catch {
-            Add-Warning "$($provider.Name) image generation endpoint was not reachable at $($provider.Uri)."
-            Add-Manual $provider.Manual
-        }
+    $imageModelRoot = Join-Path $localDataRoot "models\images"
+    try {
+        New-Item -ItemType Directory -Force -Path $imageModelRoot | Out-Null
+        Add-Verified "Integrated image model directory prepared: $imageModelRoot."
+        Add-Manual "Download image models from OnlyRag Images; downloads require explicit consent and SHA256 verification."
+    }
+    catch {
+        Add-Warning "Integrated image model directory could not be prepared: $($_.Exception.Message)"
     }
 }
 
