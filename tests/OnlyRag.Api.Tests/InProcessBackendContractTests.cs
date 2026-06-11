@@ -180,6 +180,7 @@ public sealed partial class InProcessBackendTests
         AssertTypeScriptContractMatchesDto<ImageGenerationSettings>(apiSource, "ImageGenerationSettings");
         AssertTypeScriptContractMatchesDto<ImageGenerationRuntimeStatus>(apiSource, "ImageGenerationRuntimeStatus");
         AssertTypeScriptContractMatchesDto<ImageModelCatalogEntry>(apiSource, "ImageModelCatalogEntry");
+        AssertTypeScriptContractMatchesDto<ImageModelCatalogEntryRequest>(apiSource, "ImageModelCatalogEntryRequest");
         AssertTypeScriptContractMatchesDto<ImageModelLocalState>(apiSource, "ImageModelLocalState");
         AssertTypeScriptContractMatchesDto<ImageModelDownloadResponse>(apiSource, "ImageModelDownloadResponse");
         AssertTypeScriptContractMatchesDto<ImageGenerationRequest>(apiSource, "ImageGenerationRequest");

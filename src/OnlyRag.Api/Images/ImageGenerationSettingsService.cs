@@ -15,16 +15,21 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
     private const int MaxRequestTimeoutSeconds = 1800;
 
     private readonly ISettingsRepository settingsRepository;
+    private readonly ImageModelCatalogStore modelCatalog;
 
-    public ImageGenerationSettingsService(ISettingsRepository settingsRepository)
+    public ImageGenerationSettingsService(
+        ISettingsRepository settingsRepository,
+        ImageModelCatalogStore modelCatalog)
     {
         this.settingsRepository = settingsRepository;
+        this.modelCatalog = modelCatalog;
     }
 
     public async Task<ImageGenerationSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        string selectedModelId = NormalizeModelId(
-            await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken));
+        string selectedModelId = await NormalizeModelIdAsync(
+            await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken),
+            cancellationToken);
         string? timeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
         string? preferGpuValue = await settingsRepository.GetValueAsync(PreferGpuKey, cancellationToken);
         string activeExecutionProvider = NormalizeExecutionProvider(
@@ -41,7 +46,7 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
         ImageGenerationSettings settings,
         CancellationToken cancellationToken = default)
     {
-        string selectedModelId = NormalizeModelId(settings.SelectedModelId);
+        string selectedModelId = await NormalizeModelIdAsync(settings.SelectedModelId, cancellationToken);
         int timeout = ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds);
         string activeExecutionProvider = NormalizeExecutionProvider(settings.ActiveExecutionProvider);
 
@@ -78,10 +83,10 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
             : DefaultRequestTimeoutSeconds;
     }
 
-    private static string NormalizeModelId(string? value)
+    private async Task<string> NormalizeModelIdAsync(string? value, CancellationToken cancellationToken)
     {
         string modelId = string.IsNullOrWhiteSpace(value) ? DefaultSelectedModelId : value.Trim();
-        if (!ImageModelCatalog.Contains(modelId))
+        if (!await modelCatalog.ContainsAsync(modelId, cancellationToken))
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidConfiguration,

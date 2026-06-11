@@ -158,7 +158,8 @@ function createCatalogEntry() {
     licenseLabel: "OpenRAIL++",
     expectedSizeBytes: 46,
     requiredFiles: ["model.onnx"],
-    sha256: "41300f6070c3a7152cc4b92b93c3aee5a868f95e4711973d60060a123074496b"
+    sha256: "41300f6070c3a7152cc4b92b93c3aee5a868f95e4711973d60060a123074496b",
+    isBuiltIn: true
   };
 }
 

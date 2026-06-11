@@ -28,7 +28,7 @@ internal sealed class ImageGenerationService
         CancellationToken cancellationToken = default)
     {
         ImageGenerationSettings settings = await settingsService.GetAsync(cancellationToken);
-        ImageModelLocalState state = modelManager.GetState(settings.SelectedModelId);
+        ImageModelLocalState state = await modelManager.GetStateAsync(settings.SelectedModelId, cancellationToken);
         return new ImageGenerationRuntimeStatus(
             state.IsVerified ? "Ready" : state.State,
             state.IsVerified,
@@ -48,7 +48,7 @@ internal sealed class ImageGenerationService
             string.IsNullOrWhiteSpace(request.ModelId)
                 ? request with { ModelId = settings.SelectedModelId }
                 : request);
-        _ = modelManager.GetVerifiedModelFilePath(normalized.ModelId ?? settings.SelectedModelId);
+        _ = await modelManager.GetVerifiedModelFilePathAsync(normalized.ModelId ?? settings.SelectedModelId, cancellationToken);
         IReadOnlyList<ImageGenerationBinary> generated = GenerateIntegratedImages(normalized);
         if (generated.Count == 0)
         {

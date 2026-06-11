@@ -7,33 +7,50 @@ internal static class ImageModelCatalog
     public const string DefaultModelId = "onlyrag-sdxl-turbo-directml";
     public const string RequiredModelFileName = "model.onnx";
     public const string PlaceholderModelContent = "OnlyRag integrated image model placeholder v1\n";
-    public const string EmbeddedPlaceholderDownloadUrl = "onlyrag://models/images/onlyrag-sdxl-turbo-directml/model.onnx";
 
-    private static readonly ImageModelCatalogEntry[] Models =
+    private static readonly ImageModelCatalogEntry[] DefaultModels =
     [
         new(
             DefaultModelId,
-            "OnlyRag SDXL Turbo",
-            "DirectML GPU consigliato, CPU disponibile per fallback",
-            EmbeddedPlaceholderDownloadUrl,
-            "OpenRAIL++ / verificare termini modello upstream",
-            46,
-            [RequiredModelFileName],
-            "41300f6070c3a7152cc4b92b93c3aee5a868f95e4711973d60060a123074496b")
+            "SDXL Turbo Olive ONNX",
+            "ONNX ottimizzato Olive per DirectML; richiede pipeline multi-file",
+            "https://huggingface.co/softwareweaver/Sdxl-Turbo-Olive-Onnx",
+            "CC-BY-NC-4.0 / verificare termini upstream",
+            0,
+            ["model_index.json"],
+            string.Empty,
+            IsBuiltIn: true),
+        new(
+            "onnxruntime-sdxl-turbo-cuda",
+            "SDXL Turbo ONNX Runtime CUDA",
+            "ONNX Runtime CUDA per GPU NVIDIA; non compatibile con CPU/DirectML",
+            "https://huggingface.co/onnxruntime/sdxl-turbo",
+            "Stability AI Non-Commercial Community License",
+            0,
+            ["model_index.json"],
+            string.Empty,
+            IsBuiltIn: true),
+        new(
+            "lcm-sdxl-olive-onnx",
+            "LCM SDXL Olive ONNX",
+            "ONNX ottimizzato Olive per generazione a pochi step; richiede pipeline multi-file",
+            "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
+            "OpenRAIL++ / verificare termini upstream",
+            0,
+            ["model_index.json"],
+            string.Empty,
+            IsBuiltIn: true)
     ];
 
-    public static IReadOnlyList<ImageModelCatalogEntry> List() => Models;
+    public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;
 
-    public static bool Contains(string modelId)
+    public static bool IsBuiltIn(string modelId)
     {
-        return Models.Any(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase));
+        return DefaultModels.Any(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static ImageModelCatalogEntry Get(string modelId)
+    public static ImageModelCatalogEntry? GetDefault(string modelId)
     {
-        return Models.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase))
-            ?? throw new ImageGenerationException(
-                ImageGenerationErrorKind.NotFound,
-                "Modello immagini non presente nel catalogo integrato.");
+        return DefaultModels.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase));
     }
 }

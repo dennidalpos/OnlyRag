@@ -34,13 +34,46 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await imageGeneration.GetRuntimeStatusAsync(cancellationToken)));
 
-        app.MapGet("/api/images/models/catalog", (
-            ImageModelManager models) =>
-            Results.Ok(models.ListCatalog()));
+        app.MapGet("/api/images/models/catalog", async (
+            ImageModelManager models,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await models.ListCatalogAsync(cancellationToken)));
 
-        app.MapGet("/api/images/models", (
-            ImageModelManager models) =>
-            Results.Ok(models.ListStates()));
+        app.MapPut("/api/images/models/catalog/{modelId}", async (
+            string modelId,
+            ImageModelCatalogEntryRequest request,
+            ImageModelCatalogStore modelCatalog,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await modelCatalog.UpsertAsync(request with { Id = modelId }, cancellationToken));
+            }
+            catch (ImageGenerationException ex)
+            {
+                return MapImageGenerationException(ex, app.Services, "/api/images/models/catalog");
+            }
+        });
+
+        app.MapDelete("/api/images/models/catalog/{modelId}", async (
+            string modelId,
+            ImageModelCatalogStore modelCatalog,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await modelCatalog.ResetOrDeleteAsync(modelId, cancellationToken));
+            }
+            catch (ImageGenerationException ex)
+            {
+                return MapImageGenerationException(ex, app.Services, "/api/images/models/catalog");
+            }
+        });
+
+        app.MapGet("/api/images/models", async (
+            ImageModelManager models,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await models.ListStatesAsync(cancellationToken)));
 
         app.MapPost("/api/images/models/{modelId}/download", async (
             string modelId,
@@ -58,13 +91,14 @@ public static partial class InProcessBackend
             }
         });
 
-        app.MapDelete("/api/images/models/{modelId}/download", (
+        app.MapDelete("/api/images/models/{modelId}/download", async (
             string modelId,
-            ImageModelManager models) =>
+            ImageModelManager models,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                return Results.Ok(models.CancelDownload(modelId));
+                return Results.Ok(await models.CancelDownloadAsync(modelId, cancellationToken));
             }
             catch (ImageGenerationException ex)
             {
@@ -72,13 +106,14 @@ public static partial class InProcessBackend
             }
         });
 
-        app.MapDelete("/api/images/models/{modelId}", (
+        app.MapDelete("/api/images/models/{modelId}", async (
             string modelId,
-            ImageModelManager models) =>
+            ImageModelManager models,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                return Results.Ok(models.Delete(modelId));
+                return Results.Ok(await models.DeleteAsync(modelId, cancellationToken));
             }
             catch (ImageGenerationException ex)
             {

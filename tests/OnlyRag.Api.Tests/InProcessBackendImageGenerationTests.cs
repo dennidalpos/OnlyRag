@@ -19,11 +19,12 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
         Assert.NotNull(catalog);
-        ImageModelCatalogEntry model = Assert.Single(catalog);
+        Assert.True(catalog.Length >= 3);
+        ImageModelCatalogEntry model = Assert.Single(catalog, candidate => candidate.Id == ImageModelCatalog.DefaultModelId);
         Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
-        Assert.Equal(ImageModelCatalog.RequiredModelFileName, Assert.Single(model.RequiredFiles));
+        Assert.True(model.IsBuiltIn);
         Assert.NotNull(states);
-        ImageModelLocalState state = Assert.Single(states);
+        ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == model.Id);
         Assert.Equal(model.Id, state.ModelId);
         Assert.False(state.IsVerified);
         Assert.Equal("NotDownloaded", state.State);
@@ -95,28 +96,35 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task ImageModelDownload_RejectsEmbeddedPlaceholderModel()
+    public async Task ImageModelCatalog_AllowsManualModelWithEditableDownloadUrl()
     {
-        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-catalog-edit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
-        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
-            $"/api/images/models/{ImageModelCatalog.DefaultModelId}/download",
-            new ImageModelDownloadRequest(ConsentConfirmed: true),
+        using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
+            "/api/images/models/catalog/manual-model",
+            new ImageModelCatalogEntryRequest(
+                "ignored-client-id",
+                "Manual model",
+                "Manual profile",
+                "https://example.test/model.onnx",
+                "Manual license",
+                123,
+                [ImageModelCatalog.RequiredModelFileName],
+                string.Empty),
             JsonOptions);
+        ImageModelCatalogEntry? payload = await response.Content.ReadFromJsonAsync<ImageModelCatalogEntry>(JsonOptions);
 
-        await AssertProblemAsync(
-            response,
-            HttpStatusCode.BadRequest,
-            "Configurazione immagini non valida",
-            "image_generation_invalid_configuration");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("manual-model", payload.Id);
+        Assert.Equal("https://example.test/model.onnx", payload.DownloadUrl);
+        Assert.False(payload.IsBuiltIn);
 
-        string modelPath = Path.Combine(
-            tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
-            ImageModelCatalog.DefaultModelId,
-            ImageModelCatalog.RequiredModelFileName);
-        Assert.False(File.Exists(modelPath));
+        ImageModelCatalogEntry[]? catalog = await httpClient.GetFromJsonAsync<ImageModelCatalogEntry[]>("/api/images/models/catalog", JsonOptions);
+        Assert.NotNull(catalog);
+        Assert.Contains(catalog, model => model.Id == "manual-model" && model.DownloadUrl == "https://example.test/model.onnx");
     }
 
     [Fact]
@@ -129,7 +137,7 @@ public sealed partial class InProcessBackendTests
 
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
         Assert.NotNull(states);
-        ImageModelLocalState state = Assert.Single(states);
+        ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == ImageModelCatalog.DefaultModelId);
         Assert.Equal("VerificationFailed", state.State);
         Assert.False(state.IsVerified);
         Assert.Equal(46, state.LocalSizeBytes);

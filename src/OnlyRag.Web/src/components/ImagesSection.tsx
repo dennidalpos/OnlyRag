@@ -4,6 +4,7 @@ import {
   resolveBackendBaseUrl,
   resolveBackendSessionToken,
   type GeneratedImage,
+  type ImageModelCatalogEntryRequest,
   type ImageGenerationResponse,
   type ImageGenerationRuntimeStatus,
   type ImageGenerationSettings,
@@ -27,6 +28,17 @@ type Feedback = {
   message: string;
 };
 
+type ModelDraft = {
+  id: string;
+  displayName: string;
+  recommendedProfile: string;
+  downloadUrl: string;
+  licenseLabel: string;
+  expectedSizeBytes: string;
+  requiredFiles: string;
+  sha256: string;
+};
+
 export function ImagesSection() {
   const [settings, setSettings] = useState<ImageGenerationSettings>(defaultSettings);
   const [savedSettings, setSavedSettings] = useState<ImageGenerationSettings>(defaultSettings);
@@ -42,8 +54,10 @@ export function ImagesSection() {
   const [steps, setSteps] = useState(30);
   const [batchSize, setBatchSize] = useState(1);
   const [seed, setSeed] = useState("");
+  const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createEmptyModelDraft(defaultModelId));
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingModel, setIsSavingModel] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isModelActionRunning, setIsModelActionRunning] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -62,6 +76,12 @@ export function ImagesSection() {
   );
   const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const canGenerate = Boolean(prompt.trim()) && Boolean(selectedModelState?.isVerified);
+
+  useEffect(() => {
+    if (selectedModel) {
+      setModelDraft(createModelDraft(selectedModel));
+    }
+  }, [selectedModel]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -109,6 +129,17 @@ export function ImagesSection() {
     ]);
     setRuntimeStatus(loadedRuntimeStatus);
     setModelStates(loadedModelStates);
+  }
+
+  async function refreshImageCatalog() {
+    const [loadedCatalog, loadedModelStates, loadedRuntimeStatus] = await Promise.all([
+      apiRequest<ImageModelCatalogEntry[]>("/api/images/models/catalog"),
+      apiRequest<ImageModelLocalState[]>("/api/images/models"),
+      apiRequest<ImageGenerationRuntimeStatus>("/api/images/runtime/status")
+    ]);
+    setCatalog(loadedCatalog);
+    setModelStates(loadedModelStates);
+    setRuntimeStatus(loadedRuntimeStatus);
   }
 
   async function handleSaveSettings() {
@@ -159,6 +190,44 @@ export function ImagesSection() {
       setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Rimozione modello non riuscita." });
     } finally {
       setIsModelActionRunning(false);
+    }
+  }
+
+  async function handleSaveModel() {
+    setIsSavingModel(true);
+    setFeedback(null);
+    try {
+      const request = createModelRequest(modelDraft);
+      const saved = await apiRequest<ImageModelCatalogEntry>(`/api/images/models/catalog/${encodeURIComponent(request.id)}`, {
+        method: "PUT",
+        body: JSON.stringify(request)
+      });
+      setSettings((current) => ({ ...current, selectedModelId: saved.id }));
+      await refreshImageCatalog();
+      setFeedback({ tone: "success", message: saved.isBuiltIn ? "Modello integrato aggiornato." : "Modello manuale salvato." });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Salvataggio modello non riuscito." });
+    } finally {
+      setIsSavingModel(false);
+    }
+  }
+
+  async function handleResetOrRemoveModel() {
+    if (!selectedModel) return;
+    setIsSavingModel(true);
+    setFeedback(null);
+    try {
+      await apiRequest<ImageModelCatalogEntry>(`/api/images/models/catalog/${encodeURIComponent(selectedModel.id)}`, {
+        method: "DELETE"
+      });
+      const nextModelId = selectedModel.isBuiltIn ? selectedModel.id : defaultModelId;
+      setSettings((current) => ({ ...current, selectedModelId: nextModelId }));
+      await refreshImageCatalog();
+      setFeedback({ tone: "success", message: selectedModel.isBuiltIn ? "Modello integrato ripristinato." : "Modello manuale rimosso." });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Aggiornamento catalogo non riuscito." });
+    } finally {
+      setIsSavingModel(false);
     }
   }
 
@@ -269,13 +338,24 @@ export function ImagesSection() {
           </div>
 
           {selectedModel && (
-            <ModelReadiness
-              model={selectedModel}
-              state={selectedModelState}
-              onAskConsent={() => setPendingConsentModelId(selectedModel.id)}
-              onDelete={() => void handleDeleteModel(selectedModel.id)}
-              disabled={isModelActionRunning}
-            />
+            <>
+              <ModelReadiness
+                model={selectedModel}
+                state={selectedModelState}
+                onAskConsent={() => setPendingConsentModelId(selectedModel.id)}
+                onDelete={() => void handleDeleteModel(selectedModel.id)}
+                disabled={isModelActionRunning}
+              />
+              <ModelCatalogEditor
+                draft={modelDraft}
+                selectedModel={selectedModel}
+                disabled={isSavingModel}
+                onChange={setModelDraft}
+                onSave={() => void handleSaveModel()}
+                onNew={() => setModelDraft(createEmptyModelDraft(`custom-${Date.now()}`))}
+                onResetOrRemove={() => void handleResetOrRemoveModel()}
+              />
+            </>
           )}
 
           {consentModel && (
@@ -362,6 +442,86 @@ export function ImagesSection() {
             </div>
           )}
         </section>
+      </div>
+    </div>
+  );
+}
+
+function ModelCatalogEditor({
+  draft,
+  selectedModel,
+  disabled,
+  onChange,
+  onSave,
+  onNew,
+  onResetOrRemove
+}: {
+  draft: ModelDraft;
+  selectedModel: ImageModelCatalogEntry;
+  disabled: boolean;
+  onChange: (draft: ModelDraft) => void;
+  onSave: () => void;
+  onNew: () => void;
+  onResetOrRemove: () => void;
+}) {
+  return (
+    <div className="panel-note panel-note--info">
+      <h3>Catalogo modello</h3>
+      <div className="settings-grid settings-grid--two">
+        <label className="field-group" htmlFor="image-model-id">
+          <span>Id</span>
+          <input id="image-model-id" value={draft.id} onChange={(event) => onChange({ ...draft, id: event.target.value })} />
+        </label>
+        <label className="field-group" htmlFor="image-model-name">
+          <span>Nome</span>
+          <input id="image-model-name" value={draft.displayName} onChange={(event) => onChange({ ...draft, displayName: event.target.value })} />
+        </label>
+      </div>
+      <label className="field-group" htmlFor="image-model-url">
+        <span>URL download o repository</span>
+        <input id="image-model-url" value={draft.downloadUrl} onChange={(event) => onChange({ ...draft, downloadUrl: event.target.value })} />
+      </label>
+      <label className="field-group" htmlFor="image-model-profile">
+        <span>Profilo</span>
+        <input id="image-model-profile" value={draft.recommendedProfile} onChange={(event) => onChange({ ...draft, recommendedProfile: event.target.value })} />
+      </label>
+      <div className="settings-grid settings-grid--two">
+        <label className="field-group" htmlFor="image-model-license">
+          <span>Licenza</span>
+          <input id="image-model-license" value={draft.licenseLabel} onChange={(event) => onChange({ ...draft, licenseLabel: event.target.value })} />
+        </label>
+        <label className="field-group" htmlFor="image-model-size">
+          <span>Dimensione prevista</span>
+          <input
+            id="image-model-size"
+            inputMode="numeric"
+            value={draft.expectedSizeBytes}
+            onChange={(event) => onChange({ ...draft, expectedSizeBytes: event.target.value })}
+          />
+        </label>
+      </div>
+      <label className="field-group" htmlFor="image-model-required-files">
+        <span>File richiesti</span>
+        <input
+          id="image-model-required-files"
+          value={draft.requiredFiles}
+          onChange={(event) => onChange({ ...draft, requiredFiles: event.target.value })}
+        />
+      </label>
+      <label className="field-group" htmlFor="image-model-sha">
+        <span>SHA256 opzionale</span>
+        <input id="image-model-sha" value={draft.sha256} onChange={(event) => onChange({ ...draft, sha256: event.target.value })} />
+      </label>
+      <div className="settings-actions">
+        <button type="button" onClick={onSave} disabled={disabled}>
+          {disabled ? "Salvataggio..." : "Salva modello"}
+        </button>
+        <button className="button-secondary" type="button" onClick={onNew} disabled={disabled}>
+          Nuovo
+        </button>
+        <button className="button-secondary" type="button" onClick={onResetOrRemove} disabled={disabled}>
+          {selectedModel.isBuiltIn ? "Ripristina integrato" : "Rimuovi dal catalogo"}
+        </button>
       </div>
     </div>
   );
@@ -469,4 +629,46 @@ async function fetchImageObjectUrl(imageId: number): Promise<string> {
   }
 
   return URL.createObjectURL(await response.blob());
+}
+
+function createModelDraft(model: ImageModelCatalogEntry): ModelDraft {
+  return {
+    id: model.id,
+    displayName: model.displayName,
+    recommendedProfile: model.recommendedProfile,
+    downloadUrl: model.downloadUrl,
+    licenseLabel: model.licenseLabel,
+    expectedSizeBytes: String(model.expectedSizeBytes),
+    requiredFiles: model.requiredFiles.join(", "),
+    sha256: model.sha256
+  };
+}
+
+function createEmptyModelDraft(id: string): ModelDraft {
+  return {
+    id,
+    displayName: "Modello personalizzato",
+    recommendedProfile: "Profilo personalizzato",
+    downloadUrl: "https://huggingface.co/",
+    licenseLabel: "Verificare licenza upstream",
+    expectedSizeBytes: "0",
+    requiredFiles: "model.onnx",
+    sha256: ""
+  };
+}
+
+function createModelRequest(draft: ModelDraft): ImageModelCatalogEntryRequest {
+  return {
+    id: draft.id.trim(),
+    displayName: draft.displayName.trim(),
+    recommendedProfile: draft.recommendedProfile.trim(),
+    downloadUrl: draft.downloadUrl.trim(),
+    licenseLabel: draft.licenseLabel.trim(),
+    expectedSizeBytes: Number(draft.expectedSizeBytes.trim()) || 0,
+    requiredFiles: draft.requiredFiles
+      .split(",")
+      .map((file) => file.trim())
+      .filter(Boolean),
+    sha256: draft.sha256.trim()
+  };
 }

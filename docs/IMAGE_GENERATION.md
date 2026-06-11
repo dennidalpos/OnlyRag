@@ -9,11 +9,18 @@ The Images section lists curated models with:
 
 - model id and display name;
 - recommended GPU/CPU profile;
-- download URL;
+- editable download URL or Hugging Face repository URL;
 - license label;
 - expected size;
 - required local files;
 - SHA256 verification metadata.
+
+The built-in catalog is seeded with SDXL/LCM ONNX entries. Users can edit built-in entries, reset them,
+or add manual entries from the Images section. Catalog overrides are stored in the local settings store,
+not in repository source files.
+
+When a catalog entry points at `https://huggingface.co/{owner}/{model}`, OnlyRag downloads the model
+repository snapshot into the local model folder. Direct file URLs are downloaded as `model.onnx`.
 
 Model files are stored under:
 

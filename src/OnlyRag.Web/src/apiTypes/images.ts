@@ -22,6 +22,18 @@ export type ImageModelCatalogEntry = {
   expectedSizeBytes: number;
   requiredFiles: string[];
   sha256: string;
+  isBuiltIn: boolean;
+};
+
+export type ImageModelCatalogEntryRequest = {
+  id: string;
+  displayName: string;
+  recommendedProfile: string;
+  downloadUrl: string;
+  licenseLabel: string;
+  expectedSizeBytes: number;
+  requiredFiles: string[];
+  sha256: string;
 };
 
 export type ImageModelLocalState = {

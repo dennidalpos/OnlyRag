@@ -84,6 +84,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<PdfExportSettingsStore>();
         builder.Services.AddSingleton<IPdfExportConverter, LibreOfficePdfExportConverter>();
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
+        builder.Services.AddSingleton<ImageModelCatalogStore>();
         builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
         builder.Services.AddSingleton<ImageGenerationService>();
         builder.Services.AddHttpClient<ImageModelManager>();

@@ -1,6 +1,6 @@
 namespace OnlyRag.Core;
 
-public sealed record ImageModelCatalogEntry(
+public sealed record ImageModelCatalogEntryRequest(
     string Id,
     string DisplayName,
     string RecommendedProfile,
@@ -8,5 +8,4 @@ public sealed record ImageModelCatalogEntry(
     string LicenseLabel,
     long ExpectedSizeBytes,
     IReadOnlyList<string> RequiredFiles,
-    string Sha256,
-    bool IsBuiltIn);
+    string Sha256);
