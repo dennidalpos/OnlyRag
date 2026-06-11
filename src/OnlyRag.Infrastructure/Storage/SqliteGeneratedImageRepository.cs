@@ -139,6 +139,59 @@ public sealed class SqliteGeneratedImageRepository : IGeneratedImageRepository
         return (image, relativePath);
     }
 
+    public async Task<GeneratedImage?> DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        await using SqliteCommand selectCommand = connection.CreateCommand();
+        selectCommand.Transaction = transaction;
+        selectCommand.CommandText =
+            """
+            SELECT
+                id,
+                provider,
+                prompt,
+                negative_prompt,
+                model,
+                width,
+                height,
+                steps,
+                batch_size,
+                seed,
+                file_name,
+                mime_type,
+                file_size_bytes,
+                created_at_utc
+            FROM generated_images
+            WHERE id = $id;
+            """;
+        selectCommand.AddParameter("$id", id);
+
+        GeneratedImage? image = null;
+        await using (SqliteDataReader reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                image = ReadImage(reader);
+            }
+        }
+
+        if (image is null)
+        {
+            return null;
+        }
+
+        await using SqliteCommand deleteCommand = connection.CreateCommand();
+        deleteCommand.Transaction = transaction;
+        deleteCommand.CommandText = "DELETE FROM generated_images WHERE id = $id;";
+        deleteCommand.AddParameter("$id", id);
+        await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return image;
+    }
+
     private static void AddImageParameters(SqliteCommand command, GeneratedImage image, string relativePath)
     {
         command.AddParameter("$provider", image.Provider);
@@ -177,4 +230,3 @@ public sealed class SqliteGeneratedImageRepository : IGeneratedImageRepository
             DateTimeOffset.Parse(reader.GetString(offset + (reader.FieldCount == 15 ? 14 : 13))));
     }
 }
-

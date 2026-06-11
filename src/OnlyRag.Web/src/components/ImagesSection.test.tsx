@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { GeneratedImage, ImageModelLocalState } from "../api";
@@ -17,8 +17,9 @@ describe("ImagesSection", () => {
 
     render(<ImagesSection />);
 
-    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await screen.findByRole("heading", { name: "Crea immagine" });
 
+    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
     expect(screen.getAllByText("OnlyRag SDXL Turbo").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Scarica modello" })).toBeInTheDocument();
     expect(screen.queryByText(/Automatic1111/i)).not.toBeInTheDocument();
@@ -36,7 +37,7 @@ describe("ImagesSection", () => {
 
     render(<ImagesSection />);
 
-    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await screen.findByRole("heading", { name: "Crea immagine" });
     await userEvent.type(screen.getByLabelText("Prompt"), "Una libreria futuristica");
 
     expect(screen.getByRole("button", { name: "Genera" })).toBeDisabled();
@@ -66,7 +67,8 @@ describe("ImagesSection", () => {
 
     render(<ImagesSection />);
 
-    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
     await userEvent.click(screen.getByRole("button", { name: "Scarica modello" }));
     expect(screen.getByRole("dialog", { name: "Conferma download modello" })).toHaveTextContent("Licenza");
     await userEvent.click(screen.getByRole("button", { name: "Conferma e scarica" }));
@@ -106,7 +108,8 @@ describe("ImagesSection", () => {
 
     render(<ImagesSection />);
 
-    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
     await userEvent.click(screen.getByRole("button", { name: "Scarica modello" }));
     await userEvent.click(screen.getByRole("button", { name: "Conferma e scarica" }));
 
@@ -150,7 +153,7 @@ describe("ImagesSection", () => {
 
     render(<ImagesSection />);
 
-    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await screen.findByRole("heading", { name: "Crea immagine" });
     await userEvent.type(screen.getByLabelText("Prompt"), "Una libreria futuristica");
     await userEvent.click(screen.getByRole("button", { name: "Genera" }));
 
@@ -165,9 +168,82 @@ describe("ImagesSection", () => {
       modelId: "onlyrag-sdxl-turbo-directml",
       width: 1024,
       height: 1024,
-      steps: 30,
+      steps: 8,
       batchSize: 1
     });
+  });
+
+  it("opens the generated images folder from the editor", async () => {
+    const api = mockApi([
+      { path: "/api/settings/image-generation", response: createImageSettings() },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: true, state: "Ready" }) },
+      { path: "/api/images/models/catalog", response: [createCatalogEntry()] },
+      { path: "/api/images/models", response: [createModelState({ isVerified: true })] },
+      { path: "/api/images", response: [] },
+      {
+        path: "/api/images/open-folder",
+        method: "POST",
+        response: { message: "Cartella immagini generate aperta." }
+      }
+    ]);
+
+    render(<ImagesSection />);
+
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await userEvent.click(screen.getByRole("button", { name: "Apri cartella" }));
+
+    expect(await screen.findByText("Cartella immagini generate aperta.")).toBeInTheDocument();
+    const openCall = api.calls.find((call) => call.path === "/api/images/open-folder");
+    expect(JSON.parse(String(openCall?.body))).toEqual({ confirmed: true });
+  });
+
+  it("deletes a generated image from the editor", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:onlyrag-image")
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn()
+    });
+    mockApi([
+      { path: "/api/settings/image-generation", response: createImageSettings() },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: true, state: "Ready" }) },
+      { path: "/api/images/models/catalog", response: [createCatalogEntry()] },
+      { path: "/api/images/models", response: [createModelState({ isVerified: true })] },
+      { path: "/api/images", response: [createGeneratedImage({ prompt: "Prompt lungo non troncato" })] },
+      { path: "/api/images/1/file", response: "image-bytes" },
+      { path: "/api/images/1", method: "DELETE", response: createGeneratedImage() }
+    ]);
+
+    render(<ImagesSection />);
+
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await screen.findAllByText("image.png");
+    await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+
+    expect(await screen.findByText("Immagine eliminata.")).toBeInTheDocument();
+    expect(screen.getByText("Nessuna immagine generata.")).toBeInTheDocument();
+  });
+
+  it("keeps image settings in a modal with remaining model size", async () => {
+    mockApi([
+      { path: "/api/settings/image-generation", response: createImageSettings() },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: false, state: "NotDownloaded" }) },
+      { path: "/api/images/models/catalog", response: [createCatalogEntry({ expectedSizeBytes: 10_000_000 })] },
+      { path: "/api/images/models", response: [createModelState({ isVerified: false, expectedSizeBytes: 10_000_000, remainingDownloadBytes: 10_000_000 })] },
+      { path: "/api/images", response: [] }
+    ]);
+
+    render(<ImagesSection />);
+
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+    const dialog = screen.getByRole("dialog", { name: "Impostazioni immagini" });
+
+    expect(within(dialog).getByLabelText("Modello integrato")).toBeInTheDocument();
+    expect(within(dialog).getByText(/rimanenti/i)).toBeInTheDocument();
   });
 });
 
@@ -186,11 +262,21 @@ function createRuntimeStatus(overrides: Partial<{ isReady: boolean; state: strin
     isReady: overrides.isReady ?? true,
     executionProvider: "CPU",
     message: "Provider integrato pronto con CPU.",
-    suggestion: null
+    suggestion: null,
+    preferredExecutionProvider: "DirectML",
+    modelState: overrides.state ?? "Verified",
+    fallbackReason: null
   };
 }
 
-function createCatalogEntry() {
+function createCatalogEntry(overrides: Partial<ReturnType<typeof createCatalogEntryBase>> = {}) {
+  return {
+    ...createCatalogEntryBase(),
+    ...overrides
+  };
+}
+
+function createCatalogEntryBase() {
   return {
     id: "onlyrag-sdxl-turbo-directml",
     displayName: "OnlyRag SDXL Turbo",
@@ -213,6 +299,8 @@ function createModelState(overrides: Partial<ImageModelLocalState> = {}): ImageM
     localSizeBytes: 0,
     localDirectory: "C:\\Users\\User\\AppData\\Local\\OnlyRag\\models\\images\\onlyrag-sdxl-turbo-directml",
     verificationError: "Il modello non e ancora stato scaricato.",
+    expectedSizeBytes: 46,
+    remainingDownloadBytes: 46,
     ...overrides
   };
 }

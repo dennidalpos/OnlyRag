@@ -235,6 +235,16 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
       },
       gpu: null
     },
+    imageGeneration: {
+      state: "Ready",
+      isReady: true,
+      executionProvider: "CPU",
+      message: "Provider integrato pronto con CPU.",
+      suggestion: null,
+      preferredExecutionProvider: "DirectML",
+      modelState: "Verified",
+      fallbackReason: null
+    },
     ...overrides
   };
 }

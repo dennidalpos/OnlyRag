@@ -11,17 +11,20 @@ internal sealed class ImageGenerationService
     private readonly IImageGenerationSettingsService settingsService;
     private readonly ImageModelManager modelManager;
     private readonly IGeneratedImageRepository images;
+    private readonly IImageGenerationEngine engine;
 
     public ImageGenerationService(
         InProcessBackendDescriptor descriptor,
         IImageGenerationSettingsService settingsService,
         ImageModelManager modelManager,
-        IGeneratedImageRepository images)
+        IGeneratedImageRepository images,
+        IImageGenerationEngine engine)
     {
         this.descriptor = descriptor;
         this.settingsService = settingsService;
         this.modelManager = modelManager;
         this.images = images;
+        this.engine = engine;
     }
 
     public async Task<ImageGenerationRuntimeStatus> GetRuntimeStatusAsync(
@@ -29,14 +32,22 @@ internal sealed class ImageGenerationService
     {
         ImageGenerationSettings settings = await settingsService.GetAsync(cancellationToken);
         ImageModelLocalState state = await modelManager.GetStateAsync(settings.SelectedModelId, cancellationToken);
+        ImageGenerationEngineStatus engineStatus = engine.GetStatus();
+        string activeProvider = string.IsNullOrWhiteSpace(settings.ActiveExecutionProvider)
+            ? engineStatus.ActiveExecutionProvider
+            : settings.ActiveExecutionProvider;
+        string preferredProvider = settings.PreferGpu ? "DirectML" : "CPU";
         return new ImageGenerationRuntimeStatus(
             state.IsVerified ? "Ready" : state.State,
             state.IsVerified,
-            settings.ActiveExecutionProvider,
+            activeProvider,
             state.IsVerified
-                ? $"Provider integrato pronto con {settings.ActiveExecutionProvider}."
+                ? $"Provider integrato pronto con {activeProvider}."
                 : "Scarica e verifica un modello integrato prima di generare immagini.",
-            state.IsVerified ? null : state.VerificationError);
+            state.IsVerified ? null : state.VerificationError,
+            preferredProvider,
+            state.State,
+            engineStatus.FallbackReason);
     }
 
     public async Task<ImageGenerationResponse> GenerateAsync(
@@ -48,8 +59,20 @@ internal sealed class ImageGenerationService
             string.IsNullOrWhiteSpace(request.ModelId)
                 ? request with { ModelId = settings.SelectedModelId }
                 : request);
-        _ = await modelManager.GetVerifiedModelFilePathAsync(normalized.ModelId ?? settings.SelectedModelId, cancellationToken);
-        IReadOnlyList<ImageGenerationBinary> generated = GenerateIntegratedImages(normalized);
+        string modelId = normalized.ModelId ?? settings.SelectedModelId;
+        _ = await modelManager.GetVerifiedModelFilePathAsync(modelId, cancellationToken);
+        string modelDirectory = modelManager.GetModelDirectory(modelId);
+        ImageGenerationEngineResult engineResult = await engine.GenerateAsync(
+            normalized,
+            modelDirectory,
+            settings.PreferGpu,
+            cancellationToken);
+        if (!string.Equals(settings.ActiveExecutionProvider, engineResult.ActiveExecutionProvider, StringComparison.Ordinal))
+        {
+            await settingsService.UpdateAsync(settings with { ActiveExecutionProvider = engineResult.ActiveExecutionProvider }, cancellationToken);
+        }
+
+        IReadOnlyList<ImageGenerationBinary> generated = engineResult.Images;
         if (generated.Count == 0)
         {
             throw new ImageGenerationException(
@@ -113,24 +136,27 @@ internal sealed class ImageGenerationService
         return File.Exists(absolutePath) ? (record.Value.Image, absolutePath) : null;
     }
 
-    private static IReadOnlyList<ImageGenerationBinary> GenerateIntegratedImages(ImageGenerationRequest request)
+    public async Task<GeneratedImage?> DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
     {
-        List<ImageGenerationBinary> images = [];
-        for (int index = 0; index < request.BatchSize; index++)
+        (GeneratedImage Image, string RelativePath)? record = await images.GetWithPathAsync(id, cancellationToken);
+        if (record is null)
         {
-            long? imageSeed = request.Seed is null ? null : request.Seed + index;
-            images.Add(IntegratedImageGenerator.GeneratePng(
-                request.Prompt,
-                request.NegativePrompt,
-                request.Width,
-                request.Height,
-                imageSeed));
+            return null;
         }
 
-        return images;
+        string absolutePath = ResolveGeneratedPath(record.Value.RelativePath);
+        GeneratedImage? deleted = await images.DeleteAsync(id, cancellationToken);
+        if (File.Exists(absolutePath))
+        {
+            File.Delete(absolutePath);
+        }
+
+        return deleted;
     }
 
-    private string GetGeneratedRoot()
+    public string GetGeneratedRoot()
     {
         return Path.Combine(descriptor.StoragePaths.DataRoot, "images", "generated");
     }

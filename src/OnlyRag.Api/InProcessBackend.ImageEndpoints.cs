@@ -151,5 +151,32 @@ public static partial class InProcessBackend
                 ? CreateNotFoundProblem("Immagine")
                 : Results.File(file.Value.AbsolutePath, file.Value.Image.MimeType, file.Value.Image.FileName);
         });
+
+        app.MapDelete("/api/images/{id:long}", async (
+            long id,
+            ImageGenerationService imageGeneration,
+            CancellationToken cancellationToken) =>
+        {
+            GeneratedImage? deleted = await imageGeneration.DeleteAsync(id, cancellationToken);
+            return deleted is null ? CreateNotFoundProblem("Immagine") : Results.Ok(deleted);
+        });
+
+        app.MapPost("/api/images/open-folder", (
+            HttpContext httpContext,
+            ProcessLaunchRequest request,
+            InProcessBackendDescriptor descriptor,
+            ILocalProcessLauncher processLauncher,
+            ImageGenerationService imageGeneration) =>
+        {
+            return OpenConfirmedFolder(
+                httpContext,
+                request,
+                descriptor,
+                processLauncher,
+                imageGeneration.GetGeneratedRoot(),
+                "Open generated images folder",
+                "Cartella immagini generate aperta.",
+                "Cartella immagini generate non aperta");
+        });
     }
 }

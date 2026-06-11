@@ -28,7 +28,8 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
     buildQdrantBadge(diagnostics, backendStatus.backendTone),
     buildOcrBadge(diagnostics, backendStatus.backendTone),
-    buildOcrGpuBadge(diagnostics, backendStatus.backendTone)
+    buildOcrGpuBadge(diagnostics, backendStatus.backendTone),
+    buildImageBadge(diagnostics, backendStatus.backendTone)
   ].filter((badge): badge is StatusBadge => badge !== null);
 
   useEffect(() => {
@@ -128,6 +129,50 @@ function buildOcrGpuBadge(
     label: "OCR GPU",
     value: diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile",
     tone: diagnostics.ocrGpuCapability.isUsable ? "online" : "neutral"
+  };
+}
+
+function buildImageBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics?.imageGeneration) {
+    return {
+      label: "Immagini",
+      value: backendTone === "offline" ? "Offline" : "In lettura",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  const status = diagnostics.imageGeneration;
+  if (!status.isReady) {
+    return {
+      label: "Immagini",
+      value: "Modello mancante",
+      tone: "warning"
+    };
+  }
+
+  if (status.executionProvider === "DirectML") {
+    return {
+      label: "Immagini",
+      value: "DirectML",
+      tone: "online"
+    };
+  }
+
+  if (status.executionProvider === "CPU") {
+    return {
+      label: "Immagini",
+      value: "CPU",
+      tone: status.preferredExecutionProvider === "DirectML" ? "warning" : "online"
+    };
+  }
+
+  return {
+    label: "Immagini",
+    value: "Pronto",
+    tone: "online"
   };
 }
 

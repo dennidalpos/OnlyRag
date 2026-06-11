@@ -1,4 +1,5 @@
 import type { OllamaRunningModel } from "./settings";
+import type { ImageGenerationRuntimeStatus } from "./images";
 
 export type DiagnosticsResponse = {
   appVersion: string;
@@ -14,6 +15,7 @@ export type DiagnosticsResponse = {
   ocrEngineName: string;
   ocrGpuCapability: OcrGpuCapability;
   systemTelemetry: SystemTelemetry;
+  imageGeneration: ImageGenerationRuntimeStatus | null;
 };
 
 export type QdrantStatusResponse = {

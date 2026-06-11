@@ -1,6 +1,7 @@
 using System.Net;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
+using OnlyRag.Api.Images;
 
 namespace OnlyRag.Api;
 
@@ -17,6 +18,8 @@ public sealed record InProcessBackendOptions
     public ILocalProcessLauncher? ProcessLauncher { get; init; }
 
     public IQdrantVectorStore? QdrantVectorStore { get; init; }
+
+    public IImageGenerationEngine? ImageGenerationEngine { get; init; }
 
     public bool EnableDevelopmentCorsOrigins { get; init; } =
 #if DEBUG

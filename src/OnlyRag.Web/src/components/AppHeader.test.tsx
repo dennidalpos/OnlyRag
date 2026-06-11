@@ -18,6 +18,7 @@ describe("AppHeader", () => {
 
     expect(status).toHaveTextContent("Backend");
     expect(status).toHaveTextContent("Ollama");
+    expect(status).toHaveTextContent("Immagini");
     expect(status).toHaveTextContent("Operazioni");
     expect(status).not.toHaveTextContent("Ora");
     expect(screen.getByTitle(/Ora corrente/)).toBeInTheDocument();

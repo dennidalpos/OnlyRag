@@ -86,6 +86,7 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         builder.Services.AddSingleton<ImageModelCatalogStore>();
         builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
+        builder.Services.AddSingleton(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
         builder.Services.AddSingleton<ImageGenerationService>();
         builder.Services.AddHttpClient<ImageModelManager>();
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
@@ -137,6 +138,12 @@ public static partial class InProcessBackend
                 string correlationId = context.TraceIdentifier;
                 if (exceptionFeature?.Error is Exception exception)
                 {
+                    if (IsClientAbortException(exception))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status499ClientClosedRequest;
+                        return;
+                    }
+
                     var appDescriptor = context.RequestServices.GetRequiredService<InProcessBackendDescriptor>();
                     BackendLog.WriteException(appDescriptor.StoragePaths, correlationId, "Unhandled API exception.", exception);
                 }
@@ -155,6 +162,13 @@ public static partial class InProcessBackend
         MapEndpoints(app);
 
         return app;
+    }
+
+    private static bool IsClientAbortException(Exception exception)
+    {
+        return exception is OperationCanceledException
+            || exception.GetType().FullName == "System.Net.Http.HttpIOException"
+                && exception.Message.Contains("response ended prematurely", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string[] ResolveAllowedCorsOrigins(InProcessBackendOptions options)

@@ -64,7 +64,9 @@ internal sealed class ImageModelManager
                 IsVerified: false,
                 GetDirectorySize(modelDirectory),
                 modelDirectory,
-                "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.");
+                "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.",
+                model.ExpectedSizeBytes,
+                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, GetDirectorySize(modelDirectory)));
         }
 
         if (!HasRequiredFiles(model, modelDirectory))
@@ -76,7 +78,9 @@ internal sealed class ImageModelManager
                 IsVerified: false,
                 LocalSizeBytes: 0,
                 modelDirectory,
-                isDownloading ? null : "Il modello non e ancora stato scaricato.");
+                isDownloading ? null : "Il modello non e ancora stato scaricato.",
+                model.ExpectedSizeBytes,
+                model.ExpectedSizeBytes);
         }
 
         long localSizeBytes = GetDirectorySize(modelDirectory);
@@ -89,7 +93,9 @@ internal sealed class ImageModelManager
                 IsVerified: false,
                 localSizeBytes,
                 modelDirectory,
-                "Modello scaricato, ma manca lo SHA256 per la verifica.");
+                "Modello scaricato, ma manca lo SHA256 per la verifica.",
+                model.ExpectedSizeBytes,
+                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
         }
 
         bool hashMatches = File.Exists(modelPath)
@@ -101,7 +107,9 @@ internal sealed class ImageModelManager
             IsVerified: hashMatches,
             localSizeBytes,
             modelDirectory,
-            hashMatches ? null : "Hash SHA256 non valido per il file modello locale.");
+            hashMatches ? null : "Hash SHA256 non valido per il file modello locale.",
+            model.ExpectedSizeBytes,
+            CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
     }
 
     public async Task<ImageModelDownloadResponse> DownloadAsync(
@@ -203,7 +211,7 @@ internal sealed class ImageModelManager
         return Path.Combine(GetModelDirectory(modelId), ImageModelCatalog.RequiredModelFileName);
     }
 
-    private string GetModelDirectory(string modelId)
+    public string GetModelDirectory(string modelId)
     {
         string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
         string modelDirectory = Path.GetFullPath(Path.Combine(root, modelId));
@@ -338,6 +346,11 @@ internal sealed class ImageModelManager
         return Directory.Exists(modelDirectory)
             ? Directory.EnumerateFiles(modelDirectory, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length)
             : 0;
+    }
+
+    private static long CalculateRemainingDownloadBytes(long expectedSizeBytes, long localSizeBytes)
+    {
+        return expectedSizeBytes <= 0 ? 0 : Math.Max(0, expectedSizeBytes - localSizeBytes);
     }
 
     private static string ResolveModelSnapshotPath(string modelDirectory, string relativePath)

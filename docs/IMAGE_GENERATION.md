@@ -34,13 +34,23 @@ disk-space impact.
 
 ## Runtime
 
-OnlyRag prefers DirectML GPU execution on Windows when available and falls back to CPU. The Images UI
-shows the active execution provider and blocks generation until the selected model is downloaded and
-verified.
+OnlyRag uses the integrated ONNX Stable Diffusion/SDXL pipeline. On Windows it prefers DirectML GPU
+execution when available and falls back to CPU if the DirectML provider cannot be initialized for the
+selected model or device. The runtime status records the preferred provider, the active provider, and
+the readable fallback reason shown by the UI.
 
-The current integrated catalog entry is a technical placeholder until real ONNX Runtime text-to-image
-inference is wired in. Placeholder model files are rejected during verification and generation is
-blocked instead of producing synthetic pattern images.
+The Images UI blocks generation until the selected model is downloaded and verified. Technical
+placeholder files are rejected during verification and generation is blocked instead of producing fake
+pattern images.
+
+Generated images are stored under:
+
+```powershell
+%LOCALAPPDATA%\OnlyRag\images\generated
+```
+
+Users can delete generated images from the editor and can open the generated-images folder through the
+Images section after explicit confirmation.
 
 ## Release Verification
 

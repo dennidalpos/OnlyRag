@@ -7,4 +7,6 @@ public sealed record ImageModelLocalState(
     bool IsVerified,
     long LocalSizeBytes,
     string LocalDirectory,
-    string? VerificationError);
+    string? VerificationError,
+    long ExpectedSizeBytes = 0,
+    long RemainingDownloadBytes = 0);

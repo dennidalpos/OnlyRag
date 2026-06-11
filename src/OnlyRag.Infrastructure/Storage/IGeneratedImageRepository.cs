@@ -16,5 +16,8 @@ public interface IGeneratedImageRepository
     Task<(GeneratedImage Image, string RelativePath)?> GetWithPathAsync(
         long id,
         CancellationToken cancellationToken = default);
-}
 
+    Task<GeneratedImage?> DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+}

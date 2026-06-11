@@ -11,6 +11,9 @@ export type ImageGenerationRuntimeStatus = {
   executionProvider: string;
   message: string;
   suggestion: string | null;
+  preferredExecutionProvider: string;
+  modelState: string;
+  fallbackReason: string | null;
 };
 
 export type ImageModelCatalogEntry = {
@@ -44,6 +47,8 @@ export type ImageModelLocalState = {
   localSizeBytes: number;
   localDirectory: string;
   verificationError: string | null;
+  expectedSizeBytes: number;
+  remainingDownloadBytes: number;
 };
 
 export type ImageModelDownloadResponse = {

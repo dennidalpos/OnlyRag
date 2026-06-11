@@ -1,19 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   apiRequest,
   resolveBackendBaseUrl,
   resolveBackendSessionToken,
   type GeneratedImage,
-  type ImageModelCatalogEntryRequest,
   type ImageGenerationResponse,
   type ImageGenerationRuntimeStatus,
   type ImageGenerationSettings,
   type ImageModelCatalogEntry,
+  type ImageModelCatalogEntryRequest,
   type ImageModelDownloadResponse,
-  type ImageModelLocalState
+  type ImageModelLocalState,
+  type OperationMessageResponse
 } from "../api";
 import { formatFileSize } from "./DocumentsSection.formatting";
 import { ProgressBar } from "./ProgressBar";
+import { useModalFocusTrap } from "./useModalFocusTrap";
 
 const defaultModelId = "onlyrag-sdxl-turbo-directml";
 
@@ -23,6 +25,19 @@ const defaultSettings: ImageGenerationSettings = {
   preferGpu: true,
   activeExecutionProvider: "CPU"
 };
+
+const promptCommands = [
+  "Fotorealistico",
+  "Illustrazione pulita",
+  "Luce naturale",
+  "Sfondo semplice"
+];
+
+const sizePresets = [
+  { label: "Quadrata", width: 1024, height: 1024 },
+  { label: "Verticale", width: 832, height: 1216 },
+  { label: "Orizzontale", width: 1216, height: 832 }
+];
 
 type Feedback = {
   tone: "success" | "error" | "warning";
@@ -48,18 +63,21 @@ export function ImagesSection() {
   const [modelStates, setModelStates] = useState<ImageModelLocalState[]>([]);
   const [pendingConsentModelId, setPendingConsentModelId] = useState<string | null>(null);
   const [images, setImages] = useState<GeneratedImage[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
-  const [steps, setSteps] = useState(30);
+  const [steps, setSteps] = useState(8);
   const [batchSize, setBatchSize] = useState(1);
   const [seed, setSeed] = useState("");
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createEmptyModelDraft(defaultModelId));
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingModel, setIsSavingModel] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
   const [isModelActionRunning, setIsModelActionRunning] = useState(false);
   const [modelActionMessage, setModelActionMessage] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -76,6 +94,10 @@ export function ImagesSection() {
     () => catalog.find((model) => model.id === pendingConsentModelId) ?? null,
     [catalog, pendingConsentModelId]
   );
+  const selectedImage = useMemo(
+    () => images.find((image) => image.id === selectedImageId) ?? images[0] ?? null,
+    [images, selectedImageId]
+  );
   const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const canGenerate = Boolean(prompt.trim()) && Boolean(selectedModelState?.isVerified);
 
@@ -84,6 +106,17 @@ export function ImagesSection() {
       setModelDraft(createModelDraft(selectedModel));
     }
   }, [selectedModel]);
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setSelectedImageId(null);
+      return;
+    }
+
+    if (!selectedImageId || !images.some((image) => image.id === selectedImageId)) {
+      setSelectedImageId(images[0].id);
+    }
+  }, [images, selectedImageId]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -106,6 +139,7 @@ export function ImagesSection() {
         setCatalog(loadedCatalog);
         setModelStates(loadedModelStates);
         setImages(generatedImages);
+        setSelectedImageId(generatedImages[0]?.id ?? null);
         setFeedback(null);
       } catch (error) {
         if (!isCancelled) {
@@ -265,6 +299,7 @@ export function ImagesSection() {
         })
       });
       setImages((current) => [...response.images, ...current]);
+      setSelectedImageId(response.images[0]?.id ?? selectedImageId);
       setFeedback({ tone: "success", message: response.message });
       await refreshImageState();
     } catch (error) {
@@ -274,39 +309,383 @@ export function ImagesSection() {
     }
   }
 
+  async function handleDeleteImage(image: GeneratedImage) {
+    if (!window.confirm(`Eliminare definitivamente "${image.fileName}"?`)) return;
+    setIsDeletingImage(true);
+    setFeedback(null);
+    try {
+      await apiRequest<GeneratedImage>(`/api/images/${image.id}`, { method: "DELETE" });
+      setImages((current) => current.filter((item) => item.id !== image.id));
+      setFeedback({ tone: "success", message: "Immagine eliminata." });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Eliminazione immagine non riuscita." });
+    } finally {
+      setIsDeletingImage(false);
+    }
+  }
+
+  async function handleOpenGeneratedFolder() {
+    setFeedback(null);
+    try {
+      const response = await apiRequest<OperationMessageResponse>("/api/images/open-folder", {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
+      });
+      setFeedback({ tone: "success", message: response.message });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Cartella immagini non aperta." });
+    }
+  }
+
+  function appendPromptCommand(command: string) {
+    setPrompt((current) => {
+      const trimmed = current.trim();
+      return trimmed ? `${trimmed}, ${command.toLowerCase()}` : command;
+    });
+  }
+
+  function applyPreset(preset: { width: number; height: number }) {
+    setWidth(preset.width);
+    setHeight(preset.height);
+  }
+
   return (
     <div className="images-panel">
+      {feedback && (
+        <div className={`feedback-banner feedback-banner--${feedback.tone}`} role={feedback.tone === "error" ? "alert" : "status"}>
+          {feedback.message}
+        </div>
+      )}
+
+      <div className="images-toolbar">
+        <ImageRuntimeSummary runtimeStatus={runtimeStatus} state={selectedModelState} />
+        <div className="images-toolbar__actions">
+          <button className="button-secondary" type="button" onClick={() => void refreshImageState()} disabled={isLoading}>
+            Aggiorna
+          </button>
+          <button className="button-secondary" type="button" onClick={() => setIsSettingsOpen(true)}>
+            Impostazioni
+          </button>
+        </div>
+      </div>
+
       <div className="images-layout">
-        <section className="settings-card images-control-panel" aria-labelledby="images-title">
-          <div className="settings-card__header">
-            <div>
-              <h2 id="images-title">Generazione immagini</h2>
-              <p>Provider integrato locale con modelli scaricati nella cartella dati dell'app.</p>
-            </div>
-            <button className="button-secondary" type="button" onClick={() => void refreshImageState()} disabled={isLoading}>
-              Aggiorna
+        <PromptPanel
+          prompt={prompt}
+          negativePrompt={negativePrompt}
+          width={width}
+          height={height}
+          steps={steps}
+          batchSize={batchSize}
+          seed={seed}
+          canGenerate={canGenerate}
+          isGenerating={isGenerating}
+          selectedModelState={selectedModelState}
+          onPromptChange={setPrompt}
+          onNegativePromptChange={setNegativePrompt}
+          onWidthChange={setWidth}
+          onHeightChange={setHeight}
+          onStepsChange={setSteps}
+          onBatchSizeChange={setBatchSize}
+          onSeedChange={setSeed}
+          onAppendCommand={appendPromptCommand}
+          onApplyPreset={applyPreset}
+          onSubmit={handleGenerate}
+        />
+
+        <EditorPanel
+          image={selectedImage}
+          images={images}
+          isDeleting={isDeletingImage}
+          onSelectImage={setSelectedImageId}
+          onDeleteImage={(image) => void handleDeleteImage(image)}
+          onOpenFolder={() => void handleOpenGeneratedFolder()}
+        />
+      </div>
+
+      {isSettingsOpen && (
+        <ImageSettingsModal
+          settings={settings}
+          savedSettings={savedSettings}
+          runtimeStatus={runtimeStatus}
+          catalog={catalog}
+          modelStates={modelStates}
+          selectedModel={selectedModel}
+          selectedModelState={selectedModelState}
+          modelDraft={modelDraft}
+          consentModel={consentModel}
+          isSaving={isSaving}
+          isSavingModel={isSavingModel}
+          isModelActionRunning={isModelActionRunning}
+          modelActionMessage={modelActionMessage}
+          onSettingsChange={setSettings}
+          onModelDraftChange={setModelDraft}
+          onSaveSettings={() => void handleSaveSettings()}
+          onClose={() => setIsSettingsOpen(false)}
+          onAskConsent={(modelId) => setPendingConsentModelId(modelId)}
+          onCancelConsent={() => setPendingConsentModelId(null)}
+          onDownloadConfirmed={(modelId) => void handleDownloadConfirmed(modelId)}
+          onDeleteModel={(modelId) => void handleDeleteModel(modelId)}
+          onSaveModel={() => void handleSaveModel()}
+          onNewModel={() => setModelDraft(createEmptyModelDraft(`custom-${Date.now()}`))}
+          onResetOrRemoveModel={() => void handleResetOrRemoveModel()}
+        />
+      )}
+    </div>
+  );
+}
+
+function PromptPanel({
+  prompt,
+  negativePrompt,
+  width,
+  height,
+  steps,
+  batchSize,
+  seed,
+  canGenerate,
+  isGenerating,
+  selectedModelState,
+  onPromptChange,
+  onNegativePromptChange,
+  onWidthChange,
+  onHeightChange,
+  onStepsChange,
+  onBatchSizeChange,
+  onSeedChange,
+  onAppendCommand,
+  onApplyPreset,
+  onSubmit
+}: {
+  prompt: string;
+  negativePrompt: string;
+  width: number;
+  height: number;
+  steps: number;
+  batchSize: number;
+  seed: string;
+  canGenerate: boolean;
+  isGenerating: boolean;
+  selectedModelState: ImageModelLocalState | null;
+  onPromptChange: (value: string) => void;
+  onNegativePromptChange: (value: string) => void;
+  onWidthChange: (value: number) => void;
+  onHeightChange: (value: number) => void;
+  onStepsChange: (value: number) => void;
+  onBatchSizeChange: (value: number) => void;
+  onSeedChange: (value: string) => void;
+  onAppendCommand: (value: string) => void;
+  onApplyPreset: (preset: { width: number; height: number }) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="settings-card images-prompt-panel" aria-labelledby="images-prompt-title">
+      <div className="settings-card__header">
+        <h2 id="images-prompt-title">Crea immagine</h2>
+      </div>
+      <form className="images-generate-form" onSubmit={onSubmit}>
+        <div className="images-command-row" aria-label="Comandi standard">
+          {promptCommands.map((command) => (
+            <button className="button-secondary" type="button" onClick={() => onAppendCommand(command)} key={command}>
+              {command}
+            </button>
+          ))}
+        </div>
+        <label className="field-group" htmlFor="image-prompt">
+          <span>Prompt</span>
+          <textarea id="image-prompt" rows={8} value={prompt} onChange={(event) => onPromptChange(event.target.value)} />
+        </label>
+        <label className="field-group" htmlFor="image-negative-prompt">
+          <span>Negative prompt</span>
+          <textarea
+            id="image-negative-prompt"
+            rows={3}
+            value={negativePrompt}
+            onChange={(event) => onNegativePromptChange(event.target.value)}
+          />
+        </label>
+        <div className="images-preset-row" aria-label="Formato">
+          {sizePresets.map((preset) => (
+            <button
+              className={`button-secondary${width === preset.width && height === preset.height ? " button-secondary--active" : ""}`}
+              type="button"
+              onClick={() => onApplyPreset(preset)}
+              key={preset.label}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <div className="settings-grid settings-grid--four">
+          <label className="field-group" htmlFor="image-width">
+            <span>Larghezza</span>
+            <input id="image-width" min={256} max={2048} step={8} type="number" value={width} onChange={(event) => onWidthChange(Number(event.target.value))} />
+          </label>
+          <label className="field-group" htmlFor="image-height">
+            <span>Altezza</span>
+            <input id="image-height" min={256} max={2048} step={8} type="number" value={height} onChange={(event) => onHeightChange(Number(event.target.value))} />
+          </label>
+          <label className="field-group" htmlFor="image-steps">
+            <span>Step</span>
+            <input id="image-steps" min={1} max={150} type="number" value={steps} onChange={(event) => onStepsChange(Number(event.target.value))} />
+          </label>
+          <label className="field-group" htmlFor="image-batch">
+            <span>Batch</span>
+            <input id="image-batch" min={1} max={4} type="number" value={batchSize} onChange={(event) => onBatchSizeChange(Number(event.target.value))} />
+          </label>
+          <label className="field-group" htmlFor="image-seed">
+            <span>Seed</span>
+            <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => onSeedChange(event.target.value)} />
+          </label>
+        </div>
+        {!selectedModelState?.isVerified && (
+          <div className="panel-note panel-note--warning" role="status">
+            <p>Scarica e verifica il modello selezionato prima di generare.</p>
+          </div>
+        )}
+        <div className="settings-actions">
+          <button type="submit" disabled={isGenerating || !canGenerate}>
+            {isGenerating ? "Generazione..." : "Genera"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function EditorPanel({
+  image,
+  images,
+  isDeleting,
+  onSelectImage,
+  onDeleteImage,
+  onOpenFolder
+}: {
+  image: GeneratedImage | null;
+  images: GeneratedImage[];
+  isDeleting: boolean;
+  onSelectImage: (id: number) => void;
+  onDeleteImage: (image: GeneratedImage) => void;
+  onOpenFolder: () => void;
+}) {
+  return (
+    <section className="settings-card images-editor-panel" aria-labelledby="images-editor-title">
+      <div className="settings-card__header">
+        <h2 id="images-editor-title">Editor</h2>
+        <button className="button-secondary" type="button" onClick={onOpenFolder}>
+          Apri cartella
+        </button>
+      </div>
+      <ImagePreview image={image} />
+      {image ? (
+        <div className="image-detail">
+          <strong>{image.fileName}</strong>
+          <p>{image.prompt}</p>
+          <small>
+            {image.width}x{image.height} · {image.steps} step · {formatFileSize(image.fileSizeBytes)}
+          </small>
+          <div className="settings-actions">
+            <button className="button-danger" type="button" onClick={() => onDeleteImage(image)} disabled={isDeleting}>
+              {isDeleting ? "Eliminazione..." : "Elimina"}
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="empty-state" role="status">
+          <p>Nessuna immagine generata.</p>
+        </div>
+      )}
+      {images.length > 0 && (
+        <div className="images-gallery" aria-label="Gallery">
+          {images.map((generated) => (
+            <GeneratedImageCard
+              image={generated}
+              isSelected={image?.id === generated.id}
+              onSelect={() => onSelectImage(generated.id)}
+              key={generated.id}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-          {feedback && (
-            <div className={`feedback-banner feedback-banner--${feedback.tone}`} role={feedback.tone === "error" ? "alert" : "status"}>
-              {feedback.message}
-            </div>
-          )}
+function ImageSettingsModal({
+  settings,
+  savedSettings,
+  runtimeStatus,
+  catalog,
+  modelStates,
+  selectedModel,
+  selectedModelState,
+  modelDraft,
+  consentModel,
+  isSaving,
+  isSavingModel,
+  isModelActionRunning,
+  modelActionMessage,
+  onSettingsChange,
+  onModelDraftChange,
+  onSaveSettings,
+  onClose,
+  onAskConsent,
+  onCancelConsent,
+  onDownloadConfirmed,
+  onDeleteModel,
+  onSaveModel,
+  onNewModel,
+  onResetOrRemoveModel
+}: {
+  settings: ImageGenerationSettings;
+  savedSettings: ImageGenerationSettings;
+  runtimeStatus: ImageGenerationRuntimeStatus | null;
+  catalog: ImageModelCatalogEntry[];
+  modelStates: ImageModelLocalState[];
+  selectedModel: ImageModelCatalogEntry | null;
+  selectedModelState: ImageModelLocalState | null;
+  modelDraft: ModelDraft;
+  consentModel: ImageModelCatalogEntry | null;
+  isSaving: boolean;
+  isSavingModel: boolean;
+  isModelActionRunning: boolean;
+  modelActionMessage: string | null;
+  onSettingsChange: (settings: ImageGenerationSettings) => void;
+  onModelDraftChange: (draft: ModelDraft) => void;
+  onSaveSettings: () => void;
+  onClose: () => void;
+  onAskConsent: (modelId: string) => void;
+  onCancelConsent: () => void;
+  onDownloadConfirmed: (modelId: string) => void;
+  onDeleteModel: (modelId: string) => void;
+  onSaveModel: () => void;
+  onNewModel: () => void;
+  onResetOrRemoveModel: () => void;
+}) {
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  useModalFocusTrap(modalRef, true, { onEscape: onClose });
 
-          <div className={runtimeStatus?.isReady ? "image-status image-status--online" : "image-status image-status--offline"}>
-            <strong>{runtimeStatus?.state ?? "Caricamento"}</strong>
-            <span>{runtimeStatus?.executionProvider ?? settings.activeExecutionProvider}</span>
-            <small>{runtimeStatus?.message ?? "Lettura stato immagini..."}</small>
+  return (
+    <div className="modal-backdrop">
+      <div className="compare-modal image-settings-modal" role="dialog" aria-modal="true" aria-labelledby="image-settings-title" ref={modalRef} tabIndex={-1}>
+        <div className="compare-modal__header">
+          <div>
+            <h3 id="image-settings-title">Impostazioni immagini</h3>
+            <span>{runtimeStatus?.message ?? "Lettura stato immagini..."}</span>
           </div>
-
+          <button className="button-secondary" type="button" onClick={onClose} aria-label="Chiudi impostazioni immagini">
+            Chiudi
+          </button>
+        </div>
+        <div className="image-settings-modal__body">
           <div className="settings-grid settings-grid--two">
             <label className="field-group" htmlFor="image-model">
               <span>Modello integrato</span>
               <select
                 id="image-model"
                 value={settings.selectedModelId}
-                onChange={(event) => setSettings((current) => ({ ...current, selectedModelId: event.target.value }))}
+                onChange={(event) => onSettingsChange({ ...settings, selectedModelId: event.target.value })}
               >
                 {catalog.map((model) => (
                   <option value={model.id} key={model.id}>
@@ -323,7 +702,7 @@ export function ImagesSection() {
                 max={1800}
                 type="number"
                 value={settings.requestTimeoutSeconds}
-                onChange={(event) => setSettings((current) => ({ ...current, requestTimeoutSeconds: Number(event.target.value) }))}
+                onChange={(event) => onSettingsChange({ ...settings, requestTimeoutSeconds: Number(event.target.value) })}
               />
             </label>
             <label className="toggle-row images-trust-row" htmlFor="image-prefer-gpu">
@@ -331,14 +710,13 @@ export function ImagesSection() {
                 id="image-prefer-gpu"
                 type="checkbox"
                 checked={settings.preferGpu}
-                onChange={(event) => setSettings((current) => ({ ...current, preferGpu: event.target.checked }))}
+                onChange={(event) => onSettingsChange({ ...settings, preferGpu: event.target.checked })}
               />
               <span>Preferisci GPU DirectML quando disponibile</span>
             </label>
           </div>
-
           <div className="settings-actions">
-            <button type="button" onClick={() => void handleSaveSettings()} disabled={isSaving || !hasDirtySettings}>
+            <button type="button" onClick={onSaveSettings} disabled={isSaving || !hasDirtySettings}>
               {isSaving ? "Salvataggio..." : "Salva impostazioni"}
             </button>
           </div>
@@ -348,8 +726,8 @@ export function ImagesSection() {
               <ModelReadiness
                 model={selectedModel}
                 state={selectedModelState}
-                onAskConsent={() => setPendingConsentModelId(selectedModel.id)}
-                onDelete={() => void handleDeleteModel(selectedModel.id)}
+                onAskConsent={() => onAskConsent(selectedModel.id)}
+                onDelete={() => onDeleteModel(selectedModel.id)}
                 disabled={isModelActionRunning}
               />
               {modelActionMessage && (
@@ -365,10 +743,10 @@ export function ImagesSection() {
                 draft={modelDraft}
                 selectedModel={selectedModel}
                 disabled={isSavingModel}
-                onChange={setModelDraft}
-                onSave={() => void handleSaveModel()}
-                onNew={() => setModelDraft(createEmptyModelDraft(`custom-${Date.now()}`))}
-                onResetOrRemove={() => void handleResetOrRemoveModel()}
+                onChange={onModelDraftChange}
+                onSave={onSaveModel}
+                onNew={onNewModel}
+                onResetOrRemove={onResetOrRemoveModel}
               />
             </>
           )}
@@ -378,86 +756,36 @@ export function ImagesSection() {
               <h3 id="image-model-consent-title">Conferma download modello</h3>
               <p>{consentModel.displayName}</p>
               <p>Licenza: {consentModel.licenseLabel}</p>
-              <p>Dimensione prevista: {formatFileSize(consentModel.expectedSizeBytes)}</p>
-              <p>Destinazione: {selectedModelState?.localDirectory ?? "%LOCALAPPDATA%\\OnlyRag\\models\\images"}</p>
+              <p>Dimensione prevista: {formatModelSize(consentModel.expectedSizeBytes)}</p>
+              <p>Destinazione: {modelStates.find((state) => state.modelId === consentModel.id)?.localDirectory ?? "%LOCALAPPDATA%\\OnlyRag\\models\\images"}</p>
               <div className="settings-actions">
-                <button type="button" onClick={() => void handleDownloadConfirmed(consentModel.id)} disabled={isModelActionRunning}>
+                <button type="button" onClick={() => onDownloadConfirmed(consentModel.id)} disabled={isModelActionRunning}>
                   Conferma e scarica
                 </button>
-                <button className="button-secondary" type="button" onClick={() => setPendingConsentModelId(null)} disabled={isModelActionRunning}>
+                <button className="button-secondary" type="button" onClick={onCancelConsent} disabled={isModelActionRunning}>
                   Annulla
                 </button>
               </div>
             </div>
           )}
-
-          <form className="images-generate-form" onSubmit={handleGenerate}>
-            <label className="field-group" htmlFor="image-prompt">
-              <span>Prompt</span>
-              <textarea id="image-prompt" rows={4} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-            </label>
-            <label className="field-group" htmlFor="image-negative-prompt">
-              <span>Negative prompt</span>
-              <textarea
-                id="image-negative-prompt"
-                rows={2}
-                value={negativePrompt}
-                onChange={(event) => setNegativePrompt(event.target.value)}
-              />
-            </label>
-            <div className="settings-grid settings-grid--four">
-              <label className="field-group" htmlFor="image-width">
-                <span>Larghezza</span>
-                <input id="image-width" min={256} max={2048} step={8} type="number" value={width} onChange={(event) => setWidth(Number(event.target.value))} />
-              </label>
-              <label className="field-group" htmlFor="image-height">
-                <span>Altezza</span>
-                <input id="image-height" min={256} max={2048} step={8} type="number" value={height} onChange={(event) => setHeight(Number(event.target.value))} />
-              </label>
-              <label className="field-group" htmlFor="image-steps">
-                <span>Step</span>
-                <input id="image-steps" min={1} max={150} type="number" value={steps} onChange={(event) => setSteps(Number(event.target.value))} />
-              </label>
-              <label className="field-group" htmlFor="image-batch">
-                <span>Batch</span>
-                <input id="image-batch" min={1} max={4} type="number" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} />
-              </label>
-              <label className="field-group" htmlFor="image-seed">
-                <span>Seed</span>
-                <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => setSeed(event.target.value)} />
-              </label>
-            </div>
-            {!selectedModelState?.isVerified && (
-              <div className="panel-note panel-note--warning" role="status">
-                <p>Scarica e verifica il modello selezionato prima di generare.</p>
-              </div>
-            )}
-            <div className="settings-actions">
-              <button type="submit" disabled={isGenerating || !canGenerate}>
-                {isGenerating ? "Generazione..." : "Genera"}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="settings-card images-gallery-panel" aria-labelledby="images-gallery-title">
-          <div className="settings-card__header">
-            <h2 id="images-gallery-title">Gallery</h2>
-            <span>{images.length}</span>
-          </div>
-          {images.length === 0 ? (
-            <div className="empty-state" role="status">
-              <p>Nessuna immagine generata.</p>
-            </div>
-          ) : (
-            <div className="images-gallery">
-              {images.map((image) => (
-                <GeneratedImageCard image={image} key={image.id} />
-              ))}
-            </div>
-          )}
-        </section>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function ImageRuntimeSummary({
+  runtimeStatus,
+  state
+}: {
+  runtimeStatus: ImageGenerationRuntimeStatus | null;
+  state: ImageModelLocalState | null;
+}) {
+  return (
+    <div className={runtimeStatus?.isReady ? "image-status image-status--online" : "image-status image-status--offline"}>
+      <strong>{runtimeStatus?.isReady ? "Motore immagini pronto" : "Motore immagini non pronto"}</strong>
+      <span>{runtimeStatus?.executionProvider ?? "In lettura"}</span>
+      <small>{runtimeStatus?.fallbackReason ?? runtimeStatus?.suggestion ?? state?.verificationError ?? runtimeStatus?.message ?? "Lettura stato immagini..."}</small>
     </div>
   );
 }
@@ -480,8 +808,8 @@ function ModelCatalogEditor({
   onResetOrRemove: () => void;
 }) {
   return (
-    <div className="panel-note panel-note--info">
-      <h3>Catalogo modello</h3>
+    <details className="panel-note panel-note--info image-advanced-settings">
+      <summary>Catalogo avanzato</summary>
       <div className="settings-grid settings-grid--two">
         <label className="field-group" htmlFor="image-model-id">
           <span>Id</span>
@@ -538,7 +866,7 @@ function ModelCatalogEditor({
           {selectedModel.isBuiltIn ? "Ripristina integrato" : "Rimuovi dal catalogo"}
         </button>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -562,7 +890,7 @@ function ModelReadiness({
       <small>
         {state?.isVerified
           ? `${formatFileSize(state.localSizeBytes)} verificati in ${state.localDirectory}`
-          : state?.verificationError ?? model.recommendedProfile}
+          : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
       <div className="settings-actions">
         {!state?.isVerified && (
@@ -580,7 +908,52 @@ function ModelReadiness({
   );
 }
 
-function GeneratedImageCard({ image }: { image: GeneratedImage }) {
+function ImagePreview({ image }: { image: GeneratedImage | null }) {
+  const objectUrl = useImageObjectUrl(image?.id ?? null);
+
+  if (!image) {
+    return <div className="generated-image-preview generated-image-preview--empty" role="status">Nessuna immagine selezionata.</div>;
+  }
+
+  return objectUrl ? (
+    <img className="generated-image-preview" src={objectUrl} alt={image.prompt} />
+  ) : (
+    <div className="generated-image-preview generated-image-preview--empty" role="status">Caricamento...</div>
+  );
+}
+
+function GeneratedImageCard({
+  image,
+  isSelected,
+  onSelect
+}: {
+  image: GeneratedImage;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const objectUrl = useImageObjectUrl(image.id);
+
+  return (
+    <button
+      className={`generated-image-card${isSelected ? " generated-image-card--selected" : ""}`}
+      type="button"
+      onClick={onSelect}
+      aria-label={`Seleziona ${image.fileName}`}
+    >
+      {objectUrl ? (
+        <img src={objectUrl} alt="" />
+      ) : (
+        <span className="generated-image-card__placeholder" role="status">Caricamento...</span>
+      )}
+      <span className="generated-image-card__body">
+        <strong>{image.fileName}</strong>
+        <small>{formatFileSize(image.fileSizeBytes)}</small>
+      </span>
+    </button>
+  );
+}
+
+function useImageObjectUrl(imageId: number | null) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -588,8 +961,13 @@ function GeneratedImageCard({ image }: { image: GeneratedImage }) {
     let createdUrl: string | null = null;
 
     async function loadImage() {
+      if (!imageId) {
+        setObjectUrl(null);
+        return;
+      }
+
       try {
-        const url = await fetchImageObjectUrl(image.id);
+        const url = await fetchImageObjectUrl(imageId);
         if (isCancelled) {
           URL.revokeObjectURL(url);
           return;
@@ -609,24 +987,9 @@ function GeneratedImageCard({ image }: { image: GeneratedImage }) {
         URL.revokeObjectURL(createdUrl);
       }
     };
-  }, [image.id]);
+  }, [imageId]);
 
-  return (
-    <article className="generated-image-card">
-      {objectUrl ? (
-        <img src={objectUrl} alt={image.prompt} />
-      ) : (
-        <div className="generated-image-card__placeholder" role="status">Caricamento...</div>
-      )}
-      <div className="generated-image-card__body">
-        <strong>Integrato</strong>
-        <p>{image.prompt}</p>
-        <small>
-          {image.width}x{image.height} · {image.steps} step · {formatFileSize(image.fileSizeBytes)}
-        </small>
-      </div>
-    </article>
-  );
+  return objectUrl;
 }
 
 async function fetchImageObjectUrl(imageId: number): Promise<string> {
@@ -686,4 +1049,18 @@ function createModelRequest(draft: ModelDraft): ImageModelCatalogEntryRequest {
       .filter(Boolean),
     sha256: draft.sha256.trim()
   };
+}
+
+function formatRemainingDownload(state: ImageModelLocalState | null, model: ImageModelCatalogEntry): string {
+  const expected = state?.expectedSizeBytes ?? model.expectedSizeBytes;
+  const remaining = state?.remainingDownloadBytes ?? expected;
+  if (expected <= 0) {
+    return "Dimensione modello non dichiarata";
+  }
+
+  return `${formatFileSize(remaining)} rimanenti`;
+}
+
+function formatModelSize(bytes: number): string {
+  return bytes > 0 ? formatFileSize(bytes) : "Dimensione non dichiarata";
 }

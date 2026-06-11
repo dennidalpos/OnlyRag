@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
@@ -93,6 +94,7 @@ public static partial class InProcessBackend
             QdrantLocalRuntimeService qdrantRuntime,
             IQdrantVectorStore qdrantVectorStore,
             IOcrEngine ocrEngine,
+            ImageGenerationService imageGeneration,
             OcrGpuCapabilityService ocrGpuCapability,
             SystemTelemetryService systemTelemetry,
             DiagnosticsProbeCacheService diagnosticsProbeCache,
@@ -122,6 +124,7 @@ public static partial class InProcessBackend
             OcrEngineAvailability ocrAvailability = await diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken);
             OcrGpuCapabilityResponse gpuCapability = await diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, cancellationToken);
             SystemTelemetryResponse telemetry = await diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken);
+            ImageGenerationRuntimeStatus imageGenerationStatus = await imageGeneration.GetRuntimeStatusAsync(cancellationToken);
 
             return Results.Ok(new DiagnosticsResponse(
                 BackendLog.ResolveAppVersion(),
@@ -136,7 +139,8 @@ public static partial class InProcessBackend
                 gpuCapability,
                 telemetry,
                 ollamaVersion,
-                ollamaRunningModels));
+                ollamaRunningModels,
+                imageGenerationStatus));
         });
 
         app.MapPost("/api/diagnostics/open-logs-folder", (

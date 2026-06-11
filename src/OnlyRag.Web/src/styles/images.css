@@ -4,38 +4,43 @@
   gap: 10px;
 }
 
+.images-toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.images-toolbar > .image-status {
+  flex: 1 1 auto;
+}
+
+.images-toolbar__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .images-layout {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(300px, 1.05fr);
+  grid-template-columns: minmax(340px, 0.82fr) minmax(360px, 1.18fr);
   gap: 12px;
   align-items: start;
 }
 
-.images-control-panel,
-.images-gallery-panel {
+.images-prompt-panel,
+.images-editor-panel {
   align-content: start;
   gap: 10px;
-}
-
-.images-control-panel .settings-card__header p {
-  margin-top: 3px;
-  color: #627084;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.image-status-grid {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
 }
 
 .image-status {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
   padding: 8px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
@@ -54,10 +59,15 @@
 
 .image-status strong,
 .image-status span,
-.image-status small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.image-status small,
+.image-detail strong,
+.image-detail p,
+.image-detail small,
+.image-settings-modal p,
+.image-settings-modal span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .image-status span {
@@ -69,6 +79,135 @@
 .image-status small {
   color: #627084;
   font-size: 12px;
+  line-height: 1.35;
+}
+
+.images-generate-form {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.images-command-row,
+.images-preset-row {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.images-trust-row {
+  align-self: end;
+  min-height: 32px;
+}
+
+.generated-image-preview {
+  width: 100%;
+  max-height: min(58vh, 620px);
+  aspect-ratio: 1 / 1;
+  display: block;
+  object-fit: contain;
+  border: 1px solid #d7e1ea;
+  border-radius: 8px;
+  background: #edf2f6;
+}
+
+.generated-image-preview--empty {
+  display: grid;
+  place-items: center;
+  color: #627084;
+  font-size: 13px;
+}
+
+.image-detail {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.image-detail p {
+  color: #425066;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.image-detail small {
+  color: #627084;
+  font-size: 12px;
+}
+
+.images-gallery {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+  gap: 8px;
+}
+
+.generated-image-card {
+  min-width: 0;
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d7e1ea;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: #172033;
+  cursor: pointer;
+  text-align: left;
+}
+
+.generated-image-card--selected {
+  border-color: #2d6f8f;
+  box-shadow: 0 0 0 2px rgba(45, 111, 143, 0.18);
+}
+
+.generated-image-card img,
+.generated-image-card__placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  object-fit: cover;
+  background: #edf2f6;
+}
+
+.generated-image-card__placeholder {
+  display: grid;
+  place-items: center;
+  color: #627084;
+  font-size: 12px;
+}
+
+.generated-image-card__body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+}
+
+.generated-image-card__body strong,
+.generated-image-card__body small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generated-image-card__body strong {
+  font-size: 12px;
+}
+
+.generated-image-card__body small {
+  color: #627084;
+  font-size: 11px;
 }
 
 .image-model-progress {
@@ -93,98 +232,45 @@
 .image-model-progress__header strong,
 .image-model-progress__header span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .image-model-progress__header span {
   color: #627084;
 }
 
-.settings-grid--four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.image-settings-modal {
+  width: min(900px, calc(100vw - 28px));
+  max-height: min(860px, calc(100vh - 28px));
 }
 
-.images-workflow-field {
-  grid-column: 1 / -1;
-}
-
-.images-trust-row {
-  align-self: end;
-  min-height: 32px;
-}
-
-.images-generate-form {
+.image-settings-modal__body {
   min-width: 0;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.image-advanced-settings {
   display: grid;
   gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #dce5ed;
 }
 
-.images-gallery {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+.image-advanced-settings summary {
+  cursor: pointer;
+  color: #172033;
+  font-weight: 700;
 }
 
-.generated-image-card {
-  min-width: 0;
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid #d7e1ea;
-  border-radius: 8px;
-  background: #fbfdff;
-}
-
-.generated-image-card img,
-.generated-image-card__placeholder {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  display: block;
-  object-fit: cover;
-  background: #edf2f6;
-}
-
-.generated-image-card__placeholder {
-  display: grid;
-  place-items: center;
-  color: #627084;
-  font-size: 13px;
-}
-
-.generated-image-card__body {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-}
-
-.generated-image-card__body strong,
-.generated-image-card__body p,
-.generated-image-card__body small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.generated-image-card__body p {
-  color: #425066;
-  font-size: 13px;
-}
-
-.generated-image-card__body small {
-  color: #627084;
-  font-size: 12px;
-}
-
-@media (max-width: 980px) {
-  .images-layout {
+@media (max-width: 1040px) {
+  .images-layout,
+  .images-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .images-toolbar {
+    display: grid;
   }
 
   .settings-grid--four {
@@ -193,7 +279,15 @@
 }
 
 @media (max-width: 680px) {
-  .image-status-grid,
+  .images-toolbar__actions,
+  .settings-grid--four {
+    grid-template-columns: 1fr;
+  }
+
+  .images-toolbar__actions {
+    display: grid;
+  }
+
   .settings-grid--four {
     grid-template-columns: 1fr;
   }

@@ -13,7 +13,8 @@ public sealed record DiagnosticsResponse(
     OcrGpuCapabilityResponse OcrGpuCapability,
     SystemTelemetryResponse SystemTelemetry,
     string? OllamaVersion = null,
-    IReadOnlyList<OllamaRunningModelResponse>? OllamaRunningModels = null);
+    IReadOnlyList<OllamaRunningModelResponse>? OllamaRunningModels = null,
+    ImageGenerationRuntimeStatus? ImageGeneration = null);
 
 public sealed record OcrGpuCapabilityResponse(
     bool IsUsable,
