@@ -49,42 +49,30 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task ImageGeneration_IntegratedModelGeneratesAndServesLocalFile()
+    public async Task ImageGeneration_PlaceholderModelReturnsClearError()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-integrated-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
-        SeedVerifiedImageModel(tempDescriptor);
+        SeedPlaceholderImageModel(tempDescriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
         await SaveImageSettingsAsync(httpClient);
 
         ImageGenerationRuntimeStatus? runtimeStatus =
             await httpClient.GetFromJsonAsync<ImageGenerationRuntimeStatus>("/api/images/runtime/status", JsonOptions);
         Assert.NotNull(runtimeStatus);
-        Assert.True(runtimeStatus.IsReady);
+        Assert.False(runtimeStatus.IsReady);
+        Assert.Equal("VerificationFailed", runtimeStatus.State);
 
         using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
             "/api/images/generate",
             new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
             JsonOptions);
-        ImageGenerationResponse? payload = await generateResponse.Content.ReadFromJsonAsync<ImageGenerationResponse>(JsonOptions);
 
-        Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
-        Assert.NotNull(payload);
-        GeneratedImage image = Assert.Single(payload.Images);
-        Assert.Equal("integrated", image.Provider);
-        Assert.Equal("A local-first document desk", image.Prompt);
-        Assert.Equal("image/png", image.MimeType);
-        Assert.Equal(ImageModelCatalog.DefaultModelId, image.Model);
-
-        GeneratedImage[]? listed = await httpClient.GetFromJsonAsync<GeneratedImage[]>("/api/images", JsonOptions);
-        Assert.NotNull(listed);
-        GeneratedImage listedImage = Assert.Single(listed);
-        Assert.Equal(image.Id, listedImage.Id);
-
-        using HttpResponseMessage fileResponse = await httpClient.GetAsync($"/api/images/{image.Id}/file");
-        Assert.Equal(HttpStatusCode.OK, fileResponse.StatusCode);
-        Assert.Equal("image/png", fileResponse.Content.Headers.ContentType?.MediaType);
-        Assert.NotEmpty(await fileResponse.Content.ReadAsByteArrayAsync());
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.Conflict,
+            "Modello immagini non pronto",
+            "image_generation_model_not_ready");
     }
 
     [Fact]
@@ -107,7 +95,7 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task ImageModelDownload_WritesAndVerifiesEmbeddedModel()
+    public async Task ImageModelDownload_RejectsEmbeddedPlaceholderModel()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
@@ -117,23 +105,35 @@ public sealed partial class InProcessBackendTests
             $"/api/images/models/{ImageModelCatalog.DefaultModelId}/download",
             new ImageModelDownloadRequest(ConsentConfirmed: true),
             JsonOptions);
-        ImageModelDownloadResponse? payload = await response.Content.ReadFromJsonAsync<ImageModelDownloadResponse>(JsonOptions);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotNull(payload);
-        Assert.Equal("Verified", payload.State);
+        await AssertProblemAsync(
+            response,
+            HttpStatusCode.BadRequest,
+            "Configurazione immagini non valida",
+            "image_generation_invalid_configuration");
 
         string modelPath = Path.Combine(
             tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
             ImageModelCatalog.DefaultModelId,
             ImageModelCatalog.RequiredModelFileName);
-        Assert.True(File.Exists(modelPath));
+        Assert.False(File.Exists(modelPath));
+    }
+
+    [Fact]
+    public async Task ImageModelState_RejectsExistingPlaceholderModel()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-placeholder-state-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SeedPlaceholderImageModel(tempDescriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
         Assert.NotNull(states);
         ImageModelLocalState state = Assert.Single(states);
-        Assert.True(state.IsVerified);
+        Assert.Equal("VerificationFailed", state.State);
+        Assert.False(state.IsVerified);
         Assert.Equal(46, state.LocalSizeBytes);
+        Assert.Contains("segnaposto", state.VerificationError, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task SaveImageSettingsAsync(HttpClient httpClient)
@@ -149,7 +149,7 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private static void SeedVerifiedImageModel(TempBackendDescriptor tempDescriptor)
+    private static void SeedPlaceholderImageModel(TempBackendDescriptor tempDescriptor)
     {
         string modelDirectory = Path.Combine(
             tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,

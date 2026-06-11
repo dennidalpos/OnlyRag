@@ -50,6 +50,18 @@ internal sealed class ImageModelManager
         }
 
         FileInfo file = new(modelPath);
+        if (IsPlaceholderModelFile(modelPath))
+        {
+            return new ImageModelLocalState(
+                model.Id,
+                "VerificationFailed",
+                IsDownloaded: true,
+                IsVerified: false,
+                file.Length,
+                modelDirectory,
+                "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.");
+        }
+
         string actualSha256 = ComputeSha256(modelPath);
         bool hashMatches = actualSha256.Equals(model.Sha256, StringComparison.OrdinalIgnoreCase);
         return new ImageModelLocalState(
@@ -176,11 +188,9 @@ internal sealed class ImageModelManager
         Uri uri = new(model.DownloadUrl);
         if (string.Equals(uri.Scheme, "onlyrag", StringComparison.OrdinalIgnoreCase))
         {
-            await File.WriteAllBytesAsync(
-                destinationPath,
-                System.Text.Encoding.UTF8.GetBytes(ImageModelCatalog.PlaceholderModelContent),
-                cancellationToken);
-            return;
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidConfiguration,
+                "Il modello integrato e ancora un segnaposto tecnico: la generazione immagini reale non e disponibile in questa build.");
         }
 
         if (uri.Scheme == Uri.UriSchemeFile)
@@ -209,5 +219,18 @@ internal sealed class ImageModelManager
         using FileStream stream = File.OpenRead(path);
         byte[] hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static bool IsPlaceholderModelFile(string path)
+    {
+        byte[] placeholder = System.Text.Encoding.UTF8.GetBytes(ImageModelCatalog.PlaceholderModelContent);
+        FileInfo file = new(path);
+        if (file.Length != placeholder.Length)
+        {
+            return false;
+        }
+
+        byte[] content = File.ReadAllBytes(path);
+        return content.AsSpan().SequenceEqual(placeholder);
     }
 }

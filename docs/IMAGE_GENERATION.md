@@ -31,6 +31,10 @@ OnlyRag prefers DirectML GPU execution on Windows when available and falls back 
 shows the active execution provider and blocks generation until the selected model is downloaded and
 verified.
 
+The current integrated catalog entry is a technical placeholder until real ONNX Runtime text-to-image
+inference is wired in. Placeholder model files are rejected during verification and generation is
+blocked instead of producing synthetic pattern images.
+
 ## Release Verification
 
 Representative release verification should cover:
