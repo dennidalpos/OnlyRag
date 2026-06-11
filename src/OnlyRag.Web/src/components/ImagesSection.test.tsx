@@ -76,6 +76,47 @@ describe("ImagesSection", () => {
     expect(JSON.parse(String(downloadCall?.body))).toEqual({ consentConfirmed: true });
   });
 
+  it("shows progress while a model download is running", async () => {
+    let finishDownload: () => void = () => {};
+    mockApi([
+      { path: "/api/settings/image-generation", response: createImageSettings() },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: false, state: "NotDownloaded" }) },
+      { path: "/api/images/models/catalog", response: [createCatalogEntry()] },
+      { path: "/api/images/models", response: [createModelState({ isVerified: false })] },
+      { path: "/api/images", response: [] },
+      {
+        path: "/api/images/models/onlyrag-sdxl-turbo-directml/download",
+        method: "POST",
+        handler: async () => {
+          await new Promise<void>((resolve) => {
+            finishDownload = resolve;
+          });
+          return {
+            body: {
+              modelId: "onlyrag-sdxl-turbo-directml",
+              state: "Downloaded",
+              message: "Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica."
+            }
+          };
+        }
+      },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: false, state: "Downloaded" }) },
+      { path: "/api/images/models", response: [createModelState({ isVerified: false, isDownloaded: true, state: "Downloaded" })] }
+    ]);
+
+    render(<ImagesSection />);
+
+    await screen.findByRole("heading", { name: "Generazione immagini" });
+    await userEvent.click(screen.getByRole("button", { name: "Scarica modello" }));
+    await userEvent.click(screen.getByRole("button", { name: "Conferma e scarica" }));
+
+    expect(screen.getByRole("progressbar", { name: "Download modello in corso..." })).toBeInTheDocument();
+    expect(screen.getByText("Download modello in corso...")).toBeInTheDocument();
+
+    finishDownload();
+    expect(await screen.findByText("Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica.")).toBeInTheDocument();
+  });
+
   it("generates an image and shows it in the gallery", async () => {
     const createObjectUrl = vi.fn(() => "blob:onlyrag-image");
     const revokeObjectUrl = vi.fn();

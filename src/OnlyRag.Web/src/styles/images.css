@@ -71,6 +71,37 @@
   font-size: 12px;
 }
 
+.image-model-progress {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid #c9d9e6;
+  border-radius: 8px;
+  background: #f4f9fd;
+}
+
+.image-model-progress__header {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #172033;
+  font-size: 12px;
+}
+
+.image-model-progress__header strong,
+.image-model-progress__header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-model-progress__header span {
+  color: #627084;
+}
+
 .settings-grid--four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -167,4 +198,3 @@
     grid-template-columns: 1fr;
   }
 }
-

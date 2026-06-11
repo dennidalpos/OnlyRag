@@ -13,6 +13,7 @@ import {
   type ImageModelLocalState
 } from "../api";
 import { formatFileSize } from "./DocumentsSection.formatting";
+import { ProgressBar } from "./ProgressBar";
 
 const defaultModelId = "onlyrag-sdxl-turbo-directml";
 
@@ -60,6 +61,7 @@ export function ImagesSection() {
   const [isSavingModel, setIsSavingModel] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isModelActionRunning, setIsModelActionRunning] = useState(false);
+  const [modelActionMessage, setModelActionMessage] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const selectedModel = useMemo(
@@ -163,6 +165,7 @@ export function ImagesSection() {
 
   async function handleDownloadConfirmed(modelId: string) {
     setIsModelActionRunning(true);
+    setModelActionMessage("Download modello in corso...");
     setFeedback(null);
     try {
       const response = await apiRequest<ImageModelDownloadResponse>(`/api/images/models/${modelId}/download`, {
@@ -175,12 +178,14 @@ export function ImagesSection() {
     } catch (error) {
       setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Download modello non riuscito." });
     } finally {
+      setModelActionMessage(null);
       setIsModelActionRunning(false);
     }
   }
 
   async function handleDeleteModel(modelId: string) {
     setIsModelActionRunning(true);
+    setModelActionMessage("Rimozione file modello in corso...");
     setFeedback(null);
     try {
       const response = await apiRequest<ImageModelDownloadResponse>(`/api/images/models/${modelId}`, { method: "DELETE" });
@@ -189,6 +194,7 @@ export function ImagesSection() {
     } catch (error) {
       setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Rimozione modello non riuscita." });
     } finally {
+      setModelActionMessage(null);
       setIsModelActionRunning(false);
     }
   }
@@ -346,6 +352,15 @@ export function ImagesSection() {
                 onDelete={() => void handleDeleteModel(selectedModel.id)}
                 disabled={isModelActionRunning}
               />
+              {modelActionMessage && (
+                <div className="image-model-progress" role="status">
+                  <div className="image-model-progress__header">
+                    <strong>{modelActionMessage}</strong>
+                    <span>{selectedModel.displayName}</span>
+                  </div>
+                  <ProgressBar label={modelActionMessage} value={0} indeterminate />
+                </div>
+              )}
               <ModelCatalogEditor
                 draft={modelDraft}
                 selectedModel={selectedModel}

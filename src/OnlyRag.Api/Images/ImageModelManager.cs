@@ -130,14 +130,19 @@ internal sealed class ImageModelManager
             Directory.CreateDirectory(GetModelDirectory(model.Id));
             await DownloadModelAsync(model, cancellationToken);
             ImageModelLocalState state = await GetStateAsync(model.Id, cancellationToken);
-            if (!state.IsVerified)
+            if (!state.IsVerified && state.State != "Downloaded")
             {
                 throw new ImageGenerationException(
                     ImageGenerationErrorKind.InvalidConfiguration,
                     state.VerificationError ?? "Verifica modello immagini non riuscita.");
             }
 
-            return new ImageModelDownloadResponse(model.Id, state.State, "Modello immagini scaricato e verificato.");
+            return new ImageModelDownloadResponse(
+                model.Id,
+                state.State,
+                state.IsVerified
+                    ? "Modello immagini scaricato e verificato."
+                    : "Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica.");
         }
         finally
         {
