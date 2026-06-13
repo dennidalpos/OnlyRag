@@ -19,6 +19,11 @@ $knownCatalog = @(
     [pscustomobject]@{ Runtime = "cuda118"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu118/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" }
 )
 
+$futureCatalog = @(
+    [pscustomobject]@{ Runtime = "cuda133"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu133/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" },
+    [pscustomobject]@{ Runtime = "cuda132"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu132/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" }
+)
+
 function Compare-VersionString {
     param(
         [string]$Left,
@@ -27,6 +32,14 @@ function Compare-VersionString {
 
     $normalizedLeft = $Left -replace "\.x$", ".999"
     $normalizedRight = $Right -replace "\.x$", ".999"
+    if ($normalizedLeft -match '^\d+\.\d+$') {
+        $normalizedLeft = "$normalizedLeft.0"
+    }
+
+    if ($normalizedRight -match '^\d+\.\d+$') {
+        $normalizedRight = "$normalizedRight.0"
+    }
+
     return ([version]$normalizedLeft).CompareTo([version]$normalizedRight)
 }
 
@@ -90,7 +103,7 @@ function Test-PipDryRun {
     }
 
     $requirement = "$($Candidate.Package)==$($Candidate.Version)"
-    $output = @(& $python.Source -m pip install --dry-run --disable-pip-version-check --only-binary=:all: --no-deps --extra-index-url $Candidate.Url $requirement 2>&1)
+    $output = @(& $python.Source -m pip install --dry-run --disable-pip-version-check --timeout 20 --retries 1 --only-binary=:all: --no-deps --extra-index-url $Candidate.Url $requirement 2>&1)
     $exitCode = $LASTEXITCODE
     $text = ($output | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
     return [pscustomobject]@{
@@ -102,7 +115,7 @@ function Test-PipDryRun {
     }
 }
 
-$results = foreach ($candidate in $knownCatalog) {
+$results = foreach ($candidate in @($futureCatalog + $knownCatalog)) {
     $manifestTarget = @($manifest.runtimeTargets | Where-Object { $_.resolvedRuntime -eq $candidate.Runtime } | Select-Object -First 1)
     $sourceReachable = $false
     $sourceStatus = $null
@@ -115,15 +128,21 @@ $results = foreach ($candidate in $knownCatalog) {
         $sourceStatus = $_.Exception.Message
     }
 
-    $targetForDryRun = if ($manifestTarget.Count -gt 0) {
-        $manifestTarget[0]
+    $dryRuns = if ($manifestTarget.Count -gt 0) {
+        @([pscustomobject]@{
+            python = $null
+            pythonVersion = $null
+            skipped = $true
+            installable = $null
+            detail = "runtime target already present in manifest"
+        })
     }
     else {
-        [pscustomobject]@{ supportedPythonMin = "3.10"; supportedPythonMax = "3.13" }
+        $targetForDryRun = [pscustomobject]@{ supportedPythonMin = "3.10"; supportedPythonMax = "3.13" }
+        @($PythonCommands | ForEach-Object {
+            Test-PipDryRun -Candidate $candidate -ManifestTarget $targetForDryRun -PythonCommand $_
+        })
     }
-    $dryRuns = @($PythonCommands | ForEach-Object {
-        Test-PipDryRun -Candidate $candidate -ManifestTarget $targetForDryRun -PythonCommand $_
-    })
     [pscustomobject]@{
         runtime = $candidate.Runtime
         sourceUrl = $candidate.Url
@@ -138,7 +157,7 @@ $results = foreach ($candidate in $knownCatalog) {
 }
 
 $updateRecommended = @($results | Where-Object {
-    ($_.sourceReachable -eq $true -or $_.dryRunInstallable -eq $true) -and -not $_.manifestPresent
+    $_.dryRunInstallable -eq $true -and -not $_.manifestPresent
 }).Count -gt 0
 
 $report = [pscustomobject]@{

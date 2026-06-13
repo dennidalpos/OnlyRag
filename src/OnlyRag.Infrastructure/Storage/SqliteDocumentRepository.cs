@@ -110,7 +110,7 @@ public sealed partial class SqliteDocumentRepository : IDocumentRepository
         return await GetAsync(id, cancellationToken);
     }
 
-public async Task<ImportedDocument?> DeleteAsync(long id, CancellationToken cancellationToken = default)
+    public async Task<ImportedDocument?> DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
         ImportedDocument? current = await GetAsync(id, cancellationToken);
         if (current is null)

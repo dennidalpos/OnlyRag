@@ -576,6 +576,38 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task ImageGeneration_RuntimeStatusExplainsCpuWhenGpuPreferenceDisabled()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ActiveExecutionProvider = "CPU"
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-cpu-preference-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await SeedVerifiedImageModelAsync(httpClient, tempDescriptor);
+        using HttpResponseMessage settingsResponse = await httpClient.PutAsJsonAsync(
+            "/api/settings/image-generation",
+            new ImageGenerationSettings(
+                ImageModelCatalog.DefaultModelId,
+                60,
+                PreferGpu: false),
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
+
+        ImageGenerationRuntimeStatus? status =
+            await httpClient.GetFromJsonAsync<ImageGenerationRuntimeStatus>("/api/images/runtime/status", JsonOptions);
+
+        Assert.NotNull(status);
+        Assert.True(status.IsReady);
+        Assert.Equal("CPU", status.ExecutionProvider);
+        Assert.Equal("CPU", status.PreferredExecutionProvider);
+        Assert.Equal("DirectML disabilitato nelle impostazioni immagini.", status.FallbackReason);
+    }
+
+    [Fact]
     public async Task ImageGeneration_SettingsFallsBackFromRemovedCudaModel()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-removed-cuda-model-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));

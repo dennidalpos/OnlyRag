@@ -49,7 +49,16 @@ const imageTooltips = {
   format: "Imposta larghezza e altezza con formati stabili per SDXL.",
   negativePrompt: "Opzionale. Il motore aggiunge gia filtri per anatomia e difetti comuni.",
   seed: "Opzionale. Ripete una generazione simile quando usi lo stesso prompt e modello.",
-  model: "Scegli il modello in base al caso d'uso: qualita, velocita, bozza o creativo."
+  model: "Scegli il modello in base al caso d'uso: qualita, velocita, bozza o creativo.",
+  downloadConsent: "Il download parte solo dopo conferma esplicita e salva i file nel profilo locale.",
+  catalogEditor: "Modifica solo snapshot ONNX SDXL compatibili e verifica licenza, file richiesti e hash.",
+  downloadUrl: "URL del repository o del file modello da scaricare nel profilo locale.",
+  recommendedProfile: "Nota breve mostrata nello stato modello per guidare la scelta.",
+  expectedSize: "Dimensione attesa in byte; 0 indica dimensione non dichiarata.",
+  requiredFiles: "Elenco separato da virgole dei file che rendono lo snapshot utilizzabile.",
+  sha256: "Hash opzionale del file modello singolo. Lascia vuoto per snapshot verificati dai file richiesti.",
+  preferGpu: "Usa DirectML quando disponibile; se fallisce, il backend puo ripiegare su CPU.",
+  timeout: "Tempo massimo concesso a una generazione prima di interrompere la richiesta."
 };
 
 type GenerationModeValue = (typeof generationModes)[number]["value"];
@@ -727,7 +736,7 @@ function ImageSettingsModal({
               </select>
             </label>
             <label className="field-group" htmlFor="image-timeout">
-              <span>Timeout</span>
+              <TooltipLabel text="Timeout" tooltip={imageTooltips.timeout} />
               <input
                 id="image-timeout"
                 min={10}
@@ -735,6 +744,7 @@ function ImageSettingsModal({
                 type="number"
                 value={settings.requestTimeoutSeconds}
                 onChange={(event) => onSettingsChange({ ...settings, requestTimeoutSeconds: Number(event.target.value) })}
+                title={imageTooltips.timeout}
               />
             </label>
             <label className="toggle-row images-trust-row" htmlFor="image-prefer-gpu">
@@ -744,7 +754,7 @@ function ImageSettingsModal({
                 checked={settings.preferGpu}
                 onChange={(event) => onSettingsChange({ ...settings, preferGpu: event.target.checked })}
               />
-              <span>Preferisci GPU DirectML quando disponibile</span>
+              <TooltipLabel text="Preferisci GPU DirectML" tooltip={imageTooltips.preferGpu} />
             </label>
           </div>
           <div className="settings-actions">
@@ -785,11 +795,27 @@ function ImageSettingsModal({
 
           {consentModel && (
             <div className="panel-note panel-note--warning" role="dialog" aria-labelledby="image-model-consent-title">
-              <h3 id="image-model-consent-title">Conferma download modello</h3>
-              <p>{consentModel.displayName}</p>
-              <p>Licenza: {consentModel.licenseLabel}</p>
-              <p>Dimensione prevista: {formatModelSize(consentModel.expectedSizeBytes)}</p>
-              <p>Destinazione: {modelStates.find((state) => state.modelId === consentModel.id)?.localDirectory ?? "%LOCALAPPDATA%\\OnlyRag\\models\\images"}</p>
+              <h3 id="image-model-consent-title">
+                <TooltipLabel text="Conferma download modello" tooltip={imageTooltips.downloadConsent} />
+              </h3>
+              <dl className="image-consent-summary">
+                <div>
+                  <dt>Modello</dt>
+                  <dd>{consentModel.displayName}</dd>
+                </div>
+                <div>
+                  <dt>Licenza</dt>
+                  <dd>{consentModel.licenseLabel}</dd>
+                </div>
+                <div>
+                  <dt>Dimensione</dt>
+                  <dd>{formatModelSize(consentModel.expectedSizeBytes)}</dd>
+                </div>
+                <div>
+                  <dt>Destinazione</dt>
+                  <dd>{modelStates.find((state) => state.modelId === consentModel.id)?.localDirectory ?? "%LOCALAPPDATA%\\OnlyRag\\models\\images"}</dd>
+                </div>
+              </dl>
               <div className="settings-actions">
                 <button type="button" onClick={() => onDownloadConfirmed(consentModel.id)} disabled={isModelActionRunning}>
                   Conferma e scarica
@@ -841,7 +867,9 @@ function ModelCatalogEditor({
 }) {
   return (
     <details className="panel-note panel-note--info image-advanced-settings">
-      <summary>Catalogo avanzato</summary>
+      <summary>
+        <TooltipLabel text="Catalogo avanzato" tooltip={imageTooltips.catalogEditor} />
+      </summary>
       <div className="settings-grid settings-grid--two">
         <label className="field-group" htmlFor="image-model-id">
           <span>Id</span>
@@ -853,12 +881,22 @@ function ModelCatalogEditor({
         </label>
       </div>
       <label className="field-group" htmlFor="image-model-url">
-        <span>URL download o repository</span>
-        <input id="image-model-url" value={draft.downloadUrl} onChange={(event) => onChange({ ...draft, downloadUrl: event.target.value })} />
+        <TooltipLabel text="URL download o repository" tooltip={imageTooltips.downloadUrl} />
+        <input
+          id="image-model-url"
+          value={draft.downloadUrl}
+          onChange={(event) => onChange({ ...draft, downloadUrl: event.target.value })}
+          title={imageTooltips.downloadUrl}
+        />
       </label>
       <label className="field-group" htmlFor="image-model-profile">
-        <span>Profilo</span>
-        <input id="image-model-profile" value={draft.recommendedProfile} onChange={(event) => onChange({ ...draft, recommendedProfile: event.target.value })} />
+        <TooltipLabel text="Profilo" tooltip={imageTooltips.recommendedProfile} />
+        <input
+          id="image-model-profile"
+          value={draft.recommendedProfile}
+          onChange={(event) => onChange({ ...draft, recommendedProfile: event.target.value })}
+          title={imageTooltips.recommendedProfile}
+        />
       </label>
       <div className="settings-grid settings-grid--two">
         <label className="field-group" htmlFor="image-model-license">
@@ -866,26 +904,33 @@ function ModelCatalogEditor({
           <input id="image-model-license" value={draft.licenseLabel} onChange={(event) => onChange({ ...draft, licenseLabel: event.target.value })} />
         </label>
         <label className="field-group" htmlFor="image-model-size">
-          <span>Dimensione prevista</span>
+          <TooltipLabel text="Dimensione prevista" tooltip={imageTooltips.expectedSize} />
           <input
             id="image-model-size"
             inputMode="numeric"
             value={draft.expectedSizeBytes}
             onChange={(event) => onChange({ ...draft, expectedSizeBytes: event.target.value })}
+            title={imageTooltips.expectedSize}
           />
         </label>
       </div>
       <label className="field-group" htmlFor="image-model-required-files">
-        <span>File richiesti</span>
+        <TooltipLabel text="File richiesti" tooltip={imageTooltips.requiredFiles} />
         <input
           id="image-model-required-files"
           value={draft.requiredFiles}
           onChange={(event) => onChange({ ...draft, requiredFiles: event.target.value })}
+          title={imageTooltips.requiredFiles}
         />
       </label>
       <label className="field-group" htmlFor="image-model-sha">
-        <span>SHA256 opzionale</span>
-        <input id="image-model-sha" value={draft.sha256} onChange={(event) => onChange({ ...draft, sha256: event.target.value })} />
+        <TooltipLabel text="SHA256 opzionale" tooltip={imageTooltips.sha256} />
+        <input
+          id="image-model-sha"
+          value={draft.sha256}
+          onChange={(event) => onChange({ ...draft, sha256: event.target.value })}
+          title={imageTooltips.sha256}
+        />
       </label>
       <div className="settings-actions">
         <button type="button" onClick={onSave} disabled={disabled}>

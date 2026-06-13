@@ -24,8 +24,8 @@ pwsh .\scripts\Build-Installer.ps1 -Configuration Release
 ```
 
 The script builds the React/Vite UI, prepares the Qdrant payload when needed, publishes the WPF app
-self-contained for `win-x64`, verifies the publish payload, and compiles `packaging\OnlyRag.iss`
-with Inno Setup. Default outputs:
+self-contained for `win-x64`, verifies the publish payload including DirectML/ONNX Runtime native
+files, and compiles `packaging\OnlyRag.iss` with Inno Setup. Default outputs:
 
 - `artifacts\publish\OnlyRag\win-x64`
 - `artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe`
@@ -56,7 +56,8 @@ The installer:
 - Installs under `%LOCALAPPDATA%\Programs\OnlyRag`.
 - Preserves user data under `%LOCALAPPDATA%\OnlyRag` on uninstall.
 - Includes the self-contained .NET runtime payload, WebView2 assemblies, SQLite native provider,
-  Qdrant payload, OCR scripts, OCR requirements, and bundled web UI.
+  DirectML/ONNX Runtime native files, Qdrant payload, OCR scripts, OCR requirements, and bundled
+  web UI.
 - Runs OCR runtime preparation when compatible Python and Internet access are available.
 
 ## Verification

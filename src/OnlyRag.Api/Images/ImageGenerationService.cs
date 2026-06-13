@@ -37,6 +37,9 @@ internal sealed class ImageGenerationService
         string activeProvider = engineStatus.IsInitialized
             ? engineStatus.ActiveExecutionProvider
             : preferredProvider;
+        string? fallbackReason = settings.PreferGpu
+            ? engineStatus.FallbackReason
+            : "DirectML disabilitato nelle impostazioni immagini.";
         return new ImageGenerationRuntimeStatus(
             state.IsVerified ? "Ready" : state.State,
             state.IsVerified,
@@ -47,7 +50,7 @@ internal sealed class ImageGenerationService
             state.IsVerified ? null : state.VerificationError,
             preferredProvider,
             state.State,
-            engineStatus.FallbackReason);
+            fallbackReason);
     }
 
     public async Task<ImageGenerationResponse> GenerateAsync(
