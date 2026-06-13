@@ -98,7 +98,6 @@ export function ImagesSection() {
     () => images.find((image) => image.id === selectedImageId) ?? images[0] ?? null,
     [images, selectedImageId]
   );
-  const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const canGenerate = Boolean(prompt.trim()) && Boolean(selectedModelState?.isVerified);
 
   useEffect(() => {
@@ -889,7 +888,7 @@ function ModelReadiness({
       <span>{state?.state ?? "NotDownloaded"}</span>
       <small>
         {state?.isVerified
-          ? `${formatFileSize(state.localSizeBytes)} verificati in ${state.localDirectory}`
+          ? `${formatFileSize(state.localSizeBytes)} pronti in ${state.localDirectory}`
           : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
       <div className="settings-actions">

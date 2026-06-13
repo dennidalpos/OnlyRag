@@ -48,6 +48,7 @@ internal sealed class ImageModelManager
     private ImageModelLocalState GetState(ImageModelCatalogEntry model)
     {
         string modelDirectory = GetModelDirectory(model.Id);
+        long localSizeBytes = GetDirectorySize(modelDirectory);
         bool isDownloading;
         lock (gate)
         {
@@ -55,45 +56,59 @@ internal sealed class ImageModelManager
         }
 
         string modelPath = GetModelFilePath(model.Id);
-        if (IsPlaceholderModelFile(modelPath))
+        bool hasRequiredFiles = HasRequiredFiles(model, modelDirectory);
+        if (!hasRequiredFiles)
+        {
+            if (ModelRequiresSingleOnnxFile(model) && IsPlaceholderModelFile(modelPath))
+            {
+                return new ImageModelLocalState(
+                    model.Id,
+                    "VerificationFailed",
+                    IsDownloaded: true,
+                    IsVerified: false,
+                    localSizeBytes,
+                    modelDirectory,
+                    "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.",
+                    model.ExpectedSizeBytes,
+                    CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
+            }
+
+            return new ImageModelLocalState(
+                model.Id,
+                isDownloading ? "Downloading" : "NotDownloaded",
+                IsDownloaded: false,
+                IsVerified: false,
+                localSizeBytes,
+                modelDirectory,
+                isDownloading ? null : "Il modello non e ancora stato scaricato.",
+                model.ExpectedSizeBytes,
+                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
+        }
+
+        if (ModelRequiresSingleOnnxFile(model) && IsPlaceholderModelFile(modelPath))
         {
             return new ImageModelLocalState(
                 model.Id,
                 "VerificationFailed",
                 IsDownloaded: true,
                 IsVerified: false,
-                GetDirectorySize(modelDirectory),
+                localSizeBytes,
                 modelDirectory,
                 "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.",
                 model.ExpectedSizeBytes,
-                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, GetDirectorySize(modelDirectory)));
+                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
         }
 
-        if (!HasRequiredFiles(model, modelDirectory))
-        {
-            return new ImageModelLocalState(
-                model.Id,
-                isDownloading ? "Downloading" : "NotDownloaded",
-                IsDownloaded: false,
-                IsVerified: false,
-                LocalSizeBytes: 0,
-                modelDirectory,
-                isDownloading ? null : "Il modello non e ancora stato scaricato.",
-                model.ExpectedSizeBytes,
-                model.ExpectedSizeBytes);
-        }
-
-        long localSizeBytes = GetDirectorySize(modelDirectory);
         if (string.IsNullOrWhiteSpace(model.Sha256))
         {
             return new ImageModelLocalState(
                 model.Id,
-                "Downloaded",
+                "Ready",
                 IsDownloaded: true,
-                IsVerified: false,
+                IsVerified: true,
                 localSizeBytes,
                 modelDirectory,
-                "Modello scaricato, ma manca lo SHA256 per la verifica.",
+                null,
                 model.ExpectedSizeBytes,
                 CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
         }
@@ -148,9 +163,9 @@ internal sealed class ImageModelManager
             return new ImageModelDownloadResponse(
                 model.Id,
                 state.State,
-                state.IsVerified
+                state.IsVerified && !string.IsNullOrWhiteSpace(model.Sha256)
                     ? "Modello immagini scaricato e verificato."
-                    : "Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica.");
+                    : "Modello immagini scaricato e pronto.");
         }
         finally
         {
@@ -339,6 +354,12 @@ internal sealed class ImageModelManager
     {
         return model.RequiredFiles.Count > 0
             && model.RequiredFiles.All(requiredFile => File.Exists(ResolveModelSnapshotPath(modelDirectory, requiredFile)));
+    }
+
+    private static bool ModelRequiresSingleOnnxFile(ImageModelCatalogEntry model)
+    {
+        return model.RequiredFiles.Any(requiredFile =>
+            requiredFile.Equals(ImageModelCatalog.RequiredModelFileName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static long GetDirectorySize(string modelDirectory)

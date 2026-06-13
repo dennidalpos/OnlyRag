@@ -58,8 +58,16 @@ function Invoke-OcrSetupProcess {
     )
 
     Write-OcrSetupLog "Running: $FilePath $($Arguments -join ' ')"
-    $output = @(& $FilePath @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = @(& $FilePath @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
     $text = ($output | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
     if (-not $Quiet -and -not [string]::IsNullOrWhiteSpace($text)) {
         Write-OcrSetupLog $text
@@ -76,9 +84,9 @@ function Test-OcrBenignPaddleUninstallOutput {
     param([string]$Text)
 
     return -not [string]::IsNullOrWhiteSpace($Text) -and
-        $Text.Contains("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -and
-        $Text.Contains("not installed", [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not $Text.Contains("ERROR:", [System.StringComparison]::OrdinalIgnoreCase)
+        $Text.IndexOf("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $Text.IndexOf("not installed", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $Text.IndexOf("ERROR:", [System.StringComparison]::OrdinalIgnoreCase) -lt 0
 }
 
 function Get-OcrPythonCommand {

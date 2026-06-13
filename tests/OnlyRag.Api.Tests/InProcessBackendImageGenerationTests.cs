@@ -58,6 +58,7 @@ public sealed partial class InProcessBackendTests
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         SeedPlaceholderImageModel(tempDescriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 46);
         await SaveImageSettingsAsync(httpClient);
 
         ImageGenerationRuntimeStatus? runtimeStatus =
@@ -136,6 +137,7 @@ public sealed partial class InProcessBackendTests
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         SeedPlaceholderImageModel(tempDescriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 46);
 
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
         Assert.NotNull(states);
@@ -161,6 +163,44 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == ImageModelCatalog.DefaultModelId);
         Assert.Equal(1_000, state.ExpectedSizeBytes);
         Assert.Equal(993, state.RemainingDownloadBytes);
+    }
+
+    [Fact]
+    public async Task ImageModelState_TreatsSnapshotWithoutShaAsReady()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-ready-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+
+        ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
+
+        Assert.NotNull(states);
+        ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == ImageModelCatalog.DefaultModelId);
+        Assert.Equal("Ready", state.State);
+        Assert.True(state.IsDownloaded);
+        Assert.True(state.IsVerified);
+        Assert.Null(state.VerificationError);
+    }
+
+    [Fact]
+    public async Task ImageModelState_IgnoresStalePlaceholderWhenSnapshotRequiredFilesExist()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-placeholder-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedPlaceholderImageModel(tempDescriptor);
+        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+
+        ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
+
+        Assert.NotNull(states);
+        ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == ImageModelCatalog.DefaultModelId);
+        Assert.Equal("Ready", state.State);
+        Assert.True(state.IsVerified);
+        Assert.DoesNotContain("segnaposto", state.VerificationError ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -192,6 +232,30 @@ public sealed partial class InProcessBackendTests
 
         using HttpResponseMessage fileResponse = await httpClient.GetAsync($"/api/images/{image.Id}/file");
         Assert.Equal(HttpStatusCode.NotFound, fileResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task ImageGeneration_WithSnapshotModelWithoutSha_AllowsGeneration()
+    {
+        FakeImageGenerationEngine engine = new();
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-generate-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+        await SaveImageSettingsAsync(httpClient);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+        ImageGenerationResponse? generated = await generateResponse.Content.ReadFromJsonAsync<ImageGenerationResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
+        Assert.NotNull(generated);
+        Assert.Single(generated.Images);
     }
 
     [Fact]
@@ -287,10 +351,24 @@ public sealed partial class InProcessBackendTests
         File.WriteAllBytes(Path.Combine(modelDirectory, ImageModelCatalog.RequiredModelFileName), content);
     }
 
+    private static void SeedImageModelSnapshotFile(
+        TempBackendDescriptor tempDescriptor,
+        string relativePath,
+        string content)
+    {
+        string modelDirectory = Path.Combine(
+            tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
+            ImageModelCatalog.DefaultModelId);
+        string destinationPath = Path.Combine(modelDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        File.WriteAllText(destinationPath, content);
+    }
+
     private static async Task UpsertImageModelCatalogAsync(
         HttpClient httpClient,
         long expectedSizeBytes,
-        string sha256 = "")
+        string sha256 = "",
+        IReadOnlyList<string>? requiredFiles = null)
     {
         using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
             $"/api/images/models/catalog/{ImageModelCatalog.DefaultModelId}",
@@ -301,7 +379,7 @@ public sealed partial class InProcessBackendTests
                 "file:///C:/OnlyRag/test-model.onnx",
                 "Test license",
                 expectedSizeBytes,
-                [ImageModelCatalog.RequiredModelFileName],
+                requiredFiles ?? [ImageModelCatalog.RequiredModelFileName],
                 sha256),
             JsonOptions);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

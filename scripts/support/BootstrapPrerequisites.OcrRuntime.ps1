@@ -150,20 +150,20 @@ function Test-OcrBenignNativeOutputLine {
     param([object]$Line)
 
     $text = [string]$Line
-    return $text.Contains("No ccache found", [System.StringComparison]::OrdinalIgnoreCase) -or
-        $text.Contains("extension_utils.py", [System.StringComparison]::OrdinalIgnoreCase) -or
-        $text.Contains("warnings.warn(warning_message)", [System.StringComparison]::OrdinalIgnoreCase) -or
-        $text.Contains("INFORMAZIONI: impossibile trovare file", [System.StringComparison]::OrdinalIgnoreCase) -or
-        $text.Contains("criteri di ricerca indicati", [System.StringComparison]::OrdinalIgnoreCase)
+    return $text.IndexOf("No ccache found", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $text.IndexOf("extension_utils.py", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $text.IndexOf("warnings.warn(warning_message)", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $text.IndexOf("INFORMAZIONI: impossibile trovare file", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $text.IndexOf("criteri di ricerca indicati", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
 function Test-OcrBenignPaddleUninstallOutput {
     param([string]$Text)
 
     return -not [string]::IsNullOrWhiteSpace($Text) -and
-        $Text.Contains("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -and
-        $Text.Contains("not installed", [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not $Text.Contains("ERROR:", [System.StringComparison]::OrdinalIgnoreCase)
+        $Text.IndexOf("Skipping paddlepaddle", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $Text.IndexOf("not installed", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $Text.IndexOf("ERROR:", [System.StringComparison]::OrdinalIgnoreCase) -lt 0
 }
 
 function Invoke-OcrNativeCaptured {
@@ -176,11 +176,14 @@ function Invoke-OcrNativeCaptured {
     )
 
     Push-Location $repoRoot
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
         $outputItems = @(& $FilePath @Arguments 2>&1)
         $exitCode = $LASTEXITCODE
     }
     finally {
+        $ErrorActionPreference = $previousErrorActionPreference
         Pop-Location
     }
 

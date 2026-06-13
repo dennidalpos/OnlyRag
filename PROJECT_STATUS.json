@@ -2,6 +2,7 @@
   "todos": [
     "Sign the installer and verify the signed install-launch-uninstall lifecycle on a clean Windows profile or verification machine.",
     "Verify representative Ollama, OCR, Qdrant, integrated image generation, and translation PDF export via LibreOffice runtime behavior for the target deployment scope.",
-    "Verify integrated image generation manually on Windows with DirectML GPU acceleration available and again with CPU fallback, including model download, SHA256 verification, prompt generation, saved gallery entries, and generated file retrieval."
+    "Verify integrated image generation manually on Windows with DirectML GPU acceleration available and again with CPU fallback, including model download, SHA256 verification, prompt generation, saved gallery entries, and generated file retrieval.",
+    "Monitor and add the next OCR NVIDIA CUDA runtime target beyond cuda130 when PaddlePaddle publishes stable Windows win_amd64 paddlepaddle-gpu wheels for newer CUDA SDK targets such as cu132 or cu133; update runtime-manifest.json, requirements-nvidia-cu*.txt, Test-OcrRuntimeCatalog.ps1, then verify the installed app provisions and uses the new GPU runtime successfully."
   ]
 }
