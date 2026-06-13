@@ -11,6 +11,12 @@ internal sealed class ImageModelManager
     private readonly ImageModelCatalogStore modelCatalog;
     private readonly HashSet<string> activeDownloads = new(StringComparer.OrdinalIgnoreCase);
     private readonly object gate = new();
+    private static readonly string[] SupportedPipelineClasses =
+    [
+        "StableDiffusionXLPipeline",
+        "OnnxStableDiffusionXLPipeline",
+        "ORTStableDiffusionXLPipeline"
+    ];
 
     private sealed record RemoteFileInfo(long? ContentLength, string? Sha256);
 
@@ -103,6 +109,21 @@ internal sealed class ImageModelManager
                 localSizeBytes,
                 modelDirectory,
                 "Il file locale e un segnaposto tecnico e non contiene un modello immagini eseguibile.",
+                model.ExpectedSizeBytes,
+                CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
+        }
+
+        string? snapshotVerificationError = GetSnapshotVerificationError(model, modelDirectory);
+        if (snapshotVerificationError is not null)
+        {
+            return new ImageModelLocalState(
+                model.Id,
+                "VerificationFailed",
+                IsDownloaded: true,
+                IsVerified: false,
+                localSizeBytes,
+                modelDirectory,
+                snapshotVerificationError,
                 model.ExpectedSizeBytes,
                 CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
         }
@@ -566,6 +587,52 @@ internal sealed class ImageModelManager
     {
         return model.RequiredFiles.Count > 0
             && model.RequiredFiles.All(requiredFile => File.Exists(ResolveModelSnapshotPath(modelDirectory, requiredFile)));
+    }
+
+    private static string? GetSnapshotVerificationError(ImageModelCatalogEntry model, string modelDirectory)
+    {
+        foreach (string requiredFile in model.RequiredFiles)
+        {
+            string requiredPath = ResolveModelSnapshotPath(modelDirectory, requiredFile);
+            if (IsPlaceholderModelFile(requiredPath))
+            {
+                return $"Il file richiesto {requiredFile} e un segnaposto tecnico e non contiene un modello immagini eseguibile.";
+            }
+        }
+
+        string modelIndexPath = ResolveModelSnapshotPath(modelDirectory, "model_index.json");
+        if (!File.Exists(modelIndexPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument modelIndex = JsonDocument.Parse(File.ReadAllText(modelIndexPath));
+            if (!modelIndex.RootElement.TryGetProperty("_class_name", out JsonElement classNameElement))
+            {
+                return null;
+            }
+
+            string? className = classNameElement.GetString();
+            if (string.IsNullOrWhiteSpace(className))
+            {
+                return "model_index.json non dichiara una pipeline modello valida.";
+            }
+
+            return SupportedPipelineClasses.Any(supported =>
+                className.Contains(supported, StringComparison.OrdinalIgnoreCase))
+                ? null
+                : $"Pipeline modello non supportata: {className}. Usa uno snapshot ONNX SDXL compatibile con DirectML.";
+        }
+        catch (JsonException)
+        {
+            return "model_index.json non e un file JSON valido.";
+        }
+        catch (IOException ex)
+        {
+            return $"model_index.json non leggibile: {ex.Message}";
+        }
     }
 
     private static bool ModelRequiresSingleOnnxFile(ImageModelCatalogEntry model)

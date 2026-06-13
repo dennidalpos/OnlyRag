@@ -315,6 +315,26 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task ImageModelState_RejectsUnsupportedSnapshotPipeline()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-pipeline-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
+        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", """{"_class_name":"StableDiffusionPipeline"}""");
+
+        ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
+
+        Assert.NotNull(states);
+        ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == ImageModelCatalog.DefaultModelId);
+        Assert.Equal("VerificationFailed", state.State);
+        Assert.True(state.IsDownloaded);
+        Assert.False(state.IsVerified);
+        Assert.Contains("Pipeline modello non supportata", state.VerificationError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ImageModelState_IgnoresStalePlaceholderWhenSnapshotRequiredFilesExist()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-placeholder-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
@@ -414,6 +434,90 @@ public sealed partial class InProcessBackendTests
             HttpStatusCode.Conflict,
             "Modello immagini non pronto",
             "image_generation_model_not_ready");
+    }
+
+    [Fact]
+    public async Task ImageGeneration_EngineTimeoutReturnsTypedProblem()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ExceptionToThrow = new TimeoutException("generation timed out")
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-engine-timeout-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.RequestTimeout,
+            "Timeout generazione immagini",
+            "image_generation_timeout");
+    }
+
+    [Fact]
+    public async Task ImageGeneration_EngineConfigurationFailureReturnsTypedProblem()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ExceptionToThrow = new InvalidOperationException("Unsupported model layout")
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-engine-config-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.BadRequest,
+            "Configurazione immagini non valida",
+            "image_generation_invalid_configuration");
+    }
+
+    [Fact]
+    public async Task ImageGeneration_EngineEmptyOutputReturnsTypedProblem()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ReturnEmptyResult = true
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-engine-empty-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.BadGateway,
+            "Errore generazione immagini",
+            "image_generation_unexpected_response");
     }
 
     [Fact]
@@ -642,6 +746,8 @@ public sealed partial class InProcessBackendTests
 
         public Exception? ExceptionToThrow { get; init; }
 
+        public bool ReturnEmptyResult { get; init; }
+
         private bool hasGenerated;
 
         public ImageGenerationEngineStatus GetStatus() =>
@@ -660,7 +766,7 @@ public sealed partial class InProcessBackendTests
 
             hasGenerated = true;
             return Task.FromResult(new ImageGenerationEngineResult(
-                [new ImageGenerationBinary(CreateTinyPng(), "image/png", ".png")],
+                ReturnEmptyResult ? [] : [new ImageGenerationBinary(CreateTinyPng(), "image/png", ".png")],
                 ActiveExecutionProvider,
                 FallbackReason));
         }

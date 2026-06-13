@@ -78,6 +78,31 @@ internal sealed class ImageGenerationService
                 "Il modello immagini locale e incompleto. Elimina il download del modello e scaricalo di nuovo.",
                 ex);
         }
+        catch (TimeoutException ex)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.Timeout,
+                "La generazione immagini non ha completato entro il tempo configurato. Aumenta il timeout o usa un preset piu veloce.",
+                ex);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.Timeout,
+                "La generazione immagini e stata interrotta per timeout interno del motore.",
+                ex);
+        }
+        catch (ImageGenerationException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsEngineConfigurationException(ex))
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidConfiguration,
+                $"Il motore immagini integrato non puo usare il modello selezionato: {ex.Message}",
+                ex);
+        }
 
         IReadOnlyList<ImageGenerationBinary> generated = engineResult.Images;
         if (generated.Count == 0)
@@ -183,5 +208,14 @@ internal sealed class ImageGenerationService
         }
 
         return absolutePath;
+    }
+
+    private static bool IsEngineConfigurationException(Exception exception)
+    {
+        return exception is InvalidOperationException
+            or NotSupportedException
+            or DllNotFoundException
+            or EntryPointNotFoundException
+            or IOException;
     }
 }

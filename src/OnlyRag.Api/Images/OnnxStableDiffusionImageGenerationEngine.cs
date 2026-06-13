@@ -52,27 +52,49 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
             catch (Exception ex) when (IsRecoverableProviderException(ex))
             {
                 string reason = $"DirectML non disponibile per questo modello o dispositivo: {ex.Message}";
-                ImageGenerationEngineResult cpu = await GenerateWithProviderAsync(
-                    request,
-                    modelDirectory,
-                    CreateCpuProvider(),
-                    CpuProvider,
-                    reason,
-                    cancellationToken);
-                SetStatus(cpu.ActiveExecutionProvider, cpu.FallbackReason);
-                return cpu;
+                try
+                {
+                    ImageGenerationEngineResult cpu = await GenerateWithProviderAsync(
+                        request,
+                        modelDirectory,
+                        CreateCpuProvider(),
+                        CpuProvider,
+                        reason,
+                        cancellationToken);
+                    SetStatus(cpu.ActiveExecutionProvider, cpu.FallbackReason);
+                    return cpu;
+                }
+                catch (Exception cpuEx) when (IsRecoverableProviderException(cpuEx))
+                {
+                    SetStatus(CpuProvider, reason);
+                    throw new ImageGenerationException(
+                        ImageGenerationErrorKind.InvalidConfiguration,
+                        $"DirectML non disponibile e fallback CPU non riuscito: {cpuEx.Message}",
+                        cpuEx);
+                }
             }
         }
 
-        ImageGenerationEngineResult result = await GenerateWithProviderAsync(
-            request,
-            modelDirectory,
-            CreateCpuProvider(),
-            CpuProvider,
-            fallbackReason: null,
-            cancellationToken);
-        SetStatus(result.ActiveExecutionProvider, result.FallbackReason);
-        return result;
+        try
+        {
+            ImageGenerationEngineResult result = await GenerateWithProviderAsync(
+                request,
+                modelDirectory,
+                CreateCpuProvider(),
+                CpuProvider,
+                fallbackReason: null,
+                cancellationToken);
+            SetStatus(result.ActiveExecutionProvider, result.FallbackReason);
+            return result;
+        }
+        catch (Exception ex) when (IsRecoverableProviderException(ex))
+        {
+            SetStatus(CpuProvider, "CPU non disponibile per la generazione immagini.");
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidConfiguration,
+                $"CPU non riuscita per la generazione immagini: {ex.Message}",
+                ex);
+        }
     }
 
     private static async Task<ImageGenerationEngineResult> GenerateWithProviderAsync(
