@@ -205,7 +205,8 @@ commands recreate required ignored outputs.
   action in Settings.
 - Ollama unavailable: install/start Ollama or configure a trusted LAN endpoint in Settings.
 - Image generation unavailable: open Images, download the selected integrated model, verify the
-  SHA256 status, and retry. DirectML GPU is preferred when available; CPU fallback is supported.
+  SHA256 status, and retry. DirectML GPU is preferred when available, including on NVIDIA GPUs; CPU
+  fallback is supported.
 - LibreOffice unavailable: install LibreOffice or set `ONLYRAG_LIBREOFFICE_PATH` to enable
   translation PDF export.
 

@@ -251,8 +251,7 @@ function createImageSettings() {
   return {
     selectedModelId: "onlyrag-sdxl-turbo-directml",
     requestTimeoutSeconds: 300,
-    preferGpu: true,
-    activeExecutionProvider: "CPU"
+    preferGpu: true
   };
 }
 
@@ -260,8 +259,8 @@ function createRuntimeStatus(overrides: Partial<{ isReady: boolean; state: strin
   return {
     state: overrides.state ?? "Ready",
     isReady: overrides.isReady ?? true,
-    executionProvider: "CPU",
-    message: "Provider integrato pronto con CPU.",
+    executionProvider: "DirectML",
+    message: "Provider integrato pronto con DirectML.",
     suggestion: null,
     preferredExecutionProvider: "DirectML",
     modelState: overrides.state ?? "Verified",

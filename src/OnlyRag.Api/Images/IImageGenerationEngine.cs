@@ -15,7 +15,8 @@ public interface IImageGenerationEngine
 
 public sealed record ImageGenerationEngineStatus(
     string ActiveExecutionProvider,
-    string? FallbackReason);
+    string? FallbackReason,
+    bool IsInitialized = false);
 
 public sealed record ImageGenerationEngineResult(
     IReadOnlyList<ImageGenerationBinary> Images,

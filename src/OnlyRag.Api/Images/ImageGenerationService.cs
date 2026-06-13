@@ -33,10 +33,10 @@ internal sealed class ImageGenerationService
         ImageGenerationSettings settings = await settingsService.GetAsync(cancellationToken);
         ImageModelLocalState state = await modelManager.GetStateAsync(settings.SelectedModelId, cancellationToken);
         ImageGenerationEngineStatus engineStatus = engine.GetStatus();
-        string activeProvider = string.IsNullOrWhiteSpace(settings.ActiveExecutionProvider)
-            ? engineStatus.ActiveExecutionProvider
-            : settings.ActiveExecutionProvider;
         string preferredProvider = settings.PreferGpu ? "DirectML" : "CPU";
+        string activeProvider = engineStatus.IsInitialized
+            ? engineStatus.ActiveExecutionProvider
+            : preferredProvider;
         return new ImageGenerationRuntimeStatus(
             state.IsVerified ? "Ready" : state.State,
             state.IsVerified,
@@ -67,10 +67,6 @@ internal sealed class ImageGenerationService
             modelDirectory,
             settings.PreferGpu,
             cancellationToken);
-        if (!string.Equals(settings.ActiveExecutionProvider, engineResult.ActiveExecutionProvider, StringComparison.Ordinal))
-        {
-            await settingsService.UpdateAsync(settings with { ActiveExecutionProvider = engineResult.ActiveExecutionProvider }, cancellationToken);
-        }
 
         IReadOnlyList<ImageGenerationBinary> generated = engineResult.Images;
         if (generated.Count == 0)

@@ -15,9 +15,9 @@ The Images section lists curated models with:
 - required local files;
 - SHA256 verification metadata.
 
-The built-in catalog is seeded with SDXL/LCM ONNX entries. Users can edit built-in entries, reset them,
-or add manual entries from the Images section. Catalog overrides are stored in the local settings store,
-not in repository source files.
+The built-in catalog is seeded with DirectML-compatible SDXL/LCM ONNX entries. Users can edit
+built-in entries, reset them, or add manual entries from the Images section. Catalog overrides are
+stored in the local settings store, not in repository source files.
 
 When a catalog entry points at `https://huggingface.co/{owner}/{model}`, OnlyRag downloads the model
 repository snapshot into the local model folder. Direct file URLs are downloaded as `model.onnx`.
@@ -35,9 +35,9 @@ disk-space impact.
 ## Runtime
 
 OnlyRag uses the integrated ONNX Stable Diffusion/SDXL pipeline. On Windows it prefers DirectML GPU
-execution when available and falls back to CPU if the DirectML provider cannot be initialized for the
-selected model or device. The runtime status records the preferred provider, the active provider, and
-the readable fallback reason shown by the UI.
+execution, including on NVIDIA GPUs, and falls back to CPU if the DirectML provider cannot be
+initialized for the selected model or device. The runtime status records the preferred provider, the
+active provider, and the readable fallback reason shown by the UI.
 
 The Images UI blocks generation until the selected model is downloaded and verified. Technical
 placeholder files are rejected during verification and generation is blocked instead of producing fake

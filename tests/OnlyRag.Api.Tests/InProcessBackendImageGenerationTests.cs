@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using OnlyRag.Api.Images;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api.Tests;
@@ -21,7 +22,7 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
         Assert.NotNull(catalog);
-        Assert.True(catalog.Length >= 3);
+        Assert.True(catalog.Length >= 2);
         ImageModelCatalogEntry model = Assert.Single(catalog, candidate => candidate.Id == ImageModelCatalog.DefaultModelId);
         Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
         Assert.True(model.IsBuiltIn);
@@ -289,6 +290,48 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task ImageGeneration_RuntimeStatusUsesPreferredProviderBeforeFirstGeneration()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ActiveExecutionProvider = "CPU"
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-initial-provider-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await SeedVerifiedImageModelAsync(httpClient, tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        ImageGenerationRuntimeStatus? status =
+            await httpClient.GetFromJsonAsync<ImageGenerationRuntimeStatus>("/api/images/runtime/status", JsonOptions);
+
+        Assert.NotNull(status);
+        Assert.True(status.IsReady);
+        Assert.Equal("DirectML", status.ExecutionProvider);
+        Assert.Equal("DirectML", status.PreferredExecutionProvider);
+        Assert.Null(status.FallbackReason);
+    }
+
+    [Fact]
+    public async Task ImageGeneration_SettingsFallsBackFromRemovedCudaModel()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-removed-cuda-model-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SqliteSettingsRepository settings = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store));
+        await settings.UpsertAsync("imageGeneration.selectedModelId", "onnxruntime-sdxl-turbo-cuda");
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        ImageGenerationSettings? imageSettings =
+            await httpClient.GetFromJsonAsync<ImageGenerationSettings>("/api/settings/image-generation", JsonOptions);
+
+        Assert.NotNull(imageSettings);
+        Assert.Equal(ImageModelCatalog.DefaultModelId, imageSettings.SelectedModelId);
+        Assert.True(imageSettings.PreferGpu);
+    }
+
+    [Fact]
     public async Task ImageGeneration_OpenFolderRequiresConfirmationAndStartsExplorer()
     {
         FakeProcessLauncher processLauncher = new();
@@ -321,8 +364,7 @@ public sealed partial class InProcessBackendTests
             new ImageGenerationSettings(
                 ImageModelCatalog.DefaultModelId,
                 60,
-                PreferGpu: true,
-                ActiveExecutionProvider: "CPU"),
+                PreferGpu: true),
             JsonOptions);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -402,8 +444,10 @@ public sealed partial class InProcessBackendTests
 
         public string? FallbackReason { get; init; }
 
+        private bool hasGenerated;
+
         public ImageGenerationEngineStatus GetStatus() =>
-            new(ActiveExecutionProvider, FallbackReason);
+            new(ActiveExecutionProvider, FallbackReason, hasGenerated);
 
         public Task<ImageGenerationEngineResult> GenerateAsync(
             ImageGenerationRequest request,
@@ -411,6 +455,7 @@ public sealed partial class InProcessBackendTests
             bool preferGpu,
             CancellationToken cancellationToken = default)
         {
+            hasGenerated = true;
             return Task.FromResult(new ImageGenerationEngineResult(
                 [new ImageGenerationBinary(CreateTinyPng(), "image/png", ".png")],
                 ActiveExecutionProvider,

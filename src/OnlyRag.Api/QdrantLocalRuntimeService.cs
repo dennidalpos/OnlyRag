@@ -157,11 +157,12 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         WriteConfig(settings);
         Directory.CreateDirectory(ResolveStorageDirectory());
         Directory.CreateDirectory(ResolveLogDirectory());
+        Directory.CreateDirectory(ResolveRuntimeDirectory());
 
         ProcessStartInfo startInfo = new()
         {
             FileName = binary,
-            WorkingDirectory = Path.GetDirectoryName(binary) ?? AppContext.BaseDirectory,
+            WorkingDirectory = ResolveRuntimeDirectory(),
             UseShellExecute = false,
             CreateNoWindow = true
         };
@@ -302,6 +303,11 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     private string ResolveLogDirectory()
     {
         return Path.Combine(descriptor.StoragePaths.DataRoot, "qdrant", "logs");
+    }
+
+    private string ResolveRuntimeDirectory()
+    {
+        return Path.Combine(descriptor.StoragePaths.DataRoot, "qdrant", "runtime");
     }
 
     private string ResolvePidPath()

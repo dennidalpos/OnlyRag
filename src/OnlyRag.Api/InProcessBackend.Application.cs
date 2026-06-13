@@ -145,7 +145,12 @@ public static partial class InProcessBackend
                     }
 
                     var appDescriptor = context.RequestServices.GetRequiredService<InProcessBackendDescriptor>();
-                    BackendLog.WriteException(appDescriptor.StoragePaths, correlationId, "Unhandled API exception.", exception);
+                    string requestPath = $"{context.Request.Method} {context.Request.Path}";
+                    BackendLog.WriteException(
+                        appDescriptor.StoragePaths,
+                        correlationId,
+                        $"Unhandled API exception for {requestPath}.",
+                        exception);
                 }
 
                 await WriteProblemAsync(

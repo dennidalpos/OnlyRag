@@ -8,7 +8,6 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
     private const string SelectedModelIdKey = "imageGeneration.selectedModelId";
     private const string RequestTimeoutSecondsKey = "imageGeneration.requestTimeoutSeconds";
     private const string PreferGpuKey = "imageGeneration.preferGpu";
-    private const string ActiveExecutionProviderKey = "imageGeneration.activeExecutionProvider";
     private const string DefaultSelectedModelId = ImageModelCatalog.DefaultModelId;
     private const int DefaultRequestTimeoutSeconds = 300;
     private const int MinRequestTimeoutSeconds = 10;
@@ -29,37 +28,34 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
     {
         string selectedModelId = await NormalizeModelIdAsync(
             await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken),
+            allowDefaultFallback: true,
             cancellationToken);
         string? timeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
         string? preferGpuValue = await settingsRepository.GetValueAsync(PreferGpuKey, cancellationToken);
-        string activeExecutionProvider = NormalizeExecutionProvider(
-            await settingsRepository.GetValueAsync(ActiveExecutionProviderKey, cancellationToken));
-
         return new ImageGenerationSettings(
             selectedModelId,
             ParseRequestTimeoutSeconds(timeoutValue),
-            !bool.TryParse(preferGpuValue, out bool preferGpu) || preferGpu,
-            activeExecutionProvider);
+            !bool.TryParse(preferGpuValue, out bool preferGpu) || preferGpu);
     }
 
     public async Task<ImageGenerationSettings> UpdateAsync(
         ImageGenerationSettings settings,
         CancellationToken cancellationToken = default)
     {
-        string selectedModelId = await NormalizeModelIdAsync(settings.SelectedModelId, cancellationToken);
+        string selectedModelId = await NormalizeModelIdAsync(
+            settings.SelectedModelId,
+            allowDefaultFallback: false,
+            cancellationToken);
         int timeout = ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds);
-        string activeExecutionProvider = NormalizeExecutionProvider(settings.ActiveExecutionProvider);
 
         await settingsRepository.UpsertAsync(SelectedModelIdKey, selectedModelId, cancellationToken);
         await settingsRepository.UpsertAsync(RequestTimeoutSecondsKey, timeout.ToString(), cancellationToken);
         await settingsRepository.UpsertAsync(PreferGpuKey, settings.PreferGpu ? bool.TrueString : bool.FalseString, cancellationToken);
-        await settingsRepository.UpsertAsync(ActiveExecutionProviderKey, activeExecutionProvider, cancellationToken);
 
         return new ImageGenerationSettings(
             selectedModelId,
             timeout,
-            settings.PreferGpu,
-            activeExecutionProvider);
+            settings.PreferGpu);
     }
 
     public static int ValidateRequestTimeoutSeconds(int requestTimeoutSeconds)
@@ -83,11 +79,19 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
             : DefaultRequestTimeoutSeconds;
     }
 
-    private async Task<string> NormalizeModelIdAsync(string? value, CancellationToken cancellationToken)
+    private async Task<string> NormalizeModelIdAsync(
+        string? value,
+        bool allowDefaultFallback,
+        CancellationToken cancellationToken)
     {
         string modelId = string.IsNullOrWhiteSpace(value) ? DefaultSelectedModelId : value.Trim();
         if (!await modelCatalog.ContainsAsync(modelId, cancellationToken))
         {
+            if (allowDefaultFallback)
+            {
+                return DefaultSelectedModelId;
+            }
+
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidConfiguration,
                 "Il modello immagini selezionato non fa parte del catalogo integrato.");
@@ -96,9 +100,4 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
         return modelId;
     }
 
-    private static string NormalizeExecutionProvider(string? value)
-    {
-        string provider = string.IsNullOrWhiteSpace(value) ? "CPU" : value.Trim();
-        return provider.Equals("DirectML", StringComparison.OrdinalIgnoreCase) ? "DirectML" : "CPU";
-    }
 }

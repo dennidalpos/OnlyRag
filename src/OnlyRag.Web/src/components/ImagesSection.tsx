@@ -22,8 +22,7 @@ const defaultModelId = "onlyrag-sdxl-turbo-directml";
 const defaultSettings: ImageGenerationSettings = {
   selectedModelId: defaultModelId,
   requestTimeoutSeconds: 300,
-  preferGpu: true,
-  activeExecutionProvider: "CPU"
+  preferGpu: true
 };
 
 const promptCommands = [

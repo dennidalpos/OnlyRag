@@ -14,14 +14,15 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
     private const string CpuProvider = "CPU";
 
     private readonly object gate = new();
-    private string activeExecutionProvider = CpuProvider;
+    private string activeExecutionProvider = DirectMlProvider;
     private string? fallbackReason;
+    private bool isInitialized;
 
     public ImageGenerationEngineStatus GetStatus()
     {
         lock (gate)
         {
-            return new ImageGenerationEngineStatus(activeExecutionProvider, fallbackReason);
+            return new ImageGenerationEngineStatus(activeExecutionProvider, fallbackReason, isInitialized);
         }
     }
 
@@ -171,6 +172,7 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
         {
             activeExecutionProvider = provider;
             fallbackReason = reason;
+            isInitialized = true;
         }
     }
 

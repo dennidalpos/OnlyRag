@@ -21,16 +21,6 @@ internal static class ImageModelCatalog
             string.Empty,
             IsBuiltIn: true),
         new(
-            "onnxruntime-sdxl-turbo-cuda",
-            "SDXL Turbo ONNX Runtime CUDA",
-            "ONNX Runtime CUDA per GPU NVIDIA; non compatibile con CPU/DirectML",
-            "https://huggingface.co/onnxruntime/sdxl-turbo",
-            "Stability AI Non-Commercial Community License",
-            0,
-            ["model_index.json"],
-            string.Empty,
-            IsBuiltIn: true),
-        new(
             "lcm-sdxl-olive-onnx",
             "LCM SDXL Olive ONNX",
             "ONNX ottimizzato Olive per generazione a pochi step; richiede pipeline multi-file",

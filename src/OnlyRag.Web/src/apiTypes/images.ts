@@ -2,7 +2,6 @@ export type ImageGenerationSettings = {
   selectedModelId: string;
   requestTimeoutSeconds: number;
   preferGpu: boolean;
-  activeExecutionProvider: string;
 };
 
 export type ImageGenerationRuntimeStatus = {

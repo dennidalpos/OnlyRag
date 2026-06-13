@@ -238,8 +238,8 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
     imageGeneration: {
       state: "Ready",
       isReady: true,
-      executionProvider: "CPU",
-      message: "Provider integrato pronto con CPU.",
+      executionProvider: "DirectML",
+      message: "Provider integrato pronto con DirectML.",
       suggestion: null,
       preferredExecutionProvider: "DirectML",
       modelState: "Verified",

@@ -24,6 +24,11 @@ internal static class BackendLog
             exInfo += $" [{exception.InnerException.GetType().Name}: {SanitizeLogMessage(exception.InnerException.Message)}]";
         }
 
+        if (!string.IsNullOrWhiteSpace(exception.StackTrace))
+        {
+            exInfo += $" Stack: {SanitizeLogMessage(exception.StackTrace)}";
+        }
+
         WriteCore(paths, correlationId, $"{SanitizeLogMessage(context)} {exInfo}");
     }
 
