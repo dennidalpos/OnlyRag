@@ -100,6 +100,61 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task ImageModelDownload_SkipsExistingValidModelFile()
+    {
+        const string modelId = "manual-incremental-valid";
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-incremental-valid-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        string sourcePath = Path.Combine(tempDescriptor.Root, "source-model.onnx");
+        byte[] content = System.Text.Encoding.UTF8.GetBytes("valid-model-content");
+        await File.WriteAllBytesAsync(sourcePath, content);
+        string sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        await UpsertManualImageModelCatalogAsync(httpClient, modelId, new Uri(sourcePath).AbsoluteUri, content.LongLength, sha256);
+        string destinationPath = GetModelFilePath(tempDescriptor, modelId);
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        await File.WriteAllBytesAsync(destinationPath, content);
+        DateTime oldTimestamp = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(destinationPath, oldTimestamp);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"/api/images/models/{modelId}/download",
+            new ImageModelDownloadRequest(ConsentConfirmed: true),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(oldTimestamp, File.GetLastWriteTimeUtc(destinationPath));
+        Assert.Equal(content, await File.ReadAllBytesAsync(destinationPath));
+    }
+
+    [Fact]
+    public async Task ImageModelDownload_ReplacesCorruptModelFile()
+    {
+        const string modelId = "manual-incremental-corrupt";
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-download-incremental-corrupt-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        string sourcePath = Path.Combine(tempDescriptor.Root, "source-model.onnx");
+        byte[] validContent = System.Text.Encoding.UTF8.GetBytes("valid-model-content");
+        byte[] corruptContent = System.Text.Encoding.UTF8.GetBytes("invalid-model-data!");
+        Assert.Equal(validContent.Length, corruptContent.Length);
+        await File.WriteAllBytesAsync(sourcePath, validContent);
+        string sha256 = Convert.ToHexString(SHA256.HashData(validContent)).ToLowerInvariant();
+        await UpsertManualImageModelCatalogAsync(httpClient, modelId, new Uri(sourcePath).AbsoluteUri, validContent.LongLength, sha256);
+        string destinationPath = GetModelFilePath(tempDescriptor, modelId);
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        await File.WriteAllBytesAsync(destinationPath, corruptContent);
+
+        using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"/api/images/models/{modelId}/download",
+            new ImageModelDownloadRequest(ConsentConfirmed: true),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(validContent, await File.ReadAllBytesAsync(destinationPath));
+    }
+
+    [Fact]
     public async Task ImageModelCatalog_AllowsManualModelWithEditableDownloadUrl()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-catalog-edit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
@@ -173,7 +228,7 @@ public sealed partial class InProcessBackendTests
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
         await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
-        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
 
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
@@ -186,6 +241,36 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task ImageModelState_RejectsIncompleteBuiltInSnapshot()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-incomplete-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+        await SaveImageSettingsAsync(httpClient);
+
+        ImageGenerationRuntimeStatus? runtimeStatus =
+            await httpClient.GetFromJsonAsync<ImageGenerationRuntimeStatus>("/api/images/runtime/status", JsonOptions);
+
+        Assert.NotNull(runtimeStatus);
+        Assert.False(runtimeStatus.IsReady);
+        Assert.Equal("NotDownloaded", runtimeStatus.State);
+        Assert.Contains("incompleto", runtimeStatus.Suggestion ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.Conflict,
+            "Modello immagini non pronto",
+            "image_generation_model_not_ready");
+    }
+
+    [Fact]
     public async Task ImageModelState_IgnoresStalePlaceholderWhenSnapshotRequiredFilesExist()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-snapshot-placeholder-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
@@ -193,7 +278,7 @@ public sealed partial class InProcessBackendTests
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
         await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
         SeedPlaceholderImageModel(tempDescriptor);
-        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
 
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
@@ -245,7 +330,7 @@ public sealed partial class InProcessBackendTests
             new InProcessBackendOptions { ImageGenerationEngine = engine });
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
         await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
-        SeedImageModelSnapshotFile(tempDescriptor, "model_index.json", "{}");
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
         await SaveImageSettingsAsync(httpClient);
 
         using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
@@ -257,6 +342,34 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
         Assert.NotNull(generated);
         Assert.Single(generated.Images);
+    }
+
+    [Fact]
+    public async Task ImageGeneration_EngineMissingModelFileReturnsModelNotReady()
+    {
+        FakeImageGenerationEngine engine = new()
+        {
+            ExceptionToThrow = new FileNotFoundException("Onnx model file not found")
+        };
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-engine-file-missing-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = engine });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await UpsertImageModelCatalogAsync(httpClient, expectedSizeBytes: 1_000, requiredFiles: ["model_index.json"]);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        using HttpResponseMessage generateResponse = await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions);
+
+        await AssertProblemAsync(
+            generateResponse,
+            HttpStatusCode.Conflict,
+            "Modello immagini non pronto",
+            "image_generation_model_not_ready");
     }
 
     [Fact]
@@ -375,6 +488,7 @@ public sealed partial class InProcessBackendTests
     {
         byte[] content = System.Text.Encoding.UTF8.GetBytes("real-test-model");
         SeedImageModelFile(tempDescriptor, content);
+        SeedRequiredSdxlSnapshotFiles(tempDescriptor);
         string sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         await UpsertImageModelCatalogAsync(httpClient, content.LongLength, sha256);
     }
@@ -406,6 +520,14 @@ public sealed partial class InProcessBackendTests
         File.WriteAllText(destinationPath, content);
     }
 
+    private static void SeedRequiredSdxlSnapshotFiles(TempBackendDescriptor tempDescriptor)
+    {
+        foreach (string requiredFile in ImageModelCatalog.RequiredSdxlSnapshotFiles)
+        {
+            SeedImageModelSnapshotFile(tempDescriptor, requiredFile, "{}");
+        }
+    }
+
     private static async Task UpsertImageModelCatalogAsync(
         HttpClient httpClient,
         long expectedSizeBytes,
@@ -427,6 +549,36 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    private static async Task UpsertManualImageModelCatalogAsync(
+        HttpClient httpClient,
+        string modelId,
+        string downloadUrl,
+        long expectedSizeBytes,
+        string sha256)
+    {
+        using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
+            $"/api/images/models/catalog/{modelId}",
+            new ImageModelCatalogEntryRequest(
+                modelId,
+                "Manual incremental test model",
+                "CPU test model",
+                downloadUrl,
+                "Test license",
+                expectedSizeBytes,
+                [ImageModelCatalog.RequiredModelFileName],
+                sha256),
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static string GetModelFilePath(TempBackendDescriptor tempDescriptor, string modelId)
+    {
+        return Path.Combine(
+            tempDescriptor.Descriptor.StoragePaths.ImageModelsDirectory,
+            modelId,
+            ImageModelCatalog.RequiredModelFileName);
+    }
+
     private static void SeedPlaceholderImageModel(TempBackendDescriptor tempDescriptor)
     {
         string modelDirectory = Path.Combine(
@@ -444,6 +596,8 @@ public sealed partial class InProcessBackendTests
 
         public string? FallbackReason { get; init; }
 
+        public Exception? ExceptionToThrow { get; init; }
+
         private bool hasGenerated;
 
         public ImageGenerationEngineStatus GetStatus() =>
@@ -455,6 +609,11 @@ public sealed partial class InProcessBackendTests
             bool preferGpu,
             CancellationToken cancellationToken = default)
         {
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
             hasGenerated = true;
             return Task.FromResult(new ImageGenerationEngineResult(
                 [new ImageGenerationBinary(CreateTinyPng(), "image/png", ".png")],

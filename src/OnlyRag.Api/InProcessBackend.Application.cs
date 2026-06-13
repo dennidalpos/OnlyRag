@@ -88,7 +88,10 @@ public static partial class InProcessBackend
         builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
         builder.Services.AddSingleton(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
         builder.Services.AddSingleton<ImageGenerationService>();
-        builder.Services.AddHttpClient<ImageModelManager>();
+        builder.Services.AddHttpClient<ImageModelManager>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
         builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         builder.Services.AddSingleton<OllamaGenerationCoordinator>();
         builder.Services.AddSingleton<DependencyProvisioningService>();

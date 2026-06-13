@@ -12,6 +12,10 @@ internal sealed class ImageModelManager
     private readonly HashSet<string> activeDownloads = new(StringComparer.OrdinalIgnoreCase);
     private readonly object gate = new();
 
+    private sealed record RemoteFileInfo(long? ContentLength, string? Sha256);
+
+    private sealed record ModelSnapshotFile(string RelativePath, long? SizeBytes, string? Sha256);
+
     public ImageModelManager(
         InProcessBackendDescriptor descriptor,
         HttpClient httpClient,
@@ -80,7 +84,11 @@ internal sealed class ImageModelManager
                 IsVerified: false,
                 localSizeBytes,
                 modelDirectory,
-                isDownloading ? null : "Il modello non e ancora stato scaricato.",
+                isDownloading
+                    ? null
+                    : localSizeBytes > 0
+                        ? "Il modello locale e incompleto. Elimina il download e scaricalo di nuovo."
+                        : "Il modello non e ancora stato scaricato.",
                 model.ExpectedSizeBytes,
                 CalculateRemainingDownloadBytes(model.ExpectedSizeBytes, localSizeBytes));
         }
@@ -257,6 +265,183 @@ internal sealed class ImageModelManager
         string destinationPath = GetModelFilePath(model.Id);
         if (uri.Scheme == Uri.UriSchemeFile)
         {
+            await DownloadFileIfNeededAsync(
+                uri,
+                destinationPath,
+                NormalizeSha256OrNull(model.Sha256),
+                model.ExpectedSizeBytes > 0 ? model.ExpectedSizeBytes : null,
+                cancellationToken);
+            return;
+        }
+
+        await DownloadFileIfNeededAsync(
+            uri,
+            destinationPath,
+            NormalizeSha256OrNull(model.Sha256),
+            model.ExpectedSizeBytes > 0 ? model.ExpectedSizeBytes : null,
+            cancellationToken);
+    }
+
+    private async Task DownloadHuggingFaceSnapshotAsync(
+        string repositoryId,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ModelSnapshotFile> snapshotFiles = await ListHuggingFaceSnapshotFilesAsync(repositoryId, cancellationToken);
+        if (snapshotFiles.Count == 0)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.UnexpectedResponse,
+                "Metadata modello Hugging Face senza file modello.");
+        }
+
+        foreach (ModelSnapshotFile snapshotFile in snapshotFiles)
+        {
+            string safeRelativePath = snapshotFile.RelativePath.Replace('\\', '/');
+            string destinationPath = ResolveModelSnapshotPath(destinationDirectory, safeRelativePath);
+            Uri downloadUri = CreateHuggingFaceResolveUri(repositoryId, safeRelativePath);
+            await DownloadFileIfNeededAsync(
+                downloadUri,
+                destinationPath,
+                snapshotFile.Sha256,
+                snapshotFile.SizeBytes,
+                cancellationToken);
+        }
+    }
+
+    private async Task<IReadOnlyList<ModelSnapshotFile>> ListHuggingFaceSnapshotFilesAsync(
+        string repositoryId,
+        CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage treeResponse = await httpClient.GetAsync(
+            $"https://huggingface.co/api/models/{repositoryId}/tree/main?recursive=true",
+            cancellationToken);
+        if (!treeResponse.IsSuccessStatusCode)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.Unreachable,
+                $"Metadata modello Hugging Face non raggiungibili. HTTP {(int)treeResponse.StatusCode}.");
+        }
+
+        using JsonDocument metadata = JsonDocument.Parse(await treeResponse.Content.ReadAsStreamAsync(cancellationToken));
+        if (metadata.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.UnexpectedResponse,
+                "Metadata modello Hugging Face senza lista file.");
+        }
+
+        List<ModelSnapshotFile> files = [];
+        foreach (JsonElement entry in metadata.RootElement.EnumerateArray())
+        {
+            string type = entry.TryGetProperty("type", out JsonElement typeElement)
+                ? typeElement.GetString() ?? string.Empty
+                : string.Empty;
+            if (!type.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string? relativePath = entry.TryGetProperty("path", out JsonElement pathElement)
+                ? pathElement.GetString()
+                : null;
+            if (string.IsNullOrWhiteSpace(relativePath) || relativePath.Equals(".gitattributes", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            long? sizeBytes = TryGetInt64(entry, "size");
+            string? sha256 = null;
+            if (entry.TryGetProperty("lfs", out JsonElement lfs) && lfs.ValueKind == JsonValueKind.Object)
+            {
+                sha256 = NormalizeSha256OrNull(
+                    lfs.TryGetProperty("oid", out JsonElement oidElement)
+                        ? oidElement.GetString() ?? string.Empty
+                        : string.Empty);
+                sizeBytes = TryGetInt64(lfs, "size") ?? sizeBytes;
+            }
+
+            files.Add(new ModelSnapshotFile(relativePath.Replace('\\', '/'), sizeBytes, sha256));
+        }
+
+        return files;
+    }
+
+    private async Task DownloadFileIfNeededAsync(
+        Uri uri,
+        string destinationPath,
+        string? expectedSha256,
+        long? expectedSizeBytes,
+        CancellationToken cancellationToken)
+    {
+        RemoteFileInfo remoteInfo = await ProbeRemoteFileAsync(uri, cancellationToken);
+        string? sha256 = expectedSha256 ?? remoteInfo.Sha256;
+        long? sizeBytes = expectedSizeBytes ?? remoteInfo.ContentLength;
+        if (await ExistingFileMatchesAsync(destinationPath, sha256, sizeBytes, cancellationToken))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        string tempPath = $"{destinationPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await DownloadFileCoreAsync(uri, tempPath, cancellationToken);
+            await VerifyDownloadedFileAsync(tempPath, sha256, sizeBytes, cancellationToken);
+            File.Move(tempPath, destinationPath, overwrite: true);
+        }
+        catch
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<RemoteFileInfo> ProbeRemoteFileAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        if (uri.Scheme == Uri.UriSchemeFile)
+        {
+            FileInfo source = new(uri.LocalPath);
+            if (!source.Exists)
+            {
+                throw new ImageGenerationException(
+                    ImageGenerationErrorKind.NotFound,
+                    "File modello sorgente non trovato.");
+            }
+
+            return new RemoteFileInfo(source.Length, null);
+        }
+
+        try
+        {
+            using HttpRequestMessage request = new(HttpMethod.Head, uri);
+            using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new RemoteFileInfo(null, null);
+            }
+
+            return new RemoteFileInfo(
+                response.Content.Headers.ContentLength,
+                null);
+        }
+        catch (HttpRequestException)
+        {
+            return new RemoteFileInfo(null, null);
+        }
+    }
+
+    private async Task DownloadFileCoreAsync(
+        Uri uri,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        if (uri.Scheme == Uri.UriSchemeFile)
+        {
             await using FileStream source = File.OpenRead(uri.LocalPath);
             await using FileStream destination = File.Create(destinationPath);
             await source.CopyToAsync(destination, cancellationToken);
@@ -276,52 +461,51 @@ internal sealed class ImageModelManager
         await sourceStream.CopyToAsync(destinationStream, cancellationToken);
     }
 
-    private async Task DownloadHuggingFaceSnapshotAsync(
-        string repositoryId,
-        string destinationDirectory,
+    private static async Task<bool> ExistingFileMatchesAsync(
+        string path,
+        string? expectedSha256,
+        long? expectedSizeBytes,
         CancellationToken cancellationToken)
     {
-        using HttpResponseMessage metadataResponse = await httpClient.GetAsync(
-            $"https://huggingface.co/api/models/{repositoryId}",
-            cancellationToken);
-        if (!metadataResponse.IsSuccessStatusCode)
+        if (!File.Exists(path))
         {
-            throw new ImageGenerationException(
-                ImageGenerationErrorKind.Unreachable,
-                $"Metadata modello Hugging Face non raggiungibili. HTTP {(int)metadataResponse.StatusCode}.");
+            return false;
         }
 
-        using JsonDocument metadata = JsonDocument.Parse(await metadataResponse.Content.ReadAsStreamAsync(cancellationToken));
-        if (!metadata.RootElement.TryGetProperty("siblings", out JsonElement siblings))
+        FileInfo file = new(path);
+        if (expectedSizeBytes is not null && file.Length != expectedSizeBytes.Value)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(expectedSha256))
+        {
+            return (await ComputeSha256Async(path, cancellationToken)).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return expectedSizeBytes is not null || file.Length > 0;
+    }
+
+    private static async Task VerifyDownloadedFileAsync(
+        string path,
+        string? expectedSha256,
+        long? expectedSizeBytes,
+        CancellationToken cancellationToken)
+    {
+        FileInfo file = new(path);
+        if (expectedSizeBytes is not null && file.Length != expectedSizeBytes.Value)
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.UnexpectedResponse,
-                "Metadata modello Hugging Face senza lista file.");
+                "Il file modello scaricato ha una dimensione diversa da quella attesa.");
         }
 
-        foreach (JsonElement sibling in siblings.EnumerateArray())
+        if (!string.IsNullOrWhiteSpace(expectedSha256)
+            && !(await ComputeSha256Async(path, cancellationToken)).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
-            string? relativePath = sibling.GetProperty("rfilename").GetString();
-            if (string.IsNullOrWhiteSpace(relativePath) || relativePath.Equals(".gitattributes", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string safeRelativePath = relativePath.Replace('\\', '/');
-            string destinationPath = ResolveModelSnapshotPath(destinationDirectory, safeRelativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            Uri downloadUri = new($"https://huggingface.co/{repositoryId}/resolve/main/{Uri.EscapeDataString(safeRelativePath).Replace("%2F", "/", StringComparison.Ordinal)}");
-            using HttpResponseMessage response = await httpClient.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ImageGenerationException(
-                    ImageGenerationErrorKind.Unreachable,
-                    $"Download file modello non riuscito per {safeRelativePath}. HTTP {(int)response.StatusCode}.");
-            }
-
-            await using Stream sourceStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using FileStream destinationStream = File.Create(destinationPath);
-            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.UnexpectedResponse,
+                "Il file modello scaricato non supera la verifica SHA256.");
         }
     }
 
@@ -330,6 +514,34 @@ internal sealed class ImageModelManager
         using FileStream stream = File.OpenRead(path);
         byte[] hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
+    {
+        await using FileStream stream = File.OpenRead(path);
+        byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static Uri CreateHuggingFaceResolveUri(string repositoryId, string safeRelativePath)
+    {
+        return new Uri(
+            $"https://huggingface.co/{repositoryId}/resolve/main/{Uri.EscapeDataString(safeRelativePath).Replace("%2F", "/", StringComparison.Ordinal)}");
+    }
+
+    private static long? TryGetInt64(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out JsonElement property) && property.TryGetInt64(out long value)
+            ? value
+            : null;
+    }
+
+    private static string? NormalizeSha256OrNull(string value)
+    {
+        string normalized = value.Trim().Trim('"').ToLowerInvariant();
+        return normalized.Length == 64 && normalized.All(Uri.IsHexDigit)
+            ? normalized
+            : null;
     }
 
     private static bool IsPlaceholderModelFile(string path)

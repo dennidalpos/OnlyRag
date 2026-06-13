@@ -183,6 +183,6 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
             or EntryPointNotFoundException
             or InvalidOperationException
             or NotSupportedException
-            or IOException;
+            or IOException and not FileNotFoundException and not DirectoryNotFoundException;
     }
 }

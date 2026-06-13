@@ -143,6 +143,14 @@ internal sealed class ImageModelCatalogStore
             }
         }
 
+        if (ImageModelCatalog.GetDefault(id) is { } defaultModel)
+        {
+            requiredFiles = requiredFiles
+                .Concat(defaultModel.RequiredFiles)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         string sha256 = request.Sha256.Trim();
         if (sha256.Length is not 0 and not 64 || !sha256.All(Uri.IsHexDigit))
         {

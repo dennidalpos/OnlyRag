@@ -62,11 +62,22 @@ internal sealed class ImageGenerationService
         string modelId = normalized.ModelId ?? settings.SelectedModelId;
         _ = await modelManager.GetVerifiedModelFilePathAsync(modelId, cancellationToken);
         string modelDirectory = modelManager.GetModelDirectory(modelId);
-        ImageGenerationEngineResult engineResult = await engine.GenerateAsync(
-            normalized,
-            modelDirectory,
-            settings.PreferGpu,
-            cancellationToken);
+        ImageGenerationEngineResult engineResult;
+        try
+        {
+            engineResult = await engine.GenerateAsync(
+                normalized,
+                modelDirectory,
+                settings.PreferGpu,
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.ModelNotReady,
+                "Il modello immagini locale e incompleto. Elimina il download del modello e scaricalo di nuovo.",
+                ex);
+        }
 
         IReadOnlyList<ImageGenerationBinary> generated = engineResult.Images;
         if (generated.Count == 0)

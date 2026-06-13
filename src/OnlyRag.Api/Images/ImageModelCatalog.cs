@@ -7,6 +7,26 @@ internal static class ImageModelCatalog
     public const string DefaultModelId = "onlyrag-sdxl-turbo-directml";
     public const string RequiredModelFileName = "model.onnx";
     public const string PlaceholderModelContent = "OnlyRag integrated image model placeholder v1\n";
+    public static readonly IReadOnlyList<string> RequiredSdxlSnapshotFiles =
+    [
+        "model_index.json",
+        "scheduler/scheduler_config.json",
+        "text_encoder/model.onnx",
+        "text_encoder_2/model.onnx",
+        "text_encoder_2/model.onnx.data",
+        "tokenizer/merges.txt",
+        "tokenizer/special_tokens_map.json",
+        "tokenizer/tokenizer_config.json",
+        "tokenizer/vocab.json",
+        "tokenizer_2/merges.txt",
+        "tokenizer_2/special_tokens_map.json",
+        "tokenizer_2/tokenizer_config.json",
+        "tokenizer_2/vocab.json",
+        "unet/model.onnx",
+        "unet/model.onnx.data",
+        "vae_decoder/model.onnx",
+        "vae_encoder/model.onnx"
+    ];
 
     private static readonly ImageModelCatalogEntry[] DefaultModels =
     [
@@ -17,7 +37,7 @@ internal static class ImageModelCatalog
             "https://huggingface.co/softwareweaver/Sdxl-Turbo-Olive-Onnx",
             "CC-BY-NC-4.0 / verificare termini upstream",
             0,
-            ["model_index.json"],
+            RequiredSdxlSnapshotFiles,
             string.Empty,
             IsBuiltIn: true),
         new(
@@ -27,7 +47,7 @@ internal static class ImageModelCatalog
             "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
             "OpenRAIL++ / verificare termini upstream",
             0,
-            ["model_index.json"],
+            RequiredSdxlSnapshotFiles,
             string.Empty,
             IsBuiltIn: true)
     ];
