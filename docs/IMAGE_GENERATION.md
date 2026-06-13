@@ -15,9 +15,15 @@ The Images section lists curated models with:
 - required local files;
 - SHA256 verification metadata.
 
-The built-in catalog is seeded with DirectML-compatible SDXL/LCM ONNX entries. Users can edit
-built-in entries, reset them, or add manual entries from the Images section. Catalog overrides are
-stored in the local settings store, not in repository source files.
+The built-in catalog is seeded with DirectML-compatible ONNX entries for distinct use cases:
+
+- SDXL Base quality for portraits, people, and detail-sensitive prompts;
+- SDXL Turbo for fast drafts and simple objects or environments;
+- LCM SDXL for quick prompt iteration;
+- FFusionXL for creative SDXL-style illustration checks.
+
+Users can edit built-in entries, reset them, or add manual entries from the Images section. Catalog
+overrides are stored in the local settings store, not in repository source files.
 
 When a catalog entry points at `https://huggingface.co/{owner}/{model}`, OnlyRag downloads the model
 repository snapshot into the local model folder. Direct file URLs are downloaded as `model.onnx`.
@@ -42,6 +48,10 @@ active provider, and the readable fallback reason shown by the UI.
 The Images UI blocks generation until the selected model is downloaded and verified. Technical
 placeholder files are rejected during verification and generation is blocked instead of producing fake
 pattern images.
+
+Generation controls expose a quality-to-speed preset instead of raw step and batch controls. The
+backend maps the preset and selected model to safe defaults, uses DirectML where requested, applies
+quality prompts for common anatomy failures, and keeps seed and negative prompt as advanced options.
 
 Generated images are stored under:
 

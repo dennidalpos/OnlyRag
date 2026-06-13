@@ -18,7 +18,7 @@ internal static class ImageGenerationRequestValidator
         string? modelId = string.IsNullOrWhiteSpace(request.ModelId) ? null : request.ModelId.Trim();
         int width = ClampToMultipleOfEight(request.Width, 256, 2048);
         int height = ClampToMultipleOfEight(request.Height, 256, 2048);
-        int steps = Math.Clamp(request.Steps, 1, 150);
+        int steps = Math.Clamp(request.Steps, 4, 40);
         int batchSize = Math.Clamp(request.BatchSize, 1, 4);
         long? seed = request.Seed is < 0 ? null : request.Seed;
 

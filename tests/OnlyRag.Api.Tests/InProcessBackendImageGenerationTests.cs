@@ -22,10 +22,13 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
         Assert.NotNull(catalog);
-        Assert.True(catalog.Length >= 2);
+        Assert.True(catalog.Length >= 4);
         ImageModelCatalogEntry model = Assert.Single(catalog, candidate => candidate.Id == ImageModelCatalog.DefaultModelId);
         Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
         Assert.True(model.IsBuiltIn);
+        Assert.Contains(catalog, candidate => candidate.Id == "onlyrag-sdxl-turbo-directml");
+        Assert.Contains(catalog, candidate => candidate.Id == "lcm-sdxl-olive-onnx");
+        Assert.Contains(catalog, candidate => candidate.Id == "ffusion-sdxl-base-directml");
         Assert.NotNull(states);
         ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == model.Id);
         Assert.Equal(model.Id, state.ModelId);
@@ -50,6 +53,47 @@ public sealed partial class InProcessBackendTests
             HttpStatusCode.Conflict,
             "Modello immagini non pronto",
             "image_generation_model_not_ready");
+    }
+
+    [Fact]
+    public void ImageGeneration_NormalizeUsesQualityFirstStepRange()
+    {
+        ImageGenerationRequest lowSteps = ImageGenerationRequestValidator.Normalize(
+            new ImageGenerationRequest("portrait", null, null, 1024, 1024, 1, 1, null));
+        ImageGenerationRequest highSteps = ImageGenerationRequestValidator.Normalize(
+            new ImageGenerationRequest("portrait", null, null, 1024, 1024, 150, 1, null));
+
+        Assert.Equal(4, lowSteps.Steps);
+        Assert.Equal(40, highSteps.Steps);
+    }
+
+    [Fact]
+    public void ImageGeneration_EngineAddsQualityPromptsForAnatomy()
+    {
+        string prompt = OnnxStableDiffusionImageGenerationEngine.CreateQualityPrompt("portrait of a person");
+        string negativePrompt = OnnxStableDiffusionImageGenerationEngine.CreateNegativePrompt(null);
+        string combinedNegativePrompt = OnnxStableDiffusionImageGenerationEngine.CreateNegativePrompt("washed out");
+
+        Assert.Contains("coherent anatomy", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("realistic face", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("bad anatomy", negativePrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("extra fingers", negativePrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("washed out,", combinedNegativePrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fused limbs", combinedNegativePrompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ImageGeneration_EngineSelectsModelTypeFromCatalogModelId()
+    {
+        Assert.Equal(
+            OnnxStack.StableDiffusion.Enums.ModelType.Base,
+            OnnxStableDiffusionImageGenerationEngine.ResolveModelType(ImageModelCatalog.DefaultModelId));
+        Assert.Equal(
+            OnnxStack.StableDiffusion.Enums.ModelType.Turbo,
+            OnnxStableDiffusionImageGenerationEngine.ResolveModelType("onlyrag-sdxl-turbo-directml"));
+        Assert.Equal(
+            OnnxStack.StableDiffusion.Enums.ModelType.Turbo,
+            OnnxStableDiffusionImageGenerationEngine.ResolveModelType("lcm-sdxl-olive-onnx"));
     }
 
     [Fact]

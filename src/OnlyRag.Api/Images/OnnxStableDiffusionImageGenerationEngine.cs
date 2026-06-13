@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime;
 using OnnxStack.Core.Model;
 using OnnxStack.StableDiffusion.Config;
@@ -12,6 +11,10 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
 {
     private const string DirectMlProvider = "DirectML";
     private const string CpuProvider = "CPU";
+    private const string QualityPromptSuffix =
+        "coherent anatomy, natural proportions, realistic face, detailed hands, separated limbs, clean silhouette";
+    private const string DefaultNegativePrompt =
+        "bad anatomy, deformed body, distorted face, mutated hands, fused fingers, extra fingers, missing fingers, extra arms, extra legs, fused limbs, duplicate body, disfigured, malformed, blurry, low quality";
 
     private readonly object gate = new();
     private string activeExecutionProvider = DirectMlProvider;
@@ -83,8 +86,8 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
         StableDiffusionXLPipeline pipeline = StableDiffusionXLPipeline.CreatePipeline(
             provider,
             modelDirectory,
-            ModelType.Turbo,
-            NullLogger.Instance);
+            ResolveModelType(request.ModelId),
+            logger: null);
 
         try
         {
@@ -114,11 +117,12 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
 
     private static GenerateOptions CreateGenerateOptions(ImageGenerationRequest request, long seed)
     {
+        ModelType modelType = ResolveModelType(request.ModelId);
         return new GenerateOptions
         {
             Diffuser = DiffuserType.TextToImage,
-            Prompt = request.Prompt,
-            NegativePrompt = request.NegativePrompt ?? string.Empty,
+            Prompt = CreateQualityPrompt(request.Prompt),
+            NegativePrompt = CreateNegativePrompt(request.NegativePrompt),
             SchedulerOptions = new SchedulerOptions
             {
                 SchedulerType = SchedulerType.EulerAncestral,
@@ -126,14 +130,52 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
                 Height = request.Height,
                 Seed = unchecked((int)Math.Clamp(seed, 0, int.MaxValue)),
                 InferenceSteps = request.Steps,
-                GuidanceScale = 0,
-                TimestepSpacing = TimestepSpacingType.Trailing
+                GuidanceScale = ResolveGuidanceScale(modelType),
+                TimestepSpacing = ResolveTimestepSpacing(modelType)
             },
             IsLowMemoryComputeEnabled = true,
             IsLowMemoryDecoderEnabled = true,
             IsLowMemoryEncoderEnabled = true,
             IsLowMemoryTextEncoderEnabled = true
         };
+    }
+
+    internal static string CreateQualityPrompt(string prompt)
+    {
+        return ContainsAny(prompt, ["anatomy", "proportions", "face", "hands", "limbs"])
+            ? prompt
+            : $"{prompt}, {QualityPromptSuffix}";
+    }
+
+    internal static string CreateNegativePrompt(string? negativePrompt)
+    {
+        return string.IsNullOrWhiteSpace(negativePrompt)
+            ? DefaultNegativePrompt
+            : $"{negativePrompt.Trim()}, {DefaultNegativePrompt}";
+    }
+
+    internal static ModelType ResolveModelType(string? modelId)
+    {
+        return ContainsAny(modelId ?? string.Empty, ["turbo", "lcm"])
+            ? ModelType.Turbo
+            : ModelType.Base;
+    }
+
+    private static float ResolveGuidanceScale(ModelType modelType)
+    {
+        return modelType == ModelType.Turbo ? 0 : 7.0f;
+    }
+
+    private static TimestepSpacingType ResolveTimestepSpacing(ModelType modelType)
+    {
+        return modelType == ModelType.Turbo
+            ? TimestepSpacingType.Trailing
+            : TimestepSpacingType.Linspace;
+    }
+
+    private static bool ContainsAny(string value, IReadOnlyList<string> terms)
+    {
+        return terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private static OnnxExecutionProvider CreateDirectMlProvider()

@@ -20,7 +20,7 @@ describe("ImagesSection", () => {
     await screen.findByRole("heading", { name: "Crea immagine" });
 
     await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
-    expect(screen.getAllByText("OnlyRag SDXL Turbo").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("SDXL Base qualita").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Scarica modello" })).toBeInTheDocument();
     expect(screen.queryByText(/Automatic1111/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/ComfyUI/i)).not.toBeInTheDocument();
@@ -53,10 +53,10 @@ describe("ImagesSection", () => {
       { path: "/api/images/models", response: [createModelState({ isVerified: false })] },
       { path: "/api/images", response: [] },
       {
-        path: "/api/images/models/onlyrag-sdxl-turbo-directml/download",
+        path: "/api/images/models/onlyrag-sdxl-quality-directml/download",
         method: "POST",
         response: {
-          modelId: "onlyrag-sdxl-turbo-directml",
+          modelId: "onlyrag-sdxl-quality-directml",
           state: "Verified",
           message: "Modello immagini scaricato e verificato."
         }
@@ -87,7 +87,7 @@ describe("ImagesSection", () => {
       { path: "/api/images/models", response: [createModelState({ isVerified: false })] },
       { path: "/api/images", response: [] },
       {
-        path: "/api/images/models/onlyrag-sdxl-turbo-directml/download",
+        path: "/api/images/models/onlyrag-sdxl-quality-directml/download",
         method: "POST",
         handler: async () => {
           await new Promise<void>((resolve) => {
@@ -95,7 +95,7 @@ describe("ImagesSection", () => {
           });
           return {
             body: {
-              modelId: "onlyrag-sdxl-turbo-directml",
+              modelId: "onlyrag-sdxl-quality-directml",
               state: "Downloaded",
               message: "Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica."
             }
@@ -165,10 +165,10 @@ describe("ImagesSection", () => {
     expect(generateCall).toBeDefined();
     expect(JSON.parse(String(generateCall?.body))).toMatchObject({
       prompt: "Una libreria futuristica",
-      modelId: "onlyrag-sdxl-turbo-directml",
+      modelId: "onlyrag-sdxl-quality-directml",
       width: 1024,
       height: 1024,
-      steps: 8,
+      steps: 26,
       batchSize: 1
     });
   });
@@ -249,7 +249,7 @@ describe("ImagesSection", () => {
 
 function createImageSettings() {
   return {
-    selectedModelId: "onlyrag-sdxl-turbo-directml",
+    selectedModelId: "onlyrag-sdxl-quality-directml",
     requestTimeoutSeconds: 300,
     preferGpu: true
   };
@@ -277,9 +277,9 @@ function createCatalogEntry(overrides: Partial<ReturnType<typeof createCatalogEn
 
 function createCatalogEntryBase() {
   return {
-    id: "onlyrag-sdxl-turbo-directml",
-    displayName: "OnlyRag SDXL Turbo",
-    recommendedProfile: "DirectML GPU consigliato, CPU disponibile per fallback",
+    id: "onlyrag-sdxl-quality-directml",
+    displayName: "SDXL Base qualita",
+    recommendedProfile: "Ritratti, persone e composizioni dove contano coerenza e dettagli.",
     downloadUrl: "https://example.test/model.onnx",
     licenseLabel: "OpenRAIL++",
     expectedSizeBytes: 46,
@@ -291,12 +291,12 @@ function createCatalogEntryBase() {
 
 function createModelState(overrides: Partial<ImageModelLocalState> = {}): ImageModelLocalState {
   return {
-    modelId: "onlyrag-sdxl-turbo-directml",
+    modelId: "onlyrag-sdxl-quality-directml",
     state: overrides.isVerified ? "Verified" : "NotDownloaded",
     isDownloaded: overrides.isVerified ?? false,
     isVerified: false,
     localSizeBytes: 0,
-    localDirectory: "C:\\Users\\User\\AppData\\Local\\OnlyRag\\models\\images\\onlyrag-sdxl-turbo-directml",
+    localDirectory: "C:\\Users\\User\\AppData\\Local\\OnlyRag\\models\\images\\onlyrag-sdxl-quality-directml",
     verificationError: "Il modello non e ancora stato scaricato.",
     expectedSizeBytes: 46,
     remainingDownloadBytes: 46,
@@ -310,7 +310,7 @@ function createGeneratedImage(overrides: Partial<GeneratedImage> = {}): Generate
     provider: "integrated",
     prompt: "Prompt",
     negativePrompt: null,
-    model: "onlyrag-sdxl-turbo-directml",
+    model: "onlyrag-sdxl-quality-directml",
     width: 1024,
     height: 1024,
     steps: 30,

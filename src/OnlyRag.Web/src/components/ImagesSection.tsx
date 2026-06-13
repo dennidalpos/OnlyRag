@@ -17,7 +17,7 @@ import { formatFileSize } from "./DocumentsSection.formatting";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
-const defaultModelId = "onlyrag-sdxl-turbo-directml";
+const defaultModelId = "onlyrag-sdxl-quality-directml";
 
 const defaultSettings: ImageGenerationSettings = {
   selectedModelId: defaultModelId,
@@ -37,6 +37,22 @@ const sizePresets = [
   { label: "Verticale", width: 832, height: 1216 },
   { label: "Orizzontale", width: 1216, height: 832 }
 ];
+
+const generationModes = [
+  { label: "Qualita", value: 0 },
+  { label: "Bilanciato", value: 1 },
+  { label: "Velocita", value: 2 }
+] as const;
+
+const imageTooltips = {
+  generationMode: "Sceglie automaticamente step e batch: qualita privilegia dettagli, velocita riduce attesa.",
+  format: "Imposta larghezza e altezza con formati stabili per SDXL.",
+  negativePrompt: "Opzionale. Il motore aggiunge gia filtri per anatomia e difetti comuni.",
+  seed: "Opzionale. Ripete una generazione simile quando usi lo stesso prompt e modello.",
+  model: "Scegli il modello in base al caso d'uso: qualita, velocita, bozza o creativo."
+};
+
+type GenerationModeValue = (typeof generationModes)[number]["value"];
 
 type Feedback = {
   tone: "success" | "error" | "warning";
@@ -67,8 +83,7 @@ export function ImagesSection() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
-  const [steps, setSteps] = useState(8);
-  const [batchSize, setBatchSize] = useState(1);
+  const [generationMode, setGenerationMode] = useState<GenerationModeValue>(1);
   const [seed, setSeed] = useState("");
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createEmptyModelDraft(defaultModelId));
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -283,6 +298,7 @@ export function ImagesSection() {
     setIsGenerating(true);
     setFeedback(null);
     try {
+      const generationPreset = resolveGenerationPreset(settings.selectedModelId, generationMode);
       const response = await apiRequest<ImageGenerationResponse>("/api/images/generate", {
         method: "POST",
         body: JSON.stringify({
@@ -291,8 +307,8 @@ export function ImagesSection() {
           modelId: settings.selectedModelId,
           width,
           height,
-          steps,
-          batchSize,
+          steps: generationPreset.steps,
+          batchSize: generationPreset.batchSize,
           seed: seed.trim() ? Number(seed) : null
         })
       });
@@ -373,8 +389,8 @@ export function ImagesSection() {
           negativePrompt={negativePrompt}
           width={width}
           height={height}
-          steps={steps}
-          batchSize={batchSize}
+          generationMode={generationMode}
+          selectedModelId={settings.selectedModelId}
           seed={seed}
           canGenerate={canGenerate}
           isGenerating={isGenerating}
@@ -383,8 +399,7 @@ export function ImagesSection() {
           onNegativePromptChange={setNegativePrompt}
           onWidthChange={setWidth}
           onHeightChange={setHeight}
-          onStepsChange={setSteps}
-          onBatchSizeChange={setBatchSize}
+          onGenerationModeChange={setGenerationMode}
           onSeedChange={setSeed}
           onAppendCommand={appendPromptCommand}
           onApplyPreset={applyPreset}
@@ -438,8 +453,8 @@ function PromptPanel({
   negativePrompt,
   width,
   height,
-  steps,
-  batchSize,
+  generationMode,
+  selectedModelId,
   seed,
   canGenerate,
   isGenerating,
@@ -448,8 +463,7 @@ function PromptPanel({
   onNegativePromptChange,
   onWidthChange,
   onHeightChange,
-  onStepsChange,
-  onBatchSizeChange,
+  onGenerationModeChange,
   onSeedChange,
   onAppendCommand,
   onApplyPreset,
@@ -459,8 +473,8 @@ function PromptPanel({
   negativePrompt: string;
   width: number;
   height: number;
-  steps: number;
-  batchSize: number;
+  generationMode: GenerationModeValue;
+  selectedModelId: string;
   seed: string;
   canGenerate: boolean;
   isGenerating: boolean;
@@ -469,13 +483,15 @@ function PromptPanel({
   onNegativePromptChange: (value: string) => void;
   onWidthChange: (value: number) => void;
   onHeightChange: (value: number) => void;
-  onStepsChange: (value: number) => void;
-  onBatchSizeChange: (value: number) => void;
+  onGenerationModeChange: (value: GenerationModeValue) => void;
   onSeedChange: (value: string) => void;
   onAppendCommand: (value: string) => void;
   onApplyPreset: (preset: { width: number; height: number }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const generationPreset = resolveGenerationPreset(selectedModelId, generationMode);
+  const selectedModeLabel = generationModes.find((mode) => mode.value === generationMode)?.label ?? "Bilanciato";
+
   return (
     <section className="settings-card images-prompt-panel" aria-labelledby="images-prompt-title">
       <div className="settings-card__header">
@@ -493,16 +509,7 @@ function PromptPanel({
           <span>Prompt</span>
           <textarea id="image-prompt" rows={8} value={prompt} onChange={(event) => onPromptChange(event.target.value)} />
         </label>
-        <label className="field-group" htmlFor="image-negative-prompt">
-          <span>Negative prompt</span>
-          <textarea
-            id="image-negative-prompt"
-            rows={3}
-            value={negativePrompt}
-            onChange={(event) => onNegativePromptChange(event.target.value)}
-          />
-        </label>
-        <div className="images-preset-row" aria-label="Formato">
+        <div className="images-preset-row" aria-label="Formato" title={imageTooltips.format}>
           {sizePresets.map((preset) => (
             <button
               className={`button-secondary${width === preset.width && height === preset.height ? " button-secondary--active" : ""}`}
@@ -514,28 +521,53 @@ function PromptPanel({
             </button>
           ))}
         </div>
-        <div className="settings-grid settings-grid--four">
-          <label className="field-group" htmlFor="image-width">
-            <span>Larghezza</span>
-            <input id="image-width" min={256} max={2048} step={8} type="number" value={width} onChange={(event) => onWidthChange(Number(event.target.value))} />
+        <div className="image-mode-control">
+          <label htmlFor="image-generation-mode">
+            <TooltipLabel text="Preset" tooltip={imageTooltips.generationMode} />
+            <strong>{selectedModeLabel}</strong>
           </label>
-          <label className="field-group" htmlFor="image-height">
-            <span>Altezza</span>
-            <input id="image-height" min={256} max={2048} step={8} type="number" value={height} onChange={(event) => onHeightChange(Number(event.target.value))} />
-          </label>
-          <label className="field-group" htmlFor="image-steps">
-            <span>Step</span>
-            <input id="image-steps" min={1} max={150} type="number" value={steps} onChange={(event) => onStepsChange(Number(event.target.value))} />
-          </label>
-          <label className="field-group" htmlFor="image-batch">
-            <span>Batch</span>
-            <input id="image-batch" min={1} max={4} type="number" value={batchSize} onChange={(event) => onBatchSizeChange(Number(event.target.value))} />
-          </label>
-          <label className="field-group" htmlFor="image-seed">
-            <span>Seed</span>
-            <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => onSeedChange(event.target.value)} />
-          </label>
+          <input
+            id="image-generation-mode"
+            type="range"
+            min={0}
+            max={2}
+            step={1}
+            value={generationMode}
+            onChange={(event) => onGenerationModeChange(Number(event.target.value) as GenerationModeValue)}
+            title={imageTooltips.generationMode}
+          />
+          <div className="image-mode-control__labels" aria-hidden="true">
+            {generationModes.map((mode) => <span key={mode.value}>{mode.label}</span>)}
+          </div>
+          <small>{generationPreset.steps} step</small>
         </div>
+        <details className="image-advanced-options">
+          <summary>Avanzate</summary>
+          <label className="field-group" htmlFor="image-negative-prompt">
+            <TooltipLabel text="Negative prompt" tooltip={imageTooltips.negativePrompt} />
+            <textarea
+              id="image-negative-prompt"
+              rows={3}
+              value={negativePrompt}
+              onChange={(event) => onNegativePromptChange(event.target.value)}
+              title={imageTooltips.negativePrompt}
+            />
+          </label>
+          <div className="settings-grid settings-grid--two">
+            <label className="field-group" htmlFor="image-width">
+              <span>Larghezza</span>
+              <input id="image-width" min={256} max={2048} step={8} type="number" value={width} onChange={(event) => onWidthChange(Number(event.target.value))} />
+            </label>
+            <label className="field-group" htmlFor="image-height">
+              <span>Altezza</span>
+              <input id="image-height" min={256} max={2048} step={8} type="number" value={height} onChange={(event) => onHeightChange(Number(event.target.value))} />
+            </label>
+            <label className="field-group" htmlFor="image-seed">
+              <TooltipLabel text="Seed" tooltip={imageTooltips.seed} />
+              <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => onSeedChange(event.target.value)} title={imageTooltips.seed} />
+            </label>
+          </div>
+        </details>
         {!selectedModelState?.isVerified && (
           <div className="panel-note panel-note--warning" role="status">
             <p>Scarica e verifica il modello selezionato prima di generare.</p>
@@ -679,11 +711,13 @@ function ImageSettingsModal({
         <div className="image-settings-modal__body">
           <div className="settings-grid settings-grid--two">
             <label className="field-group" htmlFor="image-model">
-              <span>Modello integrato</span>
+              <TooltipLabel text="Modello integrato" tooltip={imageTooltips.model} />
               <select
                 id="image-model"
+                aria-label="Modello integrato"
                 value={settings.selectedModelId}
                 onChange={(event) => onSettingsChange({ ...settings, selectedModelId: event.target.value })}
+                title={imageTooltips.model}
               >
                 {catalog.map((model) => (
                   <option value={model.id} key={model.id}>
@@ -887,7 +921,7 @@ function ModelReadiness({
       <span>{state?.state ?? "NotDownloaded"}</span>
       <small>
         {state?.isVerified
-          ? `${formatFileSize(state.localSizeBytes)} pronti in ${state.localDirectory}`
+          ? `${formatFileSize(state.localSizeBytes)} pronti`
           : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
       <div className="settings-actions">
@@ -949,6 +983,28 @@ function GeneratedImageCard({
       </span>
     </button>
   );
+}
+
+function TooltipLabel({ text, tooltip }: { text: string; tooltip: string }) {
+  return (
+    <span className="image-tooltip-label">
+      {text}
+      <span className="image-tooltip-label__icon" title={tooltip} aria-hidden="true">?</span>
+    </span>
+  );
+}
+
+function resolveGenerationPreset(modelId: string, mode: GenerationModeValue): { steps: number; batchSize: number } {
+  const isFastModel = /turbo|lcm/i.test(modelId);
+  if (mode === 0) {
+    return { steps: isFastModel ? 8 : 36, batchSize: 1 };
+  }
+
+  if (mode === 2) {
+    return { steps: isFastModel ? 4 : 16, batchSize: 1 };
+  }
+
+  return { steps: isFastModel ? 6 : 26, batchSize: 1 };
 }
 
 function useImageObjectUrl(imageId: number | null) {

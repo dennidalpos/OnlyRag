@@ -96,6 +96,70 @@
   gap: 6px;
 }
 
+.image-mode-control,
+.image-advanced-options {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.image-mode-control {
+  padding: 8px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.image-mode-control label,
+.image-mode-control__labels {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.image-mode-control label {
+  align-items: center;
+  color: #172033;
+  font-size: 13px;
+}
+
+.image-mode-control input[type="range"] {
+  width: 100%;
+}
+
+.image-mode-control__labels,
+.image-mode-control small {
+  color: #627084;
+  font-size: 12px;
+}
+
+.image-advanced-options summary {
+  cursor: pointer;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.image-tooltip-label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.image-tooltip-label__icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #9aacbd;
+  border-radius: 999px;
+  color: #506072;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .settings-grid--four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
