@@ -12,7 +12,16 @@ public static partial class InProcessBackend
         app.MapGet("/api/settings/image-generation", async (
             IImageGenerationSettingsService settings,
             CancellationToken cancellationToken) =>
-            Results.Ok(await settings.GetAsync(cancellationToken)));
+        {
+            try
+            {
+                return Results.Ok(await settings.GetAsync(cancellationToken));
+            }
+            catch (ImageGenerationException ex)
+            {
+                return MapImageGenerationException(ex, app.Services, "/api/settings/image-generation");
+            }
+        });
 
         app.MapPut("/api/settings/image-generation", async (
             ImageGenerationSettings request,

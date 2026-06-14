@@ -7,7 +7,7 @@ public sealed partial class LocalSqliteSchemaInitializer
 {
     public const int CurrentSchemaVersion = 1;
 
-    private const string FtsUnavailableNote = "No SQLite FTS module is available in the active SQLite provider; keyword search is disabled until FTS5 or FTS4 is available.";
+    private const string FtsUnavailableNote = "SQLite FTS5 is unavailable in the active SQLite provider; keyword search is disabled.";
 
     private readonly LocalSqliteStoreDescriptor descriptor;
     private readonly ISqliteConnectionFactory connectionFactory;
@@ -24,12 +24,10 @@ public sealed partial class LocalSqliteSchemaInitializer
     {
         if (!File.Exists(descriptor.Paths.DatabasePath))
         {
-            await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-            SqliteTextSearchBackend textSearchBackend = await DetectTextSearchBackendAsync(connection, cancellationToken);
-            await ApplyFreshSchemaAsync(connection, textSearchBackend, cancellationToken);
-            return BuildStatus(CurrentSchemaVersion, textSearchBackend);
+            return await CreateFreshSchemaAsync(schemaTechnicalNote: null, cancellationToken);
         }
 
+        string resetReason;
         try
         {
             await using SqliteConnection existingConnection = await connectionFactory.OpenConnectionAsync(cancellationToken);
@@ -42,43 +40,14 @@ public sealed partial class LocalSqliteSchemaInitializer
                 return BuildStatus(existingVersion, existingTextSearchBackend);
             }
 
-            if (inspection.LegacySchemaVersion is { } legacySchemaVersion)
-            {
-                SchemaMigrationResult migrationResult = await TryMigrateLegacySchemaAsync(
-                    existingConnection,
-                    legacySchemaVersion,
-                    existingTextSearchBackend,
-                    cancellationToken);
-                if (migrationResult.Migrated)
-                {
-                    return BuildStatus(CurrentSchemaVersion, existingTextSearchBackend);
-                }
-
-                return BuildStatus(
-                    existingVersion,
-                    existingTextSearchBackend,
-                    "MigrationRequired",
-                    migrationResult.TechnicalNote);
-            }
-
-            return BuildStatus(
-                existingVersion,
-                existingTextSearchBackend,
-                inspection.Status,
-                inspection.TechnicalNote);
+            resetReason = inspection.TechnicalNote ?? "Il database locale non corrisponde allo schema fresh corrente.";
         }
         catch (SqliteException ex)
         {
-            return new StorageStatusResponse(
-                descriptor.ProviderName,
-                descriptor.Paths.DatabasePath,
-                DatabaseExists: true,
-                CurrentSchemaVersion: 0,
-                TargetSchemaVersion: CurrentSchemaVersion,
-                SchemaStatus: "CorruptDatabase",
-                Fts5Available: false,
-                TechnicalNote: $"Database locale non leggibile: {ex.Message}");
+            resetReason = $"Database locale non leggibile: {ex.Message}";
         }
+
+        return await ResetAndCreateFreshSchemaAsync(resetReason, cancellationToken);
     }
 
     public async Task<StorageStatusResponse> GetStatusAsync(CancellationToken cancellationToken = default)
@@ -130,7 +99,6 @@ public sealed partial class LocalSqliteSchemaInitializer
         string? technicalNote = textSearchBackend switch
         {
             SqliteTextSearchBackend.Fts5 => null,
-            SqliteTextSearchBackend.Fts4 => "SQLite FTS5 is unavailable; keyword search uses the indexed SQLite FTS4 fallback.",
             _ => FtsUnavailableNote
         };
         if (!string.IsNullOrWhiteSpace(schemaTechnicalNote))
@@ -146,7 +114,7 @@ public sealed partial class LocalSqliteSchemaInitializer
             File.Exists(descriptor.Paths.DatabasePath),
             currentVersion,
             CurrentSchemaVersion,
-            schemaStatus ?? (currentVersion == CurrentSchemaVersion ? "Current" : "MigrationRequired"),
+            schemaStatus ?? (currentVersion == CurrentSchemaVersion ? "Current" : "ResetRequired"),
             textSearchBackend == SqliteTextSearchBackend.Fts5,
             technicalNote);
     }
@@ -156,53 +124,33 @@ public sealed partial class LocalSqliteSchemaInitializer
         int currentVersion,
         CancellationToken cancellationToken)
     {
-        bool hasDocuments = await TableExistsAsync(connection, "documents", cancellationToken);
-        bool hasSchemaMigrations = await TableExistsAsync(connection, "schema_migrations", cancellationToken);
-        if (currentVersion == CurrentSchemaVersion && hasDocuments && !hasSchemaMigrations)
+        bool hasCurrentSchema = await HasCurrentFreshSchemaAsync(connection, currentVersion, cancellationToken);
+        if (hasCurrentSchema)
         {
-            return new SchemaInspection("Current", null, null);
+            return new SchemaInspection("Current", null);
         }
 
         if (currentVersion > CurrentSchemaVersion)
         {
             return new SchemaInspection(
-                "UnsupportedSchema",
-                "Il database locale usa una versione schema piu recente; aggiorna l'app o ripristina da backup. Nessun dato e stato eliminato.",
-                null);
+                "ResetRequired",
+                "Il database locale usa una versione schema non supportata da questa app fresh.");
         }
 
-        if (hasSchemaMigrations)
-        {
-            int? legacySchemaVersion = await GetLegacySchemaVersionAsync(connection, cancellationToken);
-            if (legacySchemaVersion is >= LegacySchemaMinimumSupportedVersion and <= LegacySchemaMaximumSupportedVersion)
-            {
-                return new SchemaInspection(
-                    "MigrationRequired",
-                    $"Il database locale usa lo schema legacy {legacySchemaVersion} e verra migrato allo schema corrente.",
-                    legacySchemaVersion);
-            }
-
-            return new SchemaInspection(
-                "UnsupportedSchema",
-                "Il database locale usa metadati schema legacy non supportati. Nessun dato e stato eliminato automaticamente.",
-                null);
-        }
-
-        if (currentVersion > 0 || hasDocuments)
+        bool hasAnyUserTables = await HasAnyUserTablesAsync(connection, cancellationToken);
+        if (currentVersion > 0 || hasAnyUserTables)
         {
             return new SchemaInspection(
-                "MigrationRequired",
-                "Il database locale richiede una migrazione esplicita prima dell'uso. Nessun dato e stato eliminato automaticamente.",
-                null);
+                "ResetRequired",
+                "Il database locale non corrisponde allo schema fresh corrente.");
         }
 
         return new SchemaInspection(
-            "UnsupportedSchema",
-            "Il database locale non contiene metadati schema riconosciuti. Nessun dato e stato eliminato automaticamente.",
-            null);
+            "ResetRequired",
+            "Il database locale e vuoto o non contiene lo schema fresh corrente.");
     }
 
-    private sealed record SchemaInspection(string Status, string? TechnicalNote, int? LegacySchemaVersion);
+    private sealed record SchemaInspection(string Status, string? TechnicalNote);
 
     private static async Task<int> GetUserVersionAsync(
         SqliteConnection connection,
@@ -244,20 +192,55 @@ public sealed partial class LocalSqliteSchemaInitializer
         {
         }
 
-        try
+        return SqliteTextSearchBackend.None;
+    }
+
+    private async Task<StorageStatusResponse> ResetAndCreateFreshSchemaAsync(
+        string? resetReason,
+        CancellationToken cancellationToken)
+    {
+        AppDataResetBackup backup = AppDataReset.ResetNow(descriptor.Paths);
+        string note = string.IsNullOrWhiteSpace(resetReason)
+            ? $"Database locale resettato per usare lo schema fresh corrente. Backup: {backup.BackupPath}"
+            : $"{resetReason} Database locale resettato per usare lo schema fresh corrente. Backup: {backup.BackupPath}";
+        foreach (string directory in descriptor.Paths.EnumerateRequiredDirectories())
         {
-            await connection.ExecuteNonQueryAsync(
-                "CREATE VIRTUAL TABLE temp.__onlyrag_fts4_probe USING fts4(content);",
-                cancellationToken);
-            await connection.ExecuteNonQueryAsync(
-                "DROP TABLE temp.__onlyrag_fts4_probe;",
-                cancellationToken);
-            return SqliteTextSearchBackend.Fts4;
+            LocalRuntimeDirectoryPreparer.EnsureDirectory(directory);
         }
-        catch (SqliteException)
-        {
-            return SqliteTextSearchBackend.None;
-        }
+
+        return await CreateFreshSchemaAsync(note, cancellationToken);
+    }
+
+    private async Task<StorageStatusResponse> CreateFreshSchemaAsync(
+        string? schemaTechnicalNote,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        SqliteTextSearchBackend textSearchBackend = await DetectTextSearchBackendAsync(connection, cancellationToken);
+        await ApplyFreshSchemaAsync(connection, textSearchBackend, cancellationToken);
+        return BuildStatus(CurrentSchemaVersion, textSearchBackend, schemaTechnicalNote: schemaTechnicalNote);
+    }
+
+    private static async Task<bool> HasCurrentFreshSchemaAsync(
+        SqliteConnection connection,
+        int currentVersion,
+        CancellationToken cancellationToken)
+    {
+        return currentVersion == CurrentSchemaVersion
+            && await TableExistsAsync(connection, "documents", cancellationToken)
+            && await TableExistsAsync(connection, "chunks", cancellationToken)
+            && await TableExistsAsync(connection, "settings", cancellationToken)
+            && !await TableExistsAsync(connection, "schema_migrations", cancellationToken);
+    }
+
+    private static async Task<bool> HasAnyUserTablesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1;";
+        object? value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is not null;
     }
 
     private static async Task ApplyFreshSchemaAsync(
@@ -284,7 +267,6 @@ public sealed partial class LocalSqliteSchemaInitializer
     private enum SqliteTextSearchBackend
     {
         None,
-        Fts4,
         Fts5
     }
 }

@@ -234,13 +234,6 @@ public sealed partial class LocalSqliteSchemaInitializer
                 content
             );
             """,
-            SqliteTextSearchBackend.Fts4 => """
-            CREATE VIRTUAL TABLE chunks_fts USING fts4(
-                chunk_id,
-                content,
-                notindexed=chunk_id
-            );
-            """,
             _ => string.Empty
         };
 

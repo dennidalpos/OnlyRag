@@ -26,12 +26,13 @@ public static class AppDataReset
         return true;
     }
 
-    public static void ResetNow(AppStoragePaths paths)
+    public static AppDataResetBackup ResetNow(AppStoragePaths paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
-        CreateTimestampedBackup(paths);
+        AppDataResetBackup backup = CreateTimestampedBackup(paths);
         DeleteDirectoryContents(paths.DataRoot);
+        return backup;
     }
 
     public static AppDataResetBackup CreateTimestampedBackup(AppStoragePaths paths)

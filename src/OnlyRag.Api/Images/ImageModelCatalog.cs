@@ -54,14 +54,6 @@ internal static class ImageModelCatalog
             CompatibilityNotes: "DirectML GPU preferred on Windows, including NVIDIA GPUs; CPU fallback is supported for slower local validation.")
     ];
 
-    private static readonly HashSet<string> ObsoleteBuiltInModelIds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "onlyrag-sdxl-quality-directml",
-        "onlyrag-sdxl-turbo-directml",
-        "ffusion-sdxl-base-directml",
-        "onnxruntime-sdxl-turbo-cuda"
-    };
-
     public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;
 
     public static bool IsBuiltIn(string modelId)
@@ -72,10 +64,5 @@ internal static class ImageModelCatalog
     public static ImageModelCatalogEntry? GetDefault(string modelId)
     {
         return DefaultModels.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public static bool IsObsoleteBuiltIn(string modelId)
-    {
-        return ObsoleteBuiltInModelIds.Contains(modelId);
     }
 }

@@ -24,11 +24,6 @@ internal sealed class ImageModelCatalogStore
 
         foreach (ImageModelCatalogEntry saved in await ReadSavedAsync(cancellationToken))
         {
-            if (ImageModelCatalog.IsObsoleteBuiltIn(saved.Id))
-            {
-                continue;
-            }
-
             ImageModelCatalogEntry? defaultModel = ImageModelCatalog.GetDefault(saved.Id);
             bool isBuiltIn = defaultModel is not null;
             models[saved.Id] = ApplyCatalogMetadataDefaults(saved, defaultModel) with { IsBuiltIn = isBuiltIn };

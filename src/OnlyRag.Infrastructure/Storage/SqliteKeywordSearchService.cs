@@ -26,9 +26,8 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
 
         string ftsQuery = BuildFtsQuery(terms);
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        if (await TableExistsAsync(connection, "chunks_fts", cancellationToken))
+        if (await IsFts5TableAsync(connection, "chunks_fts", cancellationToken))
         {
-            bool usesFts5 = await TableSqlContainsAsync(connection, "chunks_fts", "USING fts5", cancellationToken);
             try
             {
                 IReadOnlyList<KeywordSearchResult> ftsResults = await SearchFtsAsync(
@@ -37,17 +36,11 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
                     documentIds,
                     limit,
                     cancellationToken);
-                return new KeywordSearchResponse(ftsResults, usesFts5 ? "SQLite FTS5" : "SQLite FTS indexed fallback");
+                return new KeywordSearchResponse(ftsResults, "SQLite FTS5");
             }
             catch (SqliteException)
             {
-                IReadOnlyList<KeywordSearchResult> fallbackResults = await SearchFtsWithoutRankAsync(
-                    connection,
-                    ftsQuery,
-                    documentIds,
-                    limit,
-                    cancellationToken);
-                return new KeywordSearchResponse(fallbackResults, "SQLite FTS indexed fallback");
+                return new KeywordSearchResponse([], "SQLite keyword search unavailable");
             }
         }
 
@@ -83,47 +76,6 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         return await ReadRankedResultsAsync(command, limit, cancellationToken);
     }
 
-    private static async Task<IReadOnlyList<KeywordSearchResult>> SearchFtsWithoutRankAsync(
-        SqliteConnection connection,
-        string ftsQuery,
-        IReadOnlyCollection<long> documentIds,
-        int limit,
-        CancellationToken cancellationToken)
-    {
-        await using SqliteCommand command = connection.CreateCommand();
-        string documentParameters = command.AddInParameters("$doc", documentIds.Distinct().ToArray());
-        command.CommandText =
-            $$"""
-            SELECT c.id, c.document_id, c.chunk_index
-            FROM (
-                SELECT chunk_id
-                FROM chunks_fts
-                WHERE chunks_fts MATCH $query
-            ) AS fts
-            INNER JOIN chunks AS c ON c.id = fts.chunk_id
-            WHERE c.document_id IN ({{documentParameters}})
-              AND LENGTH(TRIM(c.content)) > 0
-            ORDER BY c.id ASC
-            LIMIT $limit;
-            """;
-        command.AddParameter("$query", ftsQuery);
-        command.AddParameter("$limit", Math.Max(1, limit));
-
-        List<KeywordSearchResult> results = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            double score = Math.Max(1, limit - results.Count);
-            results.Add(new KeywordSearchResult(
-                reader.GetInt64(0),
-                reader.GetInt64(1),
-                reader.GetInt32(2),
-                score));
-        }
-
-        return results;
-    }
-
     private static async Task<IReadOnlyList<KeywordSearchResult>> ReadRankedResultsAsync(
         SqliteCommand command,
         int limit,
@@ -156,22 +108,9 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
             : 1d / (1d + rank);
     }
 
-    private static async Task<bool> TableExistsAsync(
+    private static async Task<bool> IsFts5TableAsync(
         SqliteConnection connection,
         string tableName,
-        CancellationToken cancellationToken)
-    {
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
-        command.AddParameter("$name", tableName);
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is not null;
-    }
-
-    private static async Task<bool> TableSqlContainsAsync(
-        SqliteConnection connection,
-        string tableName,
-        string expectedText,
         CancellationToken cancellationToken)
     {
         await using SqliteCommand command = connection.CreateCommand();
@@ -179,7 +118,7 @@ public sealed class SqliteKeywordSearchService : IKeywordSearchService
         command.AddParameter("$name", tableName);
         object? value = await command.ExecuteScalarAsync(cancellationToken);
         return value is string sql
-            && sql.Contains(expectedText, StringComparison.OrdinalIgnoreCase);
+            && sql.Contains("USING fts5", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildFtsQuery(IEnumerable<string> terms)

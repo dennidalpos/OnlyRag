@@ -21,7 +21,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal("Current", status.SchemaStatus);
         Assert.True(status.Fts5Available || status.TechnicalNote is not null);
-        if (status.Fts5Available || status.TechnicalNote?.Contains("FTS4", StringComparison.OrdinalIgnoreCase) == true)
+        if (status.Fts5Available)
         {
             Assert.True(await tempStorage.TableExistsAsync("chunks_fts"));
         }
@@ -67,10 +67,10 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task InitializeAsync_MigratesLegacyVersionedSchemaWithoutDeletingDataRootContents()
+    public async Task InitializeAsync_ResetsVersionedSchemaAndCreatesBackup()
     {
         using TempStorage tempStorage = TempStorage.Create();
-        await CreateVersion8SchemaAsync(tempStorage);
+        await CreateVersionedSchemaAsync(tempStorage);
         Directory.CreateDirectory(tempStorage.Paths.LogsDirectory);
         string staleLogPath = Path.Combine(tempStorage.Paths.LogsDirectory, "stale.log");
         await File.WriteAllTextAsync(staleLogPath, "old data");
@@ -82,7 +82,10 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
         Assert.Equal("Current", status.SchemaStatus);
-        Assert.True(File.Exists(staleLogPath));
+        Assert.Contains("resettato", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(staleLogPath));
+        string backupRoot = Assert.Single(tempStorage.ListBackupRoots());
+        Assert.True(File.Exists(Path.Combine(backupRoot, "logs", "stale.log")));
         Assert.True(await tempStorage.TableExistsAsync("documents"));
         Assert.True(await tempStorage.TableExistsAsync("document_pages"));
         Assert.True(await tempStorage.TableExistsAsync("chunk_vector_index_status"));
@@ -92,63 +95,51 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ReportsUnsupportedPreexistingUnversionedSchema()
+    public async Task InitializeAsync_ResetsPreexistingUnversionedSchema()
     {
         using TempStorage tempStorage = TempStorage.Create();
-        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
-        {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE obsolete_data (id INTEGER PRIMARY KEY);";
-            await command.ExecuteNonQueryAsync();
-        }
-
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-
-        StorageStatusResponse status = await storage.InitializeAsync();
-
-        Assert.Equal("UnsupportedSchema", status.SchemaStatus);
-        Assert.True(await tempStorage.TableExistsAsync("obsolete_data"));
-        Assert.Contains("Nessun dato", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_ReportsUnsupportedFutureSchemaWithoutDeletingData()
-    {
-        using TempStorage tempStorage = TempStorage.Create();
-        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
-        {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText =
-                """
-                PRAGMA user_version = 99;
-                CREATE TABLE documents (id INTEGER PRIMARY KEY);
-                """;
-            await command.ExecuteNonQueryAsync();
-        }
-
-        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
-
-        StorageStatusResponse status = await storage.InitializeAsync();
-
-        Assert.Equal(99, status.CurrentSchemaVersion);
-        Assert.Equal("UnsupportedSchema", status.SchemaStatus);
-        Assert.True(await tempStorage.TableExistsAsync("documents"));
-    }
-
-    [Fact]
-    public async Task InitializeAsync_MigratesLegacyDuplicateDocumentHashesWithoutDeletingDocuments()
-    {
-        using TempStorage tempStorage = TempStorage.Create();
-        await CreateVersion10SchemaWithDuplicateDocumentHashesAsync(tempStorage);
+        await CreateUnknownSchemaAsync(tempStorage);
 
         LocalSqliteStorageService storage = tempStorage.CreateStorageService();
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
         Assert.Equal("Current", status.SchemaStatus);
-        Assert.Equal(2, await CountRowsAsync(tempStorage, "documents", "1 = $value", 1));
-        Assert.Equal(1, await CountRowsAsync(tempStorage, "documents", "sha256 = 'duplicate-sha'", 1));
-        Assert.True(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
+        Assert.False(await tempStorage.TableExistsAsync("obsolete_data"));
+        Assert.True(await tempStorage.TableExistsAsync("documents"));
+        Assert.Single(tempStorage.ListBackupRoots());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ResetsFutureSchema()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateFutureSchemaAsync(tempStorage);
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.InitializeAsync();
+
+        Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
+        Assert.Equal("Current", status.SchemaStatus);
+        Assert.True(await tempStorage.TableExistsAsync("documents"));
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "document_uid"));
+        Assert.Single(tempStorage.ListBackupRoots());
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_ReportsResetRequiredWithoutChangingPreexistingSchema()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateUnknownSchemaAsync(tempStorage);
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.GetStatusAsync();
+
+        Assert.Equal("ResetRequired", status.SchemaStatus);
+        Assert.True(await tempStorage.TableExistsAsync("obsolete_data"));
+        Assert.Empty(tempStorage.ListBackupRoots());
     }
 
     private static async Task<int> ReadUserVersionAsync(TempStorage tempStorage)

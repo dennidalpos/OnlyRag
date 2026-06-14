@@ -38,8 +38,8 @@ no-context answer when no selected document chunk can be retrieved.
 - Model features require a reachable Ollama endpoint.
 - Qdrant must be available for vector search. Keyword-only search/chat can still work when indexed
   chunks exist, but results include notices that vector retrieval is unavailable.
-- Documents migrated from any older vector backend require Qdrant re-indexing before vector
-  search/chat can use them.
+- Only the fresh local SQLite/Qdrant layout is supported. If local data is reset because the
+  schema is not current, documents must be imported and indexed again.
 - Remote Qdrant use should be explicitly trusted and protected as configured in Settings.
 
 ## Retrieval Evaluation

@@ -252,7 +252,7 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task StorageStatus_ReturnsDatabasePathAndMigrationState()
+    public async Task StorageStatus_ReturnsDatabasePathAndSchemaState()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);

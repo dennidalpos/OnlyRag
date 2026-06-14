@@ -26,10 +26,10 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
 
     public async Task<ImageGenerationSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        string selectedModelId = await NormalizeModelIdAsync(
-            await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken),
-            allowDefaultFallback: true,
-            cancellationToken);
+        string? savedModelId = await settingsRepository.GetValueAsync(SelectedModelIdKey, cancellationToken);
+        string selectedModelId = string.IsNullOrWhiteSpace(savedModelId)
+            ? DefaultSelectedModelId
+            : await NormalizeModelIdAsync(savedModelId, cancellationToken);
         string? timeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
         string? preferGpuValue = await settingsRepository.GetValueAsync(PreferGpuKey, cancellationToken);
         return new ImageGenerationSettings(
@@ -44,7 +44,6 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
     {
         string selectedModelId = await NormalizeModelIdAsync(
             settings.SelectedModelId,
-            allowDefaultFallback: false,
             cancellationToken);
         int timeout = ValidateRequestTimeoutSeconds(settings.RequestTimeoutSeconds);
 
@@ -81,17 +80,11 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
 
     private async Task<string> NormalizeModelIdAsync(
         string? value,
-        bool allowDefaultFallback,
         CancellationToken cancellationToken)
     {
         string modelId = string.IsNullOrWhiteSpace(value) ? DefaultSelectedModelId : value.Trim();
         if (!await modelCatalog.ContainsAsync(modelId, cancellationToken))
         {
-            if (allowDefaultFallback)
-            {
-                return DefaultSelectedModelId;
-            }
-
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidConfiguration,
                 "Il modello immagini selezionato non fa parte del catalogo integrato.");

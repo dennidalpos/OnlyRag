@@ -611,12 +611,10 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task ImageGeneration_SettingsFallsBackFromRemovedCudaModel()
+    public async Task ImageGeneration_SettingsUseDefaultWhenSelectedModelIsMissing()
     {
-        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-removed-cuda-model-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-default-model-settings-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
-        SqliteSettingsRepository settings = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store));
-        await settings.UpsertAsync("imageGeneration.selectedModelId", "onnxruntime-sdxl-turbo-cuda");
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
         ImageGenerationSettings? imageSettings =
@@ -625,6 +623,24 @@ public sealed partial class InProcessBackendTests
         Assert.NotNull(imageSettings);
         Assert.Equal(ImageModelCatalog.DefaultModelId, imageSettings.SelectedModelId);
         Assert.True(imageSettings.PreferGpu);
+    }
+
+    [Fact]
+    public async Task ImageGeneration_SettingsRejectUnknownSavedModel()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-unknown-model-settings-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        SqliteSettingsRepository settings = new(new LocalSqliteConnectionFactory(tempDescriptor.Descriptor.Store));
+        await settings.UpsertAsync("imageGeneration.selectedModelId", "unknown-model");
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        using HttpResponseMessage response = await httpClient.GetAsync("/api/settings/image-generation");
+
+        await AssertProblemAsync(
+            response,
+            HttpStatusCode.BadRequest,
+            "Configurazione immagini non valida",
+            "image_generation_invalid_configuration");
     }
 
     [Fact]
