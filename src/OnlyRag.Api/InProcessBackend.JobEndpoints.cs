@@ -6,7 +6,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapJobEndpoints(WebApplication app)
+    internal static void MapJobEndpoints(WebApplication app)
     {
         app.MapGet("/api/jobs", async (int? limit, ILocalJobQueue jobs, CancellationToken cancellationToken) =>
             Results.Ok(await jobs.ListAsync(limit, cancellationToken)));

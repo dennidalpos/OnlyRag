@@ -24,8 +24,14 @@ internal sealed class ImageModelCatalogStore
 
         foreach (ImageModelCatalogEntry saved in await ReadSavedAsync(cancellationToken))
         {
-            bool isBuiltIn = ImageModelCatalog.IsBuiltIn(saved.Id);
-            models[saved.Id] = saved with { IsBuiltIn = isBuiltIn };
+            if (ImageModelCatalog.IsObsoleteBuiltIn(saved.Id))
+            {
+                continue;
+            }
+
+            ImageModelCatalogEntry? defaultModel = ImageModelCatalog.GetDefault(saved.Id);
+            bool isBuiltIn = defaultModel is not null;
+            models[saved.Id] = ApplyCatalogMetadataDefaults(saved, defaultModel) with { IsBuiltIn = isBuiltIn };
         }
 
         return models.Values
@@ -168,7 +174,32 @@ internal sealed class ImageModelCatalogStore
             Math.Max(0, request.ExpectedSizeBytes),
             requiredFiles,
             sha256.ToLowerInvariant(),
-            ImageModelCatalog.IsBuiltIn(id));
+            ImageModelCatalog.IsBuiltIn(id),
+            NormalizeOptional(request.ModelType, "SDXL ONNX"),
+            NormalizeOptional(request.ModelProfile, "custom"),
+            NormalizeResolutions(request.SupportedResolutions),
+            Math.Clamp(request.DefaultSteps, 1, 150),
+            Math.Clamp(request.DefaultGuidance, 0, 30),
+            NormalizeOptional(request.Scheduler, "Runtime default"),
+            NormalizeOptional(request.CompatibilityNotes, "DirectML GPU preferred; CPU fallback supported."));
+    }
+
+    private static ImageModelCatalogEntry ApplyCatalogMetadataDefaults(
+        ImageModelCatalogEntry saved,
+        ImageModelCatalogEntry? defaultModel)
+    {
+        return saved with
+        {
+            ModelType = NormalizeOptional(saved.ModelType, defaultModel?.ModelType ?? "SDXL ONNX"),
+            ModelProfile = NormalizeOptional(saved.ModelProfile, defaultModel?.ModelProfile ?? "custom"),
+            SupportedResolutions = NormalizeResolutions(saved.SupportedResolutions ?? defaultModel?.SupportedResolutions),
+            DefaultSteps = saved.DefaultSteps > 0 ? saved.DefaultSteps : defaultModel?.DefaultSteps ?? 6,
+            DefaultGuidance = saved.DefaultGuidance >= 0 ? saved.DefaultGuidance : defaultModel?.DefaultGuidance ?? 0,
+            Scheduler = NormalizeOptional(saved.Scheduler, defaultModel?.Scheduler ?? "Runtime default"),
+            CompatibilityNotes = NormalizeOptional(
+                saved.CompatibilityNotes,
+                defaultModel?.CompatibilityNotes ?? "DirectML GPU preferred; CPU fallback supported.")
+        };
     }
 
     private static string NormalizeRequired(string value, string errorMessage)
@@ -180,5 +211,22 @@ internal sealed class ImageModelCatalogStore
         }
 
         return normalized;
+    }
+
+    private static string NormalizeOptional(string? value, string fallback)
+    {
+        string? normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+    }
+
+    private static IReadOnlyList<string> NormalizeResolutions(IReadOnlyList<string>? values)
+    {
+        string[] resolutions = (values ?? [])
+            .Select(value => value.Trim().ToLowerInvariant())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return resolutions.Length == 0 ? ["1024x1024"] : resolutions;
     }
 }

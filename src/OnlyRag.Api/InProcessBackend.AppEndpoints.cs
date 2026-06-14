@@ -13,7 +13,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapAppEndpoints(WebApplication app)
+    internal static void MapAppEndpoints(WebApplication app)
     {
         app.MapGet("/health", () =>
             Results.Ok(new BackendHealthResponse("Healthy")));
@@ -62,7 +62,7 @@ public static partial class InProcessBackend
 
             AppDataReset.RequestResetOnNextStartup(descriptor.StoragePaths);
             return Results.Ok(new OperationMessageResponse(
-                "Reset dati pianificato. Riavvia OnlyRag per cancellare dati locali, profilo WebView2, cache, log e impostazioni."));
+                "Reset dati pianificato. Al riavvio verra creato un backup timestamped prima di cancellare dati locali, profilo WebView2, cache, log e impostazioni."));
         });
 
         app.MapGet("/api/health", () =>

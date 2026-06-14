@@ -1,21 +1,11 @@
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OnlyRag.Api.Images;
-using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
-using OnlyRag.Infrastructure.Ingestion;
-using OnlyRag.Infrastructure.Ocr;
-using OnlyRag.Infrastructure.Retrieval;
-using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
 
@@ -41,95 +31,11 @@ public static partial class InProcessBackend
             kestrel.Limits.MaxRequestBodySize = options.DocumentLibraryLimits.MaxRequestBodySizeBytes;
         });
 
-        builder.Services.AddSingleton(descriptor);
-        builder.Services.AddSingleton(descriptor.Store);
-        builder.Services.AddSingleton(descriptor.JobQueue);
-        builder.Services.AddSingleton(options.DocumentLibraryLimits);
-        builder.Services.AddSingleton<ILocalProcessLauncher>(options.ProcessLauncher ?? new LocalProcessLauncher());
-        builder.Services.AddSingleton(runtimeState);
-        builder.Services.AddSingleton<ISqliteConnectionFactory, LocalSqliteConnectionFactory>();
-        builder.Services.AddSingleton<LocalSqliteSchemaInitializer>();
-        builder.Services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();
-        builder.Services.AddSingleton<IDocumentRepository, SqliteDocumentRepository>();
-        builder.Services.AddSingleton<IEmbeddingRepository, SqliteEmbeddingRepository>();
-        builder.Services.AddSingleton<QdrantSettingsStore>();
-        if (options.QdrantVectorStore is not null)
-        {
-            builder.Services.AddSingleton(options.QdrantVectorStore);
-        }
-        else
-        {
-            builder.Services.AddSingleton<IQdrantVectorStore, QdrantVectorStore>();
-        }
-        builder.Services.AddSingleton<QdrantLocalRuntimeService>();
-        builder.Services.AddSingleton(HybridRetrievalOptions.Default);
-        builder.Services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
-        builder.Services.AddSingleton<IRetrievalChunkRepository, SqliteRetrievalChunkRepository>();
-        builder.Services.AddSingleton<IQueryEmbeddingGenerator, OllamaQueryEmbeddingGenerator>();
-        builder.Services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
-        builder.Services.AddSingleton<IChatHistoryRepository, SqliteChatHistoryRepository>();
-        builder.Services.AddSingleton<ChatService>();
-        builder.Services.AddSingleton<ITranslationRepository, SqliteTranslationRepository>();
-        builder.Services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
-        builder.Services.AddSingleton<TranslationExportService>();
-        builder.Services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
-        builder.Services.AddSingleton<LocalDocumentStorageGuard>();
-        builder.Services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
-        builder.Services.AddSingleton<IOcrCacheRepository, SqliteOcrCacheRepository>();
-        builder.Services.AddSingleton<OcrSettingsStore>();
-        builder.Services.AddSingleton<OcrProcessingSettingsStore>();
-        builder.Services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
-        builder.Services.AddSingleton<OcrRetryPolicy>();
-        builder.Services.AddSingleton<IngestionSettingsStore>();
-        builder.Services.AddSingleton<PdfExportSettingsStore>();
-        builder.Services.AddSingleton<IPdfExportConverter, LibreOfficePdfExportConverter>();
-        builder.Services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
-        builder.Services.AddSingleton<ImageModelCatalogStore>();
-        builder.Services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
-        builder.Services.AddSingleton(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
-        builder.Services.AddSingleton<ImageGenerationService>();
-        builder.Services.AddHttpClient<ImageModelManager>(client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
-        builder.Services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
-        builder.Services.AddSingleton<OllamaGenerationCoordinator>();
-        builder.Services.AddSingleton<DependencyProvisioningService>();
-        builder.Services.AddSingleton<OcrStartupAnalysisService>();
-        builder.Services.AddSingleton<OcrGpuCapabilityService>();
-        builder.Services.AddSingleton<DiagnosticsProbeCacheService>();
-        builder.Services.AddSingleton<SystemTelemetryService>();
-        builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
-        builder.Services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
-        builder.Services.AddSingleton<DocumentTextChunker>();
-        builder.Services.AddSingleton<OfficeOpenXmlTextExtractor>();
-        builder.Services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();
-        builder.Services.AddSingleton<ILocalJobHandler, DocumentIngestionJobHandler>();
-        builder.Services.AddSingleton<ILocalJobHandler, DocumentEmbeddingJobHandler>();
-        builder.Services.AddSingleton<ILocalJobHandler, DocumentTranslationJobHandler>();
-        builder.Services.AddSingleton<ILocalJobHandler, OllamaModelPullJobHandler>();
-        builder.Services.AddSingleton<RunningJobCancellationRegistry>();
-        builder.Services.AddSingleton<ApplicationShutdownService>();
-        builder.Services.AddHostedService<LocalJobWorkerService>();
-        builder.Services.Configure<FormOptions>(formOptions =>
-        {
-            formOptions.MultipartBodyLengthLimit = options.DocumentLibraryLimits.MaxRequestBodySizeBytes;
-            formOptions.MemoryBufferThreshold = 1024 * 64;
-        });
-        builder.Services.ConfigureHttpJsonOptions(json =>
-        {
-            json.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        });
-        builder.Services.AddCors(cors =>
-        {
-            cors.AddPolicy(WebViewCorsPolicy, policy =>
-            {
-                policy
-                    .WithOrigins(ResolveAllowedCorsOrigins(options))
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            });
-        });
+        builder.Services.AddOnlyRagBackendServices(descriptor, options, runtimeState);
+        builder.Services.AddOnlyRagHttpApiOptions(
+            options,
+            WebViewCorsPolicy,
+            ResolveAllowedCorsOrigins(options));
 
         WebApplication app = builder.Build();
 
@@ -167,7 +73,7 @@ public static partial class InProcessBackend
         });
         app.UseCors(WebViewCorsPolicy);
         UseSessionTokenAuthentication(app, sessionToken);
-        MapEndpoints(app);
+        app.MapOnlyRagFeatureEndpoints();
 
         return app;
     }
@@ -189,18 +95,6 @@ public static partial class InProcessBackend
         }
 
         return origins.ToArray();
-    }
-
-    private static void MapEndpoints(WebApplication app)
-    {
-        MapAppEndpoints(app);
-        MapRetrievalEndpoints(app);
-        MapSettingsEndpoints(app);
-        MapDependencyEndpoints(app);
-        MapJobEndpoints(app);
-        MapDocumentEndpoints(app);
-        MapTranslationEndpoints(app);
-        MapImageEndpoints(app);
     }
 
     private static Uri ResolveBaseUri(IHost app)

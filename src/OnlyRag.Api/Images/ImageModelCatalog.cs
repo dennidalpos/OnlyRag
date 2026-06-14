@@ -4,7 +4,7 @@ namespace OnlyRag.Api.Images;
 
 internal static class ImageModelCatalog
 {
-    public const string DefaultModelId = "onlyrag-sdxl-quality-directml";
+    public const string DefaultModelId = "lcm-sdxl-olive-onnx";
     public const string RequiredModelFileName = "model.onnx";
     public const string PlaceholderModelContent = "OnlyRag integrated image model placeholder v1\n";
     public static readonly IReadOnlyList<string> RequiredSdxlCoreSnapshotFiles =
@@ -37,45 +37,30 @@ internal static class ImageModelCatalog
     [
         new(
             DefaultModelId,
-            "SDXL Base qualita",
-            "Ritratti, persone e composizioni dove contano coerenza e dettagli; piu lento dei modelli Turbo.",
-            "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
-            "CreativeML Open RAIL++-M / verificare termini upstream",
-            0,
-            RequiredSdxlCoreSnapshotFiles,
-            string.Empty,
-            IsBuiltIn: true),
-        new(
-            "onlyrag-sdxl-turbo-directml",
-            "SDXL Turbo rapido",
-            "Bozze veloci, idee, oggetti e ambienti semplici; meno adatto ad anatomia e mani.",
-            "https://huggingface.co/softwareweaver/Sdxl-Turbo-Olive-Onnx",
-            "CC-BY-NC-4.0 / verificare termini upstream",
-            0,
-            RequiredSdxlSnapshotFiles,
-            string.Empty,
-            IsBuiltIn: true),
-        new(
-            "lcm-sdxl-olive-onnx",
-            "LCM SDXL bozza",
-            "Iterazioni molto rapide e concept a pochi step; usare per provare prompt prima del modello qualità.",
+            "LCM SDXL Olive ONNX",
+            "Profilo ONNX DirectML/CPU locale per qualita, bilanciato e performance.",
             "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
             "OpenRAIL++ / verificare termini upstream",
-            0,
+            8_000_000_000,
             RequiredSdxlSnapshotFiles,
             string.Empty,
-            IsBuiltIn: true),
-        new(
-            "ffusion-sdxl-base-directml",
-            "FFusionXL creativo",
-            "Illustrazioni e scene creative basate su SDXL; verificare stile e licenza del modello upstream.",
-            "https://huggingface.co/FFusion/FFusionXL-BASE",
-            "OpenRAIL++ / verificare termini upstream",
-            0,
-            RequiredSdxlSnapshotFiles,
-            string.Empty,
-            IsBuiltIn: true)
+            IsBuiltIn: true,
+            ModelType: "SDXL Turbo/LCM ONNX",
+            ModelProfile: "lcm-sdxl-olive",
+            SupportedResolutions: ["1024x1024", "832x1216", "1216x832"],
+            DefaultSteps: 6,
+            DefaultGuidance: 0,
+            Scheduler: "Euler Ancestral with trailing timestep spacing",
+            CompatibilityNotes: "DirectML GPU preferred on Windows, including NVIDIA GPUs; CPU fallback is supported for slower local validation.")
     ];
+
+    private static readonly HashSet<string> ObsoleteBuiltInModelIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "onlyrag-sdxl-quality-directml",
+        "onlyrag-sdxl-turbo-directml",
+        "ffusion-sdxl-base-directml",
+        "onnxruntime-sdxl-turbo-cuda"
+    };
 
     public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;
 
@@ -87,5 +72,10 @@ internal static class ImageModelCatalog
     public static ImageModelCatalogEntry? GetDefault(string modelId)
     {
         return DefaultModels.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool IsObsoleteBuiltIn(string modelId)
+    {
+        return ObsoleteBuiltInModelIds.Contains(modelId);
     }
 }

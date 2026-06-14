@@ -11,10 +11,6 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
 {
     private const string DirectMlProvider = "DirectML";
     private const string CpuProvider = "CPU";
-    private const string QualityPromptSuffix =
-        "coherent anatomy, natural proportions, realistic face, detailed hands, separated limbs, clean silhouette";
-    private const string DefaultNegativePrompt =
-        "bad anatomy, deformed body, distorted face, mutated hands, fused fingers, extra fingers, missing fingers, extra arms, extra legs, fused limbs, duplicate body, disfigured, malformed, blurry, low quality";
 
     private readonly object gate = new();
     private string activeExecutionProvider = DirectMlProvider;
@@ -143,7 +139,7 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
         return new GenerateOptions
         {
             Diffuser = DiffuserType.TextToImage,
-            Prompt = CreateQualityPrompt(request.Prompt),
+            Prompt = CreatePrompt(request.Prompt),
             NegativePrompt = CreateNegativePrompt(request.NegativePrompt),
             SchedulerOptions = new SchedulerOptions
             {
@@ -162,18 +158,16 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
         };
     }
 
-    internal static string CreateQualityPrompt(string prompt)
+    internal static string CreatePrompt(string prompt)
     {
-        return ContainsAny(prompt, ["anatomy", "proportions", "face", "hands", "limbs"])
-            ? prompt
-            : $"{prompt}, {QualityPromptSuffix}";
+        return prompt.Trim();
     }
 
     internal static string CreateNegativePrompt(string? negativePrompt)
     {
         return string.IsNullOrWhiteSpace(negativePrompt)
-            ? DefaultNegativePrompt
-            : $"{negativePrompt.Trim()}, {DefaultNegativePrompt}";
+            ? string.Empty
+            : negativePrompt.Trim();
     }
 
     internal static ModelType ResolveModelType(string? modelId)

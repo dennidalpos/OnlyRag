@@ -7,7 +7,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapImageEndpoints(WebApplication app)
+    internal static void MapImageEndpoints(WebApplication app)
     {
         app.MapGet("/api/settings/image-generation", async (
             IImageGenerationSettingsService settings,
@@ -159,6 +159,22 @@ public static partial class InProcessBackend
         {
             GeneratedImage? deleted = await imageGeneration.DeleteAsync(id, cancellationToken);
             return deleted is null ? CreateNotFoundProblem("Immagine") : Results.Ok(deleted);
+        });
+
+        app.MapPost("/api/images/{id:long}/crop", async (
+            long id,
+            ImageCropSaveRequest request,
+            ImageGenerationService imageGeneration,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                return Results.Ok(await imageGeneration.SaveCroppedImageAsync(id, request, cancellationToken));
+            }
+            catch (ImageGenerationException ex)
+            {
+                return MapImageGenerationException(ex, app.Services, "/api/images/crop");
+            }
         });
 
         app.MapPost("/api/images/open-folder", (

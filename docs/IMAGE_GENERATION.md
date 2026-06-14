@@ -1,11 +1,11 @@
 # Image Generation
 
 OnlyRag uses a single integrated local image provider. Users do not install or start separate image
-tools, and prompts are not sent to remote endpoints.
+tools, and prompts are not sent to remote generation endpoints.
 
 ## Models
 
-The Images section lists curated models with:
+The Images section lists image model catalog entries with:
 
 - model id and display name;
 - recommended GPU/CPU profile;
@@ -15,18 +15,17 @@ The Images section lists curated models with:
 - required local files;
 - SHA256 verification metadata.
 
-The built-in catalog is seeded with DirectML-compatible ONNX entries for distinct use cases:
+The built-in catalog currently contains one manageable DirectML/CPU ONNX entry:
 
-- SDXL Base quality for portraits, people, and detail-sensitive prompts;
-- SDXL Turbo for fast drafts and simple objects or environments;
-- LCM SDXL for quick prompt iteration;
-- FFusionXL for creative SDXL-style illustration checks.
+- `lcm-sdxl-olive-onnx` (`LCM SDXL Olive ONNX`), an OpenRAIL++ upstream model entry intended for
+  local quality, balanced, and performance profiles.
 
 Users can edit built-in entries, reset them, or add manual entries from the Images section. Catalog
 overrides are stored in the local settings store, not in repository source files.
 
-When a catalog entry points at `https://huggingface.co/{owner}/{model}`, OnlyRag downloads the model
-repository snapshot into the local model folder. Direct file URLs are downloaded as `model.onnx`.
+When a catalog entry points at `https://huggingface.co/{owner}/{model}`, OnlyRag reads repository
+metadata and downloads only the required files declared by the catalog entry into the local model
+folder. Direct file URLs are downloaded as `model.onnx`.
 
 Model files are stored under:
 
@@ -49,9 +48,10 @@ The Images UI blocks generation until the selected model is downloaded and verif
 placeholder files are rejected during verification and generation is blocked instead of producing fake
 pattern images.
 
-Generation controls expose a quality-to-speed preset instead of raw step and batch controls. The
-backend maps the preset and selected model to safe defaults, uses DirectML where requested, applies
-quality prompts for common anatomy failures, and keeps seed and negative prompt as advanced options.
+Generation controls expose quality, balanced, performance, and custom profiles. The profiles set
+technical defaults for steps and batch size; manual changes switch the UI to custom. Prompt,
+negative prompt, seed, size, steps, and batch size are visible controls, and the backend stores the
+prompt values after trimming rather than adding hidden creative prompt text.
 
 Generated images are stored under:
 
@@ -59,7 +59,8 @@ Generated images are stored under:
 %LOCALAPPDATA%\OnlyRag\images\generated
 ```
 
-Users can delete generated images from the editor and can open the generated-images folder through the
+Users can crop a generated image, save the crop as a new local image, optionally replace the source
+image, delete generated images from the editor, and open the generated-images folder through the
 Images section after explicit confirmation.
 
 ## Release Verification
@@ -72,5 +73,6 @@ Representative release verification should cover:
 - GPU execution when DirectML is available;
 - CPU fallback when GPU acceleration is unavailable;
 - prompt generation;
+- crop save and optional source replacement;
 - saved gallery entries;
 - generated file retrieval.

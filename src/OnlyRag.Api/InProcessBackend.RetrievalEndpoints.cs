@@ -8,7 +8,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapRetrievalEndpoints(WebApplication app)
+    internal static void MapRetrievalEndpoints(WebApplication app)
     {
         app.MapPost("/api/search", async (
             DocumentSearchRequest request,

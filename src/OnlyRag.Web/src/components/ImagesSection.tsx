@@ -17,7 +17,7 @@ import { formatFileSize } from "./DocumentsSection.formatting";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
-const defaultModelId = "onlyrag-sdxl-quality-directml";
+const defaultModelId = "lcm-sdxl-olive-onnx";
 
 const defaultSettings: ImageGenerationSettings = {
   selectedModelId: defaultModelId,
@@ -25,35 +25,38 @@ const defaultSettings: ImageGenerationSettings = {
   preferGpu: true
 };
 
-const promptCommands = [
-  "Fotorealistico",
-  "Illustrazione pulita",
-  "Luce naturale",
-  "Sfondo semplice"
-];
-
 const sizePresets = [
   { label: "Quadrata", width: 1024, height: 1024 },
   { label: "Verticale", width: 832, height: 1216 },
   { label: "Orizzontale", width: 1216, height: 832 }
 ];
 
-const generationModes = [
-  { label: "Qualita", value: 0 },
-  { label: "Bilanciato", value: 1 },
-  { label: "Velocita", value: 2 }
+const generationProfiles = [
+  { label: "Qualita", value: "quality" },
+  { label: "Bilanciato", value: "balanced" },
+  { label: "Performance", value: "performance" },
+  { label: "Custom", value: "custom" }
 ] as const;
 
 const imageTooltips = {
-  generationMode: "Sceglie automaticamente step e batch: qualita privilegia dettagli, velocita riduce attesa.",
+  generationProfile: "Regola solo parametri tecnici. Le modifiche manuali passano a custom.",
   format: "Imposta larghezza e altezza con formati stabili per SDXL.",
-  negativePrompt: "Opzionale. Il motore aggiunge gia filtri per anatomia e difetti comuni.",
+  negativePrompt: "Opzionale. Viene inviato esattamente come scritto.",
   seed: "Opzionale. Ripete una generazione simile quando usi lo stesso prompt e modello.",
-  model: "Scegli il modello in base al caso d'uso: qualita, velocita, bozza o creativo.",
+  steps: "Numero di step di inferenza usati dal runtime locale.",
+  batchSize: "Numero di immagini prodotte nella stessa richiesta.",
+  model: "Scegli un modello locale o manuale configurato nel catalogo.",
   downloadConsent: "Il download parte solo dopo conferma esplicita e salva i file nel profilo locale.",
   catalogEditor: "Modifica solo snapshot ONNX SDXL compatibili e verifica licenza, file richiesti e hash.",
   downloadUrl: "URL del repository o del file modello da scaricare nel profilo locale.",
   recommendedProfile: "Nota breve mostrata nello stato modello per guidare la scelta.",
+  modelType: "Tipo runtime atteso dal motore ONNX locale.",
+  modelProfile: "Profilo tecnico del modello, ad esempio SDXL base, turbo o LCM.",
+  supportedResolutions: "Risoluzioni supportate separate da virgole nel formato larghezzaxaltezza.",
+  defaultSteps: "Step consigliati quando il profilo generazione non viene personalizzato.",
+  defaultGuidance: "Guidance scale attesa dal modello o scheduler.",
+  scheduler: "Scheduler o aspettativa di timestep richiesta dal modello.",
+  compatibilityNotes: "Note operative per DirectML, CPU, GPU e VRAM.",
   expectedSize: "Dimensione attesa in byte; 0 indica dimensione non dichiarata.",
   requiredFiles: "Elenco separato da virgole dei file che rendono lo snapshot utilizzabile.",
   sha256: "Hash opzionale del file modello singolo. Lascia vuoto per snapshot verificati dai file richiesti.",
@@ -61,7 +64,7 @@ const imageTooltips = {
   timeout: "Tempo massimo concesso a una generazione prima di interrompere la richiesta."
 };
 
-type GenerationModeValue = (typeof generationModes)[number]["value"];
+type GenerationProfile = (typeof generationProfiles)[number]["value"];
 
 type Feedback = {
   tone: "success" | "error" | "warning";
@@ -72,11 +75,25 @@ type ModelDraft = {
   id: string;
   displayName: string;
   recommendedProfile: string;
+  modelType: string;
+  modelProfile: string;
+  supportedResolutions: string;
+  defaultSteps: string;
+  defaultGuidance: string;
+  scheduler: string;
+  compatibilityNotes: string;
   downloadUrl: string;
   licenseLabel: string;
   expectedSizeBytes: string;
   requiredFiles: string;
   sha256: string;
+};
+
+type CropSelection = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 
 export function ImagesSection() {
@@ -92,7 +109,9 @@ export function ImagesSection() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
-  const [generationMode, setGenerationMode] = useState<GenerationModeValue>(1);
+  const [generationProfile, setGenerationProfile] = useState<GenerationProfile>("balanced");
+  const [steps, setSteps] = useState(resolveGenerationProfile(defaultModelId, "balanced").steps);
+  const [batchSize, setBatchSize] = useState(resolveGenerationProfile(defaultModelId, "balanced").batchSize);
   const [seed, setSeed] = useState("");
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createEmptyModelDraft(defaultModelId));
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -128,6 +147,14 @@ export function ImagesSection() {
       setModelDraft(createModelDraft(selectedModel));
     }
   }, [selectedModel]);
+
+  useEffect(() => {
+    if (generationProfile !== "custom") {
+      const profile = resolveGenerationProfile(settings.selectedModelId, generationProfile);
+      setSteps(profile.steps);
+      setBatchSize(profile.batchSize);
+    }
+  }, [generationProfile, settings.selectedModelId]);
 
   useEffect(() => {
     if (images.length === 0) {
@@ -307,7 +334,6 @@ export function ImagesSection() {
     setIsGenerating(true);
     setFeedback(null);
     try {
-      const generationPreset = resolveGenerationPreset(settings.selectedModelId, generationMode);
       const response = await apiRequest<ImageGenerationResponse>("/api/images/generate", {
         method: "POST",
         body: JSON.stringify({
@@ -316,8 +342,8 @@ export function ImagesSection() {
           modelId: settings.selectedModelId,
           width,
           height,
-          steps: generationPreset.steps,
-          batchSize: generationPreset.batchSize,
+          steps,
+          batchSize,
           seed: seed.trim() ? Number(seed) : null
         })
       });
@@ -360,16 +386,30 @@ export function ImagesSection() {
     }
   }
 
-  function appendPromptCommand(command: string) {
-    setPrompt((current) => {
-      const trimmed = current.trim();
-      return trimmed ? `${trimmed}, ${command.toLowerCase()}` : command;
-    });
-  }
-
   function applyPreset(preset: { width: number; height: number }) {
     setWidth(preset.width);
     setHeight(preset.height);
+  }
+
+  function applyGenerationProfile(profile: GenerationProfile) {
+    setGenerationProfile(profile);
+    if (profile !== "custom") {
+      const resolvedProfile = resolveGenerationProfile(settings.selectedModelId, profile);
+      setSteps(resolvedProfile.steps);
+      setBatchSize(resolvedProfile.batchSize);
+    }
+  }
+
+  function updateProfileParameter(patch: { steps?: number; batchSize?: number }) {
+    if (patch.steps !== undefined) {
+      setSteps(patch.steps);
+    }
+
+    if (patch.batchSize !== undefined) {
+      setBatchSize(patch.batchSize);
+    }
+
+    setGenerationProfile("custom");
   }
 
   return (
@@ -398,8 +438,9 @@ export function ImagesSection() {
           negativePrompt={negativePrompt}
           width={width}
           height={height}
-          generationMode={generationMode}
-          selectedModelId={settings.selectedModelId}
+          generationProfile={generationProfile}
+          steps={steps}
+          batchSize={batchSize}
           seed={seed}
           canGenerate={canGenerate}
           isGenerating={isGenerating}
@@ -408,9 +449,9 @@ export function ImagesSection() {
           onNegativePromptChange={setNegativePrompt}
           onWidthChange={setWidth}
           onHeightChange={setHeight}
-          onGenerationModeChange={setGenerationMode}
+          onGenerationProfileChange={applyGenerationProfile}
+          onProfileParameterChange={updateProfileParameter}
           onSeedChange={setSeed}
-          onAppendCommand={appendPromptCommand}
           onApplyPreset={applyPreset}
           onSubmit={handleGenerate}
         />
@@ -421,6 +462,10 @@ export function ImagesSection() {
           isDeleting={isDeletingImage}
           onSelectImage={setSelectedImageId}
           onDeleteImage={(image) => void handleDeleteImage(image)}
+          onCropSaved={(saved, replacedId) => {
+            setImages((current) => [saved, ...current.filter((item) => item.id !== replacedId)]);
+            setSelectedImageId(saved.id);
+          }}
           onOpenFolder={() => void handleOpenGeneratedFolder()}
         />
       </div>
@@ -462,8 +507,9 @@ function PromptPanel({
   negativePrompt,
   width,
   height,
-  generationMode,
-  selectedModelId,
+  generationProfile,
+  steps,
+  batchSize,
   seed,
   canGenerate,
   isGenerating,
@@ -472,9 +518,9 @@ function PromptPanel({
   onNegativePromptChange,
   onWidthChange,
   onHeightChange,
-  onGenerationModeChange,
+  onGenerationProfileChange,
+  onProfileParameterChange,
   onSeedChange,
-  onAppendCommand,
   onApplyPreset,
   onSubmit
 }: {
@@ -482,8 +528,9 @@ function PromptPanel({
   negativePrompt: string;
   width: number;
   height: number;
-  generationMode: GenerationModeValue;
-  selectedModelId: string;
+  generationProfile: GenerationProfile;
+  steps: number;
+  batchSize: number;
   seed: string;
   canGenerate: boolean;
   isGenerating: boolean;
@@ -492,28 +539,18 @@ function PromptPanel({
   onNegativePromptChange: (value: string) => void;
   onWidthChange: (value: number) => void;
   onHeightChange: (value: number) => void;
-  onGenerationModeChange: (value: GenerationModeValue) => void;
+  onGenerationProfileChange: (value: GenerationProfile) => void;
+  onProfileParameterChange: (patch: { steps?: number; batchSize?: number }) => void;
   onSeedChange: (value: string) => void;
-  onAppendCommand: (value: string) => void;
   onApplyPreset: (preset: { width: number; height: number }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const generationPreset = resolveGenerationPreset(selectedModelId, generationMode);
-  const selectedModeLabel = generationModes.find((mode) => mode.value === generationMode)?.label ?? "Bilanciato";
-
   return (
     <section className="settings-card images-prompt-panel" aria-labelledby="images-prompt-title">
       <div className="settings-card__header">
         <h2 id="images-prompt-title">Crea immagine</h2>
       </div>
       <form className="images-generate-form" onSubmit={onSubmit}>
-        <div className="images-command-row" aria-label="Comandi standard">
-          {promptCommands.map((command) => (
-            <button className="button-secondary" type="button" onClick={() => onAppendCommand(command)} key={command}>
-              {command}
-            </button>
-          ))}
-        </div>
         <label className="field-group" htmlFor="image-prompt">
           <span>Prompt</span>
           <textarea id="image-prompt" rows={8} value={prompt} onChange={(event) => onPromptChange(event.target.value)} />
@@ -530,26 +567,21 @@ function PromptPanel({
             </button>
           ))}
         </div>
-        <div className="image-mode-control">
-          <label htmlFor="image-generation-mode">
-            <TooltipLabel text="Preset" tooltip={imageTooltips.generationMode} />
-            <strong>{selectedModeLabel}</strong>
-          </label>
-          <input
-            id="image-generation-mode"
-            type="range"
-            min={0}
-            max={2}
-            step={1}
-            value={generationMode}
-            onChange={(event) => onGenerationModeChange(Number(event.target.value) as GenerationModeValue)}
-            title={imageTooltips.generationMode}
-          />
-          <div className="image-mode-control__labels" aria-hidden="true">
-            {generationModes.map((mode) => <span key={mode.value}>{mode.label}</span>)}
-          </div>
-          <small>{generationPreset.steps} step</small>
-        </div>
+        <label className="field-group" htmlFor="image-generation-profile">
+          <TooltipLabel text="Profilo runtime" tooltip={imageTooltips.generationProfile} />
+          <select
+            id="image-generation-profile"
+            value={generationProfile}
+            onChange={(event) => onGenerationProfileChange(event.target.value as GenerationProfile)}
+            title={imageTooltips.generationProfile}
+          >
+            {generationProfiles.map((profile) => (
+              <option value={profile.value} key={profile.value}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <details className="image-advanced-options">
           <summary>Avanzate</summary>
           <label className="field-group" htmlFor="image-negative-prompt">
@@ -575,6 +607,14 @@ function PromptPanel({
               <TooltipLabel text="Seed" tooltip={imageTooltips.seed} />
               <input id="image-seed" inputMode="numeric" value={seed} placeholder="Automatico" onChange={(event) => onSeedChange(event.target.value)} title={imageTooltips.seed} />
             </label>
+            <label className="field-group" htmlFor="image-steps">
+              <TooltipLabel text="Step" tooltip={imageTooltips.steps} />
+              <input id="image-steps" min={4} max={40} type="number" value={steps} onChange={(event) => onProfileParameterChange({ steps: Number(event.target.value) })} title={imageTooltips.steps} />
+            </label>
+            <label className="field-group" htmlFor="image-batch-size">
+              <TooltipLabel text="Batch" tooltip={imageTooltips.batchSize} />
+              <input id="image-batch-size" min={1} max={4} type="number" value={batchSize} onChange={(event) => onProfileParameterChange({ batchSize: Number(event.target.value) })} title={imageTooltips.batchSize} />
+            </label>
           </div>
         </details>
         {!selectedModelState?.isVerified && (
@@ -598,6 +638,7 @@ function EditorPanel({
   isDeleting,
   onSelectImage,
   onDeleteImage,
+  onCropSaved,
   onOpenFolder
 }: {
   image: GeneratedImage | null;
@@ -605,8 +646,39 @@ function EditorPanel({
   isDeleting: boolean;
   onSelectImage: (id: number) => void;
   onDeleteImage: (image: GeneratedImage) => void;
+  onCropSaved: (image: GeneratedImage, replacedId: number | null) => void;
   onOpenFolder: () => void;
 }) {
+  const [crop, setCrop] = useState<CropSelection>({ x: 10, y: 10, width: 80, height: 80 });
+  const [replaceOriginal, setReplaceOriginal] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropError, setCropError] = useState<string | null>(null);
+  const objectUrl = useImageObjectUrl(image?.id ?? null);
+
+  async function saveCrop() {
+    if (!image || !objectUrl) return;
+    setIsCropping(true);
+    setCropError(null);
+    try {
+      const cropped = await cropImageToPng(objectUrl, crop);
+      const saved = await apiRequest<GeneratedImage>(`/api/images/${image.id}/crop`, {
+        method: "POST",
+        body: JSON.stringify({
+          imageBase64: cropped.base64,
+          mimeType: "image/png",
+          width: cropped.width,
+          height: cropped.height,
+          replaceOriginal
+        })
+      });
+      onCropSaved(saved, replaceOriginal ? image.id : null);
+    } catch (error) {
+      setCropError(error instanceof Error ? error.message : "Crop non riuscito.");
+    } finally {
+      setIsCropping(false);
+    }
+  }
+
   return (
     <section className="settings-card images-editor-panel" aria-labelledby="images-editor-title">
       <div className="settings-card__header">
@@ -615,7 +687,7 @@ function EditorPanel({
           Apri cartella
         </button>
       </div>
-      <ImagePreview image={image} />
+      <ImagePreview image={image} objectUrl={objectUrl} crop={crop} />
       {image ? (
         <div className="image-detail">
           <strong>{image.fileName}</strong>
@@ -628,6 +700,25 @@ function EditorPanel({
               {isDeleting ? "Eliminazione..." : "Elimina"}
             </button>
           </div>
+          <details className="image-crop-panel">
+            <summary>Crop</summary>
+            <div className="settings-grid settings-grid--two">
+              <CropNumberField id="image-crop-x" label="X %" value={crop.x} onChange={(value) => setCrop(normalizeCrop({ ...crop, x: value }))} />
+              <CropNumberField id="image-crop-y" label="Y %" value={crop.y} onChange={(value) => setCrop(normalizeCrop({ ...crop, y: value }))} />
+              <CropNumberField id="image-crop-width" label="Larghezza %" value={crop.width} onChange={(value) => setCrop(normalizeCrop({ ...crop, width: value }))} />
+              <CropNumberField id="image-crop-height" label="Altezza %" value={crop.height} onChange={(value) => setCrop(normalizeCrop({ ...crop, height: value }))} />
+            </div>
+            <label className="toggle-row" htmlFor="image-crop-replace">
+              <input id="image-crop-replace" type="checkbox" checked={replaceOriginal} onChange={(event) => setReplaceOriginal(event.target.checked)} />
+              <span>Sostituisci originale</span>
+            </label>
+            {cropError && <p className="field-error">{cropError}</p>}
+            <div className="settings-actions">
+              <button type="button" onClick={() => void saveCrop()} disabled={isCropping || !objectUrl}>
+                {isCropping ? "Salvataggio..." : "Salva crop"}
+              </button>
+            </div>
+          </details>
         </div>
       ) : (
         <div className="empty-state" role="status">
@@ -899,6 +990,76 @@ function ModelCatalogEditor({
         />
       </label>
       <div className="settings-grid settings-grid--two">
+        <label className="field-group" htmlFor="image-model-type">
+          <TooltipLabel text="Tipo modello" tooltip={imageTooltips.modelType} />
+          <input
+            id="image-model-type"
+            value={draft.modelType}
+            onChange={(event) => onChange({ ...draft, modelType: event.target.value })}
+            title={imageTooltips.modelType}
+          />
+        </label>
+        <label className="field-group" htmlFor="image-model-runtime-profile">
+          <TooltipLabel text="Profile runtime" tooltip={imageTooltips.modelProfile} />
+          <input
+            id="image-model-runtime-profile"
+            value={draft.modelProfile}
+            onChange={(event) => onChange({ ...draft, modelProfile: event.target.value })}
+            title={imageTooltips.modelProfile}
+          />
+        </label>
+      </div>
+      <label className="field-group" htmlFor="image-model-resolutions">
+        <TooltipLabel text="Risoluzioni supportate" tooltip={imageTooltips.supportedResolutions} />
+        <input
+          id="image-model-resolutions"
+          value={draft.supportedResolutions}
+          onChange={(event) => onChange({ ...draft, supportedResolutions: event.target.value })}
+          title={imageTooltips.supportedResolutions}
+        />
+      </label>
+      <div className="settings-grid settings-grid--two">
+        <label className="field-group" htmlFor="image-model-default-steps">
+          <TooltipLabel text="Step default" tooltip={imageTooltips.defaultSteps} />
+          <input
+            id="image-model-default-steps"
+            inputMode="numeric"
+            value={draft.defaultSteps}
+            onChange={(event) => onChange({ ...draft, defaultSteps: event.target.value })}
+            title={imageTooltips.defaultSteps}
+          />
+        </label>
+        <label className="field-group" htmlFor="image-model-default-guidance">
+          <TooltipLabel text="Guidance default" tooltip={imageTooltips.defaultGuidance} />
+          <input
+            id="image-model-default-guidance"
+            inputMode="decimal"
+            value={draft.defaultGuidance}
+            onChange={(event) => onChange({ ...draft, defaultGuidance: event.target.value })}
+            title={imageTooltips.defaultGuidance}
+          />
+        </label>
+      </div>
+      <label className="field-group" htmlFor="image-model-scheduler">
+        <TooltipLabel text="Scheduler" tooltip={imageTooltips.scheduler} />
+        <input
+          id="image-model-scheduler"
+          value={draft.scheduler}
+          onChange={(event) => onChange({ ...draft, scheduler: event.target.value })}
+          title={imageTooltips.scheduler}
+        />
+      </label>
+      <label className="field-group" htmlFor="image-model-compatibility">
+        <TooltipLabel text="Compatibilita CPU/GPU" tooltip={imageTooltips.compatibilityNotes} />
+        <textarea
+          id="image-model-compatibility"
+          rows={3}
+          value={draft.compatibilityNotes}
+          onChange={(event) => onChange({ ...draft, compatibilityNotes: event.target.value })}
+          title={imageTooltips.compatibilityNotes}
+        />
+      </label>
+      <div className="settings-grid settings-grid--two">
         <label className="field-group" htmlFor="image-model-license">
           <span>Licenza</span>
           <input id="image-model-license" value={draft.licenseLabel} onChange={(event) => onChange({ ...draft, licenseLabel: event.target.value })} />
@@ -969,6 +1130,28 @@ function ModelReadiness({
           ? `${formatFileSize(state.localSizeBytes)} pronti`
           : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
+      <dl className="image-model-metadata">
+        <div>
+          <dt>Tipo</dt>
+          <dd>{model.modelType}</dd>
+        </div>
+        <div>
+          <dt>Risoluzioni</dt>
+          <dd>{model.supportedResolutions.join(", ")}</dd>
+        </div>
+        <div>
+          <dt>Default</dt>
+          <dd>{model.defaultSteps} step · guidance {model.defaultGuidance}</dd>
+        </div>
+        <div>
+          <dt>Scheduler</dt>
+          <dd>{model.scheduler}</dd>
+        </div>
+        <div>
+          <dt>CPU/GPU</dt>
+          <dd>{model.compatibilityNotes}</dd>
+        </div>
+      </dl>
       <div className="settings-actions">
         {!state?.isVerified && (
           <button type="button" onClick={onAskConsent} disabled={disabled}>
@@ -985,15 +1168,35 @@ function ModelReadiness({
   );
 }
 
-function ImagePreview({ image }: { image: GeneratedImage | null }) {
-  const objectUrl = useImageObjectUrl(image?.id ?? null);
-
+function ImagePreview({
+  image,
+  objectUrl,
+  crop
+}: {
+  image: GeneratedImage | null;
+  objectUrl: string | null;
+  crop?: CropSelection;
+}) {
   if (!image) {
     return <div className="generated-image-preview generated-image-preview--empty" role="status">Nessuna immagine selezionata.</div>;
   }
 
   return objectUrl ? (
-    <img className="generated-image-preview" src={objectUrl} alt={image.prompt} />
+    <div className="generated-image-preview-frame">
+      <img className="generated-image-preview" src={objectUrl} alt={image.prompt} />
+      {crop && (
+        <span
+          className="image-crop-box"
+          style={{
+            left: `${crop.x}%`,
+            top: `${crop.y}%`,
+            width: `${crop.width}%`,
+            height: `${crop.height}%`
+          }}
+          aria-hidden="true"
+        />
+      )}
+    </div>
   ) : (
     <div className="generated-image-preview generated-image-preview--empty" role="status">Caricamento...</div>
   );
@@ -1030,6 +1233,72 @@ function GeneratedImageCard({
   );
 }
 
+function CropNumberField({
+  id,
+  label,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="field-group" htmlFor={id}>
+      <span>{label}</span>
+      <input id={id} min={0} max={100} type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} />
+    </label>
+  );
+}
+
+function normalizeCrop(crop: CropSelection): CropSelection {
+  const x = clampNumber(crop.x, 0, 99);
+  const y = clampNumber(crop.y, 0, 99);
+  return {
+    x,
+    y,
+    width: clampNumber(crop.width, 1, 100 - x),
+    height: clampNumber(crop.height, 1, 100 - y)
+  };
+}
+
+async function cropImageToPng(objectUrl: string, crop: CropSelection): Promise<{ base64: string; width: number; height: number }> {
+  const image = await loadHtmlImage(objectUrl);
+  const sourceX = Math.round(image.naturalWidth * crop.x / 100);
+  const sourceY = Math.round(image.naturalHeight * crop.y / 100);
+  const sourceWidth = Math.max(1, Math.round(image.naturalWidth * crop.width / 100));
+  const sourceHeight = Math.max(1, Math.round(image.naturalHeight * crop.height / 100));
+  const canvas = document.createElement("canvas");
+  canvas.width = sourceWidth;
+  canvas.height = sourceHeight;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas non disponibile.");
+  }
+
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
+  const dataUrl = canvas.toDataURL("image/png");
+  return {
+    base64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+    width: sourceWidth,
+    height: sourceHeight
+  };
+}
+
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Immagine non caricata."));
+    image.src = src;
+  });
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+}
+
 function TooltipLabel({ text, tooltip }: { text: string; tooltip: string }) {
   return (
     <span className="image-tooltip-label">
@@ -1039,13 +1308,13 @@ function TooltipLabel({ text, tooltip }: { text: string; tooltip: string }) {
   );
 }
 
-function resolveGenerationPreset(modelId: string, mode: GenerationModeValue): { steps: number; batchSize: number } {
+function resolveGenerationProfile(modelId: string, profile: Exclude<GenerationProfile, "custom">): { steps: number; batchSize: number } {
   const isFastModel = /turbo|lcm/i.test(modelId);
-  if (mode === 0) {
+  if (profile === "quality") {
     return { steps: isFastModel ? 8 : 36, batchSize: 1 };
   }
 
-  if (mode === 2) {
+  if (profile === "performance") {
     return { steps: isFastModel ? 4 : 16, batchSize: 1 };
   }
 
@@ -1113,6 +1382,13 @@ function createModelDraft(model: ImageModelCatalogEntry): ModelDraft {
     id: model.id,
     displayName: model.displayName,
     recommendedProfile: model.recommendedProfile,
+    modelType: model.modelType,
+    modelProfile: model.modelProfile,
+    supportedResolutions: model.supportedResolutions.join(", "),
+    defaultSteps: String(model.defaultSteps),
+    defaultGuidance: String(model.defaultGuidance),
+    scheduler: model.scheduler,
+    compatibilityNotes: model.compatibilityNotes,
     downloadUrl: model.downloadUrl,
     licenseLabel: model.licenseLabel,
     expectedSizeBytes: String(model.expectedSizeBytes),
@@ -1126,6 +1402,13 @@ function createEmptyModelDraft(id: string): ModelDraft {
     id,
     displayName: "Modello personalizzato",
     recommendedProfile: "Profilo personalizzato",
+    modelType: "SDXL ONNX",
+    modelProfile: "custom",
+    supportedResolutions: "1024x1024",
+    defaultSteps: "6",
+    defaultGuidance: "0",
+    scheduler: "Runtime default",
+    compatibilityNotes: "DirectML GPU preferred; CPU fallback supported.",
     downloadUrl: "https://huggingface.co/",
     licenseLabel: "Verificare licenza upstream",
     expectedSizeBytes: "0",
@@ -1139,6 +1422,16 @@ function createModelRequest(draft: ModelDraft): ImageModelCatalogEntryRequest {
     id: draft.id.trim(),
     displayName: draft.displayName.trim(),
     recommendedProfile: draft.recommendedProfile.trim(),
+    modelType: draft.modelType.trim(),
+    modelProfile: draft.modelProfile.trim(),
+    supportedResolutions: draft.supportedResolutions
+      .split(",")
+      .map((resolution) => resolution.trim())
+      .filter(Boolean),
+    defaultSteps: Number(draft.defaultSteps.trim()) || 6,
+    defaultGuidance: Number(draft.defaultGuidance.trim()),
+    scheduler: draft.scheduler.trim(),
+    compatibilityNotes: draft.compatibilityNotes.trim(),
     downloadUrl: draft.downloadUrl.trim(),
     licenseLabel: draft.licenseLabel.trim(),
     expectedSizeBytes: Number(draft.expectedSizeBytes.trim()) || 0,

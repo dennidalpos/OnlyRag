@@ -209,6 +209,26 @@
   background: #edf2f6;
 }
 
+.generated-image-preview-frame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.generated-image-preview-frame .generated-image-preview {
+  margin: 0;
+}
+
+.image-crop-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #f8fafc;
+  outline: 2px solid #2d6f8f;
+  background: rgba(45, 111, 143, 0.16);
+  pointer-events: none;
+}
+
 .generated-image-preview--empty {
   display: grid;
   place-items: center;
@@ -235,6 +255,20 @@
 .image-detail small {
   color: #627084;
   font-size: 12px;
+}
+
+.image-crop-panel {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.image-crop-panel summary {
+  cursor: pointer;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .images-gallery {
@@ -330,6 +364,27 @@
 
 .image-model-progress__header span {
   color: #627084;
+}
+
+.image-model-metadata {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin: 6px 0;
+}
+
+.image-model-metadata div {
+  min-width: 0;
+}
+
+.image-model-metadata dt {
+  color: #627084;
+  font-size: 12px;
+}
+
+.image-model-metadata dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .image-settings-modal {

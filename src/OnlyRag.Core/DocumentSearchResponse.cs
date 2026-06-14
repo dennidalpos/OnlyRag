@@ -5,7 +5,14 @@ public sealed record DocumentSearchResponse(
     IReadOnlyList<DocumentSearchDocumentStatus> Documents,
     string KeywordBackend,
     string VectorBackend,
-    int MaxContextCharacters);
+    int MaxContextCharacters)
+{
+    public IReadOnlyList<RetrievalNotice> Notices { get; init; } = [];
+}
+
+public sealed record RetrievalNotice(
+    string Code,
+    string Message);
 
 public sealed record DocumentSearchResult(
     long DocumentId,

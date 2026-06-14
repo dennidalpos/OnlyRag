@@ -83,7 +83,7 @@ public sealed class SqliteStatusConstraintTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ResetsExistingVersionedSchemaWithInvalidStatuses()
+    public async Task InitializeAsync_ReportsMigrationRequiredForExistingVersionedSchemaWithInvalidStatuses()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion11SchemaWithInvalidStatusesAsync(tempStorage);
@@ -91,21 +91,16 @@ public sealed class SqliteStatusConstraintTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal("Current", status.SchemaStatus);
-        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
+        Assert.Equal("MigrationRequired", status.SchemaStatus);
+        await ExecuteRawAsync(
             tempStorage,
             """
-            INSERT INTO jobs (
-                id, type, status, created_at_utc, updated_at_utc
-            )
-            VALUES (
-                'job-invalid-after-reset', 'test', 'NotAStatus', '2026-05-22T00:00:00.000Z', '2026-05-22T00:00:00.000Z'
-            );
-            """));
+            SELECT 1 FROM jobs WHERE id = 'job-valid';
+            """);
     }
 
     [Fact]
-    public async Task InitializeAsync_ResetsExistingVersionedSchemaWithValidStatuses()
+    public async Task InitializeAsync_ReportsMigrationRequiredForExistingVersionedSchemaWithValidStatuses()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion11SchemaWithValidStatusesAsync(tempStorage);
@@ -115,7 +110,17 @@ public sealed class SqliteStatusConstraintTests
 
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal("Current", status.SchemaStatus);
-        Assert.Equal(0, await CountRowsAsync(tempStorage, "jobs", "1 = $value", 1));
+        Assert.Equal(1, await CountRowsAsync(tempStorage, "jobs", "1 = $value", 1));
+        await Assert.ThrowsAsync<SqliteException>(() => ExecuteRawAsync(
+            tempStorage,
+            """
+            INSERT INTO jobs (
+                id, type, status, created_at_utc, updated_at_utc
+            )
+            VALUES (
+                'job-invalid-after-migration', 'test', 'NotAStatus', '2026-05-22T00:00:00.000Z', '2026-05-22T00:00:00.000Z'
+            );
+            """));
     }
 
     private sealed class TempStorage : IDisposable

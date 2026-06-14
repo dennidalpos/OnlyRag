@@ -9,7 +9,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapTranslationEndpoints(WebApplication app)
+    internal static void MapTranslationEndpoints(WebApplication app)
     {
         app.MapPost("/api/translations", async (
             CreateTranslationRequest request,

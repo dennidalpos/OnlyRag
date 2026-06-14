@@ -1,0 +1,41 @@
+{
+  "topK": 5,
+  "cases": [
+    {
+      "id": "policy-retention-window",
+      "query": "How long are audit logs retained?",
+      "documentIds": [1],
+      "expectedChunkIds": [101],
+      "results": [
+        {
+          "chunkId": 101,
+          "documentId": 1,
+          "documentName": "operations-policy.md",
+          "snippet": "Audit logs are retained for 90 days unless a legal hold applies.",
+          "score": 0.91
+        }
+      ],
+      "keywordBackend": "sample",
+      "vectorBackend": "sample",
+      "maxContextCharacters": 6000
+    },
+    {
+      "id": "invoice-approval-threshold",
+      "query": "Who approves invoices over 10000 EUR?",
+      "documentIds": [2],
+      "expectedChunkIds": [205],
+      "results": [
+        {
+          "chunkId": 205,
+          "documentId": 2,
+          "documentName": "finance-handbook.md",
+          "snippet": "Invoices over 10000 EUR require finance director approval.",
+          "score": 0.88
+        }
+      ],
+      "keywordBackend": "sample",
+      "vectorBackend": "sample",
+      "maxContextCharacters": 6000
+    }
+  ]
+}

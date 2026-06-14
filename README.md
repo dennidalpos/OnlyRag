@@ -7,7 +7,7 @@
 [![CI](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml/badge.svg)](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml)
 
 OnlyRag is a Windows desktop app for a local document library with Ollama-backed search, chat,
-OCR, and translation workflows.
+OCR, translation, and local image-generation workflows.
 
 The app is local-first. Documents, indexes, jobs, settings, chat history, OCR cache, logs,
 WebView2 profile data, and exports live under `%LOCALAPPDATA%\OnlyRag`. Ollama can run locally or
@@ -20,10 +20,13 @@ documents.
 - Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
   are available.
 - Generate embeddings through a configured Ollama endpoint and store vectors in Qdrant.
-- Search selected documents with SQLite FTS plus Qdrant vector retrieval.
+- Search selected documents with SQLite FTS plus Qdrant vector retrieval, with keyword-only
+  fallback notices when vector retrieval is unavailable.
 - Chat with selected documents and show grounded source snippets.
 - Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
   DOCX, or PDF output.
+- Generate local images with the integrated ONNX/DirectML image provider after a model is
+  downloaded and verified.
 - Configure Ollama, Qdrant, OCR, PDF export, ingestion, models, `num_ctx`, and performance
   from the desktop UI.
 - Track ingestion, embedding, OCR, translation, and Ollama model-install jobs.

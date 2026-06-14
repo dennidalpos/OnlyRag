@@ -22,13 +22,19 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
         Assert.NotNull(catalog);
-        Assert.True(catalog.Length >= 4);
+        Assert.Single(catalog);
         ImageModelCatalogEntry model = Assert.Single(catalog, candidate => candidate.Id == ImageModelCatalog.DefaultModelId);
         Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
         Assert.True(model.IsBuiltIn);
-        Assert.Contains(catalog, candidate => candidate.Id == "onlyrag-sdxl-turbo-directml");
-        Assert.Contains(catalog, candidate => candidate.Id == "lcm-sdxl-olive-onnx");
-        Assert.Contains(catalog, candidate => candidate.Id == "ffusion-sdxl-base-directml");
+        Assert.Equal(8_000_000_000, model.ExpectedSizeBytes);
+        Assert.Equal("SDXL Turbo/LCM ONNX", model.ModelType);
+        Assert.Equal("lcm-sdxl-olive", model.ModelProfile);
+        Assert.Contains("1024x1024", model.SupportedResolutions);
+        Assert.Equal(6, model.DefaultSteps);
+        Assert.Equal(0, model.DefaultGuidance);
+        Assert.Contains("Euler", model.Scheduler, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CPU", model.CompatibilityNotes, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(catalog, candidate => candidate.LicenseLabel.Contains("CC-BY-NC", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(states);
         ImageModelLocalState state = Assert.Single(states, candidate => candidate.ModelId == model.Id);
         Assert.Equal(model.Id, state.ModelId);
@@ -68,25 +74,22 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public void ImageGeneration_EngineAddsQualityPromptsForAnatomy()
+    public void ImageGeneration_EnginePassesPromptsThroughWithoutHiddenAdditions()
     {
-        string prompt = OnnxStableDiffusionImageGenerationEngine.CreateQualityPrompt("portrait of a person");
+        string prompt = OnnxStableDiffusionImageGenerationEngine.CreatePrompt("portrait of a person");
         string negativePrompt = OnnxStableDiffusionImageGenerationEngine.CreateNegativePrompt(null);
         string combinedNegativePrompt = OnnxStableDiffusionImageGenerationEngine.CreateNegativePrompt("washed out");
 
-        Assert.Contains("coherent anatomy", prompt, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("realistic face", prompt, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("bad anatomy", negativePrompt, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("extra fingers", negativePrompt, StringComparison.OrdinalIgnoreCase);
-        Assert.StartsWith("washed out,", combinedNegativePrompt, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("fused limbs", combinedNegativePrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("portrait of a person", prompt);
+        Assert.Equal(string.Empty, negativePrompt);
+        Assert.Equal("washed out", combinedNegativePrompt);
     }
 
     [Fact]
     public void ImageGeneration_EngineSelectsModelTypeFromCatalogModelId()
     {
         Assert.Equal(
-            OnnxStack.StableDiffusion.Enums.ModelType.Base,
+            OnnxStack.StableDiffusion.Enums.ModelType.Turbo,
             OnnxStableDiffusionImageGenerationEngine.ResolveModelType(ImageModelCatalog.DefaultModelId));
         Assert.Equal(
             OnnxStack.StableDiffusion.Enums.ModelType.Turbo,

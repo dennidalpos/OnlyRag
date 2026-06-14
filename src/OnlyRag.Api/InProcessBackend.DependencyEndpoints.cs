@@ -8,7 +8,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static void MapDependencyEndpoints(WebApplication app)
+    internal static void MapDependencyEndpoints(WebApplication app)
     {
         app.MapGet("/api/dependencies/ollama", async (
             DependencyProvisioningService dependencies,

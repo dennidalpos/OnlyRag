@@ -66,13 +66,15 @@ internal sealed class ImageGenerationService
         _ = await modelManager.GetVerifiedModelFilePathAsync(modelId, cancellationToken);
         string modelDirectory = modelManager.GetModelDirectory(modelId);
         ImageGenerationEngineResult engineResult;
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(TimeSpan.FromSeconds(settings.RequestTimeoutSeconds));
         try
         {
             engineResult = await engine.GenerateAsync(
                 normalized,
                 modelDirectory,
                 settings.PreferGpu,
-                cancellationToken);
+                timeoutSource.Token);
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -85,14 +87,14 @@ internal sealed class ImageGenerationService
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.Timeout,
-                "La generazione immagini non ha completato entro il tempo configurato. Aumenta il timeout o usa un preset piu veloce.",
+                "La generazione immagini non ha completato entro il tempo configurato. Aumenta il timeout o usa un profilo piu veloce.",
                 ex);
         }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.Timeout,
-                "La generazione immagini e stata interrotta per timeout interno del motore.",
+                "La generazione immagini ha superato il timeout configurato.",
                 ex);
         }
         catch (ImageGenerationException)
@@ -169,6 +171,90 @@ internal sealed class ImageGenerationService
 
         string absolutePath = ResolveGeneratedPath(record.Value.RelativePath);
         return File.Exists(absolutePath) ? (record.Value.Image, absolutePath) : null;
+    }
+
+    public async Task<GeneratedImage> SaveCroppedImageAsync(
+        long sourceImageId,
+        ImageCropSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        (GeneratedImage Image, string RelativePath)? sourceRecord = await images.GetWithPathAsync(sourceImageId, cancellationToken);
+        if (sourceRecord is null)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.NotFound,
+                "Immagine sorgente non trovata.");
+        }
+
+        if (request.Width <= 0 || request.Height <= 0)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Dimensioni crop non valide.");
+        }
+
+        string mimeType = request.MimeType.Trim().ToLowerInvariant();
+        string fileExtension = mimeType switch
+        {
+            "image/png" => ".png",
+            "image/jpeg" => ".jpg",
+            _ => throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Formato crop non supportato.")
+        };
+
+        byte[] content;
+        try
+        {
+            content = Convert.FromBase64String(request.ImageBase64);
+        }
+        catch (FormatException ex)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Payload crop non valido.",
+                ex);
+        }
+
+        if (content.Length == 0)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Il crop non contiene dati immagine.");
+        }
+
+        string fileName = $"{Guid.NewGuid():N}{fileExtension}";
+        string relativePath = Path.Combine(GeneratedImagesRelativeRoot, fileName).Replace('\\', '/');
+        string absolutePath = ResolveGeneratedPath(relativePath);
+        Directory.CreateDirectory(GetGeneratedRoot());
+        await File.WriteAllBytesAsync(absolutePath, content, cancellationToken);
+
+        GeneratedImage source = sourceRecord.Value.Image;
+        GeneratedImage saved = await images.CreateAsync(
+            new GeneratedImage(
+                0,
+                source.Provider,
+                source.Prompt,
+                source.NegativePrompt,
+                source.Model,
+                request.Width,
+                request.Height,
+                source.Steps,
+                source.BatchSize,
+                source.Seed,
+                fileName,
+                mimeType,
+                content.LongLength,
+                DateTimeOffset.UtcNow),
+            relativePath,
+            cancellationToken);
+
+        if (request.ReplaceOriginal)
+        {
+            _ = await DeleteAsync(sourceImageId, cancellationToken);
+        }
+
+        return saved;
     }
 
     public async Task<GeneratedImage?> DeleteAsync(

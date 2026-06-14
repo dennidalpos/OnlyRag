@@ -65,8 +65,11 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             options.KeywordTopK,
             cancellationToken);
 
-        QueryEmbeddingResult queryEmbedding = await GenerateQueryEmbeddingAsync(query, cancellationToken);
-        VectorSearchAttempt vectorSearchAttempt = await VectorSearchAsync(queryEmbedding, documentIds, cancellationToken);
+        List<RetrievalNotice> notices = [];
+        QueryEmbeddingResult? queryEmbedding = await TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
+        VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
+            ? new VectorSearchAttempt([], "Qdrant unavailable")
+            : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
 
         IReadOnlyList<DocumentSearchResult> results = await MergeResultsAsync(
             query,
@@ -77,7 +80,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         IReadOnlyList<DocumentSearchDocumentStatus> documentStatuses = await BuildDocumentStatusesAsync(
             documentIds,
-            queryEmbedding.Model,
+            queryEmbedding?.Model,
             cancellationToken);
 
         return new DocumentSearchResponse(
@@ -85,7 +88,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             documentStatuses,
             keywordResponse.BackendName,
             vectorSearchAttempt.BackendName,
-            options.MaxContextCharacters);
+            options.MaxContextCharacters)
+        {
+            Notices = notices
+        };
     }
 
     private int NormalizeTopK(int? requestedTopK)
@@ -107,8 +113,9 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             : options.DefaultTopK;
     }
 
-    private async Task<QueryEmbeddingResult> GenerateQueryEmbeddingAsync(
+    private async Task<QueryEmbeddingResult?> TryGenerateQueryEmbeddingAsync(
         string query,
+        List<RetrievalNotice> notices,
         CancellationToken cancellationToken)
     {
         try
@@ -123,30 +130,50 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         }
         catch (QueryEmbeddingUnavailableException)
         {
-            throw new InvalidOperationException("Embedding query non disponibile: retrieval Qdrant non eseguibile.");
+            notices.Add(new RetrievalNotice(
+                "vector_embedding_unavailable",
+                "Embedding query non disponibile: continuo con retrieval keyword locale."));
+            return null;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            throw;
+            notices.Add(new RetrievalNotice(
+                "vector_embedding_unavailable",
+                $"Embedding query non disponibile: {ex.Message} Continuo con retrieval keyword locale."));
+            return null;
         }
         catch (NotSupportedException ex)
         {
-            throw new InvalidOperationException("Generatore embedding query non supportato: retrieval Qdrant non eseguibile.", ex);
+            notices.Add(new RetrievalNotice(
+                "vector_embedding_unavailable",
+                $"Generatore embedding query non supportato: {ex.Message} Continuo con retrieval keyword locale."));
+            return null;
         }
     }
 
-    private async Task<VectorSearchAttempt> VectorSearchAsync(
+    private async Task<VectorSearchAttempt> TryVectorSearchAsync(
         QueryEmbeddingResult queryEmbedding,
         IReadOnlyCollection<long> documentIds,
+        List<RetrievalNotice> notices,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<VectorSearchResult> results = await vectorSearch.SearchAsync(
-            queryEmbedding.Model,
-            queryEmbedding.Vector,
-            documentIds,
-            options.VectorTopK,
-            cancellationToken);
-        return new VectorSearchAttempt(results, vectorSearch.BackendName);
+        try
+        {
+            IReadOnlyList<VectorSearchResult> results = await vectorSearch.SearchAsync(
+                queryEmbedding.Model,
+                queryEmbedding.Vector,
+                documentIds,
+                options.VectorTopK,
+                cancellationToken);
+            return new VectorSearchAttempt(results, vectorSearch.BackendName);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException)
+        {
+            notices.Add(new RetrievalNotice(
+                "vector_search_unavailable",
+                $"Vector search non disponibile: {ex.Message} Continuo con retrieval keyword locale."));
+            return new VectorSearchAttempt([], $"{vectorSearch.BackendName} unavailable");
+        }
     }
 
     private async Task<IReadOnlyList<DocumentSearchResult>> MergeResultsAsync(

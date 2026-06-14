@@ -20,10 +20,16 @@ export type DocumentSearchDocumentStatus = {
   embeddedChunkCount: number;
 };
 
+export type RetrievalNotice = {
+  code: string;
+  message: string;
+};
+
 export type DocumentSearchResponse = {
   results: DocumentSearchResult[];
   documents: DocumentSearchDocumentStatus[];
   keywordBackend: string;
   vectorBackend: string;
   maxContextCharacters: number;
+  notices: RetrievalNotice[];
 };

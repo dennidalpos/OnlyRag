@@ -186,7 +186,22 @@ Optional environment variables:
 
 - `%LOCALAPPDATA%\OnlyRag`: documents, SQLite state, Qdrant local storage, jobs, settings, chat
   history, OCR cache, logs, WebView2 profile data, and exports.
+- `%LOCALAPPDATA%\OnlyRag\backups`: timestamped reset backups. A confirmed full data reset creates
+  `reset-YYYYMMDDTHHMMSSZ` here immediately before deleting the local runtime contents.
 - `%LOCALAPPDATA%\Programs\OnlyRag`: default installed app path.
+
+## Reset Backup Restore
+
+The Settings full data reset is destructive only after explicit UI confirmation. On the next
+startup, before deleting local data, OnlyRag copies the current `%LOCALAPPDATA%\OnlyRag` contents
+except existing backups into `%LOCALAPPDATA%\OnlyRag\backups\reset-YYYYMMDDTHHMMSSZ`.
+
+To restore manually:
+
+1. Close OnlyRag.
+2. Move the current `%LOCALAPPDATA%\OnlyRag` contents aside, keeping the `backups` folder.
+3. Copy the desired backup folder contents back into `%LOCALAPPDATA%\OnlyRag`.
+4. Start OnlyRag and check Settings > Diagnostics and Storage status.
 
 Ignored generated repository outputs:
 

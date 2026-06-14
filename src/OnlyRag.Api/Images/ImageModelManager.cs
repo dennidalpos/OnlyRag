@@ -9,8 +9,10 @@ internal sealed class ImageModelManager
     private readonly InProcessBackendDescriptor descriptor;
     private readonly HttpClient httpClient;
     private readonly ImageModelCatalogStore modelCatalog;
-    private readonly HashSet<string> activeDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CancellationTokenSource> activeDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> cancelledDownloads = new(StringComparer.OrdinalIgnoreCase);
     private readonly object gate = new();
+    private const string StagingDirectoryPrefix = ".download-staging-";
     private static readonly string[] SupportedPipelineClasses =
     [
         "StableDiffusionXLPipeline",
@@ -30,6 +32,7 @@ internal sealed class ImageModelManager
         this.descriptor = descriptor;
         this.httpClient = httpClient;
         this.modelCatalog = modelCatalog;
+        CleanStaleStagingDirectories();
     }
 
     public Task<IReadOnlyList<ImageModelCatalogEntry>> ListCatalogAsync(CancellationToken cancellationToken = default)
@@ -60,9 +63,11 @@ internal sealed class ImageModelManager
         string modelDirectory = GetModelDirectory(model.Id);
         long localSizeBytes = GetDirectorySize(modelDirectory);
         bool isDownloading;
+        bool isCancelled;
         lock (gate)
         {
-            isDownloading = activeDownloads.Contains(model.Id);
+            isDownloading = activeDownloads.ContainsKey(model.Id);
+            isCancelled = cancelledDownloads.Contains(model.Id);
         }
 
         string modelPath = GetModelFilePath(model.Id);
@@ -85,13 +90,15 @@ internal sealed class ImageModelManager
 
             return new ImageModelLocalState(
                 model.Id,
-                isDownloading ? "Downloading" : "NotDownloaded",
+                isDownloading ? "Downloading" : isCancelled ? "Cancelled" : "NotDownloaded",
                 IsDownloaded: false,
                 IsVerified: false,
                 localSizeBytes,
                 modelDirectory,
                 isDownloading
                     ? null
+                    : isCancelled
+                        ? "Download modello annullato. Riavvia il download quando vuoi."
                     : localSizeBytes > 0
                         ? "Il modello locale e incompleto. Elimina il download e scaricalo di nuovo."
                         : "Il modello non e ancora stato scaricato.",
@@ -169,18 +176,31 @@ internal sealed class ImageModelManager
         }
 
         ImageModelCatalogEntry model = await modelCatalog.GetAsync(modelId, cancellationToken);
-        lock (gate)
+        ImageModelLocalState existingState = GetState(model);
+        if (existingState.IsVerified)
         {
-            if (!activeDownloads.Add(model.Id))
-            {
-                return new ImageModelDownloadResponse(model.Id, "Downloading", "Download modello gia in corso.");
-            }
+            return new ImageModelDownloadResponse(model.Id, existingState.State, "Modello immagini gia scaricato e verificato.");
         }
 
+        CancellationTokenSource downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        lock (gate)
+        {
+            if (activeDownloads.ContainsKey(model.Id))
+            {
+                downloadCancellation.Dispose();
+                return new ImageModelDownloadResponse(model.Id, "Downloading", "Download modello gia in corso.");
+            }
+
+            activeDownloads[model.Id] = downloadCancellation;
+            cancelledDownloads.Remove(model.Id);
+        }
+
+        string stagingDirectory = CreateStagingDirectory(model.Id);
         try
         {
-            Directory.CreateDirectory(GetModelDirectory(model.Id));
-            await DownloadModelAsync(model, cancellationToken);
+            await DownloadModelAsync(model, stagingDirectory, downloadCancellation.Token);
+            ValidateRequiredFiles(model, stagingDirectory);
+            ReplaceModelDirectory(stagingDirectory, GetModelDirectory(model.Id));
             ImageModelLocalState state = await GetStateAsync(model.Id, cancellationToken);
             if (!state.IsVerified && state.State != "Downloaded")
             {
@@ -196,25 +216,46 @@ internal sealed class ImageModelManager
                     ? "Modello immagini scaricato e verificato."
                     : "Modello immagini scaricato e pronto.");
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            SafeDeleteDirectory(stagingDirectory);
+            lock (gate)
+            {
+                cancelledDownloads.Add(model.Id);
+            }
+
+            return new ImageModelDownloadResponse(model.Id, "Cancelled", "Download modello annullato.");
+        }
+        catch
+        {
+            SafeDeleteDirectory(stagingDirectory);
+            throw;
+        }
         finally
         {
             lock (gate)
             {
                 activeDownloads.Remove(model.Id);
             }
+
+            downloadCancellation.Dispose();
         }
     }
 
     public async Task<ImageModelDownloadResponse> CancelDownloadAsync(string modelId, CancellationToken cancellationToken = default)
     {
         ImageModelCatalogEntry model = await modelCatalog.GetAsync(modelId, cancellationToken);
-        bool removed;
+        CancellationTokenSource? downloadCancellation;
         lock (gate)
         {
-            removed = activeDownloads.Remove(model.Id);
+            activeDownloads.TryGetValue(model.Id, out downloadCancellation);
+            if (downloadCancellation is not null)
+            {
+                cancelledDownloads.Add(model.Id);
+            }
         }
 
-        if (!removed)
+        if (downloadCancellation is null)
         {
             return new ImageModelDownloadResponse(
                 model.Id,
@@ -222,6 +263,7 @@ internal sealed class ImageModelManager
                 "Nessun download modello attivo.");
         }
 
+        await downloadCancellation.CancelAsync();
         return new ImageModelDownloadResponse(model.Id, "Cancelled", "Download modello annullato.");
     }
 
@@ -272,18 +314,126 @@ internal sealed class ImageModelManager
         return modelDirectory;
     }
 
+    private string CreateStagingDirectory(string modelId)
+    {
+        string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
+        Directory.CreateDirectory(root);
+        string stagingDirectory = Path.GetFullPath(Path.Combine(
+            root,
+            $"{StagingDirectoryPrefix}{SanitizeModelId(modelId)}-{Guid.NewGuid():N}"));
+        EnsurePathInsideRoot(root, stagingDirectory);
+        Directory.CreateDirectory(stagingDirectory);
+        return stagingDirectory;
+    }
+
+    private void CleanStaleStagingDirectories()
+    {
+        string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
+        if (!Directory.Exists(root))
+        {
+            return;
+        }
+
+        foreach (string stagingDirectory in Directory.EnumerateDirectories(root, $"{StagingDirectoryPrefix}*"))
+        {
+            EnsurePathInsideRoot(root, stagingDirectory);
+            SafeDeleteDirectory(stagingDirectory);
+        }
+    }
+
+    private static void ReplaceModelDirectory(string stagingDirectory, string finalDirectory)
+    {
+        string? parent = Path.GetDirectoryName(finalDirectory);
+        if (parent is null)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Percorso directory modello non valido.");
+        }
+
+        Directory.CreateDirectory(parent);
+        string backupDirectory = Path.Combine(parent, $".previous-{Path.GetFileName(finalDirectory)}-{Guid.NewGuid():N}");
+        try
+        {
+            if (Directory.Exists(finalDirectory))
+            {
+                Directory.Move(finalDirectory, backupDirectory);
+            }
+
+            Directory.Move(stagingDirectory, finalDirectory);
+            SafeDeleteDirectory(backupDirectory);
+        }
+        catch
+        {
+            if (!Directory.Exists(finalDirectory) && Directory.Exists(backupDirectory))
+            {
+                Directory.Move(backupDirectory, finalDirectory);
+            }
+
+            throw;
+        }
+    }
+
+    private static void ValidateRequiredFiles(ImageModelCatalogEntry model, string modelDirectory)
+    {
+        string[] missingFiles = model.RequiredFiles
+            .Where(requiredFile =>
+            {
+                string path = ResolveModelSnapshotPath(modelDirectory, requiredFile);
+                return !File.Exists(path) || new FileInfo(path).Length == 0;
+            })
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingFiles.Length > 0)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.UnexpectedResponse,
+                $"Download modello incompleto. File richiesti mancanti o vuoti: {string.Join(", ", missingFiles)}.");
+        }
+    }
+
+    private static void SafeDeleteDirectory(string directory)
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static string SanitizeModelId(string modelId)
+    {
+        char[] invalid = Path.GetInvalidFileNameChars();
+        return string.Concat(modelId.Select(ch => invalid.Contains(ch) || ch is '/' or '\\' ? '_' : ch));
+    }
+
+    private static void EnsurePathInsideRoot(string root, string path)
+    {
+        string normalizedRoot = Path.GetFullPath(root);
+        string normalizedPath = Path.GetFullPath(path);
+        string rootWithSeparator = normalizedRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedRoot
+            : normalizedRoot + Path.DirectorySeparatorChar;
+        if (!normalizedPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidRequest,
+                "Percorso staging modello immagini non valido.");
+        }
+    }
+
     private async Task DownloadModelAsync(
         ImageModelCatalogEntry model,
+        string destinationDirectory,
         CancellationToken cancellationToken)
     {
         Uri uri = new(model.DownloadUrl);
         if (IsHuggingFaceModelPage(uri, out string? repositoryId))
         {
-            await DownloadHuggingFaceSnapshotAsync(repositoryId, GetModelDirectory(model.Id), cancellationToken);
+            await DownloadHuggingFaceSnapshotAsync(repositoryId, destinationDirectory, model.RequiredFiles, cancellationToken);
             return;
         }
 
-        string destinationPath = GetModelFilePath(model.Id);
+        string destinationPath = ResolveModelSnapshotPath(destinationDirectory, ImageModelCatalog.RequiredModelFileName);
         if (uri.Scheme == Uri.UriSchemeFile)
         {
             await DownloadFileIfNeededAsync(
@@ -306,17 +456,35 @@ internal sealed class ImageModelManager
     private async Task DownloadHuggingFaceSnapshotAsync(
         string repositoryId,
         string destinationDirectory,
+        IReadOnlyCollection<string> requiredFiles,
         CancellationToken cancellationToken)
     {
+        HashSet<string> required = requiredFiles
+            .Select(path => path.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (required.Count == 0)
+        {
+            throw new ImageGenerationException(
+                ImageGenerationErrorKind.InvalidConfiguration,
+                "Il modello Hugging Face non dichiara file richiesti da scaricare.");
+        }
+
         IReadOnlyList<ModelSnapshotFile> snapshotFiles = await ListHuggingFaceSnapshotFilesAsync(repositoryId, cancellationToken);
-        if (snapshotFiles.Count == 0)
+        IReadOnlyList<ModelSnapshotFile> selectedFiles = snapshotFiles
+            .Where(file => required.Contains(file.RelativePath))
+            .ToArray();
+        string[] missingFiles = required
+            .Where(requiredFile => selectedFiles.All(file => !file.RelativePath.Equals(requiredFile, StringComparison.OrdinalIgnoreCase)))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingFiles.Length > 0)
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.UnexpectedResponse,
-                "Metadata modello Hugging Face senza file modello.");
+                $"Metadata modello Hugging Face senza file richiesti: {string.Join(", ", missingFiles)}.");
         }
 
-        foreach (ModelSnapshotFile snapshotFile in snapshotFiles)
+        foreach (ModelSnapshotFile snapshotFile in selectedFiles)
         {
             string safeRelativePath = snapshotFile.RelativePath.Replace('\\', '/');
             string destinationPath = ResolveModelSnapshotPath(destinationDirectory, safeRelativePath);

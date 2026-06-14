@@ -67,7 +67,7 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ResetsIncompatibleVersionedSchemaAndDeletesDataRootContents()
+    public async Task InitializeAsync_MigratesLegacyVersionedSchemaWithoutDeletingDataRootContents()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersion8SchemaAsync(tempStorage);
@@ -82,13 +82,17 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, status.CurrentSchemaVersion);
         Assert.Equal(LocalSqliteSchemaInitializer.CurrentSchemaVersion, await ReadUserVersionAsync(tempStorage));
         Assert.Equal("Current", status.SchemaStatus);
-        Assert.False(File.Exists(staleLogPath));
+        Assert.True(File.Exists(staleLogPath));
         Assert.True(await tempStorage.TableExistsAsync("documents"));
+        Assert.True(await tempStorage.TableExistsAsync("document_pages"));
+        Assert.True(await tempStorage.TableExistsAsync("chunk_vector_index_status"));
         Assert.False(await tempStorage.TableExistsAsync("schema_migrations"));
+        Assert.True(await tempStorage.ColumnExistsAsync("documents", "file_extension"));
+        Assert.True(await tempStorage.ColumnExistsAsync("jobs", "checkpoint_json"));
     }
 
     [Fact]
-    public async Task InitializeAsync_ResetsPreexistingUnversionedSchema()
+    public async Task InitializeAsync_ReportsUnsupportedPreexistingUnversionedSchema()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
@@ -102,9 +106,49 @@ public sealed partial class LocalSqliteStorageTests
 
         StorageStatusResponse status = await storage.InitializeAsync();
 
-        Assert.Equal("Current", status.SchemaStatus);
+        Assert.Equal("UnsupportedSchema", status.SchemaStatus);
+        Assert.True(await tempStorage.TableExistsAsync("obsolete_data"));
+        Assert.Contains("Nessun dato", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ReportsUnsupportedFutureSchemaWithoutDeletingData()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await using (SqliteConnection connection = await tempStorage.CreateConnectionFactory().OpenConnectionAsync())
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                PRAGMA user_version = 99;
+                CREATE TABLE documents (id INTEGER PRIMARY KEY);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.InitializeAsync();
+
+        Assert.Equal(99, status.CurrentSchemaVersion);
+        Assert.Equal("UnsupportedSchema", status.SchemaStatus);
         Assert.True(await tempStorage.TableExistsAsync("documents"));
-        Assert.False(await tempStorage.TableExistsAsync("obsolete_data"));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_MigratesLegacyDuplicateDocumentHashesWithoutDeletingDocuments()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await CreateVersion10SchemaWithDuplicateDocumentHashesAsync(tempStorage);
+
+        LocalSqliteStorageService storage = tempStorage.CreateStorageService();
+
+        StorageStatusResponse status = await storage.InitializeAsync();
+
+        Assert.Equal("Current", status.SchemaStatus);
+        Assert.Equal(2, await CountRowsAsync(tempStorage, "documents", "1 = $value", 1));
+        Assert.Equal(1, await CountRowsAsync(tempStorage, "documents", "sha256 = 'duplicate-sha'", 1));
+        Assert.True(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
     }
 
     private static async Task<int> ReadUserVersionAsync(TempStorage tempStorage)

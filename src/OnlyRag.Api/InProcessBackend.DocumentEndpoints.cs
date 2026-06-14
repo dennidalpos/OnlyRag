@@ -14,7 +14,7 @@ public static partial class InProcessBackend
     private const int DefaultDocumentPreviewPageSize = 1;
     private const int MaxDocumentPreviewPageSize = 10;
 
-    private static void MapDocumentEndpoints(WebApplication app)
+    internal static void MapDocumentEndpoints(WebApplication app)
     {
         MapDocumentImportEndpoints(app);
 

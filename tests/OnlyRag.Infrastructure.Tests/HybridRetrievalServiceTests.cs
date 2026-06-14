@@ -89,17 +89,37 @@ public sealed class HybridRetrievalServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_FailsWhenVectorSearchIsUnavailable()
+    public async Task SearchAsync_UsesKeywordFallbackWhenEmbeddingIsUnavailable()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await tempStorage.InitializeAsync();
         TestServices services = tempStorage.CreateServices(new UnavailableQueryEmbeddingGenerator());
         ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "keyword-only.txt", ["Numero fattura 98765."]);
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            services.Retrieval.SearchAsync(new DocumentSearchRequest("98765", [document.Id], 5)));
+        DocumentSearchResponse response =
+            await services.Retrieval.SearchAsync(new DocumentSearchRequest("98765", [document.Id], 5));
 
-        Assert.Contains("retrieval Qdrant", ex.Message, StringComparison.OrdinalIgnoreCase);
+        DocumentSearchResult result = Assert.Single(response.Results);
+        Assert.Contains("98765", result.Snippet, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(response.Notices, notice => notice.Code == "vector_embedding_unavailable");
+        Assert.Equal("VectorUnavailable", Assert.Single(response.Documents).EmbeddingState);
+    }
+
+    [Fact]
+    public async Task SearchAsync_UsesKeywordFallbackWhenQdrantSearchIsUnavailable()
+    {
+        using TempStorage tempStorage = TempStorage.Create();
+        await tempStorage.InitializeAsync();
+        TestServices services = tempStorage.CreateServices(new StaticQueryEmbeddingGenerator([1f, 0f]));
+        services.VectorStore.ThrowOnSearch = true;
+        ImportedDocument document = await tempStorage.CreateDocumentAsync("doc-1", "keyword-only.txt", ["Numero fattura 98765."]);
+
+        DocumentSearchResponse response =
+            await services.Retrieval.SearchAsync(new DocumentSearchRequest("98765", [document.Id], 5));
+
+        DocumentSearchResult result = Assert.Single(response.Results);
+        Assert.Contains("98765", result.Snippet, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(response.Notices, notice => notice.Code == "vector_search_unavailable");
     }
 
     [Fact]
@@ -364,6 +384,8 @@ public sealed class HybridRetrievalServiceTests
 
         public string BackendName => "Qdrant fake";
 
+        public bool ThrowOnSearch { get; set; }
+
         public int MaxSearchableVectors => int.MaxValue;
 
         public bool IsVectorStoragePersistent => true;
@@ -387,6 +409,11 @@ public sealed class HybridRetrievalServiceTests
 
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(string model, IReadOnlyList<float> queryVector, IReadOnlyCollection<long> documentIds, int limit, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnSearch)
+            {
+                throw new InvalidOperationException("Qdrant test offline");
+            }
+
             IReadOnlyList<VectorSearchResult> results = vectors
                 .Where(item => item.Model == model && documentIds.Contains(item.Chunk.DocumentId))
                 .Select(item => new VectorSearchResult(

@@ -214,6 +214,11 @@ internal sealed class ChatService
 
     private static IEnumerable<ChatNotice> BuildDocumentNotices(DocumentSearchResponse response)
     {
+        foreach (RetrievalNotice notice in response.Notices)
+        {
+            yield return new ChatNotice(notice.Code, notice.Message);
+        }
+
         foreach (DocumentSearchDocumentStatus document in response.Documents)
         {
             if (!document.IsIndexed)

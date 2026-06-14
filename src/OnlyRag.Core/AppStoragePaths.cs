@@ -10,6 +10,7 @@ public sealed record AppStoragePaths(
     string DocumentOcrCacheDirectory,
     string DocumentExportsDirectory,
     string ImageModelsDirectory,
+    string BackupsDirectory,
     string LogsDirectory,
     string WebView2UserDataDirectory,
     string TempDirectory)
@@ -41,6 +42,7 @@ public sealed record AppStoragePaths(
             Path.Combine(documentsRoot, "ocr-cache"),
             Path.Combine(documentsRoot, "exports"),
             Path.Combine(normalizedRoot, "models", "images"),
+            Path.Combine(normalizedRoot, "backups"),
             Path.Combine(normalizedRoot, "logs"),
             Path.Combine(normalizedRoot, "webview2"),
             Path.Combine(normalizedRoot, "temp"));
@@ -55,6 +57,7 @@ public sealed record AppStoragePaths(
         yield return DocumentOcrCacheDirectory;
         yield return DocumentExportsDirectory;
         yield return ImageModelsDirectory;
+        yield return BackupsDirectory;
         yield return LogsDirectory;
         yield return WebView2UserDataDirectory;
         yield return TempDirectory;

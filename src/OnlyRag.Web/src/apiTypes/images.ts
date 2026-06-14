@@ -25,6 +25,13 @@ export type ImageModelCatalogEntry = {
   requiredFiles: string[];
   sha256: string;
   isBuiltIn: boolean;
+  modelType: string;
+  modelProfile: string;
+  supportedResolutions: string[];
+  defaultSteps: number;
+  defaultGuidance: number;
+  scheduler: string;
+  compatibilityNotes: string;
 };
 
 export type ImageModelCatalogEntryRequest = {
@@ -36,6 +43,13 @@ export type ImageModelCatalogEntryRequest = {
   expectedSizeBytes: number;
   requiredFiles: string[];
   sha256: string;
+  modelType: string;
+  modelProfile: string;
+  supportedResolutions: string[];
+  defaultSteps: number;
+  defaultGuidance: number;
+  scheduler: string;
+  compatibilityNotes: string;
 };
 
 export type ImageModelLocalState = {
