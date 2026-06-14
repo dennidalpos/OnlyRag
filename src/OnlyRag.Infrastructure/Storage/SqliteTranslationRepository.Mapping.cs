@@ -77,6 +77,7 @@ public sealed partial class SqliteTranslationRepository
         int PageNumber,
         long DocumentPageId,
         int UnitIndex,
-        string UnitKind);
+        string UnitKind,
+        string? DisplayLabel = null);
 
 }

@@ -8,6 +8,7 @@ public sealed partial class SqliteTranslationRepository : ITranslationRepository
 {
     private const int MaxUnitCharacters = 6000;
     private static readonly Regex CellRegex = new(@"\[[A-Za-z]{1,4}\d{1,7}\]\s*[^|]+", RegexOptions.Compiled);
+    private static readonly Regex PresentationLineRegex = new(@"^(Textbox|Note)\s+(\d+):\s+.+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ISqliteConnectionFactory connectionFactory;
 

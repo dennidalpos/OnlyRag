@@ -77,6 +77,9 @@ internal static class DocumentTranslationPromptBuilder
     {
         "table-cell" => "This is a single table cell: translate the content only, preserve short values like numbers or codes verbatim, do not add surrounding punctuation or sentence structure.",
         "textbox" => "This is a text box: preserve all line breaks and any capitalization style of the original.",
+        "slide-note" => "This is a speaker note from a presentation: preserve note line breaks and list markers.",
+        "heading" => "This is a heading or title: keep it concise and preserve capitalization style where possible.",
+        "ocr-line" => "This is OCR text from an image: translate the line only and do not add missing context.",
         _ => "This is a paragraph: preserve paragraph structure, bold/italic markers if present, and list indentation."
     };
 

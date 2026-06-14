@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type RefObject } from "react";
 import {
   apiRequest,
   resolveBackendBaseUrl,
@@ -16,6 +16,7 @@ import {
 import { formatFileSize } from "./DocumentsSection.formatting";
 import { ProgressBar } from "./ProgressBar";
 import { useModalFocusTrap } from "./useModalFocusTrap";
+import { useModalMaximize } from "./useModalMaximize";
 
 const defaultModelId = "lcm-sdxl-olive-onnx";
 
@@ -44,6 +45,7 @@ const imageTooltips = {
   negativePrompt: "Opzionale. Viene inviato esattamente come scritto.",
   seed: "Opzionale. Ripete una generazione simile quando usi lo stesso prompt e modello.",
   steps: "Numero di step di inferenza usati dal runtime locale.",
+  guidanceScale: "Forza la guidance scale del runtime. Lascia vuoto per usare il default del modello.",
   batchSize: "Numero di immagini prodotte nella stessa richiesta.",
   model: "Scegli un modello locale o manuale configurato nel catalogo.",
   downloadConsent: "Il download parte solo dopo conferma esplicita e salva i file nel profilo locale.",
@@ -96,6 +98,22 @@ type CropSelection = {
   height: number;
 };
 
+type EditTool = "move" | "crop" | "text";
+
+type TextLayer = {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  color: string;
+};
+
+type ImageEditState = {
+  crop: CropSelection | null;
+  textLayers: TextLayer[];
+};
+
 export function ImagesSection() {
   const [settings, setSettings] = useState<ImageGenerationSettings>(defaultSettings);
   const [savedSettings, setSavedSettings] = useState<ImageGenerationSettings>(defaultSettings);
@@ -112,6 +130,7 @@ export function ImagesSection() {
   const [generationProfile, setGenerationProfile] = useState<GenerationProfile>("balanced");
   const [steps, setSteps] = useState(resolveGenerationProfile(defaultModelId, "balanced").steps);
   const [batchSize, setBatchSize] = useState(resolveGenerationProfile(defaultModelId, "balanced").batchSize);
+  const [guidanceScale, setGuidanceScale] = useState("");
   const [seed, setSeed] = useState("");
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createEmptyModelDraft(defaultModelId));
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -344,7 +363,8 @@ export function ImagesSection() {
           height,
           steps,
           batchSize,
-          seed: seed.trim() ? Number(seed) : null
+          seed: seed.trim() ? Number(seed) : null,
+          guidanceScale: guidanceScale.trim() ? Number(guidanceScale) : null
         })
       });
       setImages((current) => [...response.images, ...current]);
@@ -441,6 +461,7 @@ export function ImagesSection() {
           generationProfile={generationProfile}
           steps={steps}
           batchSize={batchSize}
+          guidanceScale={guidanceScale}
           seed={seed}
           canGenerate={canGenerate}
           isGenerating={isGenerating}
@@ -451,6 +472,7 @@ export function ImagesSection() {
           onHeightChange={setHeight}
           onGenerationProfileChange={applyGenerationProfile}
           onProfileParameterChange={updateProfileParameter}
+          onGuidanceScaleChange={setGuidanceScale}
           onSeedChange={setSeed}
           onApplyPreset={applyPreset}
           onSubmit={handleGenerate}
@@ -462,7 +484,7 @@ export function ImagesSection() {
           isDeleting={isDeletingImage}
           onSelectImage={setSelectedImageId}
           onDeleteImage={(image) => void handleDeleteImage(image)}
-          onCropSaved={(saved, replacedId) => {
+          onEditSaved={(saved, replacedId) => {
             setImages((current) => [saved, ...current.filter((item) => item.id !== replacedId)]);
             setSelectedImageId(saved.id);
           }}
@@ -510,6 +532,7 @@ function PromptPanel({
   generationProfile,
   steps,
   batchSize,
+  guidanceScale,
   seed,
   canGenerate,
   isGenerating,
@@ -520,6 +543,7 @@ function PromptPanel({
   onHeightChange,
   onGenerationProfileChange,
   onProfileParameterChange,
+  onGuidanceScaleChange,
   onSeedChange,
   onApplyPreset,
   onSubmit
@@ -531,6 +555,7 @@ function PromptPanel({
   generationProfile: GenerationProfile;
   steps: number;
   batchSize: number;
+  guidanceScale: string;
   seed: string;
   canGenerate: boolean;
   isGenerating: boolean;
@@ -541,6 +566,7 @@ function PromptPanel({
   onHeightChange: (value: number) => void;
   onGenerationProfileChange: (value: GenerationProfile) => void;
   onProfileParameterChange: (patch: { steps?: number; batchSize?: number }) => void;
+  onGuidanceScaleChange: (value: string) => void;
   onSeedChange: (value: string) => void;
   onApplyPreset: (preset: { width: number; height: number }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -609,7 +635,11 @@ function PromptPanel({
             </label>
             <label className="field-group" htmlFor="image-steps">
               <TooltipLabel text="Step" tooltip={imageTooltips.steps} />
-              <input id="image-steps" min={4} max={40} type="number" value={steps} onChange={(event) => onProfileParameterChange({ steps: Number(event.target.value) })} title={imageTooltips.steps} />
+              <input id="image-steps" min={4} max={64} type="number" value={steps} onChange={(event) => onProfileParameterChange({ steps: Number(event.target.value) })} title={imageTooltips.steps} />
+            </label>
+            <label className="field-group" htmlFor="image-guidance-scale">
+              <TooltipLabel text="Guidance" tooltip={imageTooltips.guidanceScale} />
+              <input id="image-guidance-scale" inputMode="decimal" value={guidanceScale} placeholder="Default" onChange={(event) => onGuidanceScaleChange(event.target.value)} title={imageTooltips.guidanceScale} />
             </label>
             <label className="field-group" htmlFor="image-batch-size">
               <TooltipLabel text="Batch" tooltip={imageTooltips.batchSize} />
@@ -638,7 +668,7 @@ function EditorPanel({
   isDeleting,
   onSelectImage,
   onDeleteImage,
-  onCropSaved,
+  onEditSaved,
   onOpenFolder
 }: {
   image: GeneratedImage | null;
@@ -646,36 +676,168 @@ function EditorPanel({
   isDeleting: boolean;
   onSelectImage: (id: number) => void;
   onDeleteImage: (image: GeneratedImage) => void;
-  onCropSaved: (image: GeneratedImage, replacedId: number | null) => void;
+  onEditSaved: (image: GeneratedImage, replacedId: number | null) => void;
   onOpenFolder: () => void;
 }) {
-  const [crop, setCrop] = useState<CropSelection>({ x: 10, y: 10, width: 80, height: 80 });
+  const [tool, setTool] = useState<EditTool>("move");
+  const [editState, setEditState] = useState<ImageEditState>(() => createEmptyEditState());
+  const [undoStack, setUndoStack] = useState<ImageEditState[]>([]);
+  const [redoStack, setRedoStack] = useState<ImageEditState[]>([]);
+  const [selectedTextId, setSelectedTextId] = useState<number | null>(null);
   const [replaceOriginal, setReplaceOriginal] = useState(false);
-  const [isCropping, setIsCropping] = useState(false);
-  const [cropError, setCropError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<
+    | { mode: "crop"; startX: number; startY: number }
+    | { mode: "text"; id: number; offsetX: number; offsetY: number }
+    | null
+  >(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const objectUrl = useImageObjectUrl(image?.id ?? null);
+  const selectedTextLayer = editState.textLayers.find((layer) => layer.id === selectedTextId) ?? null;
 
-  async function saveCrop() {
+  useEffect(() => {
+    setEditState(createEmptyEditState());
+    setUndoStack([]);
+    setRedoStack([]);
+    setSelectedTextId(null);
+    setTool("move");
+    setEditError(null);
+  }, [image?.id]);
+
+  function commitEdit(updater: (state: ImageEditState) => ImageEditState) {
+    setEditState((current) => {
+      setUndoStack((stack) => [...stack, current].slice(-30));
+      setRedoStack([]);
+      return updater(current);
+    });
+  }
+
+  function handleUndo() {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const previous = stack[stack.length - 1];
+      setRedoStack((redo) => [editState, ...redo].slice(0, 30));
+      setEditState(previous);
+      return stack.slice(0, -1);
+    });
+  }
+
+  function handleRedo() {
+    setRedoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const next = stack[0];
+      setUndoStack((undo) => [...undo, editState].slice(-30));
+      setEditState(next);
+      return stack.slice(1);
+    });
+  }
+
+  function addTextLayer() {
+    const id = Date.now();
+    commitEdit((current) => ({
+      ...current,
+      textLayers: [
+        ...current.textLayers,
+        { id, text: "Testo", x: 50, y: 50, fontSize: 36, color: "#ffffff" }
+      ]
+    }));
+    setSelectedTextId(id);
+    setTool("text");
+  }
+
+  function updateSelectedText(patch: Partial<Omit<TextLayer, "id">>) {
+    if (!selectedTextId) return;
+    commitEdit((current) => ({
+      ...current,
+      textLayers: current.textLayers.map((layer) => layer.id === selectedTextId ? { ...layer, ...patch } : layer)
+    }));
+  }
+
+  function clearCrop() {
+    commitEdit((current) => ({ ...current, crop: null }));
+  }
+
+  function pointFromEvent(event: PointerEvent<HTMLElement>): { x: number; y: number } | null {
+    const frame = previewRef.current;
+    if (!frame) return null;
+    const rect = frame.getBoundingClientRect();
+    return {
+      x: clampNumber(((event.clientX - rect.left) / rect.width) * 100, 0, 100),
+      y: clampNumber(((event.clientY - rect.top) / rect.height) * 100, 0, 100)
+    };
+  }
+
+  function handlePreviewPointerDown(event: PointerEvent<HTMLDivElement>) {
+    const point = pointFromEvent(event);
+    if (!point) return;
+    if (tool === "crop") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const crop = { x: point.x, y: point.y, width: 1, height: 1 };
+      setUndoStack((stack) => [...stack, editState].slice(-30));
+      setRedoStack([]);
+      setEditState((current) => ({ ...current, crop }));
+      setDragState({ mode: "crop", startX: point.x, startY: point.y });
+    }
+  }
+
+  function handleTextPointerDown(event: PointerEvent<HTMLButtonElement>, layer: TextLayer) {
+    const point = pointFromEvent(event);
+    if (!point) return;
+    event.stopPropagation();
+    setSelectedTextId(layer.id);
+    setTool("text");
+    setUndoStack((stack) => [...stack, editState].slice(-30));
+    setRedoStack([]);
+    setDragState({ mode: "text", id: layer.id, offsetX: point.x - layer.x, offsetY: point.y - layer.y });
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!dragState) return;
+    const point = pointFromEvent(event);
+    if (!point) return;
+    if (dragState.mode === "crop") {
+      const x = Math.min(dragState.startX, point.x);
+      const y = Math.min(dragState.startY, point.y);
+      const width = Math.max(1, Math.abs(point.x - dragState.startX));
+      const height = Math.max(1, Math.abs(point.y - dragState.startY));
+      setEditState((current) => ({ ...current, crop: normalizeCrop({ x, y, width, height }) }));
+      return;
+    }
+
+    setEditState((current) => ({
+      ...current,
+      textLayers: current.textLayers.map((layer) => layer.id === dragState.id
+        ? { ...layer, x: clampNumber(point.x - dragState.offsetX, 0, 100), y: clampNumber(point.y - dragState.offsetY, 0, 100) }
+        : layer)
+    }));
+  }
+
+  function handlePointerUp() {
+    setDragState(null);
+  }
+
+  async function saveEdit() {
     if (!image || !objectUrl) return;
-    setIsCropping(true);
-    setCropError(null);
+    setIsSavingEdit(true);
+    setEditError(null);
     try {
-      const cropped = await cropImageToPng(objectUrl, crop);
-      const saved = await apiRequest<GeneratedImage>(`/api/images/${image.id}/crop`, {
+      const edited = await renderEditedImageToPng(objectUrl, editState);
+      const saved = await apiRequest<GeneratedImage>(`/api/images/${image.id}/edit`, {
         method: "POST",
         body: JSON.stringify({
-          imageBase64: cropped.base64,
+          imageBase64: edited.base64,
           mimeType: "image/png",
-          width: cropped.width,
-          height: cropped.height,
+          width: edited.width,
+          height: edited.height,
           replaceOriginal
         })
       });
-      onCropSaved(saved, replaceOriginal ? image.id : null);
+      onEditSaved(saved, replaceOriginal ? image.id : null);
     } catch (error) {
-      setCropError(error instanceof Error ? error.message : "Crop non riuscito.");
+      setEditError(error instanceof Error ? error.message : "Modifica immagine non riuscita.");
     } finally {
-      setIsCropping(false);
+      setIsSavingEdit(false);
     }
   }
 
@@ -687,7 +849,18 @@ function EditorPanel({
           Apri cartella
         </button>
       </div>
-      <ImagePreview image={image} objectUrl={objectUrl} crop={crop} />
+      <ImagePreview
+        image={image}
+        objectUrl={objectUrl}
+        editState={editState}
+        previewRef={previewRef}
+        activeTool={tool}
+        selectedTextId={selectedTextId}
+        onPreviewPointerDown={handlePreviewPointerDown}
+        onPreviewPointerMove={handlePointerMove}
+        onPreviewPointerUp={handlePointerUp}
+        onTextPointerDown={handleTextPointerDown}
+      />
       {image ? (
         <div className="image-detail">
           <strong>{image.fileName}</strong>
@@ -700,25 +873,43 @@ function EditorPanel({
               {isDeleting ? "Eliminazione..." : "Elimina"}
             </button>
           </div>
-          <details className="image-crop-panel">
-            <summary>Crop</summary>
-            <div className="settings-grid settings-grid--two">
-              <CropNumberField id="image-crop-x" label="X %" value={crop.x} onChange={(value) => setCrop(normalizeCrop({ ...crop, x: value }))} />
-              <CropNumberField id="image-crop-y" label="Y %" value={crop.y} onChange={(value) => setCrop(normalizeCrop({ ...crop, y: value }))} />
-              <CropNumberField id="image-crop-width" label="Larghezza %" value={crop.width} onChange={(value) => setCrop(normalizeCrop({ ...crop, width: value }))} />
-              <CropNumberField id="image-crop-height" label="Altezza %" value={crop.height} onChange={(value) => setCrop(normalizeCrop({ ...crop, height: value }))} />
+          <div className="image-edit-panel">
+            <div className="image-editor-toolbar" aria-label="Strumenti editor immagine">
+              <button className={tool === "move" ? "button-secondary button-secondary--active" : "button-secondary"} type="button" onClick={() => setTool("move")}>Sposta</button>
+              <button className={tool === "crop" ? "button-secondary button-secondary--active" : "button-secondary"} type="button" onClick={() => setTool("crop")}>Ritaglia</button>
+              <button className={tool === "text" ? "button-secondary button-secondary--active" : "button-secondary"} type="button" onClick={() => setTool("text")}>Testo</button>
+              <button className="button-secondary" type="button" onClick={addTextLayer}>Aggiungi testo</button>
+              <button className="button-secondary" type="button" onClick={handleUndo} disabled={undoStack.length === 0}>Annulla</button>
+              <button className="button-secondary" type="button" onClick={handleRedo} disabled={redoStack.length === 0}>Ripristina</button>
+              <button className="button-secondary" type="button" onClick={clearCrop} disabled={!editState.crop}>Cancella ritaglio</button>
             </div>
+            {selectedTextLayer && (
+              <div className="image-text-editor">
+                <label className="field-group" htmlFor="image-text-content">
+                  <span>Testo</span>
+                  <input id="image-text-content" value={selectedTextLayer.text} onChange={(event) => updateSelectedText({ text: event.target.value })} />
+                </label>
+                <label className="field-group" htmlFor="image-text-size">
+                  <span>Dimensione</span>
+                  <input id="image-text-size" type="number" min={12} max={160} value={selectedTextLayer.fontSize} onChange={(event) => updateSelectedText({ fontSize: Number(event.target.value) })} />
+                </label>
+                <label className="field-group" htmlFor="image-text-color">
+                  <span>Colore</span>
+                  <input id="image-text-color" type="color" value={selectedTextLayer.color} onChange={(event) => updateSelectedText({ color: event.target.value })} />
+                </label>
+              </div>
+            )}
             <label className="toggle-row" htmlFor="image-crop-replace">
               <input id="image-crop-replace" type="checkbox" checked={replaceOriginal} onChange={(event) => setReplaceOriginal(event.target.checked)} />
               <span>Sostituisci originale</span>
             </label>
-            {cropError && <p className="field-error">{cropError}</p>}
+            {editError && <p className="field-error">{editError}</p>}
             <div className="settings-actions">
-              <button type="button" onClick={() => void saveCrop()} disabled={isCropping || !objectUrl}>
-                {isCropping ? "Salvataggio..." : "Salva crop"}
+              <button type="button" onClick={() => void saveEdit()} disabled={isSavingEdit || !objectUrl}>
+                {isSavingEdit ? "Salvataggio..." : "Salva modifica"}
               </button>
             </div>
-          </details>
+          </div>
         </div>
       ) : (
         <div className="empty-state" role="status">
@@ -794,19 +985,25 @@ function ImageSettingsModal({
 }) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const hasDirtySettings = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  const modalSize = useModalMaximize();
   useModalFocusTrap(modalRef, true, { onEscape: onClose });
 
   return (
     <div className="modal-backdrop">
-      <div className="compare-modal image-settings-modal" role="dialog" aria-modal="true" aria-labelledby="image-settings-title" ref={modalRef} tabIndex={-1}>
+      <div className={`compare-modal image-settings-modal modal-frame--resizable${modalSize.maximizedClassName}`} role="dialog" aria-modal="true" aria-labelledby="image-settings-title" ref={modalRef} tabIndex={-1}>
         <div className="compare-modal__header">
           <div>
             <h3 id="image-settings-title">Impostazioni immagini</h3>
             <span>{runtimeStatus?.message ?? "Lettura stato immagini..."}</span>
           </div>
-          <button className="button-secondary" type="button" onClick={onClose} aria-label="Chiudi impostazioni immagini">
-            Chiudi
-          </button>
+          <div className="compare-header-actions">
+            <button className="button-secondary" type="button" onClick={modalSize.toggleMaximized}>
+              {modalSize.maximizeLabel}
+            </button>
+            <button className="button-secondary" type="button" onClick={onClose} aria-label="Chiudi impostazioni immagini">
+              Chiudi
+            </button>
+          </div>
         </div>
         <div className="image-settings-modal__body">
           <div className="settings-grid settings-grid--two">
@@ -1171,31 +1368,67 @@ function ModelReadiness({
 function ImagePreview({
   image,
   objectUrl,
-  crop
+  editState,
+  previewRef,
+  activeTool,
+  selectedTextId,
+  onPreviewPointerDown,
+  onPreviewPointerMove,
+  onPreviewPointerUp,
+  onTextPointerDown
 }: {
   image: GeneratedImage | null;
   objectUrl: string | null;
-  crop?: CropSelection;
+  editState: ImageEditState;
+  previewRef: RefObject<HTMLDivElement | null>;
+  activeTool: EditTool;
+  selectedTextId: number | null;
+  onPreviewPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+  onPreviewPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
+  onPreviewPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+  onTextPointerDown: (event: PointerEvent<HTMLButtonElement>, layer: TextLayer) => void;
 }) {
   if (!image) {
     return <div className="generated-image-preview generated-image-preview--empty" role="status">Nessuna immagine selezionata.</div>;
   }
 
   return objectUrl ? (
-    <div className="generated-image-preview-frame">
+    <div
+      className={`generated-image-preview-frame generated-image-preview-frame--${activeTool}`}
+      ref={previewRef}
+      onPointerDown={onPreviewPointerDown}
+      onPointerMove={onPreviewPointerMove}
+      onPointerUp={onPreviewPointerUp}
+    >
       <img className="generated-image-preview" src={objectUrl} alt={image.prompt} />
-      {crop && (
+      {editState.crop && (
         <span
           className="image-crop-box"
           style={{
-            left: `${crop.x}%`,
-            top: `${crop.y}%`,
-            width: `${crop.width}%`,
-            height: `${crop.height}%`
+            left: `${editState.crop.x}%`,
+            top: `${editState.crop.y}%`,
+            width: `${editState.crop.width}%`,
+            height: `${editState.crop.height}%`
           }}
           aria-hidden="true"
         />
       )}
+      {editState.textLayers.map((layer) => (
+        <button
+          className={layer.id === selectedTextId ? "image-text-layer image-text-layer--selected" : "image-text-layer"}
+          type="button"
+          style={{
+            left: `${layer.x}%`,
+            top: `${layer.y}%`,
+            color: layer.color,
+            fontSize: `${Math.max(12, layer.fontSize / 8)}px`
+          }}
+          onPointerDown={(event) => onTextPointerDown(event, layer)}
+          key={layer.id}
+        >
+          {layer.text}
+        </button>
+      ))}
     </div>
   ) : (
     <div className="generated-image-preview generated-image-preview--empty" role="status">Caricamento...</div>
@@ -1233,25 +1466,6 @@ function GeneratedImageCard({
   );
 }
 
-function CropNumberField({
-  id,
-  label,
-  value,
-  onChange
-}: {
-  id: string;
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="field-group" htmlFor={id}>
-      <span>{label}</span>
-      <input id={id} min={0} max={100} type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} />
-    </label>
-  );
-}
-
 function normalizeCrop(crop: CropSelection): CropSelection {
   const x = clampNumber(crop.x, 0, 99);
   const y = clampNumber(crop.y, 0, 99);
@@ -1263,8 +1477,13 @@ function normalizeCrop(crop: CropSelection): CropSelection {
   };
 }
 
-async function cropImageToPng(objectUrl: string, crop: CropSelection): Promise<{ base64: string; width: number; height: number }> {
+function createEmptyEditState(): ImageEditState {
+  return { crop: null, textLayers: [] };
+}
+
+async function renderEditedImageToPng(objectUrl: string, editState: ImageEditState): Promise<{ base64: string; width: number; height: number }> {
   const image = await loadHtmlImage(objectUrl);
+  const crop = editState.crop ?? { x: 0, y: 0, width: 100, height: 100 };
   const sourceX = Math.round(image.naturalWidth * crop.x / 100);
   const sourceY = Math.round(image.naturalHeight * crop.y / 100);
   const sourceWidth = Math.max(1, Math.round(image.naturalWidth * crop.width / 100));
@@ -1278,6 +1497,24 @@ async function cropImageToPng(objectUrl: string, crop: CropSelection): Promise<{
   }
 
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
+  context.textBaseline = "top";
+  context.shadowColor = "rgba(0, 0, 0, 0.55)";
+  context.shadowBlur = Math.max(2, Math.round(sourceWidth * 0.004));
+  for (const layer of editState.textLayers) {
+    if (!layer.text.trim()) {
+      continue;
+    }
+
+    const x = ((layer.x - crop.x) / crop.width) * sourceWidth;
+    const y = ((layer.y - crop.y) / crop.height) * sourceHeight;
+    if (x < -sourceWidth || y < -sourceHeight || x > sourceWidth || y > sourceHeight) {
+      continue;
+    }
+
+    context.fillStyle = layer.color;
+    context.font = `${Math.max(12, Math.round(layer.fontSize))}px Segoe UI, Arial, sans-serif`;
+    context.fillText(layer.text, x, y);
+  }
   const dataUrl = canvas.toDataURL("image/png");
   return {
     base64: dataUrl.slice(dataUrl.indexOf(",") + 1),
@@ -1311,14 +1548,14 @@ function TooltipLabel({ text, tooltip }: { text: string; tooltip: string }) {
 function resolveGenerationProfile(modelId: string, profile: Exclude<GenerationProfile, "custom">): { steps: number; batchSize: number } {
   const isFastModel = /turbo|lcm/i.test(modelId);
   if (profile === "quality") {
-    return { steps: isFastModel ? 8 : 36, batchSize: 1 };
+    return { steps: isFastModel ? 10 : 52, batchSize: 1 };
   }
 
   if (profile === "performance") {
-    return { steps: isFastModel ? 4 : 16, batchSize: 1 };
+    return { steps: isFastModel ? 5 : 18, batchSize: 1 };
   }
 
-  return { steps: isFastModel ? 6 : 26, batchSize: 1 };
+  return { steps: isFastModel ? 7 : 30, batchSize: 1 };
 }
 
 function useImageObjectUrl(imageId: number | null) {

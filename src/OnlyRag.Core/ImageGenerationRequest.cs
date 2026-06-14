@@ -8,4 +8,5 @@ public sealed record ImageGenerationRequest(
     int Height,
     int Steps,
     int BatchSize,
-    long? Seed);
+    long? Seed,
+    float? GuidanceScale = null);

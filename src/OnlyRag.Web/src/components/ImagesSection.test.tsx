@@ -168,8 +168,71 @@ describe("ImagesSection", () => {
       modelId: "lcm-sdxl-olive-onnx",
       width: 1024,
       height: 1024,
-      steps: 6,
-      batchSize: 1
+      steps: 7,
+      batchSize: 1,
+      guidanceScale: null
+    });
+  });
+
+  it("saves toolbar image edits through the edit endpoint", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+      fillText: vi.fn(),
+      measureText: vi.fn(() => ({ width: 24 })),
+      set fillStyle(_value: string) {},
+      set font(_value: string) {},
+      set shadowBlur(_value: number) {},
+      set shadowColor(_value: string) {},
+      set textBaseline(_value: string) {}
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,ZmFrZS1wbmc=");
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:onlyrag-image")
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn()
+    });
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: class {
+        naturalWidth = 1024;
+        naturalHeight = 1024;
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        set src(_value: string) {
+          this.onload?.();
+        }
+      }
+    });
+    const api = mockApi([
+      { path: "/api/settings/image-generation", response: createImageSettings() },
+      { path: "/api/images/runtime/status", response: createRuntimeStatus({ isReady: true, state: "Ready" }) },
+      { path: "/api/images/models/catalog", response: [createCatalogEntry()] },
+      { path: "/api/images/models", response: [createModelState({ isVerified: true })] },
+      { path: "/api/images", response: [createGeneratedImage({ prompt: "Prompt editor" })] },
+      { path: "/api/images/1/file", response: "image-bytes" },
+      { path: "/api/images/1/edit", method: "POST", response: createGeneratedImage({ id: 2, fileName: "edited.png" }) }
+    ]);
+
+    render(<ImagesSection />);
+
+    await screen.findByRole("heading", { name: "Crea immagine" });
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi testo" }));
+    await userEvent.clear(screen.getByLabelText("Testo"));
+    await userEvent.type(screen.getByLabelText("Testo"), "Titolo");
+    await userEvent.click(screen.getByRole("button", { name: "Salva modifica" }));
+
+    expect((await screen.findAllByText("edited.png")).length).toBeGreaterThan(0);
+    const editCall = api.calls.find((call) => call.path === "/api/images/1/edit");
+    expect(editCall).toBeDefined();
+    expect(JSON.parse(String(editCall?.body))).toMatchObject({
+      imageBase64: "ZmFrZS1wbmc=",
+      mimeType: "image/png",
+      width: 1024,
+      height: 1024,
+      replaceOriginal: false
     });
   });
 

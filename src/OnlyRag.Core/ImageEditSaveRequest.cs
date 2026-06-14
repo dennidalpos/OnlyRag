@@ -1,6 +1,6 @@
 namespace OnlyRag.Core;
 
-public sealed record ImageCropSaveRequest(
+public sealed record ImageEditSaveRequest(
     string ImageBase64,
     string MimeType,
     int Width,

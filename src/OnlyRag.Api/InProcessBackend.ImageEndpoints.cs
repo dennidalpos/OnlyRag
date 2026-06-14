@@ -170,19 +170,19 @@ public static partial class InProcessBackend
             return deleted is null ? CreateNotFoundProblem("Immagine") : Results.Ok(deleted);
         });
 
-        app.MapPost("/api/images/{id:long}/crop", async (
+        app.MapPost("/api/images/{id:long}/edit", async (
             long id,
-            ImageCropSaveRequest request,
+            ImageEditSaveRequest request,
             ImageGenerationService imageGeneration,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                return Results.Ok(await imageGeneration.SaveCroppedImageAsync(id, request, cancellationToken));
+                return Results.Ok(await imageGeneration.SaveEditedImageAsync(id, request, cancellationToken));
             }
             catch (ImageGenerationException ex)
             {
-                return MapImageGenerationException(ex, app.Services, "/api/images/crop");
+                return MapImageGenerationException(ex, app.Services, "/api/images/edit");
             }
         });
 

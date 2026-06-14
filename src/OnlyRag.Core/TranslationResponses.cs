@@ -21,6 +21,7 @@ public sealed record TranslationUnitResponse(
     long TranslationId,
     int UnitIndex,
     string UnitKind,
+    string DisplayLabel,
     int? PageNumber,
     string SourceText,
     string? MachineTranslatedText,

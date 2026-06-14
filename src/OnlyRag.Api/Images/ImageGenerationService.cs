@@ -173,9 +173,9 @@ internal sealed class ImageGenerationService
         return File.Exists(absolutePath) ? (record.Value.Image, absolutePath) : null;
     }
 
-    public async Task<GeneratedImage> SaveCroppedImageAsync(
+    public async Task<GeneratedImage> SaveEditedImageAsync(
         long sourceImageId,
-        ImageCropSaveRequest request,
+        ImageEditSaveRequest request,
         CancellationToken cancellationToken = default)
     {
         (GeneratedImage Image, string RelativePath)? sourceRecord = await images.GetWithPathAsync(sourceImageId, cancellationToken);
@@ -190,7 +190,7 @@ internal sealed class ImageGenerationService
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidRequest,
-                "Dimensioni crop non valide.");
+                "Dimensioni immagine modificate non valide.");
         }
 
         string mimeType = request.MimeType.Trim().ToLowerInvariant();
@@ -200,7 +200,7 @@ internal sealed class ImageGenerationService
             "image/jpeg" => ".jpg",
             _ => throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidRequest,
-                "Formato crop non supportato.")
+                "Formato immagine modificata non supportato.")
         };
 
         byte[] content;
@@ -212,7 +212,7 @@ internal sealed class ImageGenerationService
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidRequest,
-                "Payload crop non valido.",
+                "Payload immagine modificata non valido.",
                 ex);
         }
 
@@ -220,7 +220,7 @@ internal sealed class ImageGenerationService
         {
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidRequest,
-                "Il crop non contiene dati immagine.");
+                "L'immagine modificata non contiene dati.");
         }
 
         string fileName = $"{Guid.NewGuid():N}{fileExtension}";

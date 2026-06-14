@@ -59,9 +59,10 @@ Generated images are stored under:
 %LOCALAPPDATA%\OnlyRag\images\generated
 ```
 
-Users can crop a generated image, save the crop as a new local image, optionally replace the source
-image, delete generated images from the editor, and open the generated-images folder through the
-Images section after explicit confirmation.
+Users can edit a generated image with the local toolbar editor, drag a crop area, add text overlays,
+save the rendered edit as a new local image, optionally replace the source image, delete generated
+images from the editor, and open the generated-images folder through the Images section after
+explicit confirmation.
 
 ## Release Verification
 
@@ -73,6 +74,6 @@ Representative release verification should cover:
 - GPU execution when DirectML is available;
 - CPU fallback when GPU acceleration is unavailable;
 - prompt generation;
-- crop save and optional source replacement;
+- toolbar image editing and optional source replacement;
 - saved gallery entries;
 - generated file retrieval.

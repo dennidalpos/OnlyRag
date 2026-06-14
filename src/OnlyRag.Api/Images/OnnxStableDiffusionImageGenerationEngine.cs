@@ -148,7 +148,7 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
                 Height = request.Height,
                 Seed = unchecked((int)Math.Clamp(seed, 0, int.MaxValue)),
                 InferenceSteps = request.Steps,
-                GuidanceScale = ResolveGuidanceScale(modelType),
+                GuidanceScale = ResolveGuidanceScale(request, modelType),
                 TimestepSpacing = ResolveTimestepSpacing(modelType)
             },
             IsLowMemoryComputeEnabled = true,
@@ -177,9 +177,9 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
             : ModelType.Base;
     }
 
-    private static float ResolveGuidanceScale(ModelType modelType)
+    private static float ResolveGuidanceScale(ImageGenerationRequest request, ModelType modelType)
     {
-        return modelType == ModelType.Turbo ? 0 : 7.0f;
+        return request.GuidanceScale ?? (modelType == ModelType.Turbo ? 0 : 7.0f);
     }
 
     private static TimestepSpacingType ResolveTimestepSpacing(ModelType modelType)

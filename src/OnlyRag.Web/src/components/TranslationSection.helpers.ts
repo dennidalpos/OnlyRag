@@ -46,6 +46,12 @@ export function formatUnitKind(kind: string): string {
       return "Cella";
     case "textbox":
       return "Textbox";
+    case "slide-note":
+      return "Nota";
+    case "heading":
+      return "Titolo";
+    case "ocr-line":
+      return "Riga OCR";
     case "paragraph":
       return "Paragrafo";
     default:

@@ -51,6 +51,7 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(1, compare.CurrentPage);
         Assert.Equal(2, compare.PageCount);
         Assert.Single(compare.Units);
+        Assert.Equal("Sezione 1 - Paragrafo 1", compare.Units[0].DisplayLabel);
         Assert.Equal("Machine page one", compare.Units[0].TranslatedText);
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
         Assert.NotNull(corrected);
@@ -221,6 +222,32 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task TranslationSourceUnits_LabelSupportedMediaShapes()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("translation-label-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
+        SqliteDocumentRepository documentRepository = new(connectionFactory);
+        SqliteTranslationRepository translationRepository = new(connectionFactory);
+
+        ImportedDocument csv = await CreateIndexedDocumentWithPageAsync(documentRepository, tempDescriptor.Root, "data.csv", ".csv", "name,score\nAlice,42");
+        ImportedDocument xlsx = await CreateIndexedDocumentWithPageAsync(documentRepository, tempDescriptor.Root, "book.xlsx", ".xlsx", "Foglio: Data\nRiga 2: [A2] Alice | [B2] 42");
+        ImportedDocument pptx = await CreateIndexedDocumentWithPageAsync(documentRepository, tempDescriptor.Root, "deck.pptx", ".pptx", "Slide 1\nTextbox 1: Titolo\nNote 1: Nota relatore");
+        ImportedDocument image = await CreateIndexedDocumentWithPageAsync(documentRepository, tempDescriptor.Root, "scan.png", ".png", "Prima riga OCR\nSeconda riga OCR");
+
+        IReadOnlyList<TranslationSourceUnit> csvUnits = await translationRepository.BuildSourceUnitsAsync(csv.Id);
+        IReadOnlyList<TranslationSourceUnit> xlsxUnits = await translationRepository.BuildSourceUnitsAsync(xlsx.Id);
+        IReadOnlyList<TranslationSourceUnit> pptxUnits = await translationRepository.BuildSourceUnitsAsync(pptx.Id);
+        IReadOnlyList<TranslationSourceUnit> imageUnits = await translationRepository.BuildSourceUnitsAsync(image.Id);
+
+        Assert.Contains(csvUnits, unit => unit.DisplayLabel == "Riga 2 - Colonna 2" && unit.UnitKind == "table-cell");
+        Assert.Contains(xlsxUnits, unit => unit.DisplayLabel == "Data - B2" && unit.UnitKind == "table-cell");
+        Assert.Contains(pptxUnits, unit => unit.DisplayLabel == "Slide 1 - Textbox 1" && unit.UnitKind == "textbox");
+        Assert.Contains(pptxUnits, unit => unit.DisplayLabel == "Slide 1 - Note 1" && unit.UnitKind == "slide-note");
+        Assert.Contains(imageUnits, unit => unit.DisplayLabel == "Immagine - Riga 2" && unit.UnitKind == "ocr-line");
+    }
+
+    [Fact]
     public async Task TranslationExport_PostPdf_UsesAppTempDirectoryAndCleansIt()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
@@ -278,6 +305,36 @@ public sealed partial class InProcessBackendTests
             await File.WriteAllBytesAsync(pdfPath, Encoding.ASCII.GetBytes("%PDF-1.4 fake"), cancellationToken);
             return new PdfExportConversionResult(pdfPath, directory);
         }
+    }
+
+    private static async Task<ImportedDocument> CreateIndexedDocumentWithPageAsync(
+        SqliteDocumentRepository documents,
+        string root,
+        string fileName,
+        string extension,
+        string text)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        ImportedDocument document = await documents.CreateAsync(new CreateDocumentRecordRequest(
+            Guid.NewGuid().ToString("N"),
+            fileName,
+            Path.Combine(root, fileName),
+            Guid.NewGuid().ToString("N"),
+            DocumentFileTypeDetector.DetectMimeType(fileName),
+            extension,
+            Encoding.UTF8.GetByteCount(text),
+            DocumentStatus.Indexed,
+            PageCount: 0,
+            CurrentJobId: null,
+            LastError: null,
+            now,
+            now));
+        await documents.SaveIngestedPageAsync(
+            document.Id,
+            new IngestedDocumentPage(1, text),
+            [new IngestedDocumentChunk(1, 1, 0, text, 1, Guid.NewGuid().ToString("N"))],
+            pageCount: 1);
+        return document;
     }
 }
 

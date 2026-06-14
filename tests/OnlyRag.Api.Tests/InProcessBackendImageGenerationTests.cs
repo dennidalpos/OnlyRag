@@ -70,7 +70,7 @@ public sealed partial class InProcessBackendTests
             new ImageGenerationRequest("portrait", null, null, 1024, 1024, 150, 1, null));
 
         Assert.Equal(4, lowSteps.Steps);
-        Assert.Equal(40, highSteps.Steps);
+        Assert.Equal(64, highSteps.Steps);
     }
 
     [Fact]
@@ -669,6 +669,47 @@ public sealed partial class InProcessBackendTests
         Assert.Contains(Path.Combine(tempDescriptor.Descriptor.StoragePaths.DataRoot, "images", "generated"), startInfo.ArgumentList);
     }
 
+    [Fact]
+    public async Task ImageGeneration_EditSavesRenderedImageAndRejectsInvalidPayload()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("image-edit-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { ImageGenerationEngine = new FakeImageGenerationEngine() });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+        await SeedVerifiedImageModelAsync(httpClient, tempDescriptor);
+        await SaveImageSettingsAsync(httpClient);
+
+        ImageGenerationResponse? generated = await (await httpClient.PostAsJsonAsync(
+            "/api/images/generate",
+            new ImageGenerationRequest("A local-first document desk", null, null, 512, 512, 8, 1, 42),
+            JsonOptions)).Content.ReadFromJsonAsync<ImageGenerationResponse>(JsonOptions);
+        Assert.NotNull(generated);
+        GeneratedImage source = Assert.Single(generated.Images);
+
+        using HttpResponseMessage savedResponse = await httpClient.PostAsJsonAsync(
+            $"/api/images/{source.Id}/edit",
+            new ImageEditSaveRequest(Convert.ToBase64String(CreateTinyPng()), "image/png", 1, 1, ReplaceOriginal: false),
+            JsonOptions);
+        GeneratedImage? saved = await savedResponse.Content.ReadFromJsonAsync<GeneratedImage>(JsonOptions);
+        using HttpResponseMessage invalidResponse = await httpClient.PostAsJsonAsync(
+            $"/api/images/{source.Id}/edit",
+            new ImageEditSaveRequest("not-base64", "image/png", 1, 1, ReplaceOriginal: false),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
+        Assert.NotNull(saved);
+        Assert.NotEqual(source.Id, saved.Id);
+        Assert.Equal(1, saved.Width);
+        Assert.Equal(1, saved.Height);
+        Assert.Equal("image/png", saved.MimeType);
+        await AssertProblemAsync(
+            invalidResponse,
+            HttpStatusCode.BadRequest,
+            "Richiesta immagini non valida",
+            "image_generation_invalid_request");
+    }
+
     private static async Task SaveImageSettingsAsync(HttpClient httpClient)
     {
         using HttpResponseMessage response = await httpClient.PutAsJsonAsync(
@@ -789,6 +830,15 @@ public sealed partial class InProcessBackendTests
             System.Text.Encoding.UTF8.GetBytes(ImageModelCatalog.PlaceholderModelContent));
     }
 
+    private static byte[] CreateTinyPng() =>
+    [
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+        0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
+        0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0,
+        9, 251, 3, 253, 167, 181, 60, 199, 0, 0, 0, 0, 73, 69, 78,
+        68, 174, 66, 96, 130
+    ];
+
     private sealed class FakeImageGenerationEngine : IImageGenerationEngine
     {
         public string ActiveExecutionProvider { get; init; } = "DirectML";
@@ -821,14 +871,5 @@ public sealed partial class InProcessBackendTests
                 ActiveExecutionProvider,
                 FallbackReason));
         }
-
-        private static byte[] CreateTinyPng() =>
-        [
-            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
-            0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
-            0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0,
-            9, 251, 3, 253, 167, 181, 60, 199, 0, 0, 0, 0, 73, 69, 78,
-            68, 174, 66, 96, 130
-        ];
     }
 }

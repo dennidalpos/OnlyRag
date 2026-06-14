@@ -42,6 +42,7 @@ Development machine:
 - .NET 10 SDK. `global.json` pins SDK selection with .NET 10 feature roll-forward.
 - Node.js `^20.19.0 || >=22.12.0` with npm.
 - Microsoft Edge WebView2 Runtime.
+- Microsoft Edge browser for frontend Playwright e2e checks.
 
 Optional development/runtime tools:
 
@@ -175,6 +176,7 @@ User data:
 
 - `%LOCALAPPDATA%\OnlyRag`: documents, SQLite data, Qdrant data, jobs, settings, logs, OCR cache,
   WebView2 profile data, and exports.
+- `%LOCALAPPDATA%\OnlyRag\backups`: timestamped backups created before confirmed local data resets.
 - `%LOCALAPPDATA%\Programs\OnlyRag`: default installed application path.
 
 Generated repository outputs ignored by Git:
@@ -198,6 +200,8 @@ commands recreate required ignored outputs.
 - Missing WebView2 Runtime: install Microsoft Edge WebView2 Evergreen Runtime and verify from
   Windows Settings > Apps or by locating `msedgewebview2.exe` under
   `Program Files\Microsoft\EdgeWebView\Application`.
+- Frontend e2e tests cannot launch a browser: install or repair Microsoft Edge, then rerun
+  `npm run test` from `src\OnlyRag.Web`.
 - Missing Inno Setup: install Inno Setup 6 and verify with `ISCC.exe /?`, or pass
   `-InnoSetupCompiler` where supported.
 - Missing signing tools: install Windows 10/11 SDK and verify with `signtool.exe /?`, or pass

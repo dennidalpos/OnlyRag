@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { DocumentPageInfo, DocumentPreviewResponse, ImportedDocument } from "../api";
 import { formatFileSize, statusLabels } from "./DocumentsSection.formatting";
+import { useModalMaximize } from "./useModalMaximize";
 import { useModalFocusTrap } from "./useModalFocusTrap";
 
 type Props = {
@@ -18,6 +19,7 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
   const currentPage = pages.find((p) => p.pageNumber === selectedPage) ?? pages[0] ?? null;
   const totalPages = preview?.pageCount ?? document.pageCount;
   const pageNumbers = buildVisiblePageNumbers(selectedPage, totalPages);
+  const modalSize = useModalMaximize();
   useModalFocusTrap(modalRef, true, { onEscape: onClose });
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -27,7 +29,7 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick}>
       <div
-        className="preview-modal"
+        className={`preview-modal modal-frame--resizable${modalSize.maximizedClassName}`}
         role="dialog"
         aria-modal="true"
         aria-label="Anteprima documento"
@@ -46,9 +48,14 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
               {preview?.mimeType && ` · ${preview.mimeType}`}
             </span>
           </div>
-          <button className="button-secondary" type="button" onClick={onClose} aria-label="Chiudi anteprima">
-            ✕ Chiudi
-          </button>
+          <div className="compare-header-actions">
+            <button className="button-secondary" type="button" onClick={modalSize.toggleMaximized}>
+              {modalSize.maximizeLabel}
+            </button>
+            <button className="button-secondary" type="button" onClick={onClose} aria-label="Chiudi anteprima">
+              Chiudi
+            </button>
+          </div>
         </div>
 
         {isLoading && (

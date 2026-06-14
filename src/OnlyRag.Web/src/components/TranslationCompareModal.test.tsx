@@ -1,5 +1,6 @@
 import { createRef, type ComponentProps } from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TranslationCompare, TranslationSummary, TranslationUnit } from "../api";
 import { TranslationCompareModal } from "./TranslationCompareModal";
@@ -24,7 +25,7 @@ describe("TranslationCompareModal", () => {
       saveState: { tone: "info", message: "Correzione salvata." }
     });
 
-    expect(screen.getByRole("button", { name: "Paragrafo 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Pagina 1 - Paragrafo 1" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("status")).toHaveTextContent("Correzione salvata.");
   });
 
@@ -37,6 +38,17 @@ describe("TranslationCompareModal", () => {
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Salvataggio non riuscito.");
+  });
+
+  it("can maximize and restore the compare window", async () => {
+    renderCompareModal();
+    const dialog = screen.getByRole("dialog", { name: "Confronto traduzione" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Massimizza" }));
+    expect(dialog).toHaveClass("modal-frame--maximized");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ripristina" }));
+    expect(dialog).not.toHaveClass("modal-frame--maximized");
   });
 });
 
@@ -85,6 +97,7 @@ function createUnit(overrides: Partial<TranslationUnit> = {}): TranslationUnit {
     translationId: 1,
     unitIndex: 0,
     unitKind: "paragraph",
+    displayLabel: "Pagina 1 - Paragrafo 1",
     pageNumber: 1,
     sourceText: "Testo originale",
     machineTranslatedText: "Machine text",

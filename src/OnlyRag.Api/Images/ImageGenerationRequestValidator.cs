@@ -18,9 +18,12 @@ internal static class ImageGenerationRequestValidator
         string? modelId = string.IsNullOrWhiteSpace(request.ModelId) ? null : request.ModelId.Trim();
         int width = ClampToMultipleOfEight(request.Width, 256, 2048);
         int height = ClampToMultipleOfEight(request.Height, 256, 2048);
-        int steps = Math.Clamp(request.Steps, 4, 40);
+        int steps = Math.Clamp(request.Steps, 4, 64);
         int batchSize = Math.Clamp(request.BatchSize, 1, 4);
         long? seed = request.Seed is < 0 ? null : request.Seed;
+        float? guidanceScale = request.GuidanceScale is null
+            ? null
+            : Math.Clamp(request.GuidanceScale.Value, 0f, 20f);
 
         return new ImageGenerationRequest(
             prompt,
@@ -30,7 +33,8 @@ internal static class ImageGenerationRequestValidator
             height,
             steps,
             batchSize,
-            seed);
+            seed,
+            guidanceScale);
     }
 
     private static int ClampToMultipleOfEight(int value, int min, int max)

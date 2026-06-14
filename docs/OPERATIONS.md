@@ -12,6 +12,7 @@ Required for development:
 - .NET 10 SDK selected by [`global.json`](../global.json).
 - Node.js `^20.19.0 || >=22.12.0` with npm.
 - Microsoft Edge WebView2 Runtime.
+- Microsoft Edge browser for frontend Playwright e2e checks.
 
 Optional by feature:
 
@@ -125,7 +126,8 @@ pwsh .\scripts\Build-App.ps1 -Configuration Release
 ```
 
 `Build-App.ps1` builds the web UI unless `-SkipWebBuild` is supplied, prepares the Qdrant payload
-when missing, restores .NET unless `-NoRestore` is supplied, and builds the solution.
+when missing, restores .NET unless `-NoRestore` is supplied, and builds the WPF app project for
+the selected runtime.
 
 Installer build:
 
@@ -229,6 +231,8 @@ revert tracked source changes.
 - Missing WebView2 Runtime: install Microsoft Edge WebView2 Evergreen Runtime and verify from
   Windows Settings > Apps or by locating `msedgewebview2.exe` under
   `Program Files\Microsoft\EdgeWebView\Application`.
+- Frontend e2e tests cannot launch a browser: install or repair Microsoft Edge, then rerun
+  `npm run test` from `src\OnlyRag.Web`.
 - Missing Inno Setup: install Inno Setup 6 and verify with `ISCC.exe /?`, or pass
   `-InnoSetupCompiler` where supported.
 - Missing signing tools: install Windows 10/11 SDK and verify with `signtool.exe /?`, or pass

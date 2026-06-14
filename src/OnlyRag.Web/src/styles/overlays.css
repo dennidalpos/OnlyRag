@@ -22,6 +22,18 @@
   box-shadow: 0 18px 48px rgba(23, 32, 51, 0.24);
 }
 
+.modal-frame--resizable {
+  resize: both;
+  min-width: min(620px, calc(100vw - 32px));
+  min-height: min(420px, calc(100vh - 32px));
+}
+
+.modal-frame--maximized {
+  width: calc(100vw - 24px) !important;
+  height: calc(100vh - 24px) !important;
+  max-height: calc(100vh - 24px) !important;
+}
+
 .compare-modal__header,
 .compare-toolbar,
 .compare-footer,

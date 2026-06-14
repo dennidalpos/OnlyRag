@@ -79,6 +79,7 @@ export type ImageGenerationRequest = {
   steps: number;
   batchSize: number;
   seed: number | null;
+  guidanceScale: number | null;
 };
 
 export type ImageGenerationResponse = {

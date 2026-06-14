@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 import type { TranslationCompare, TranslationUnit } from "../api";
-import { formatUnitKind } from "./TranslationSection.helpers";
 import type { FeedbackState } from "./TranslationSection.types";
+import { useModalMaximize } from "./useModalMaximize";
 
 export function TranslationCompareModal({
   compareDialogRef,
@@ -30,10 +30,11 @@ export function TranslationCompareModal({
   onActiveUnitChange: (unitId: number) => void;
   onEditedTextChange: (text: string) => void;
 }) {
+  const modalSize = useModalMaximize();
   return (
     <div className="modal-backdrop">
       <div
-        className="compare-modal"
+        className={`compare-modal modal-frame--resizable${modalSize.maximizedClassName}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="compare-title"
@@ -46,6 +47,9 @@ export function TranslationCompareModal({
             <span>{compareData?.translation.documentName ?? "Documento"}</span>
           </div>
           <div className="compare-header-actions">
+            <button className="button-secondary" type="button" onClick={modalSize.toggleMaximized}>
+              {modalSize.maximizeLabel}
+            </button>
             <button
               type="button"
               disabled={!activeCompareUnit || !editedTranslationText.trim()}
@@ -108,7 +112,7 @@ export function TranslationCompareModal({
                   }
                   onClick={() => onActiveUnitChange(unit.id)}
                 >
-                  {formatUnitKind(unit.unitKind)} {unit.unitIndex + 1}
+                  {unit.displayLabel}
                 </button>
               ))}
             </div>
@@ -118,7 +122,7 @@ export function TranslationCompareModal({
                 <section className="compare-column compare-column--source">
                   <div className="compare-column__header">
                     <strong>Originale</strong>
-                    <span>Unità {activeCompareUnit.unitIndex + 1}</span>
+                    <span>{activeCompareUnit.displayLabel}</span>
                   </div>
                   <p>{activeCompareUnit.sourceText}</p>
                 </section>

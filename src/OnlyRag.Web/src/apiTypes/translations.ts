@@ -26,6 +26,7 @@ export type TranslationUnit = {
   translationId: number;
   unitIndex: number;
   unitKind: string;
+  displayLabel: string;
   pageNumber: number | null;
   sourceText: string;
   machineTranslatedText: string | null;
