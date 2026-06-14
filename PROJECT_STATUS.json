@@ -1,7 +1,29 @@
 {
+  "statusUpdated": "2026-06-14",
+  "source": "Static repository audit focused on data safety, local-first image workflows, RAG robustness, and maintainability.",
+  "summary": {
+    "currentFocus": "Stabilize the local-first user experience before adding new features.",
+    "highestRiskAreas": [
+      "Automatic local data reset on schema mismatch",
+      "Hugging Face image-model downloads fetching full repository snapshots instead of required files only",
+      "Hidden prompt mutation in image generation presets and runtime defaults",
+      "Download cancellation that does not actually cancel active transfers",
+      "RAG retrieval hard-failing when embedding or vector search is unavailable"
+    ],
+    "recommendedExecutionOrder": [
+      "Protect user data and schema migration paths",
+      "Fix image-model download size, validation, cancellation, and atomicity",
+      "Make image prompts and runtime profiles transparent and user-controlled",
+      "Improve RAG degradation behavior when local services are unavailable",
+      "Refactor composition and contracts for long-term maintainability"
+    ]
+  },
   "todos": [
-    "Refactor the Hugging Face image-model downloader so built-in SDXL/ONNX entries download only ImageModelCatalog.RequiredSdxlSnapshotFiles instead of fetching the full repository snapshot. Preserve the expected Diffusers/ONNX directory layout and skip unrelated assets such as alternate weight formats, previews, examples, and duplicate precision variants.",
+    "Replace automatic data-root reset on schema mismatch with explicit migrations, pre-reset backup, and user-visible recovery flow. The application must never silently delete local user data, indexes, chats, OCR cache, logs, or generated artifacts because a schema version is unexpected.",
+    "Refactor the Hugging Face image-model downloader so built-in SDXL/ONNX entries download only the required files declared by ImageModelCatalog instead of fetching the full repository snapshot. Preserve the expected Diffusers/ONNX directory layout and skip unrelated assets such as alternate weight formats, previews, examples, duplicate precision variants, and training artifacts.",
     "Add strict download validation for image models: show expectedSizeBytes as GB before consent, check that every required file exists after download, surface a clear error when a required file is missing, and keep the existing local model state consistent when a partial download fails.",
+    "Make image-model downloads atomic. Download into a staging directory, validate all required files, then rename into the final model directory only after validation succeeds. Clean stale staging directories safely on startup.",
+    "Implement real image-model download cancellation with per-download CancellationTokenSource instances. Cancel must stop active network reads, mark the model as cancelled, clean incomplete staging files, and leave any previous valid local model untouched.",
     "Remove built-in image models that are too large for a normal desktop install or not suitable for distribution because of license terms. Do not keep presets that point to full repositories around 70 GB or to non-commercial model licenses.",
     "Keep a single manageable built-in Hugging Face model that can be downloaded directly by the app. Prefer the OpenRAIL++ DirectML/CPU ONNX candidate softwareweaver/Latent-Consistency-xl-Olive-Onnx, set a non-zero expectedSizeBytes value around 8_000_000_000 bytes, and verify the declared GB value in the UI.",
     "Limit the Images section to local-only operations. Remove UI actions and copy that imply external sharing, publishing, or cloud handoff. Generated and edited images must remain local unless the user explicitly exports a local file through normal file-system controls.",
@@ -9,7 +31,291 @@
     "Remove create-image prompt presets. The user's prompt text must remain the primary and only creative request source sent to the image runtime; the app must not add hidden style directives, subject directives, scene templates, negative-prompt recipes, or prompt embellishments behind preset names.",
     "Replace image-generation presets with only three runtime profiles for built-in models: quality, balanced, and performance. These profiles may adjust only technical parameters such as steps, guidance, scheduler profile, width, height, seed behavior, and GPU preference; they must not inject creative content or alter the user's request.",
     "Allow all generation parameters to be edited manually. When the user changes any parameter controlled by a profile, automatically switch the active profile to custom and preserve the manual values instead of snapping back to quality, balanced, or performance.",
+    "Apply RequestTimeoutSeconds during image generation by linking the user cancellation token with a timeout token. Surface timeout errors distinctly from model-load errors, engine errors, and user cancellation.",
     "For manually added image models, expose required configuration fields instead of assuming built-in defaults: model id, display name, download URL or local path, license label, expected size in bytes, required files, model type/profile, supported resolutions, default steps, default guidance, scheduler expectation, and GPU/CPU compatibility notes.",
-    "Test the final image workflow on CPU and DirectML GPU, including NVIDIA cards with 8 GB VRAM. Validate download size display, selective required-file download, model loading, generation with quality/balanced/performance/custom profiles, manual model configuration, crop, local save, and CPU fallback."
-  ]
+    "Make hybrid RAG retrieval degrade gracefully. If embedding or Qdrant vector search is unavailable, continue with keyword retrieval, include a clear retrieval notice, and reserve 503 hard failures for cases where no retrieval backend can answer the request.",
+    "Add a small retrieval evaluation harness with representative local queries, expected source chunks, recall@k, MRR, and context-size metrics. Use it before changing keyword/vector weights, chunking, or ranking logic.",
+    "Split the backend composition root into focused extension methods for storage, retrieval, OCR, images, Ollama, diagnostics, jobs, and endpoint mapping. Preserve current behavior while reducing startup coupling.",
+    "Reduce TypeScript/C# API contract drift by generating TypeScript types from the backend contract or by adding contract snapshot tests for key request and response DTOs.",
+    "Test the final image workflow on CPU and DirectML GPU, including NVIDIA cards with 8 GB VRAM. Validate download size display, selective required-file download, cancellation, model loading, generation with quality/balanced/performance/custom profiles, manual model configuration, crop, local save, timeout behavior, and CPU fallback."
+  ],
+  "auditPlan": {
+    "phase1DataSafety": {
+      "priority": "P0",
+      "goal": "Prevent accidental local data loss and make schema evolution explicit.",
+      "tasks": [
+        {
+          "id": "DATA-001",
+          "title": "Replace destructive schema mismatch reset",
+          "details": "Remove automatic AppDataReset execution from schema initialization. Return a structured state such as Current, MigrationRequired, UnsupportedSchema, or CorruptDatabase instead of deleting the data root.",
+          "acceptanceCriteria": [
+            "Opening an older schema never deletes user files automatically.",
+            "The app reports the schema state in a user-visible way.",
+            "Tests cover old schema, future schema, missing schema metadata, and corrupt database cases."
+          ]
+        },
+        {
+          "id": "DATA-002",
+          "title": "Introduce schema migrations",
+          "details": "Create a schema_migrations table and incremental migration handlers. Each migration must be idempotent or guarded by an applied migration record.",
+          "acceptanceCriteria": [
+            "Fresh installs create the latest schema directly.",
+            "Existing installs migrate forward without data loss.",
+            "Migration failure preserves the pre-migration database."
+          ]
+        },
+        {
+          "id": "DATA-003",
+          "title": "Add backup before destructive maintenance",
+          "details": "Any reset or destructive repair path must create a timestamped backup of databases, indexes, chats, generated images, and settings before continuing.",
+          "acceptanceCriteria": [
+            "A backup path is displayed to the user before destructive action.",
+            "Backup creation failure blocks the destructive action.",
+            "Backup restore is documented for manual recovery."
+          ]
+        }
+      ]
+    },
+    "phase2ImageModelDownloads": {
+      "priority": "P0",
+      "goal": "Make model download size predictable, cancellable, validated, and compatible with normal desktop storage limits.",
+      "tasks": [
+        {
+          "id": "IMG-DL-001",
+          "title": "Download only required Hugging Face files",
+          "details": "Pass each catalog model's requiredFiles into the Hugging Face downloader. Avoid recursive full snapshot download for built-in models.",
+          "acceptanceCriteria": [
+            "Network requests are made only for declared required files and minimal metadata needed for validation.",
+            "Directory layout matches the runtime loader expectation.",
+            "Unrelated files such as previews, examples, duplicate precision variants, and training artifacts are skipped."
+          ]
+        },
+        {
+          "id": "IMG-DL-002",
+          "title": "Validate model download completeness",
+          "details": "After download, verify that every required file exists and has a non-zero size. Where practical, add expected file size or checksum metadata later.",
+          "acceptanceCriteria": [
+            "Missing required files produce a clear actionable error.",
+            "Partial downloads are not marked installed.",
+            "The previous installed model remains usable after a failed update."
+          ]
+        },
+        {
+          "id": "IMG-DL-003",
+          "title": "Use atomic staging directories",
+          "details": "Write downloads to a temporary staging directory. Move to final location only after validation succeeds. Clean abandoned staging directories on startup if no active download owns them.",
+          "acceptanceCriteria": [
+            "The final model directory is never a partially valid state.",
+            "Cancellation and failure remove or quarantine staging files.",
+            "Startup cleanup does not delete valid installed models."
+          ]
+        },
+        {
+          "id": "IMG-DL-004",
+          "title": "Implement real cancellation",
+          "details": "Track active downloads with CancellationTokenSource per model id. The cancel endpoint must signal the token and await or observe cleanup.",
+          "acceptanceCriteria": [
+            "Cancelling stops active HTTP reads promptly.",
+            "UI state transitions through cancelling/cancelled instead of pretending the download disappeared.",
+            "A cancelled download can be restarted cleanly."
+          ]
+        },
+        {
+          "id": "IMG-DL-005",
+          "title": "Curate built-in downloadable models",
+          "details": "Keep only a manageable default model with compatible license and desktop-sized expected download. Remove or hide catalog entries that imply huge downloads or unsuitable license terms.",
+          "acceptanceCriteria": [
+            "Built-in catalog has no non-commercial default model.",
+            "Built-in catalog has no default entry that downloads an unexpectedly huge repository.",
+            "The UI shows expected size before user consent."
+          ]
+        }
+      ]
+    },
+    "phase3ImageWorkflowTransparency": {
+      "priority": "P0",
+      "goal": "Ensure generated image output is controlled by explicit user input and visible technical parameters only.",
+      "tasks": [
+        {
+          "id": "IMG-PROMPT-001",
+          "title": "Remove hidden prompt embellishment",
+          "details": "Delete quality/style suffix injection and any preset that appends creative directives to the user's prompt.",
+          "acceptanceCriteria": [
+            "The prompt sent to the runtime exactly matches the user's prompt unless the user edits it explicitly.",
+            "Negative prompt defaults are either empty or visible and editable before generation.",
+            "Tests assert prompt pass-through behavior."
+          ]
+        },
+        {
+          "id": "IMG-PROFILE-001",
+          "title": "Replace creative presets with technical runtime profiles",
+          "details": "Keep quality, balanced, performance, and custom. Profiles may alter steps, guidance, scheduler, width, height, seed policy, timeout, and GPU preference only.",
+          "acceptanceCriteria": [
+            "Profiles do not modify prompt or negative prompt text.",
+            "Manual edits switch the active profile to custom.",
+            "Profile-derived parameters are visible before generation."
+          ]
+        },
+        {
+          "id": "IMG-LOCAL-001",
+          "title": "Keep image operations local-only",
+          "details": "Remove UI labels, commands, or copy that suggest publishing, sharing, or cloud handoff. Allow explicit local export through file-system controls only.",
+          "acceptanceCriteria": [
+            "No default image operation sends generated files outside the local machine.",
+            "Export paths are explicit user choices.",
+            "Generated and edited image metadata remains local."
+          ]
+        },
+        {
+          "id": "IMG-EDIT-001",
+          "title": "Add crop workflow",
+          "details": "Implement local crop selection, preview, apply, and save-as behavior. Preserve the original unless the user explicitly replaces it.",
+          "acceptanceCriteria": [
+            "Crop can save a new local artifact.",
+            "Replace original requires explicit user action.",
+            "Crop works offline and does not require model runtime."
+          ]
+        },
+        {
+          "id": "IMG-TIMEOUT-001",
+          "title": "Apply generation timeout setting",
+          "details": "Use RequestTimeoutSeconds to create a linked cancellation token for image generation. Show distinct messages for timeout, cancellation, missing model, and engine failure.",
+          "acceptanceCriteria": [
+            "Generation stops when the configured timeout elapses.",
+            "User cancellation remains distinct from timeout.",
+            "Timeout behavior is covered by tests or a deterministic fake engine."
+          ]
+        }
+      ]
+    },
+    "phase4RagRobustness": {
+      "priority": "P1",
+      "goal": "Make RAG useful even when optional local services are unavailable or degraded.",
+      "tasks": [
+        {
+          "id": "RAG-001",
+          "title": "Add keyword-only fallback",
+          "details": "If embedding generation or Qdrant vector search fails, continue with SQLite FTS keyword retrieval and attach a retrieval notice instead of returning a hard failure when keyword results exist.",
+          "acceptanceCriteria": [
+            "Qdrant offline still allows keyword-based answers with a clear notice.",
+            "Embedding model unavailable still allows keyword-based answers with a clear notice.",
+            "No-context cases remain explicit and do not fabricate sources."
+          ]
+        },
+        {
+          "id": "RAG-002",
+          "title": "Create retrieval evaluation harness",
+          "details": "Add a small local eval set with representative documents, queries, expected chunks, recall@k, MRR, and context-size metrics. Run it before ranking, chunking, or weighting changes.",
+          "acceptanceCriteria": [
+            "Eval command can run locally without cloud services.",
+            "Baseline metrics are committed or documented.",
+            "Ranking changes report before/after metrics."
+          ]
+        },
+        {
+          "id": "RAG-003",
+          "title": "Review hybrid ranking and context budget",
+          "details": "Tune keyword/vector weights, overlap behavior, and MaxContextCharacters using eval results instead of static assumptions. Consider diversity/MMR if context redundancy is high.",
+          "acceptanceCriteria": [
+            "Weights have documented rationale.",
+            "Context selection avoids repeated chunks from the same local area when better diverse evidence exists.",
+            "Changes do not regress recall@k on the eval set."
+          ]
+        }
+      ]
+    },
+    "phase5Maintainability": {
+      "priority": "P2",
+      "goal": "Reduce coupling and contract drift after the P0 behavior fixes are complete.",
+      "tasks": [
+        {
+          "id": "ARCH-001",
+          "title": "Split backend dependency registration",
+          "details": "Move service registration into focused extension methods: AddOnlyRagStorage, AddOnlyRagRetrieval, AddOnlyRagOcr, AddOnlyRagImages, AddOnlyRagOllama, AddOnlyRagDiagnostics, and AddOnlyRagJobs.",
+          "acceptanceCriteria": [
+            "Application bootstrap remains behaviorally equivalent.",
+            "Each extension method has a narrow dependency area.",
+            "Tests can construct individual modules without full application startup."
+          ]
+        },
+        {
+          "id": "ARCH-002",
+          "title": "Split endpoint mapping by feature",
+          "details": "Move endpoint groups into MapOnlyRagDocuments, MapOnlyRagChat, MapOnlyRagImages, MapOnlyRagDiagnostics, and MapOnlyRagSettings.",
+          "acceptanceCriteria": [
+            "Routes and auth requirements remain unchanged.",
+            "Endpoint tests continue to pass.",
+            "Feature files are small enough to review independently."
+          ]
+        },
+        {
+          "id": "CONTRACT-001",
+          "title": "Reduce C# and TypeScript DTO drift",
+          "details": "Either generate TypeScript contracts from backend metadata or add JSON snapshot tests covering key DTOs and enum/string states used by the UI.",
+          "acceptanceCriteria": [
+            "DTO shape changes fail tests unless snapshots or generated types are updated.",
+            "Image model, image generation, chat, retrieval notice, and document DTOs are covered.",
+            "UI code imports shared/generated types where practical."
+          ]
+        }
+      ]
+    },
+    "validationMatrix": [
+      {
+        "area": "Data safety",
+        "checks": [
+          "Fresh install",
+          "Upgrade from previous schema",
+          "Future schema version",
+          "Corrupt local database",
+          "Backup before destructive action"
+        ]
+      },
+      {
+        "area": "Image downloads",
+        "checks": [
+          "Expected GB display before consent",
+          "Required-file-only network calls",
+          "Partial failure recovery",
+          "Cancellation during large file download",
+          "Restart after cancellation",
+          "Startup cleanup of stale staging directory"
+        ]
+      },
+      {
+        "area": "Image generation",
+        "checks": [
+          "Prompt pass-through",
+          "Visible negative prompt behavior",
+          "Quality/balanced/performance/custom profiles",
+          "Manual parameter override switches to custom",
+          "Timeout",
+          "User cancellation",
+          "CPU fallback",
+          "DirectML GPU on NVIDIA 8 GB VRAM"
+        ]
+      },
+      {
+        "area": "RAG",
+        "checks": [
+          "Normal hybrid retrieval",
+          "Qdrant unavailable",
+          "Embedding unavailable",
+          "Keyword-only fallback",
+          "No-context answer path",
+          "Retrieval notices",
+          "Eval metrics before/after ranking changes"
+        ]
+      },
+      {
+        "area": "Architecture",
+        "checks": [
+          "Backend starts with split DI modules",
+          "Endpoint routes remain stable",
+          "TypeScript contracts match backend DTOs",
+          "CI gate remains green"
+        ]
+      }
+    ]
+  }
 }
