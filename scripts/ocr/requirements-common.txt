@@ -1,4 +1,4 @@
 paddleocr==3.5.0
-pillow==12.2.0
+pillow==12.3.0
 pypdfium2==5.8.0
 opencv-python==4.13.0.92
