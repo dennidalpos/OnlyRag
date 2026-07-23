@@ -2,9 +2,9 @@ using System.Text.Json;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal sealed class ImageModelCatalogStore
+public sealed class ImageModelCatalogStore
 {
     private const string CatalogOverridesKey = "imageGeneration.modelCatalogOverrides";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

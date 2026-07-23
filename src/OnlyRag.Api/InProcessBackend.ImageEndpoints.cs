@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using OnlyRag.Api.Images;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Images;
 
 namespace OnlyRag.Api;
 

@@ -20,7 +20,7 @@ Optional by feature:
 - LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for OCR provisioning.
 - Integrated image model download from the Images section for image generation.
-- Inno Setup 6 for installer builds.
+- NSIS 3.x for installer builds.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed release
   candidates.
 
@@ -112,7 +112,7 @@ Package build readiness:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
 ```
 
-This requires Inno Setup 6 and compiles the installer. It still does not prove production release
+This requires NSIS 3.x and compiles the installer. It still does not prove production release
 readiness without signing and lifecycle verification.
 
 CI runs `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` on `windows-latest`.
@@ -136,7 +136,7 @@ pwsh .\scripts\Build-Installer.ps1 -Configuration Release
 ```
 
 `Build-Installer.ps1` builds web assets, prepares Qdrant, publishes the WPF app self-contained for
-`win-x64`, and compiles the Inno Setup installer. Unsigned output is a packaging artifact only.
+`win-x64`, and compiles the NSIS installer. Unsigned output is a packaging artifact only.
 
 ## Release Handoff
 
@@ -233,8 +233,8 @@ revert tracked source changes.
   `Program Files\Microsoft\EdgeWebView\Application`.
 - Frontend e2e tests cannot launch a browser: install or repair Microsoft Edge, then rerun
   `npm run test` from `src\OnlyRag.Web`.
-- Missing Inno Setup: install Inno Setup 6 and verify with `ISCC.exe /?`, or pass
-  `-InnoSetupCompiler` where supported.
+- Missing NSIS: install NSIS 3.x and verify with `makensis.exe /VERSION`, or pass
+  `-NsisCompiler` where supported.
 - Missing signing tools: install Windows 10/11 SDK and verify with `signtool.exe /?`, or pass
   `-SignToolPath` where supported.
 - Installer lifecycle blocked: verify on a clean Windows profile or machine with WebView2 installed

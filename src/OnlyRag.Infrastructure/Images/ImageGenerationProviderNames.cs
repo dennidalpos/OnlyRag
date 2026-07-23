@@ -1,4 +1,4 @@
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
 internal static class ImageGenerationProviderNames
 {

@@ -1,9 +1,9 @@
-using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;

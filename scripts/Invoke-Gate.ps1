@@ -8,7 +8,7 @@ param(
 
     [switch]$ContinueOnError,
 
-    [string]$InnoSetupCompiler
+    [string]$NsisCompiler
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,7 +90,7 @@ Write-Host "Repository: $repoRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Installer: $(if ($IncludeInstaller) { 'included' } else { 'skipped by default' })"
 Write-Host "Continue on error: $(if ($ContinueOnError) { 'enabled' } else { 'disabled' })"
-Write-Host "Inno Setup: $(if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) { 'auto-detect when installer is included' } else { $InnoSetupCompiler })"
+Write-Host "NSIS: $(if ([string]::IsNullOrWhiteSpace($NsisCompiler)) { 'auto-detect when installer is included' } else { $NsisCompiler })"
 
 Invoke-GateStep "preflight" {
     if (-not $IsWindows) {
@@ -217,8 +217,8 @@ if ($IncludeInstaller) {
         $installerArguments = @{
             Configuration = $Configuration
         }
-        if (-not [string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
-            $installerArguments.InnoSetupCompiler = $InnoSetupCompiler
+        if (-not [string]::IsNullOrWhiteSpace($NsisCompiler)) {
+            $installerArguments.NsisCompiler = $NsisCompiler
         }
 
         & $buildInstallerScript @installerArguments

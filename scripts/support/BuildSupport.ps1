@@ -73,25 +73,25 @@ function Invoke-OnlyRagWebBuild {
     Invoke-OnlyRagNative -FilePath $npmCommand.Source -Arguments @("run", "build") -WorkingDirectory $WebRoot
 }
 
-function Get-OnlyRagInnoSetupCompiler {
+function Get-OnlyRagNsisCompiler {
     param([string]$RequestedPath)
 
     if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
         if (-not (Test-Path -LiteralPath $RequestedPath -PathType Leaf)) {
-            throw "Inno Setup compiler was not found at '$RequestedPath'."
+            throw "NSIS compiler was not found at '$RequestedPath'."
         }
 
         return (Resolve-Path -LiteralPath $RequestedPath).Path
     }
 
-    $command = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+    $command = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
     if ($command) {
         return $command.Source
     }
 
     $candidates = @(
-        (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
-        (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe")
+        (Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"),
+        (Join-Path $env:ProgramFiles "NSIS\makensis.exe")
     )
 
     foreach ($candidate in $candidates) {

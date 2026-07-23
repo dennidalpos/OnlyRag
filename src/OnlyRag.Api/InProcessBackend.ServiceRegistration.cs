@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
-using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Retrieval;
@@ -67,6 +67,7 @@ internal static class InProcessBackendServiceRegistration
         BackendRuntimeState runtimeState)
     {
         services.AddSingleton(descriptor);
+        services.AddSingleton(descriptor.StoragePaths);
         services.AddSingleton(descriptor.Store);
         services.AddSingleton(descriptor.JobQueue);
         services.AddSingleton(options.DocumentLibraryLimits);

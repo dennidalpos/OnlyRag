@@ -106,9 +106,9 @@ describe("App initial setup", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("dialog", { name: "Configurazione iniziale richiesta" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Notifica di configurazione" })).toBeInTheDocument();
     expect(screen.getByText("OCR CPU da installare")).toBeInTheDocument();
-    expect(screen.getByText("12.5%")).toBeInTheDocument();
+
 
     await userEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
 

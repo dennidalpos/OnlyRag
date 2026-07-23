@@ -17,7 +17,7 @@ The script uses WPF imaging assemblies and therefore requires Windows.
 
 - [`assets/brand/logos`](../assets/brand/logos): icon and logo SVG/PNG variants.
 - [`assets/brand/social`](../assets/brand/social): social preview/card images.
-- [`assets/brand/setup`](../assets/brand/setup): Inno Setup wizard imagery.
+- [`assets/brand/setup`](../assets/brand/setup): installer wizard imagery.
 - [`assets/brand/posts`](../assets/brand/posts): prepared post images.
 - [`src/OnlyRag.Web/public`](../src/OnlyRag.Web/public): favicon, manifest, and social assets
   consumed by the web UI build.

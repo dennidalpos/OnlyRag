@@ -1,26 +1,26 @@
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal sealed class ImageGenerationService
+public sealed class ImageGenerationService
 {
     private const string GeneratedImagesRelativeRoot = "images/generated";
 
-    private readonly InProcessBackendDescriptor descriptor;
+    private readonly AppStoragePaths storagePaths;
     private readonly IImageGenerationSettingsService settingsService;
     private readonly ImageModelManager modelManager;
     private readonly IGeneratedImageRepository images;
     private readonly IImageGenerationEngine engine;
 
     public ImageGenerationService(
-        InProcessBackendDescriptor descriptor,
+        AppStoragePaths storagePaths,
         IImageGenerationSettingsService settingsService,
         ImageModelManager modelManager,
         IGeneratedImageRepository images,
         IImageGenerationEngine engine)
     {
-        this.descriptor = descriptor;
+        this.storagePaths = storagePaths;
         this.settingsService = settingsService;
         this.modelManager = modelManager;
         this.images = images;
@@ -279,13 +279,13 @@ internal sealed class ImageGenerationService
 
     public string GetGeneratedRoot()
     {
-        return Path.Combine(descriptor.StoragePaths.DataRoot, "images", "generated");
+        return Path.Combine(storagePaths.DataRoot, "images", "generated");
     }
 
     private string ResolveGeneratedPath(string relativePath)
     {
         string root = Path.GetFullPath(GetGeneratedRoot());
-        string absolutePath = Path.GetFullPath(Path.Combine(descriptor.StoragePaths.DataRoot, relativePath));
+        string absolutePath = Path.GetFullPath(Path.Combine(storagePaths.DataRoot, relativePath));
         string rootWithSeparator = root.EndsWith(Path.DirectorySeparatorChar)
             ? root
             : root + Path.DirectorySeparatorChar;

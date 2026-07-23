@@ -14,14 +14,13 @@ and an in-process .NET backend.
   user-facing error mapping.
 - [`src/OnlyRag.Core`](../src/OnlyRag.Core): shared contracts, settings DTOs, responses, and
   request models.
-- [`src/OnlyRag.Infrastructure`](../src/OnlyRag.Infrastructure): SQLite storage, ingestion, OCR,
-  PDF export conversion, retrieval, and Qdrant vector store adapters.
+- [`src/OnlyRag.Infrastructure`](../src/OnlyRag.Infrastructure): SQLite storage, ingestion, OCR, ONNX DirectML image generation, PDF export conversion, retrieval, and Qdrant vector store adapters.
 - [`src/OnlyRag.Worker`](../src/OnlyRag.Worker): local job queue abstractions and job state.
 - [`tests`](../tests): xUnit tests for .NET layers and a Playwright backend host for frontend
   e2e contract tests.
 - [`scripts`](../scripts): PowerShell automation for bootstrap, gates, build, packaging, signing,
   assets, OCR, and cleanup.
-- [`packaging`](../packaging): Inno Setup script and bundled Qdrant runtime manifest/payload.
+- [`packaging`](../packaging): NSIS script and bundled Qdrant runtime manifest/payload.
 - [`assets/brand`](../assets/brand): generated source brand assets and setup/social imagery.
 
 ## Runtime Boundaries
@@ -49,7 +48,7 @@ available UI work, and stops backend processes.
 
 Development uses .NET 10, npm from Node.js, and PowerShell 7. End-user installer payloads are
 self-contained for .NET runtime components and include the bundled Qdrant runtime. WebView2,
-Ollama, Python, Inno Setup, and signing tools are external prerequisites depending on workflow.
+Ollama, Python, NSIS, and signing tools are external prerequisites depending on workflow.
 LibreOffice is optional and used only for translation PDF export.
 
 No repository code should store secrets. Signing PFX files must stay outside the repository.

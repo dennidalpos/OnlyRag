@@ -17,8 +17,9 @@ import { initializeAppLifecycleBridge } from "./appLifecycle";
 import { AppHeader } from "./components/AppHeader";
 import { ChatSection } from "./components/ChatSection";
 import { DocumentsSection } from "./components/DocumentsSection";
-import { InitialSetupWizard } from "./components/InitialSetupWizard";
+import { SetupBanner } from "./components/SetupBanner";
 import { ImagesSection } from "./components/ImagesSection";
+import { JobsDrawer } from "./components/JobsDrawer";
 import { JobsSection } from "./components/JobsSection";
 import { SectionId, Sidebar } from "./components/Sidebar";
 import { SettingsSection } from "./components/SettingsSection";
@@ -89,6 +90,7 @@ export default function App() {
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [ollamaSettingsChecked, setOllamaSettingsChecked] = useState(false);
+  const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const initialSetupCheckInProgressRef = useRef(false);
   const ocrStartupPrompt = useOcrStartupPrompt();
 
@@ -315,12 +317,20 @@ export default function App() {
       <Sidebar
         activeSection={activeSection}
         sections={sectionLabels}
-        onSectionChange={setActiveSection}
+        onSectionChange={(section) => {
+          setActiveSection(section);
+          setIsJobsDrawerOpen(false);
+        }}
         activeJobCount={parseInt(backendStatus.jobsValue, 10) || 0}
         diagnostics={diagnostics}
       />
       <main className="workspace" id="main-workspace" aria-labelledby="workspace-title" tabIndex={-1}>
-        <AppHeader currentSection={sectionLabels[activeSection]} backendStatus={backendStatus} diagnostics={diagnostics} />
+        <AppHeader
+          currentSection={sectionLabels[activeSection]}
+          backendStatus={backendStatus}
+          diagnostics={diagnostics}
+          onOpenJobsDrawer={() => setIsJobsDrawerOpen(true)}
+        />
         <section className={`workspace-content workspace-content--${activeSection}`} aria-labelledby="workspace-title">
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
@@ -330,7 +340,25 @@ export default function App() {
                   "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."}
             </div>
           )}
-          <div hidden={activeSection !== "chat"}>
+          {(initialCheckDone || ollamaSettingsChecked) && activeSection !== "settings" && (
+            <SetupBanner
+              ollamaStatus={ollamaStatus}
+              ollamaInstallStatus={ollamaInstallStatus}
+              ollamaSettings={ollamaSettings}
+              ollamaModels={ollamaModels}
+              ocrAnalysis={ocrStartupPrompt.analysis}
+              ocrProvisionStatus={ocrStartupPrompt.provisionStatus}
+              ocrLastCheckedAt={ocrStartupPrompt.lastCheckedAt}
+              isChecking={isRecheckingOllama}
+              isConfiguringOcr={ocrStartupPrompt.isConfiguring}
+              onOpenSettings={() => setActiveSection("settings")}
+              onInstallOllama={() => void handleInstallOllama()}
+              onConfigureOcr={(runtimeTarget) => void ocrStartupPrompt.configure(runtimeTarget)}
+              onCancelOcr={() => void ocrStartupPrompt.cancel()}
+              onRecheck={() => void handleRecheckInitialSetup()}
+            />
+          )}
+          <div hidden={activeSection !== "chat"} className="chat-section-wrapper">
             <ChatSection
               models={ollamaModels}
               defaultModel={ollamaSettings?.defaultChatModel ?? null}
@@ -369,24 +397,11 @@ export default function App() {
           )}
         </section>
       </main>
-      {(initialCheckDone || ollamaSettingsChecked) && activeSection !== "settings" && (
-        <InitialSetupWizard
-          ollamaStatus={ollamaStatus}
-          ollamaInstallStatus={ollamaInstallStatus}
-          ollamaSettings={ollamaSettings}
-          ollamaModels={ollamaModels}
-          ocrAnalysis={ocrStartupPrompt.analysis}
-          ocrProvisionStatus={ocrStartupPrompt.provisionStatus}
-          ocrLastCheckedAt={ocrStartupPrompt.lastCheckedAt}
-          isChecking={isRecheckingOllama}
-          isConfiguringOcr={ocrStartupPrompt.isConfiguring}
-          onOpenSettings={() => setActiveSection("settings")}
-          onInstallOllama={() => void handleInstallOllama()}
-          onConfigureOcr={(runtimeTarget) => void ocrStartupPrompt.configure(runtimeTarget)}
-          onCancelOcr={() => void ocrStartupPrompt.cancel()}
-          onRecheck={() => void handleRecheckInitialSetup()}
-        />
-      )}
+      <JobsDrawer
+        isOpen={isJobsDrawerOpen}
+        onClose={() => setIsJobsDrawerOpen(false)}
+        onJobsChanged={() => void refreshBackendStatus()}
+      />
     </div>
   );
 }

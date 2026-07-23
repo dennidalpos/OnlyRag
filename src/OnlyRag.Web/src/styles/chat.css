@@ -4,6 +4,18 @@
   gap: 10px;
 }
 
+.chat-section-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-section-wrapper[hidden] {
+  display: none !important;
+}
+
 .chat-layout {
   min-width: 0;
   height: 100%;
@@ -30,6 +42,7 @@
   display: flex;
   flex-direction: column;
   align-content: stretch;
+  overflow: hidden;
 }
 
 .chat-main {
@@ -174,7 +187,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding: 2px;
+  scrollbar-width: auto;
+  scrollbar-color: #8899a6 rgba(0, 0, 0, 0.04);
+  padding: 4px 6px 4px 2px;
 }
 
 .chat-message {

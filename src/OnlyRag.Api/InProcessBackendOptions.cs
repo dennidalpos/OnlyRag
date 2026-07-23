@@ -1,7 +1,7 @@
 using System.Net;
+using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Api.Images;
 
 namespace OnlyRag.Api;
 

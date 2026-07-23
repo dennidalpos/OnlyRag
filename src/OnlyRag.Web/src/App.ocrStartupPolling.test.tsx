@@ -139,7 +139,7 @@ describe("App OCR startup polling", () => {
       await vi.advanceTimersByTimeAsync(3_000);
     });
 
-    expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Notifica di configurazione" })).not.toBeInTheDocument();
   });
 
   it("shows the final OCR verification status when another startup check remains open", async () => {

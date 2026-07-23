@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using OnlyRag.Api.Images;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
 
 namespace OnlyRag.Api;

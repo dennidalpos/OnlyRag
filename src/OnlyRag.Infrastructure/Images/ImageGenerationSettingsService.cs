@@ -1,9 +1,9 @@
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsService
+public sealed class ImageGenerationSettingsService : IImageGenerationSettingsService
 {
     private const string SelectedModelIdKey = "imageGeneration.selectedModelId";
     private const string RequestTimeoutSecondsKey = "imageGeneration.requestTimeoutSeconds";
@@ -92,5 +92,4 @@ internal sealed class ImageGenerationSettingsService : IImageGenerationSettingsS
 
         return modelId;
     }
-
 }

@@ -95,8 +95,9 @@ describe("App initial setup model residual checks", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("dialog", { name: "Configurazione iniziale richiesta" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Notifica di configurazione" })).toBeInTheDocument();
     expect(screen.getByText("Modello chat non configurato")).toBeInTheDocument();
+
     expect(screen.getByText("Modello embedding non configurato")).toBeInTheDocument();
     expect(screen.getByText("Modello traduzione non configurato")).toBeInTheDocument();
   });
@@ -263,7 +264,7 @@ describe("App initial setup model residual checks", () => {
     await waitFor(() => {
       expect(startupChecks).toBe(1);
     });
-    expect(screen.queryByRole("dialog", { name: "Configurazione iniziale richiesta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Notifica di configurazione" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
     await screen.findByRole("heading", { name: "Impostazioni", level: 2 });

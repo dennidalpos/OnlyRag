@@ -1,10 +1,10 @@
 # Packaging
 
-OnlyRag uses Inno Setup 6 on Windows to package the self-contained desktop app.
+OnlyRag uses NSIS (Nullsoft Scriptable Install System) on Windows to package the self-contained desktop app for `win-x64`.
 
 ## Inputs
 
-- [`OnlyRag.iss`](OnlyRag.iss): Inno Setup script.
+- [`OnlyRag.nsi`](OnlyRag.nsi): NSIS installer script.
 - [`../src/OnlyRag.App/OnlyRag.App.csproj`](../src/OnlyRag.App/OnlyRag.App.csproj): WPF app
   publish target.
 - [`../src/OnlyRag.Web/dist/index.html`](../src/OnlyRag.Web/dist/index.html): web UI build
@@ -13,7 +13,6 @@ OnlyRag uses Inno Setup 6 on Windows to package the self-contained desktop app.
 - [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): bundled Qdrant executable, prepared
   by [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1). The installer build
   script runs this automatically when the payload is missing.
-- [`../assets/brand/setup`](../assets/brand/setup): installer wizard images.
 
 ## Build
 
@@ -25,7 +24,7 @@ pwsh .\scripts\Build-Installer.ps1 -Configuration Release
 
 The script builds the React/Vite UI, prepares the Qdrant payload when needed, publishes the WPF app
 self-contained for `win-x64`, verifies the publish payload including DirectML/ONNX Runtime native
-files, and compiles `packaging\OnlyRag.iss` with Inno Setup. Default outputs:
+files, and compiles `packaging\OnlyRag.nsi` with NSIS (`makensis.exe`). Default outputs:
 
 - `artifacts\publish\OnlyRag\win-x64`
 - `artifacts\installer\OnlyRag-Setup-0.1.0-win-x64.exe`
@@ -51,8 +50,7 @@ unsigned installer production-ready.
 
 The installer:
 
-- Requires Windows 10 version 1809/build 17763 or newer, or Windows 11.
-- Blocks installation when Microsoft Edge WebView2 Runtime is missing.
+- Targets 64-bit Windows (`win-x64`).
 - Installs under `%LOCALAPPDATA%\Programs\OnlyRag`.
 - Preserves user data under `%LOCALAPPDATA%\OnlyRag` on uninstall.
 - Includes the self-contained .NET runtime payload, WebView2 assemblies, SQLite native provider,

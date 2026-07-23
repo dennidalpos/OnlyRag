@@ -1,8 +1,8 @@
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal static class ImageModelCatalog
+public static class ImageModelCatalog
 {
     public const string DefaultModelId = "lcm-sdxl-olive-onnx";
     public const string RequiredModelFileName = "model.onnx";

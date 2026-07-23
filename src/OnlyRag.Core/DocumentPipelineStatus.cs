@@ -17,8 +17,7 @@ public enum PhaseState
     InProgress,
     Completed,
     Skipped,
-    Failed,
-    Obsolete
+    Failed
 }
 
 public sealed record PipelinePhaseInfo(

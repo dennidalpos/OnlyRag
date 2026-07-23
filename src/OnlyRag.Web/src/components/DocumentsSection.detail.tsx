@@ -32,8 +32,7 @@ const phaseStateIcon: Record<PhaseState, string> = {
   InProgress: "⟳",
   Failed: "✕",
   Skipped: "–",
-  Todo: "○",
-  Obsolete: "⚠"
+  Todo: "○"
 };
 
 const phaseStateLabels: Record<PhaseState, string> = {
@@ -41,8 +40,7 @@ const phaseStateLabels: Record<PhaseState, string> = {
   InProgress: "in corso",
   Failed: "errore",
   Skipped: "saltato",
-  Todo: "da fare",
-  Obsolete: "da aggiornare"
+  Todo: "da fare"
 };
 
 export function DocumentDetailCard({

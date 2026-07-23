@@ -127,16 +127,26 @@ export function ChatMainPanel({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
 
   useEffect(() => {
-    const element = messagesRef.current;
-    if (!element || !shouldStickToBottomRef.current) {
+    if (!shouldStickToBottomRef.current) {
       return;
     }
 
-    element.scrollTop = element.scrollHeight;
-  }, [messages.length, isGenerating, feedback, notices.length]);
+    const scrollToBottom = () => {
+      if (typeof messagesEndRef.current?.scrollIntoView === "function") {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      } else if (messagesRef.current) {
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      }
+    };
+
+    scrollToBottom();
+    const timer = setTimeout(scrollToBottom, 60);
+    return () => clearTimeout(timer);
+  }, [messages, isGenerating, feedback, notices]);
 
   function handleMessagesScroll() {
     const element = messagesRef.current;
@@ -146,6 +156,11 @@ export function ChatMainPanel({
 
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     shouldStickToBottomRef.current = distanceFromBottom < 80;
+  }
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    shouldStickToBottomRef.current = true;
+    onSubmit(event);
   }
 
   return (
@@ -237,9 +252,10 @@ export function ChatMainPanel({
             </button>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <form className="chat-input-row" onSubmit={onSubmit}>
+      <form className="chat-input-row" onSubmit={handleFormSubmit}>
         <textarea
           aria-label="Messaggio"
           value={input}

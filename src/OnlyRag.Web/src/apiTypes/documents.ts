@@ -75,7 +75,7 @@ export type DocumentImportResponse = {
 
 export type OcrPolicy = "Auto" | "ForceAll";
 
-export type PhaseState = "Todo" | "InProgress" | "Completed" | "Skipped" | "Failed" | "Obsolete";
+export type PhaseState = "Todo" | "InProgress" | "Completed" | "Skipped" | "Failed";
 
 export type PipelinePhaseInfo = {
   state: PhaseState;

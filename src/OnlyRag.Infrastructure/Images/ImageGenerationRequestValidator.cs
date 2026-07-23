@@ -1,8 +1,8 @@
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal static class ImageGenerationRequestValidator
+public static class ImageGenerationRequestValidator
 {
     public static ImageGenerationRequest Normalize(ImageGenerationRequest request)
     {

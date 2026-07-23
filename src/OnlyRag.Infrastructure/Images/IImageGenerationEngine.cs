@@ -1,6 +1,6 @@
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
 public interface IImageGenerationEngine
 {

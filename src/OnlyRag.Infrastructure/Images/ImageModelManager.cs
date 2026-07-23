@@ -2,11 +2,11 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal sealed class ImageModelManager
+public sealed class ImageModelManager
 {
-    private readonly InProcessBackendDescriptor descriptor;
+    private readonly AppStoragePaths storagePaths;
     private readonly HttpClient httpClient;
     private readonly ImageModelCatalogStore modelCatalog;
     private readonly Dictionary<string, CancellationTokenSource> activeDownloads = new(StringComparer.OrdinalIgnoreCase);
@@ -25,11 +25,11 @@ internal sealed class ImageModelManager
     private sealed record ModelSnapshotFile(string RelativePath, long? SizeBytes, string? Sha256);
 
     public ImageModelManager(
-        InProcessBackendDescriptor descriptor,
+        AppStoragePaths storagePaths,
         HttpClient httpClient,
         ImageModelCatalogStore modelCatalog)
     {
-        this.descriptor = descriptor;
+        this.storagePaths = storagePaths;
         this.httpClient = httpClient;
         this.modelCatalog = modelCatalog;
         CleanStaleStagingDirectories();
@@ -299,7 +299,7 @@ internal sealed class ImageModelManager
 
     public string GetModelDirectory(string modelId)
     {
-        string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
+        string root = Path.GetFullPath(storagePaths.ImageModelsDirectory);
         string modelDirectory = Path.GetFullPath(Path.Combine(root, modelId));
         string rootWithSeparator = root.EndsWith(Path.DirectorySeparatorChar)
             ? root
@@ -316,7 +316,7 @@ internal sealed class ImageModelManager
 
     private string CreateStagingDirectory(string modelId)
     {
-        string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
+        string root = Path.GetFullPath(storagePaths.ImageModelsDirectory);
         Directory.CreateDirectory(root);
         string stagingDirectory = Path.GetFullPath(Path.Combine(
             root,
@@ -328,7 +328,7 @@ internal sealed class ImageModelManager
 
     private void CleanStaleStagingDirectories()
     {
-        string root = Path.GetFullPath(descriptor.StoragePaths.ImageModelsDirectory);
+        string root = Path.GetFullPath(storagePaths.ImageModelsDirectory);
         if (!Directory.Exists(root))
         {
             return;

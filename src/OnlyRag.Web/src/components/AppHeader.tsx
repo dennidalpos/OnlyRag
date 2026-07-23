@@ -13,16 +13,19 @@ type AppHeaderProps = {
   currentSection: string;
   backendStatus: BackendStatus;
   diagnostics: DiagnosticsResponse | null;
+  onOpenJobsDrawer?: () => void;
 };
 
-export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHeaderProps) {
+export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJobsDrawer }: AppHeaderProps) {
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
   const jobsBadge: StatusBadge = {
     label: "Operazioni",
     value: formatJobsValue(backendStatus.jobsValue, activeJobs),
     tone: activeJobs > 0 ? backendStatus.jobsTone : "neutral"
   };
+
   const statusBadges: StatusBadge[] = [
     { label: "Backend", value: backendStatus.backendValue, tone: backendStatus.backendTone },
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
@@ -31,6 +34,8 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
     buildOcrGpuBadge(diagnostics, backendStatus.backendTone),
     buildImageBadge(diagnostics, backendStatus.backendTone)
   ].filter((badge): badge is StatusBadge => badge !== null);
+
+  const isOverallHealthy = backendStatus.backendTone === "online" && backendStatus.ollamaTone === "online";
 
   useEffect(() => {
     const timerId = window.setInterval(() => setCurrentTime(new Date()), 1000);
@@ -42,13 +47,49 @@ export function AppHeader({ currentSection, backendStatus, diagnostics }: AppHea
       <h1 id="workspace-title" title={currentSection}>{currentSection}</h1>
       <div className="status-row">
         <div className="status-row__states" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
-          {statusBadges.map((badge) => (
-            <StatusBadgeView badge={badge} key={badge.label} />
-          ))}
+          <div className="status-menu-container">
+            <button
+              type="button"
+              className={`status-badge status-badge--${isOverallHealthy ? "online" : "warning"}`}
+              onClick={() => setShowStatusMenu((prev) => !prev)}
+              aria-expanded={showStatusMenu}
+              aria-label="Stato sistema"
+            >
+              <span>Stato Sistema</span>
+              <strong>{isOverallHealthy ? "Pronto" : "Attenzione"}</strong>
+            </button>
+            {showStatusMenu && (
+              <div className="status-menu-popover">
+                <div className="status-menu-popover__header">
+                  <span className="status-menu-popover__title">Salute Moduli AI</span>
+                  <button type="button" className="button-secondary" onClick={() => setShowStatusMenu(false)} style={{ padding: "2px 6px" }}>✕</button>
+                </div>
+                {statusBadges.map((badge) => (
+                  <div className="status-menu-item" key={badge.label}>
+                    <span className="status-menu-item__label">{badge.label}</span>
+                    <span className={`status-badge status-badge--${badge.tone}`}>
+                      <strong>{badge.value}</strong>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Accessible hidden text content for screen readers / tests */}
+          <div className="sr-only">
+            {statusBadges.map((b) => `${b.label}: ${b.value}`).join(", ")}
+          </div>
           <span className="sr-only">{jobsBadge.label} {jobsBadge.value}</span>
         </div>
         <div className="status-row__operations">
-          <StatusBadgeView badge={jobsBadge} />
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={onOpenJobsDrawer}
+            title="Apri pannello operazioni in background"
+          >
+            <StatusBadgeView badge={jobsBadge} />
+          </button>
           <span
             className="status-badge status-badge--neutral status-row__clock"
             title={`Ora corrente ${formatTime(currentTime.toISOString())}`}

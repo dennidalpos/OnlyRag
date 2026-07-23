@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.Security.Cryptography;
-using OnlyRag.Api.Images;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Worker;
 

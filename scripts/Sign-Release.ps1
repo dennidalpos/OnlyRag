@@ -21,7 +21,7 @@ param(
 
     [string]$TimestampServer = "http://timestamp.digicert.com",
 
-    [string]$InnoSetupCompiler,
+    [string]$NsisCompiler,
 
     [string]$SignToolPath,
 
@@ -100,8 +100,8 @@ try {
         TimestampServer = $TimestampServer
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
-        $buildArguments.InnoSetupCompiler = $InnoSetupCompiler
+    if (-not [string]::IsNullOrWhiteSpace($NsisCompiler)) {
+        $buildArguments.NsisCompiler = $NsisCompiler
     }
     if (-not [string]::IsNullOrWhiteSpace($SignToolPath)) {
         $buildArguments.SignToolPath = $SignToolPath

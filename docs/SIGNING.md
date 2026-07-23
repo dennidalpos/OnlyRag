@@ -8,7 +8,7 @@ material must not be stored in the repository.
 - Windows 10/11 SDK `signtool.exe`, or pass `-SignToolPath`.
 - A trusted code-signing certificate, either installed in `CurrentUser\My` or supplied as an
   external PFX file outside the repository.
-- Inno Setup 6 for building the installer before signing.
+- NSIS 3.x for building the installer before signing.
 
 ## Build And Sign
 

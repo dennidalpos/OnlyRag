@@ -11,7 +11,7 @@ param(
 
     [string]$OutputRoot,
 
-    [string]$InnoSetupCompiler,
+    [string]$NsisCompiler,
 
     [string]$SigningCertificateThumbprint,
 
@@ -29,10 +29,8 @@ $supportScript = Join-Path $PSScriptRoot "support\BuildSupport.ps1"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $appProject = Join-Path $repoRoot "src\OnlyRag.App\OnlyRag.App.csproj"
 $appIcon = Join-Path $repoRoot "src\OnlyRag.App\Assets\OnlyRag.ico"
-$wizardImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-image-164x314.bmp"
-$wizardSmallImage = Join-Path $repoRoot "assets\brand\setup\onlyrag-setup-wizard-small-55x55.bmp"
 $webRoot = Join-Path $repoRoot "src\OnlyRag.Web"
-$innoScript = Join-Path $repoRoot "packaging\OnlyRag.iss"
+$nsiScript = Join-Path $repoRoot "packaging\OnlyRag.nsi"
 $downloadQdrantScript = Join-Path $PSScriptRoot "Download-Qdrant.ps1"
 $qdrantExe = Join-Path $repoRoot "packaging\qdrant\payload\qdrant.exe"
 
@@ -48,10 +46,8 @@ Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $outputRootPat
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $publishDir
 Assert-OnlyRagPathUnderRepository -RepositoryRoot $repoRoot -Path $installerDir
 
-foreach ($requiredInstallerAsset in @($appIcon, $wizardImage, $wizardSmallImage)) {
-    if (-not (Test-Path -LiteralPath $requiredInstallerAsset -PathType Leaf)) {
-        throw "Required installer asset was not found: $requiredInstallerAsset"
-    }
+if (-not (Test-Path -LiteralPath $appIcon -PathType Leaf)) {
+    throw "Required installer asset was not found: $appIcon"
 }
 
 foreach ($directory in @($publishDir, $installerDir)) {
@@ -89,31 +85,29 @@ Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot
 
 Test-OnlyRagPublishPayload -Path $publishDir
 
-$iscc = Get-OnlyRagInnoSetupCompiler -RequestedPath $InnoSetupCompiler
-if (-not $iscc) {
+$makensis = Get-OnlyRagNsisCompiler -RequestedPath $NsisCompiler
+if (-not $makensis) {
     throw (New-OnlyRagPrerequisiteMessage `
-        -Software "Inno Setup compiler (ISCC.exe)" `
-        -MinimumVersion "Inno Setup 6" `
-        -WhyRequired "OnlyRag uses the existing Inno Setup script packaging\OnlyRag.iss to generate the Windows installer" `
-        -Instruction "Install the official Inno Setup 6 package from https://jrsoftware.org/isinfo.php or pass -InnoSetupCompiler with the path to ISCC.exe, then rerun the command" `
-        -Verify "Run ISCC.exe /? or confirm ISCC.exe exists under Program Files\Inno Setup 6")
+        -Software "NSIS compiler (makensis.exe)" `
+        -MinimumVersion "NSIS 3.x" `
+        -WhyRequired "OnlyRag uses NSIS to compile the win-x64 Windows installer" `
+        -Instruction "Install NSIS from https://nsis.sourceforge.io/ or pass -NsisCompiler with the path to makensis.exe, then rerun the command" `
+        -Verify "Run makensis.exe /VERSION or confirm makensis.exe exists under Program Files (x86)\NSIS")
 }
 
-Write-Host "Compiling Inno Setup installer..." -ForegroundColor Cyan
-Invoke-OnlyRagNative -FilePath $iscc -WorkingDirectory $repoRoot -Arguments @(
-    "/DAppVersion=$Version",
-    "/DRuntimeIdentifier=$RuntimeIdentifier",
-    "/DPublishDir=$publishDir",
-    "/DOutputDir=$installerDir",
-    "/DAppIcon=$appIcon",
-    "/DWizardImage=$wizardImage",
-    "/DWizardSmallImage=$wizardSmallImage",
-    $innoScript
+Write-Host "Compiling NSIS installer..." -ForegroundColor Cyan
+Invoke-OnlyRagNative -FilePath $makensis -WorkingDirectory $repoRoot -Arguments @(
+    "/DAPP_VERSION=$Version",
+    "/DRUNTIME_IDENTIFIER=$RuntimeIdentifier",
+    "/DPUBLISH_DIR=$publishDir",
+    "/DOUTPUT_DIR=$installerDir",
+    "/DAPP_ICON=$appIcon",
+    $nsiScript
 )
 
 $installer = Get-ChildItem -LiteralPath $installerDir -Filter "*.exe" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $installer) {
-    throw "Inno Setup completed but no installer executable was found in '$installerDir'."
+    throw "NSIS compilation completed but no installer executable was found in '$installerDir'."
 }
 
 if (-not [string]::IsNullOrWhiteSpace($SigningCertificateThumbprint)) {

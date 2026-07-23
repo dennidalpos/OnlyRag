@@ -1,8 +1,8 @@
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal interface IImageGenerationSettingsService
+public interface IImageGenerationSettingsService
 {
     Task<ImageGenerationSettings> GetAsync(CancellationToken cancellationToken = default);
 
@@ -10,4 +10,3 @@ internal interface IImageGenerationSettingsService
         ImageGenerationSettings settings,
         CancellationToken cancellationToken = default);
 }
-

@@ -12,6 +12,7 @@ internal sealed class ChatService
     private const int MaxUserMessageCharacters = 12000;
     private const int MaxHistoryMessages = 8;
     private const int RetrievalTopK = 8;
+    private const int DefaultChatNumCtx = 8192;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -90,7 +91,8 @@ internal sealed class ChatService
             searchResponse,
             history);
 
-        int? chatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
+        int? configuredChatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
+        int chatNumCtx = configuredChatNumCtx ?? DefaultChatNumCtx;
         string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, chatNumCtx, cancellationToken);
         await PersistTurnAsync(conversationId, model, message, answer, sources, cancellationToken);
 

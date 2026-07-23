@@ -1,6 +1,6 @@
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal enum ImageGenerationErrorKind
+public enum ImageGenerationErrorKind
 {
     InvalidConfiguration,
     InvalidRequest,
@@ -11,7 +11,7 @@ internal enum ImageGenerationErrorKind
     NotFound
 }
 
-internal sealed class ImageGenerationException : Exception
+public sealed class ImageGenerationException : Exception
 {
     public ImageGenerationException(
         ImageGenerationErrorKind kind,

@@ -190,7 +190,7 @@ public static partial class InProcessBackend
             "Running" or "Pausing" or "Pending" or "Paused" => new PipelinePhaseInfo(PhaseState.InProgress, null, null),
             "Failed" => new PipelinePhaseInfo(PhaseState.Failed, document.LastError, null),
             "Partial" => new PipelinePhaseInfo(
-                PhaseState.Obsolete,
+                PhaseState.Failed,
                 "Embedding parziali: rigenera per completare la ricerca semantica.",
                 embeddingStatus.LastEmbeddedAtUtc),
             _ => new PipelinePhaseInfo(PhaseState.Todo, null, null)

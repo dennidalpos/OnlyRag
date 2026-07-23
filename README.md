@@ -50,7 +50,7 @@ Optional development/runtime tools:
 - LibreOffice for translation PDF export.
 - Python 3.10 through 3.13 for PaddleOCR provisioning. Python 3.14 is not supported by the pinned
   PaddlePaddle runtime.
-- Inno Setup 6 for installer generation.
+- NSIS 3.x for installer generation.
 - Windows 10/11 SDK `signtool.exe` and a trusted code-signing certificate for signed installers.
 
 Installed app:
@@ -148,7 +148,7 @@ Package build readiness:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
 ```
 
-This requires Inno Setup 6 and compiles the installer.
+This requires NSIS 3.x and compiles the installer.
 
 Production release readiness requires all of these:
 
@@ -202,8 +202,8 @@ commands recreate required ignored outputs.
   `Program Files\Microsoft\EdgeWebView\Application`.
 - Frontend e2e tests cannot launch a browser: install or repair Microsoft Edge, then rerun
   `npm run test` from `src\OnlyRag.Web`.
-- Missing Inno Setup: install Inno Setup 6 and verify with `ISCC.exe /?`, or pass
-  `-InnoSetupCompiler` where supported.
+- Missing NSIS: install NSIS 3.x and verify with `makensis.exe /VERSION`, or pass
+  `-NsisCompiler` where supported.
 - Missing signing tools: install Windows 10/11 SDK and verify with `signtool.exe /?`, or pass
   `-SignToolPath` where supported.
 - Installer lifecycle blocked: rerun verification on a clean Windows profile or machine with

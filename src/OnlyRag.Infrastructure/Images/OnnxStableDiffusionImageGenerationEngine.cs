@@ -5,9 +5,9 @@ using OnnxStack.StableDiffusion.Enums;
 using OnnxStack.StableDiffusion.Pipelines;
 using OnlyRag.Core;
 
-namespace OnlyRag.Api.Images;
+namespace OnlyRag.Infrastructure.Images;
 
-internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationEngine
+public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationEngine
 {
     private const string DirectMlProvider = "DirectML";
     private const string CpuProvider = "CPU";
@@ -158,19 +158,19 @@ internal sealed class OnnxStableDiffusionImageGenerationEngine : IImageGeneratio
         };
     }
 
-    internal static string CreatePrompt(string prompt)
+    public static string CreatePrompt(string prompt)
     {
         return prompt.Trim();
     }
 
-    internal static string CreateNegativePrompt(string? negativePrompt)
+    public static string CreateNegativePrompt(string? negativePrompt)
     {
         return string.IsNullOrWhiteSpace(negativePrompt)
             ? string.Empty
             : negativePrompt.Trim();
     }
 
-    internal static ModelType ResolveModelType(string? modelId)
+    public static ModelType ResolveModelType(string? modelId)
     {
         return ContainsAny(modelId ?? string.Empty, ["turbo", "lcm"])
             ? ModelType.Turbo

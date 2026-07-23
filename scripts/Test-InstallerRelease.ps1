@@ -86,10 +86,7 @@ function Invoke-Installer {
 
     $logPath = Join-Path $outputRootPath $LogName
     $arguments = @(
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/NORESTART",
-        "/LOG=$logPath"
+        "/S"
     ) + $ExtraArguments
 
     $process = Start-Process -FilePath $Path -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
@@ -260,7 +257,7 @@ if (-not $RunInstallLifecycle) {
 else {
     Stop-OnlyRagProcesses
 
-    $install = Invoke-Installer -Path $resolvedInstaller -LogName "install-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+    $install = Invoke-Installer -Path $resolvedInstaller -LogName "install-$timestamp.log" -ExtraArguments @("/D=$installDir")
     Add-Check -Id "fresh-install-exit" -Status ($(if ($install.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Fresh install exit code $($install.exitCode)." -Data $install
     Test-PathExpectation -Id "install-path" -Path $installDir -Kind "directory"
     Test-PathExpectation -Id "app-executable" -Path (Join-Path $installDir "OnlyRag.App.exe") -Kind "file"
@@ -296,7 +293,7 @@ else {
     }
 
     if ($resolvedUpgradeInstaller) {
-        $upgrade = Invoke-Installer -Path $resolvedUpgradeInstaller -LogName "upgrade-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+        $upgrade = Invoke-Installer -Path $resolvedUpgradeInstaller -LogName "upgrade-$timestamp.log" -ExtraArguments @("/D=$installDir")
         Add-Check -Id "upgrade-exit" -Status ($(if ($upgrade.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Upgrade install exit code $($upgrade.exitCode)." -Data $upgrade
         Test-AppLaunch
     }
@@ -305,7 +302,7 @@ else {
     }
 
     if ($resolvedRollbackInstaller) {
-        $rollback = Invoke-Installer -Path $resolvedRollbackInstaller -LogName "rollback-$timestamp.log" -ExtraArguments @("/TASKS=desktopicon")
+        $rollback = Invoke-Installer -Path $resolvedRollbackInstaller -LogName "rollback-$timestamp.log" -ExtraArguments @("/D=$installDir")
         $status = if ($rollback.exitCode -eq 0) { "pass" } else { "warn" }
         Add-Check -Id "rollback-downgrade" -Status $status -Message "Rollback/downgrade installer exit code $($rollback.exitCode)." -Data $rollback
         if ($rollback.exitCode -eq 0) {
@@ -316,9 +313,9 @@ else {
         Add-Check -Id "rollback-downgrade" -Status "skip" -Message "No -RollbackInstallerPath supplied."
     }
 
-    $uninstallExe = Join-Path $installDir "unins000.exe"
+    $uninstallExe = Join-Path $installDir "uninstall.exe"
     if (Test-Path -LiteralPath $uninstallExe -PathType Leaf) {
-        $uninstall = Invoke-Installer -Path $uninstallExe -LogName "uninstall-$timestamp.log"
+        $uninstall = Invoke-Installer -Path $uninstallExe -LogName "uninstall-$timestamp.log" -ExtraArguments @("_?=$installDir")
         Add-Check -Id "uninstall-exit" -Status ($(if ($uninstall.exitCode -eq 0) { "pass" } else { "fail" })) -Message "Uninstall exit code $($uninstall.exitCode)." -Data $uninstall
         if (Test-Path -LiteralPath $installDir -PathType Container) {
             Add-Check -Id "uninstall-install-dir-cleanup" -Status "fail" -Message "Install directory still exists after uninstall." -Data @{ path = $installDir }
