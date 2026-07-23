@@ -31,8 +31,8 @@ public sealed partial class InProcessBackendTests
         Assert.Equal("lcm-sdxl-olive", model.ModelProfile);
         Assert.Contains("1024x1024", model.SupportedResolutions);
         Assert.Equal(6, model.DefaultSteps);
-        Assert.Equal(0, model.DefaultGuidance);
-        Assert.Contains("Euler", model.Scheduler, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1.0, model.DefaultGuidance);
+        Assert.Contains("LCM", model.Scheduler, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CPU", model.CompatibilityNotes, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(catalog, candidate => candidate.LicenseLabel.Contains("CC-BY-NC", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(states);

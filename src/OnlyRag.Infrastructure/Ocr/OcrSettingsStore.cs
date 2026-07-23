@@ -110,6 +110,71 @@ public sealed class OcrSettingsStore
         await settingsRepository.UpsertAsync(DeviceSourceKey, deviceSource, cancellationToken);
     }
 
+    public async Task<OcrProcessingSettings> GetProcessingAsync(CancellationToken cancellationToken = default)
+    {
+        string? language = await settingsRepository.GetValueAsync(OcrLanguageSettingKey, cancellationToken);
+        string? retriesValue = await settingsRepository.GetValueAsync(OcrMaxRetriesSettingKey, cancellationToken);
+        string? timeoutValue = await settingsRepository.GetValueAsync(OcrPageTimeoutSettingKey, cancellationToken);
+        string? lowConfidenceValue = await settingsRepository.GetValueAsync(OcrLowConfidenceSettingKey, cancellationToken);
+
+        return NormalizeProcessing(
+            language,
+            int.TryParse(retriesValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int retries) ? retries : null,
+            int.TryParse(timeoutValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int timeout) ? timeout : null,
+            double.TryParse(lowConfidenceValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double confidence) ? confidence : null);
+    }
+
+    public async Task<OcrProcessingSettings> UpdateProcessingAsync(
+        OcrProcessingSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        OcrProcessingSettings normalized = NormalizeProcessing(
+            settings.Language,
+            settings.MaxRetries,
+            settings.PageTimeoutSeconds,
+            settings.LowConfidenceThreshold);
+
+        await settingsRepository.UpsertAsync(OcrLanguageSettingKey, normalized.Language, cancellationToken);
+        await settingsRepository.UpsertAsync(
+            OcrMaxRetriesSettingKey,
+            normalized.MaxRetries.ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
+        await settingsRepository.UpsertAsync(
+            OcrPageTimeoutSettingKey,
+            normalized.PageTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
+        await settingsRepository.UpsertAsync(
+            OcrLowConfidenceSettingKey,
+            normalized.LowConfidenceThreshold.ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
+
+        return normalized;
+    }
+
+    private static OcrProcessingSettings NormalizeProcessing(
+        string? language,
+        int? maxRetries,
+        int? pageTimeoutSeconds,
+        double? lowConfidenceThreshold)
+    {
+        OcrPipelineOptions normalized = OcrPipelineOptions.Normalize(
+            language,
+            maxRetries,
+            pageTimeoutSeconds,
+            lowConfidenceThreshold);
+
+        return new OcrProcessingSettings(
+            normalized.Language,
+            normalized.MaxRetries,
+            (int)normalized.PageTimeout.TotalSeconds,
+            normalized.LowConfidenceThreshold);
+    }
+
+    private const string OcrLanguageSettingKey = "ocr.language";
+    private const string OcrMaxRetriesSettingKey = "ocr.maxRetries";
+    private const string OcrPageTimeoutSettingKey = "ocr.pageTimeoutSeconds";
+    private const string OcrLowConfidenceSettingKey = "ocr.lowConfidenceThreshold";
+
     private async Task<string> ReadStringAsync(string key, string defaultValue, CancellationToken cancellationToken)
     {
         string? value = await settingsRepository.GetValueAsync(key, cancellationToken);
@@ -138,3 +203,4 @@ public sealed class OcrSettingsStore
         return bool.TryParse(value, out bool parsed) ? parsed : defaultValue;
     }
 }
+

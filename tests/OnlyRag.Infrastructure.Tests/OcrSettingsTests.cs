@@ -236,17 +236,17 @@ public sealed partial class OcrPipelineTests
     }
 
     [Fact]
-    public async Task OcrProcessingSettingsStore_PersistsNormalizedSettings()
+    public async Task OcrSettingsStore_PersistsNormalizedProcessingSettings()
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();
-        OcrProcessingSettingsStore store = new(storage.Settings);
+        OcrSettingsStore store = new(storage.Settings);
 
-        OcrProcessingSettings saved = await store.UpdateAsync(new OcrProcessingSettings(
+        OcrProcessingSettings saved = await store.UpdateProcessingAsync(new OcrProcessingSettings(
             Language: "fr",
             MaxRetries: 9,
             PageTimeoutSeconds: 1,
             LowConfidenceThreshold: 2));
-        OcrProcessingSettings loaded = await store.GetAsync();
+        OcrProcessingSettings loaded = await store.GetProcessingAsync();
 
         Assert.Equal("fr", saved.Language);
         Assert.Equal(2, saved.MaxRetries);

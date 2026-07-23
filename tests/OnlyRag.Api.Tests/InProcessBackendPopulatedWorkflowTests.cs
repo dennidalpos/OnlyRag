@@ -115,9 +115,12 @@ public sealed partial class InProcessBackendTests
         Assert.True(File.Exists(exported.OutputPath));
         AssertPathUnderRoot(tempDescriptor.Root, exported.OutputPath);
 
-        LocalJob[]? jobs = await httpClient.GetFromJsonAsync<LocalJob[]>("/api/jobs", JsonOptions);
-        Assert.NotNull(jobs);
         JobStatus[] activeStatuses = [JobStatus.Pending, JobStatus.Running, JobStatus.Pausing, JobStatus.Paused];
+        LocalJob[] jobs = await WaitForAsync(
+            async () => (await httpClient.GetFromJsonAsync<LocalJob[]>("/api/jobs", JsonOptions))!,
+            currentJobs => currentJobs != null && currentJobs.All(job => !activeStatuses.Contains(job.Status)),
+            "all active jobs completion");
+        Assert.NotNull(jobs);
         Assert.All(jobs, job => Assert.DoesNotContain(job.Status, activeStatuses));
 
         using HttpResponseMessage shutdownResponse = await httpClient.PostAsync("/api/app/prepare-shutdown", content: null);

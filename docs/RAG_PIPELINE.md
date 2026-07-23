@@ -1,57 +1,62 @@
-# RAG Pipeline
+# RAG Pipeline (Next-Gen 2.0)
 
-OnlyRag uses local document storage, SQLite keyword search, Qdrant vector search, and Ollama model
-calls for retrieval-augmented chat.
+OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking con Cross-Encoder ONNX, risoluzione Parent-Child e valutazione di confidenza Self-Corrective RAG (CRAG).
 
-## Ingestion
+---
 
-Supported import formats documented by the current app are TXT, Markdown, CSV, PDF, DOCX, XLSX,
-PPTX, and image files. Binary Office formats such as `.doc`, `.xls`, and `.ppt` are not imported.
+## Architecture Flow
 
-The ingestion layer lives under [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion).
-Document records, chunks, pages, job state, and indexing metadata are stored in SQLite through
-[`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage).
+```mermaid
+flowchart TD
+    UserQuery["Domanda Utente"] --> QueryTransform["1. Query Transformation (Multi-Query / HyDE)"]
+    QueryTransform --> CoarseSearch["2. Ricerca Ibrida 1° Stadio (SQLite FTS5 + Qdrant HNSW)"]
+    CoarseSearch --> TopKCandidates["Top Candidate Child Chunks"]
+    TopKCandidates --> ReRanker["3. Re-ranking 2° Stadio (Cross-Encoder Model)"]
+    ReRanker --> ParentResolver["4. Parent-Child Chunk Resolver"]
+    ParentResolver --> ContextAssembly["5. Context Assembly & Faithfulness Check (CRAG)"]
+    ContextAssembly --> LLMGeneration["6. Generazione Ollama + Citazioni Interattive"]
+    LLMGeneration --> Response["Risposta UI con Badges [Pag. X, Chunk Y]"]
+```
 
-## Embeddings And Vector Storage
+---
 
-Embedding jobs call the configured Ollama endpoint. Vectors are stored in Qdrant through
-[`QdrantVectorStore`](../src/OnlyRag.Infrastructure/Vector/QdrantVectorStore.cs). Local Qdrant is
-bundled from [`packaging/qdrant/manifest.json`](../packaging/qdrant/manifest.json) and prepared by
-[`scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1) when needed.
+## 1. Indicizzazione & Dual-Tier Chunking (Parent-Child)
 
-Collections are separated by embedding model and vector shape. SQLite remains the system of
-record for metadata; Qdrant is the vector index.
+I formati supportati per l'importazione diretta sono `.txt`, `.md`, `.csv`, `.pdf`, `.docx`, `.xlsx`, `.pptx` e immagini (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.tiff`). I formati legacy binari Office (`.doc`, `.xls`, `.ppt`) non sono supportati.
 
-## Search And Chat
+Il sistema di chunking genera una gerarchia **Parent-Child**:
+- **Child Chunks (~150 token)**: Indicizzati in SQLite FTS5 e vettorizzati su Qdrant per il matching ad alta risoluzione.
+- **Parent Chunks (~1000 token / paragrafo completo)**: Conservati nel database SQLite per preservare il contesto informativo ampio.
 
-Retrieval combines SQLite FTS keyword signals and Qdrant vector results through the retrieval
-services under [`src/OnlyRag.Infrastructure/Retrieval`](../src/OnlyRag.Infrastructure/Retrieval).
-Chat sends retrieved snippets to Ollama and displays source snippets for grounded answers. It does
-not send full source documents as the normal RAG context.
+I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite v2 sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage).
 
-If query embeddings or Qdrant vector search are unavailable, retrieval continues with SQLite FTS
-keyword results when possible and returns retrieval notices to the UI. Document chat only returns a
-no-context answer when no selected document chunk can be retrieved.
+---
 
-## Operational Limits
+## 2. Vettorizzazione & Storage Vettoriale
 
-- Model features require a reachable Ollama endpoint.
-- Qdrant must be available for vector search. Keyword-only search/chat can still work when indexed
-  chunks exist, but results include notices that vector retrieval is unavailable.
-- Only the fresh local SQLite/Qdrant layout is supported. If local data is reset because the
-  schema is not current, documents must be imported and indexed again.
-- Remote Qdrant use should be explicitly trusted and protected as configured in Settings.
+I task di embedding comunicano con l'endpoint Ollama configurato. I vettori vengono salvati su Qdrant locale gestito tramite [`packaging/qdrant/manifest.json`](../packaging/qdrant/manifest.json) e avviato dal servizio in-process [`QdrantLocalRuntimeService`](../src/OnlyRag.Infrastructure/Vector/QdrantSettingsStore.cs).
 
-## Retrieval Evaluation
+Le collezioni sono separate per modello di embedding e dimensione del vettore. SQLite gestisce i metadati dei documenti e delle risorse; Qdrant gestisce gli indici vettoriali.
 
-Use the local harness to track retrieval quality while tuning chunking, embeddings, keyword search,
-or context limits:
+---
+
+## 3. Recupero a Due Stadi & Query Transformation
+
+Il recupero è orchestrato da [`HybridRetrievalService`](../src/OnlyRag.Infrastructure/Retrieval/HybridRetrievalService.cs) ed è strutturato in 6 stadi:
+
+1. **Query Transformation**: Espansione di varianti sintattiche/semantiche della query tramite [`IQueryTransformationService`](../src/OnlyRag.Infrastructure/Retrieval/IQueryTransformationService.cs) (Multi-Query, Sub-Query, HyDE).
+2. **Ricerca Ibrida di 1° Stadio**: Combinazione dei candidati FTS5 e Qdrant tramite l'algoritmo **Reciprocal Rank Fusion (RRF)**.
+3. **Re-ranking di 2° Stadio**: Calcolo del punteggio di pertinenza incrociata `(Query, Chunk)` tramite il modello Cross-Encoder locale [`IReRankerService`](../src/OnlyRag.Infrastructure/Retrieval/IReRankerService.cs).
+4. **Parent-Child Resolver**: Risoluzione dei Child Chunk selezionati nei corrispondenti Parent Chunk tramite [`ParentChildChunkResolver`](../src/OnlyRag.Infrastructure/Retrieval/ParentChildChunkResolver.cs).
+5. **Valutazione CRAG (Self-Corrective RAG)**: Valutazione della confidenza dei risultati tramite [`CragEvaluator`](../src/OnlyRag.Infrastructure/Retrieval/CragEvaluator.cs) e assemblaggio del contesto.
+6. **Generazione LLM & Citazioni Interattive**: Invio del contesto arricchito a Ollama e generazione di risposte grounded corredate da citazioni interattive `[Pag. X, Chunk Y]`.
+
+---
+
+## 4. Valutazione della Qualità di Recupero
+
+È possibile valutare la qualità di recupero (Recall@K, MRR, dimensione contesto) tramite lo script di benchmark dedicato:
 
 ```powershell
 pwsh .\scripts\Evaluate-Retrieval.ps1 -DatasetPath .\docs\retrieval-evaluation.sample.json
 ```
-
-Dataset cases define a representative query, selected document IDs, expected chunk IDs, and either
-inline search results or a live backend target supplied with `-BackendBaseUrl` and `-SessionToken`.
-The generated report records per-case returned chunks, recall@k, reciprocal rank, first relevant
-rank, and context character count, plus summary recall@k, MRR, and average context size.

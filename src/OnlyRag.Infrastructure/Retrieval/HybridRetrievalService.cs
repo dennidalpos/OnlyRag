@@ -12,6 +12,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
     private readonly IQdrantVectorStore vectorSearch;
     private readonly IRetrievalChunkRepository chunks;
     private readonly IQueryEmbeddingGenerator queryEmbeddingGenerator;
+    private readonly IReRankerService reRanker;
+    private readonly IQueryTransformationService queryTransformer;
+    private readonly ParentChildChunkResolver parentChildResolver;
+    private readonly CragEvaluator cragEvaluator;
     private readonly HybridRetrievalOptions options;
     private readonly ISettingsRepository? settings;
 
@@ -22,6 +26,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         IQdrantVectorStore vectorSearch,
         IRetrievalChunkRepository chunks,
         IQueryEmbeddingGenerator queryEmbeddingGenerator,
+        IReRankerService? reRanker = null,
+        IQueryTransformationService? queryTransformer = null,
+        ParentChildChunkResolver? parentChildResolver = null,
+        CragEvaluator? cragEvaluator = null,
         HybridRetrievalOptions? options = null,
         ISettingsRepository? settings = null)
     {
@@ -31,6 +39,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         this.vectorSearch = vectorSearch;
         this.chunks = chunks;
         this.queryEmbeddingGenerator = queryEmbeddingGenerator;
+        this.reRanker = reRanker ?? new OnnxCrossEncoderReRankerService();
+        this.queryTransformer = queryTransformer ?? new OllamaQueryTransformationService();
+        this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver();
+        this.cragEvaluator = cragEvaluator ?? new CragEvaluator();
         this.options = options ?? HybridRetrievalOptions.Default;
         this.settings = settings;
     }
@@ -59,24 +71,70 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
                 options.MaxContextCharacters);
         }
 
+        List<RetrievalNotice> notices = [];
+
+        // 1. Query Transformation
+        QueryTransformationResult transformation = await queryTransformer.TransformAsync(
+            query,
+            QueryTransformationStrategy.MultiQuery,
+            cancellationToken);
+
+        // 2. Coarse Hybrid Retrieval (1st stage: FTS5 + Qdrant HNSW via RRF)
         KeywordSearchResponse keywordResponse = await keywordSearch.SearchAsync(
             query,
             documentIds,
             options.KeywordTopK,
             cancellationToken);
 
-        List<RetrievalNotice> notices = [];
         QueryEmbeddingResult? queryEmbedding = await TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
         VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
             ? new VectorSearchAttempt([], "Qdrant unavailable")
             : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
 
-        IReadOnlyList<DocumentSearchResult> results = await MergeResultsAsync(
+        // 3. Merging via Reciprocal Rank Fusion (RRF)
+        IReadOnlyList<DocumentSearchResult> coarseResults = await RrfMergeResultsAsync(
             query,
             keywordResponse.Results,
             vectorSearchAttempt.Results,
-            finalLimit,
+            options.VectorTopK,
             cancellationToken);
+
+        // 4. 2nd-Stage Re-ranking (Cross-Encoder)
+        List<ReRankCandidate> candidates = coarseResults
+            .Select(r => new ReRankCandidate(r.ChunkId, r.Snippet))
+            .ToList();
+
+        IReadOnlyList<ReRankResult> reRankedScores = await reRanker.ReRankAsync(query, candidates, cancellationToken);
+        Dictionary<long, double> scoreMap = reRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
+
+        List<DocumentSearchResult> finalResults = [];
+        foreach (DocumentSearchResult coarse in coarseResults)
+        {
+            double reRankScore = scoreMap.TryGetValue(coarse.ChunkId, out double score) ? score : coarse.Score;
+            SearchChunk? rawChunk = (await chunks.GetChunksAsync([coarse.ChunkId], cancellationToken)).Values.FirstOrDefault();
+            SearchChunk resolved = rawChunk is not null ? parentChildResolver.Resolve(rawChunk) : null!;
+
+            finalResults.Add(coarse with
+            {
+                Score = Math.Round((coarse.Score + reRankScore) / 2d, 4),
+                ReRankScore = reRankScore,
+                ParentContent = resolved?.ParentContent ?? coarse.Snippet,
+                SectionHeading = resolved?.SectionHeading,
+                ChunkLevel = resolved?.ChunkLevel ?? "Child"
+            });
+        }
+
+        IReadOnlyList<DocumentSearchResult> ranked = finalResults
+            .OrderByDescending(r => r.ReRankScore ?? r.Score)
+            .Take(finalLimit)
+            .ToList();
+
+        // 5. Self-Corrective RAG (CRAG) Confidence Check
+        CragEvaluationResult cragResult = cragEvaluator.Evaluate(ranked, 0.30d);
+        if (!cragResult.IsConfident)
+        {
+            notices.Add(new RetrievalNotice("crag_low_confidence", cragResult.SummaryNotice));
+        }
 
         IReadOnlyList<DocumentSearchDocumentStatus> documentStatuses = await BuildDocumentStatusesAsync(
             documentIds,
@@ -84,7 +142,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             cancellationToken);
 
         return new DocumentSearchResponse(
-            results,
+            ranked,
             documentStatuses,
             keywordResponse.BackendName,
             vectorSearchAttempt.BackendName,
@@ -176,75 +234,47 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         }
     }
 
-    private async Task<IReadOnlyList<DocumentSearchResult>> MergeResultsAsync(
+    private async Task<IReadOnlyList<DocumentSearchResult>> RrfMergeResultsAsync(
         string query,
         IReadOnlyList<KeywordSearchResult> keywordResults,
         IReadOnlyList<VectorSearchResult> vectorResults,
-        int finalLimit,
+        int limit,
         CancellationToken cancellationToken)
     {
-        Dictionary<long, CandidateScore> candidates = [];
-        Dictionary<long, double> normalizedKeywordScores = NormalizeKeywordScores(keywordResults);
-        foreach (KeywordSearchResult result in keywordResults)
+        const double k = 60d; // RRF constant
+        Dictionary<long, double> rrfScores = [];
+
+        for (int rank = 0; rank < keywordResults.Count; rank++)
         {
-            CandidateScore score = GetOrCreate(candidates, result.ChunkId);
-            score.KeywordScore = normalizedKeywordScores[result.ChunkId];
+            long chunkId = keywordResults[rank].ChunkId;
+            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (1d / (k + rank + 1));
         }
 
-        foreach (VectorSearchResult result in vectorResults)
+        for (int rank = 0; rank < vectorResults.Count; rank++)
         {
-            CandidateScore score = GetOrCreate(candidates, result.ChunkId);
-            score.VectorScore = Math.Clamp((result.Score + 1d) / 2d, 0d, 1d);
+            long chunkId = vectorResults[rank].ChunkId;
+            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (1d / (k + rank + 1));
         }
 
-        long[] chunkIds = candidates.Keys.ToArray();
+        long[] chunkIds = rrfScores.Keys.ToArray();
         IReadOnlyDictionary<long, SearchChunk> chunkMap = await chunks.GetChunksAsync(chunkIds, cancellationToken);
 
-        List<(SearchChunk Chunk, double Score)> ranked = candidates
-            .Where(candidate => chunkMap.ContainsKey(candidate.Key))
-            .Select(candidate =>
-            {
-                SearchChunk chunk = chunkMap[candidate.Key];
-                double keywordScore = candidate.Value.KeywordScore ?? 0d;
-                double vectorScore = candidate.Value.VectorScore ?? 0d;
-                double combined = keywordScore * options.KeywordWeight + vectorScore * options.VectorWeight;
-                if (keywordScore > 0d && vectorScore > 0d)
-                {
-                    combined += Math.Min(keywordScore, vectorScore) * 0.08d;
-                }
-
-                return (Chunk: chunk, Score: Math.Clamp(combined, 0d, 1d));
-            })
-            .OrderByDescending(candidate => candidate.Score)
-            .ThenBy(candidate => candidate.Chunk.DocumentId)
-            .ThenBy(candidate => candidate.Chunk.ChunkIndex)
-            .Take(finalLimit)
-            .ToList();
-
         List<DocumentSearchResult> results = [];
-        int remainingContextCharacters = Math.Max(0, options.MaxContextCharacters);
-        foreach ((SearchChunk chunk, double score) in ranked)
+        foreach (KeyValuePair<long, double> kvp in rrfScores.OrderByDescending(kv => kv.Value).Take(limit))
         {
-            if (remainingContextCharacters <= 0)
-            {
-                break;
-            }
-
-            string snippet = BuildSnippet(query, chunk.Content, Math.Min(options.SnippetMaxCharacters, remainingContextCharacters));
-            if (string.IsNullOrWhiteSpace(snippet))
+            if (!chunkMap.TryGetValue(kvp.Key, out SearchChunk? chunk))
             {
                 continue;
             }
 
-            remainingContextCharacters -= snippet.Length;
             results.Add(new DocumentSearchResult(
                 chunk.DocumentId,
                 chunk.DocumentName,
                 chunk.PageStart,
                 chunk.PageEnd,
                 chunk.ChunkId,
-                snippet,
-                Math.Round(score, 4)));
+                chunk.Content,
+                Math.Round(kvp.Value * 30d, 4))); // Normalized RRF score for UI
         }
 
         return results;
@@ -280,37 +310,6 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         return statuses;
     }
 
-    private static CandidateScore GetOrCreate(Dictionary<long, CandidateScore> candidates, long chunkId)
-    {
-        if (!candidates.TryGetValue(chunkId, out CandidateScore? score))
-        {
-            score = new CandidateScore();
-            candidates[chunkId] = score;
-        }
-
-        return score;
-    }
-
-    private static Dictionary<long, double> NormalizeKeywordScores(IReadOnlyList<KeywordSearchResult> results)
-    {
-        if (results.Count == 0)
-        {
-            return [];
-        }
-
-        double max = results.Max(result => result.Score);
-        double min = results.Min(result => result.Score);
-        Dictionary<long, double> normalized = [];
-        foreach (KeywordSearchResult result in results)
-        {
-            normalized[result.ChunkId] = Math.Abs(max - min) < double.Epsilon
-                ? 1d
-                : Math.Clamp((result.Score - min) / (max - min), 0d, 1d);
-        }
-
-        return normalized;
-    }
-
     private static string ResolveEmbeddingState(
         ImportedDocument document,
         string? model,
@@ -332,72 +331,6 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         }
 
         return snapshot.EmbeddedChunkCount >= snapshot.ChunkCount ? "Complete" : "Partial";
-    }
-
-    private static string BuildSnippet(string query, string content, int maxLength)
-    {
-        if (maxLength <= 0)
-        {
-            return string.Empty;
-        }
-
-        string normalizedContent = NormalizeWhitespace(content);
-        if (normalizedContent.Length <= maxLength)
-        {
-            return normalizedContent;
-        }
-
-        int firstMatch = FindFirstTermIndex(query, normalizedContent);
-        int start = firstMatch < 0
-            ? 0
-            : Math.Max(0, firstMatch - maxLength / 3);
-        if (start + maxLength > normalizedContent.Length)
-        {
-            start = Math.Max(0, normalizedContent.Length - maxLength);
-        }
-
-        string snippet = normalizedContent.Substring(start, Math.Min(maxLength, normalizedContent.Length - start)).Trim();
-        if (start > 0)
-        {
-            snippet = "..." + snippet;
-        }
-
-        if (start + maxLength < normalizedContent.Length)
-        {
-            snippet += "...";
-        }
-
-        return snippet;
-    }
-
-    private static int FindFirstTermIndex(string query, string content)
-    {
-        foreach (string term in query.Split(
-            [' ', '\t', '\r', '\n'],
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            int index = content.IndexOf(term, StringComparison.OrdinalIgnoreCase);
-            if (index >= 0)
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
-    private static string NormalizeWhitespace(string value)
-    {
-        return string.Join(" ", value.Split(
-            [' ', '\t', '\r', '\n'],
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-    }
-
-    private sealed class CandidateScore
-    {
-        public double? KeywordScore { get; set; }
-
-        public double? VectorScore { get; set; }
     }
 
     private sealed record VectorSearchAttempt(

@@ -143,7 +143,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             NegativePrompt = CreateNegativePrompt(request.NegativePrompt),
             SchedulerOptions = new SchedulerOptions
             {
-                SchedulerType = SchedulerType.EulerAncestral,
+                SchedulerType = ResolveSchedulerType(modelType),
                 Width = request.Width,
                 Height = request.Height,
                 Seed = unchecked((int)Math.Clamp(seed, 0, int.MaxValue)),
@@ -177,9 +177,16 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             : ModelType.Base;
     }
 
+    private static SchedulerType ResolveSchedulerType(ModelType modelType)
+    {
+        return modelType == ModelType.Turbo
+            ? SchedulerType.LCM
+            : SchedulerType.EulerAncestral;
+    }
+
     private static float ResolveGuidanceScale(ImageGenerationRequest request, ModelType modelType)
     {
-        return request.GuidanceScale ?? (modelType == ModelType.Turbo ? 0 : 7.0f);
+        return request.GuidanceScale ?? (modelType == ModelType.Turbo ? 1.0f : 7.0f);
     }
 
     private static TimestepSpacingType ResolveTimestepSpacing(ModelType modelType)

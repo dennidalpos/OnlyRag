@@ -19,7 +19,7 @@ describe("ImagesSection", () => {
 
     await screen.findByRole("heading", { name: "Crea immagine" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+    await userEvent.click(screen.getByRole("button", { name: /Impostazioni/i }));
     expect(screen.getAllByText("LCM SDXL Olive ONNX").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Scarica modello" })).toBeInTheDocument();
     expect(screen.queryByText(/Automatic1111/i)).not.toBeInTheDocument();
@@ -68,7 +68,7 @@ describe("ImagesSection", () => {
     render(<ImagesSection />);
 
     await screen.findByRole("heading", { name: "Crea immagine" });
-    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+    await userEvent.click(screen.getByRole("button", { name: /Impostazioni/i }));
     await userEvent.click(screen.getByRole("button", { name: "Scarica modello" }));
     expect(screen.getByRole("dialog", { name: "Conferma download modello" })).toHaveTextContent("Licenza");
     await userEvent.click(screen.getByRole("button", { name: "Conferma e scarica" }));
@@ -109,7 +109,7 @@ describe("ImagesSection", () => {
     render(<ImagesSection />);
 
     await screen.findByRole("heading", { name: "Crea immagine" });
-    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+    await userEvent.click(screen.getByRole("button", { name: /Impostazioni/i }));
     await userEvent.click(screen.getByRole("button", { name: "Scarica modello" }));
     await userEvent.click(screen.getByRole("button", { name: "Conferma e scarica" }));
 
@@ -158,7 +158,7 @@ describe("ImagesSection", () => {
     await userEvent.click(screen.getByRole("button", { name: "Genera" }));
 
     expect(await screen.findByText("Immagine generata.")).toBeInTheDocument();
-    expect(screen.getByAltText("Una libreria futuristica")).toBeInTheDocument();
+    expect(screen.getAllByAltText("Una libreria futuristica").length).toBeGreaterThan(0);
     await waitFor(() => expect(createObjectUrl).toHaveBeenCalled());
 
     const generateCall = api.calls.find((call) => call.path === "/api/images/generate");
@@ -213,16 +213,18 @@ describe("ImagesSection", () => {
       { path: "/api/images/models", response: [createModelState({ isVerified: true })] },
       { path: "/api/images", response: [createGeneratedImage({ prompt: "Prompt editor" })] },
       { path: "/api/images/1/file", response: "image-bytes" },
+      { path: "/api/images/2/file", response: "image-bytes" },
       { path: "/api/images/1/edit", method: "POST", response: createGeneratedImage({ id: 2, fileName: "edited.png" }) }
     ]);
 
     render(<ImagesSection />);
 
     await screen.findByRole("heading", { name: "Crea immagine" });
-    await userEvent.click(screen.getByRole("button", { name: "Aggiungi testo" }));
-    await userEvent.clear(screen.getByLabelText("Testo"));
-    await userEvent.type(screen.getByLabelText("Testo"), "Titolo");
-    await userEvent.click(screen.getByRole("button", { name: "Salva modifica" }));
+    await screen.findByAltText("Prompt editor");
+    await userEvent.click(screen.getByRole("button", { name: /Testo/i }));
+    await userEvent.clear(screen.getByLabelText("Testo overlay"));
+    await userEvent.type(screen.getByLabelText("Testo overlay"), "Titolo");
+    await userEvent.click(screen.getByRole("button", { name: /Salva/i }));
 
     expect((await screen.findAllByText("edited.png")).length).toBeGreaterThan(0);
     const editCall = api.calls.find((call) => call.path === "/api/images/1/edit");
@@ -253,7 +255,7 @@ describe("ImagesSection", () => {
     render(<ImagesSection />);
 
     await screen.findByRole("heading", { name: "Crea immagine" });
-    await userEvent.click(screen.getByRole("button", { name: "Apri cartella" }));
+    await userEvent.click(screen.getByRole("button", { name: /cartella/i }));
 
     expect(await screen.findByText("Cartella immagini generate aperta.")).toBeInTheDocument();
     const openCall = api.calls.find((call) => call.path === "/api/images/open-folder");
@@ -284,7 +286,7 @@ describe("ImagesSection", () => {
 
     await screen.findByRole("heading", { name: "Crea immagine" });
     await screen.findAllByText("image.png");
-    await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+    await userEvent.click(screen.getByRole("button", { name: /Elimina immagine/i }));
 
     expect(await screen.findByText("Immagine eliminata.")).toBeInTheDocument();
     expect(screen.getByText("Nessuna immagine generata.")).toBeInTheDocument();
@@ -302,10 +304,10 @@ describe("ImagesSection", () => {
     render(<ImagesSection />);
 
     await screen.findByRole("heading", { name: "Crea immagine" });
-    await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
-    const dialog = screen.getByRole("dialog", { name: "Impostazioni immagini" });
+    await userEvent.click(screen.getByRole("button", { name: /Impostazioni/i }));
+    const dialog = screen.getByRole("dialog", { name: /Impostazioni/i });
 
-    expect(within(dialog).getByLabelText("Modello integrato")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Modello selezionato")).toBeInTheDocument();
     expect(within(dialog).getByText(/rimanenti/i)).toBeInTheDocument();
   });
 });

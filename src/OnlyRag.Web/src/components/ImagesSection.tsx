@@ -8,6 +8,7 @@ import {
   type ImageGenerationRuntimeStatus,
   type ImageGenerationSettings,
   type ImageModelCatalogEntry,
+  type ImageModelCatalogEntryRequest,
   type ImageModelDownloadResponse,
   type ImageModelLocalState,
   type OperationMessageResponse
@@ -23,10 +24,12 @@ import {
   defaultModelId,
   defaultSettings,
   resolveGenerationProfile,
+  type ArrowLayer,
   type EditTool,
   type Feedback,
   type GenerationProfile,
   type ImageEditState,
+  type PromptLanguage,
   type TextLayer
 } from "./images/imageTypes";
 import { ProgressBar } from "./ProgressBar";
@@ -42,6 +45,7 @@ export function ImagesSection() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [promptLanguage, setPromptLanguage] = useState<PromptLanguage>("en");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
@@ -67,7 +71,13 @@ export function ImagesSection() {
   const [textColor, setTextColor] = useState("#ffffff");
   const [textSize, setTextSize] = useState(36);
   const [selectedTextId, setSelectedTextId] = useState<number | null>(null);
-  const [dragTarget, setDragTarget] = useState<"crop" | "text" | null>(null);
+
+  // Arrow controls
+  const [arrowColor, setArrowColor] = useState("#ef4444");
+  const [arrowWidth, setArrowWidth] = useState(4);
+  const [selectedArrowId, setSelectedArrowId] = useState<number | null>(null);
+
+  const [dragTarget, setDragTarget] = useState<"crop" | "text" | "arrow" | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [initialDragState, setInitialDragState] = useState<{ x: number; y: number } | null>(null);
 
@@ -237,6 +247,28 @@ export function ImagesSection() {
     }
   }
 
+  async function handleUpsertCatalogModel(request: ImageModelCatalogEntryRequest) {
+    setIsModelActionRunning(true);
+    setModelActionMessage("Aggiornamento catalogo modelli...");
+    setFeedback(null);
+    try {
+      await apiRequest(`/api/images/models/catalog/${request.id}`, {
+        method: "PUT",
+        body: JSON.stringify(request)
+      });
+      await refreshModelsAndStatus();
+      setFeedback({ tone: "success", message: `Modello '${request.displayName}' salvato nel catalogo.` });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Impossibile aggiornare il catalogo."
+      });
+    } finally {
+      setIsModelActionRunning(false);
+      setModelActionMessage(null);
+    }
+  }
+
   async function handleGenerate(event: FormEvent) {
     event.preventDefault();
     if (!canGenerate) {
@@ -250,10 +282,26 @@ export function ImagesSection() {
     setIsGenerating(true);
     setFeedback(null);
     try {
+      let finalPrompt = prompt.trim();
+      if (promptLanguage !== "en" && finalPrompt) {
+        try {
+          const trans = await apiRequest<{ originalPrompt: string; translatedPrompt: string }>("/api/images/translate-prompt", {
+            method: "POST",
+            body: JSON.stringify({ prompt: finalPrompt, sourceLanguage: promptLanguage })
+          });
+          if (trans.translatedPrompt && trans.translatedPrompt !== finalPrompt) {
+            finalPrompt = trans.translatedPrompt;
+            setFeedback({ tone: "success", message: `Prompt tradotto in inglese: "${finalPrompt}"` });
+          }
+        } catch {
+          // fallback to original if translation fails
+        }
+      }
+
       const result = await apiRequest<ImageGenerationResponse>("/api/images/generate", {
         method: "POST",
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: finalPrompt,
           negativePrompt: negativePrompt.trim() || null,
           modelId: settings.selectedModelId,
           width,
@@ -269,7 +317,7 @@ export function ImagesSection() {
         setImages((prev) => [...result.images, ...prev]);
         setSelectedImageId(result.images[0].id);
       }
-      setFeedback({ tone: "success", message: result.message });
+      setFeedback((prev) => prev ?? { tone: "success", message: result.message });
     } catch (error) {
       setFeedback({
         tone: "error",
@@ -355,6 +403,7 @@ export function ImagesSection() {
       setEditState(createEmptyEditState());
       setTextInput("");
       setIsAddingText(false);
+      setSelectedArrowId(null);
       setFeedback({ tone: "success", message: "Modifica salvata come nuova immagine." });
     } catch (error) {
       setFeedback({
@@ -366,7 +415,7 @@ export function ImagesSection() {
     }
   }
 
-  // Pointer events for Canvas crop and text drag
+  // Pointer events for Canvas crop, text drag, and arrow drawing
   function handlePreviewPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!previewRef.current) return;
     const rect = previewRef.current.getBoundingClientRect();
@@ -379,6 +428,23 @@ export function ImagesSection() {
       setEditState((prev) => ({
         ...prev,
         crop: { x: xPct, y: yPct, width: 0, height: 0 }
+      }));
+    } else if (activeTool === "arrow") {
+      const newArrow: ArrowLayer = {
+        id: Date.now(),
+        x1: xPct,
+        y1: yPct,
+        x2: xPct,
+        y2: yPct,
+        color: arrowColor,
+        strokeWidth: arrowWidth
+      };
+      setDragTarget("arrow");
+      setDragStart({ x: xPct, y: yPct });
+      setSelectedArrowId(newArrow.id);
+      setEditState((prev) => ({
+        ...prev,
+        arrowLayers: [...prev.arrowLayers, newArrow]
       }));
     }
   }
@@ -408,6 +474,15 @@ export function ImagesSection() {
           width: Math.max(0, Math.min(100 - minX, w)),
           height: Math.max(0, Math.min(100 - minY, h))
         }
+      }));
+    } else if (dragTarget === "arrow" && selectedArrowId) {
+      setEditState((prev) => ({
+        ...prev,
+        arrowLayers: prev.arrowLayers.map((arrow) =>
+          arrow.id === selectedArrowId
+            ? { ...arrow, x2: xPct, y2: yPct }
+            : arrow
+        )
       }));
     } else if (dragTarget === "text" && selectedTextId && initialDragState) {
       const dx = rawXPct - dragStart.x;
@@ -439,6 +514,7 @@ export function ImagesSection() {
     setTextInput(layer.text);
     setTextColor(layer.color);
     setTextSize(layer.fontSize);
+    setIsAddingText(true);
     if (!previewRef.current) return;
     const rect = previewRef.current.getBoundingClientRect();
     const xPct = ((event.clientX - rect.left) / rect.width) * 100;
@@ -460,8 +536,38 @@ export function ImagesSection() {
     };
     setEditState((prev) => ({ ...prev, textLayers: [...prev.textLayers, newLayer] }));
     setSelectedTextId(newLayer.id);
+  }
+
+  function handleUpdateTextLayer() {
+    if (!selectedTextId || !textInput.trim()) return;
+    setEditState((prev) => ({
+      ...prev,
+      textLayers: prev.textLayers.map((layer) =>
+        layer.id === selectedTextId
+          ? { ...layer, text: textInput.trim(), color: textColor, fontSize: textSize }
+          : layer
+      )
+    }));
+  }
+
+  function handleDeleteTextLayer() {
+    if (!selectedTextId) return;
+    setEditState((prev) => ({
+      ...prev,
+      textLayers: prev.textLayers.filter((layer) => layer.id !== selectedTextId)
+    }));
+    setSelectedTextId(null);
     setTextInput("");
-    setIsAddingText(false);
+  }
+
+  function handleDeselectText() {
+    setSelectedTextId(null);
+    setTextInput("");
+  }
+
+  function handleClearArrows() {
+    setEditState((prev) => ({ ...prev, arrowLayers: [] }));
+    setSelectedArrowId(null);
   }
 
   if (isLoading) {
@@ -499,6 +605,8 @@ export function ImagesSection() {
         <ImageGeneratorControls
           prompt={prompt}
           onPromptChange={setPrompt}
+          promptLanguage={promptLanguage}
+          onPromptLanguageChange={setPromptLanguage}
           negativePrompt={negativePrompt}
           onNegativePromptChange={setNegativePrompt}
           width={width}
@@ -525,6 +633,7 @@ export function ImagesSection() {
                 className={`button-secondary ${activeTool === "move" ? "button-secondary--active" : ""}`}
                 aria-pressed={activeTool === "move"}
                 onClick={() => setActiveTool("move")}
+                title="Seleziona e trascina elementi sull'immagine"
               >
                 Sposta
               </button>
@@ -533,35 +642,73 @@ export function ImagesSection() {
                 className={`button-secondary ${activeTool === "crop" ? "button-secondary--active" : ""}`}
                 aria-pressed={activeTool === "crop"}
                 onClick={() => setActiveTool("crop")}
+                title="Trascina sull'immagine per selezionare l'area di ritaglio"
               >
                 Ritaglio
+              </button>
+              <button
+                type="button"
+                className={`button-secondary ${activeTool === "arrow" ? "button-secondary--active" : ""}`}
+                aria-pressed={activeTool === "arrow"}
+                onClick={() => setActiveTool("arrow")}
+                title="Trascina sull'immagine per tracciare una freccia della lunghezza desiderata"
+              >
+                🏹 Freccia
               </button>
               <button
                 type="button"
                 className={`button-secondary ${isAddingText ? "button-secondary--active" : ""}`}
                 aria-pressed={isAddingText}
                 onClick={() => setIsAddingText(!isAddingText)}
+                title="Mostra/nascondi il pannello per inserire e modificare il testo"
               >
-                Aggiungi testo
+                Testo overlay
               </button>
             </div>
 
             <div className="canvas-toolbar__actions">
-              {(editState.crop || editState.textLayers.length > 0 || Boolean(textInput.trim())) && (
-                <button type="button" className="button-primary" onClick={handleSaveEditedImage} disabled={isSaving}>
-                  {isSaving ? "Salvataggio..." : "Salva modifica"}
+              {activeTool === "crop" && editState.crop && editState.crop.width > 1 && editState.crop.height > 1 && (
+                <button type="button" className="button-primary" onClick={handleSaveEditedImage} disabled={isSaving} title="Applica il ritaglio e salva l'immagine">
+                  ✂️ Applica Ritaglio
                 </button>
               )}
-              <button type="button" className="button-secondary" onClick={handleOpenFolder}>
-                Apri cartella
+              {(editState.crop || editState.textLayers.length > 0 || editState.arrowLayers.length > 0 || Boolean(textInput.trim())) && activeTool !== "crop" && (
+                <button type="button" className="button-primary" onClick={handleSaveEditedImage} disabled={isSaving} title="Salva l'immagine modificata come un nuovo file">
+                  {isSaving ? "Salvataggio..." : "Salva come nuova immagine"}
+                </button>
+              )}
+              <button type="button" className="button-secondary" onClick={handleOpenFolder} title="Apri la cartella locale delle immagini generate">
+                📂 Apri cartella
               </button>
               {selectedImage && (
-                <button type="button" className="button-danger" onClick={handleDeleteSelectedImage} disabled={isDeletingImage}>
-                  Elimina
+                <button type="button" className="button-danger" onClick={handleDeleteSelectedImage} disabled={isDeletingImage} title="Elimina l'immagine selezionata dal disco e dal database">
+                  Elimina immagine
                 </button>
               )}
             </div>
           </div>
+
+          {activeTool === "arrow" && (
+            <div className="text-layer-editor">
+              <span>Colore freccia:</span>
+              <input type="color" value={arrowColor} onChange={(e) => setArrowColor(e.target.value)} title="Colore freccia" />
+              <span>Spessore:</span>
+              <input
+                type="number"
+                min={2}
+                max={20}
+                value={arrowWidth}
+                onChange={(e) => setArrowWidth(Number(e.target.value))}
+                title="Spessore linea (px)"
+              />
+              <span className="editor-hint">💡 Trascina sull'immagine per inserire una freccia della lunghezza desiderata.</span>
+              {editState.arrowLayers.length > 0 && (
+                <button type="button" className="button-secondary" onClick={handleClearArrows} title="Rimuovi tutte le frecce">
+                  Rimuovi frecce ({editState.arrowLayers.length})
+                </button>
+              )}
+            </div>
+          )}
 
           {isAddingText && (
             <div className="text-layer-editor">
@@ -570,7 +717,7 @@ export function ImagesSection() {
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 placeholder="Inserisci testo da applicare..."
-                aria-label="Testo"
+                aria-label="Testo overlay"
               />
               <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} title="Colore testo" />
               <input
@@ -579,11 +726,28 @@ export function ImagesSection() {
                 max={120}
                 value={textSize}
                 onChange={(e) => setTextSize(Number(e.target.value))}
-                title="Dimensione font"
+                title="Dimensione font (px)"
               />
-              <button type="button" className="button-primary" onClick={handleAddTextLayer}>
-                Applica
-              </button>
+              {selectedTextId ? (
+                <>
+                  <button type="button" className="button-primary" onClick={handleUpdateTextLayer} title="Aggiorna il testo selezionato con il nuovo contenuto">
+                    Aggiorna
+                  </button>
+                  <button type="button" className="button-secondary" onClick={handleAddTextLayer} title="Aggiungi come nuovo layer di testo separato">
+                    Nuovo
+                  </button>
+                  <button type="button" className="button-danger" onClick={handleDeleteTextLayer} title="Elimina il testo selezionato">
+                    Elimina testo
+                  </button>
+                  <button type="button" className="button-secondary" onClick={handleDeselectText} title="Deseleziona il testo">
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="button-primary" onClick={handleAddTextLayer} title="Aggiungi testo sull'immagine">
+                  Aggiungi
+                </button>
+              )}
             </div>
           )}
 
@@ -593,11 +757,13 @@ export function ImagesSection() {
             editState={editState}
             activeTool={activeTool}
             selectedTextId={selectedTextId}
+            selectedArrowId={selectedArrowId}
             previewRef={previewRef}
             onPreviewPointerDown={handlePreviewPointerDown}
             onPreviewPointerMove={handlePreviewPointerMove}
             onPreviewPointerUp={handlePreviewPointerUp}
             onTextPointerDown={handleTextPointerDown}
+            onArrowClick={(id) => setSelectedArrowId(id)}
           />
 
           <ImageGalleryGrid
@@ -624,6 +790,7 @@ export function ImagesSection() {
         onSaveSettings={handleSaveSettings}
         onAskConsent={(modelId) => setPendingConsentModelId(modelId)}
         onDeleteModel={handleDeleteModel}
+        onUpsertCatalogModel={handleUpsertCatalogModel}
       />
 
       <ImageConsentDialog
@@ -656,12 +823,41 @@ function renderEditedImageToPng(objectUrl: string, editState: ImageEditState): P
       }
       ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
 
+      // Render Arrow Layers onto canvas context
+      for (const arrow of editState.arrowLayers) {
+        const x1 = ((arrow.x1 - crop.x) / crop.width) * sourceWidth;
+        const y1 = ((arrow.y1 - crop.y) / crop.height) * sourceHeight;
+        const x2 = ((arrow.x2 - crop.x) / crop.width) * sourceWidth;
+        const y2 = ((arrow.y2 - crop.y) / crop.height) * sourceHeight;
+
+        ctx.strokeStyle = arrow.color;
+        ctx.fillStyle = arrow.color;
+        ctx.lineWidth = arrow.strokeWidth;
+        ctx.lineCap = "round";
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLength = 16 + arrow.strokeWidth * 2;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Render Text Layers onto canvas context
       for (const layer of editState.textLayers) {
         if (!layer.text.trim()) continue;
         const x = ((layer.x - crop.x) / crop.width) * sourceWidth;
         const y = ((layer.y - crop.y) / crop.height) * sourceHeight;
         ctx.fillStyle = layer.color;
         ctx.font = `${layer.fontSize}px sans-serif`;
+        ctx.textBaseline = "top";
         ctx.fillText(layer.text, x, y);
       }
       const dataUrl = canvas.toDataURL("image/png");
@@ -676,7 +872,7 @@ function renderEditedImageToPng(objectUrl: string, editState: ImageEditState): P
   });
 }
 
-function useImageObjectUrl(imageId: number | null) {
+export function useImageObjectUrl(imageId: number | null) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
   useEffect(() => {

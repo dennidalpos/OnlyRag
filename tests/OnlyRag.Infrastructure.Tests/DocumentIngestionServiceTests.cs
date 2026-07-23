@@ -390,4 +390,25 @@ public sealed partial class DocumentIngestionServiceTests
         Assert.Equal(2, resumed.PageCount);
         Assert.Equal(resumed.ChunkCount, updated.ChunkCount);
     }
+
+    [Fact]
+    public void Chunker_PreservesMarkdownTableStructureAsAtomicUnit()
+    {
+        DocumentTextChunker chunker = new();
+        string tableText = "| Colonna 1 | Colonna 2 |\n|---|---|\n| Valore A | Valore B |\n| Valore C | Valore D |";
+        string largeFiller = string.Join(' ', Enumerable.Range(0, 800).Select(i => $"word{i}"));
+        string text = $"{largeFiller}\n\n{tableText}\n\n{largeFiller}";
+
+        IReadOnlyList<IngestedDocumentChunk> chunks = chunker.CreateChunks(
+            text,
+            pageStart: 1,
+            pageEnd: 1,
+            firstOrdinal: 0,
+            DocumentIngestionOptions.Normalize(200, 20));
+
+        Assert.True(chunks.Count > 1);
+        IngestedDocumentChunk tableChunk = chunks.First(c => c.Text.Contains("| Colonna 1 | Colonna 2 |", StringComparison.Ordinal));
+        Assert.Contains("| Valore A | Valore B |", tableChunk.Text, StringComparison.Ordinal);
+        Assert.Contains("| Valore C | Valore D |", tableChunk.Text, StringComparison.Ordinal);
+    }
 }

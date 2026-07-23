@@ -34,8 +34,17 @@ export function ImageHardwareStatusHeader({
       </div>
 
       <div className="image-gen-header__actions">
-        <button type="button" className="button-secondary" onClick={onOpenSettings} disabled={isModelActionRunning}>
-          Impostazioni
+        <a
+          href="https://huggingface.co/models?search=onnx+sdxl"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="button-secondary"
+          title="Apri la pagina web Hugging Face con i modelli ONNX SDXL/LCM compatibili"
+        >
+          🌐 Modelli Compatibili (Hugging Face)
+        </a>
+        <button type="button" className="button-secondary" onClick={onOpenSettings} disabled={isModelActionRunning} title="Apri gestione modelli e impostazioni immagini">
+          ⚙️ Impostazioni modelli
         </button>
       </div>
     </div>

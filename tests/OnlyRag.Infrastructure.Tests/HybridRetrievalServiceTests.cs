@@ -281,7 +281,7 @@ public sealed class HybridRetrievalServiceTests
                 vectorSearch,
                 chunks,
                 queryEmbeddingGenerator,
-                new HybridRetrievalOptions(
+                options: new HybridRetrievalOptions(
                     DefaultTopK: 5,
                     KeywordTopK: 10,
                     VectorTopK: 10,

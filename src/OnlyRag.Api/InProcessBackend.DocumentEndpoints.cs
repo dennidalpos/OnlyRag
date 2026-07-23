@@ -77,7 +77,7 @@ public static partial class InProcessBackend
             IDocumentLibraryService documents,
             ILocalJobQueue jobs,
             RunningJobCancellationRegistry cancellationRegistry,
-            OcrProcessingSettingsStore ocrProcessingSettings,
+            OcrSettingsStore ocrSettings,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
@@ -89,7 +89,7 @@ public static partial class InProcessBackend
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
             string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
                 ocrLanguage,
-                ocrProcessingSettings,
+                ocrSettings,
                 cancellationToken);
             ImportedDocument? queued = await documents.QueueForIndexingAsync(id, resolvedOcrLanguage, cancellationToken);
             return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
@@ -123,7 +123,7 @@ public static partial class InProcessBackend
             IDocumentLibraryService documents,
             ILocalJobQueue jobs,
             RunningJobCancellationRegistry cancellationRegistry,
-            OcrProcessingSettingsStore ocrProcessingSettings,
+            OcrSettingsStore ocrSettings,
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
@@ -135,7 +135,7 @@ public static partial class InProcessBackend
             await CancelDocumentJobIfNeededAsync(document, jobs, cancellationRegistry, cancellationToken);
             string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
                 ocrLanguage,
-                ocrProcessingSettings,
+                ocrSettings,
                 cancellationToken);
             string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DocumentIngestionJobPayload(
                 document.Id,
@@ -269,7 +269,7 @@ public static partial class InProcessBackend
 
     private static async Task<string> ResolveOcrLanguageAsync(
         string? requestedLanguage,
-        OcrProcessingSettingsStore ocrProcessingSettings,
+        OcrSettingsStore ocrSettings,
         CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(requestedLanguage))
@@ -277,8 +277,161 @@ public static partial class InProcessBackend
             return OcrLanguages.NormalizeCode(requestedLanguage);
         }
 
-        OcrProcessingSettings settings = await ocrProcessingSettings.GetAsync(cancellationToken);
+        OcrProcessingSettings settings = await ocrSettings.GetProcessingAsync(cancellationToken);
         return OcrLanguages.NormalizeCode(settings.Language);
     }
 
+    private static bool IsOcrCandidate(string? fileExtension)
+    {
+        return fileExtension?.ToLowerInvariant() is ".pdf" or ".png" or ".jpg" or ".jpeg" or ".tif" or ".tiff" or ".bmp" or ".gif" or ".webp";
+    }
+
+    private static async Task<LocalJob?> GetActiveDocumentJobAsync(
+        ImportedDocument document,
+        ILocalJobQueue jobs,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(document.CurrentJobId))
+        {
+            return null;
+        }
+
+        LocalJob? currentJob = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
+        return currentJob?.Status.IsActive() == true
+            ? currentJob
+            : null;
+    }
+
+    private static async Task<DocumentEmbeddingStatusResponse> BuildEmbeddingStatusResponseAsync(
+        long documentId,
+        string? model,
+        IDocumentLibraryService documents,
+        IEmbeddingRepository embeddings,
+        ILocalJobQueue jobs,
+        IQdrantVectorStore vectorSearch,
+        CancellationToken cancellationToken)
+    {
+        ImportedDocument? document = await documents.GetAsync(documentId, cancellationToken);
+        if (document is null)
+        {
+            throw new InvalidOperationException("Documento non trovato.");
+        }
+
+        DocumentEmbeddingStatusSnapshot snapshot = await embeddings.GetDocumentEmbeddingStatusAsync(
+            documentId,
+            model,
+            cancellationToken);
+
+        LocalJob? currentJob = null;
+        if (!string.IsNullOrWhiteSpace(document.CurrentJobId))
+        {
+            LocalJob? job = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
+            if (job?.Type == DocumentEmbeddingJobHandler.DocumentEmbeddingJobType)
+            {
+                currentJob = job;
+            }
+        }
+
+        int progressPercent = snapshot.ChunkCount == 0
+            ? 0
+            : (int)Math.Round(snapshot.EmbeddedChunkCount * 100d / snapshot.ChunkCount);
+        if (currentJob is not null)
+        {
+            progressPercent = Math.Max(progressPercent, currentJob.ProgressPercent);
+        }
+
+        string state = ResolveEmbeddingState(model, snapshot, currentJob);
+
+        return new DocumentEmbeddingStatusResponse(
+            documentId,
+            state,
+            string.IsNullOrWhiteSpace(model) ? null : model,
+            snapshot.ChunkCount,
+            snapshot.EmbeddedChunkCount,
+            Math.Clamp(progressPercent, 0, 100),
+            currentJob?.Id,
+            currentJob?.CurrentStep,
+            vectorSearch.BackendName,
+            snapshot.LastEmbeddedAtUtc);
+    }
+
+    private static string ResolveEmbeddingState(
+        string? model,
+        DocumentEmbeddingStatusSnapshot snapshot,
+        LocalJob? currentJob)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "NotConfigured";
+        }
+
+        if (currentJob is not null)
+        {
+            return currentJob.Status.ToString();
+        }
+
+        if (snapshot.ChunkCount == 0)
+        {
+            return "NotIndexed";
+        }
+
+        if (snapshot.EmbeddedChunkCount == 0)
+        {
+            return "NotStarted";
+        }
+
+        return snapshot.EmbeddedChunkCount >= snapshot.ChunkCount ? "Complete" : "Partial";
+    }
+
+    private static async Task CancelDocumentJobIfNeededAsync(
+        ImportedDocument document,
+        ILocalJobQueue jobs,
+        RunningJobCancellationRegistry cancellationRegistry,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(document.CurrentJobId))
+        {
+            return;
+        }
+
+        LocalJob? currentJob = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
+        if (currentJob?.Status.IsActive() != true)
+        {
+            return;
+        }
+
+        await jobs.CancelAsync(document.CurrentJobId, cancellationToken);
+        cancellationRegistry.Cancel(document.CurrentJobId);
+
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        while (cancellationRegistry.IsRunning(document.CurrentJobId))
+        {
+            if (timeout.Token.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Il job {document.CurrentJobId} non si e fermato entro 10 secondi. Riprovare.");
+            }
+
+            await Task.Delay(80, timeout.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
+    private static async Task DeleteDocumentVectorsAsync(
+        long documentId,
+        IEmbeddingRepository embeddings,
+        IQdrantVectorStore vectorSearch,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DocumentVectorIndexReference> references =
+            await embeddings.ListDocumentVectorIndexReferencesAsync(documentId, cancellationToken);
+
+        foreach (DocumentVectorIndexReference reference in references)
+        {
+            await vectorSearch.DeleteDocumentAsync(
+                reference.Model,
+                reference.Dimensions,
+                documentId,
+                cancellationToken);
+        }
+    }
 }

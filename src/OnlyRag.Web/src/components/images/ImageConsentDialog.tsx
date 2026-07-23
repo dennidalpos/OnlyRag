@@ -23,7 +23,7 @@ export function ImageConsentDialog({
       <div className="modal-content" ref={consentModalRef}>
         <div className="modal-header">
           <h3 id="consent-dialog-title">Conferma download modello</h3>
-          <button type="button" className="button-icon" onClick={onCancel}>
+          <button type="button" className="button-icon" onClick={onCancel} title="Chiudi" aria-label="Chiudi finestra">
             ✕
           </button>
         </div>

@@ -6,4 +6,7 @@ public sealed record IngestedDocumentChunk(
     int Ordinal,
     string Text,
     int ApproximateTokenCount,
-    string ContentHash);
+    string ContentHash,
+    long? ParentChunkId = null,
+    string ChunkLevel = "Child",
+    string? SectionHeading = null);

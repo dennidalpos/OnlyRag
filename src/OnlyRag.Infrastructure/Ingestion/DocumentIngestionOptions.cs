@@ -4,6 +4,8 @@ public sealed record DocumentIngestionOptions(
     int ChunkSizeTokens,
     int OverlapTokens)
 {
+    public static readonly DocumentIngestionOptions Default = new(0, -1);
+
     public const int DefaultChunkSizeTokens = 800;
     public const int DefaultOverlapTokens = 120;
     public const int MinimumChunkSizeTokens = 100;

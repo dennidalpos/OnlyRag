@@ -61,7 +61,9 @@ internal sealed class ChatService
         DocumentSearchResponse? searchResponse = null;
         List<ChatNotice> notices = [];
         List<ChatSource> sources = [];
-        if (useDocuments)
+        bool isChatter = IsConversationalChatter(message);
+
+        if (useDocuments && !isChatter)
         {
             searchResponse = await retrieval.SearchAsync(
                 new DocumentSearchRequest(message, selectedDocumentIds, RetrievalTopK),
@@ -282,6 +284,18 @@ internal sealed class ChatService
         }
 
         return $"{pageStart}-{pageEnd}";
+    }
+
+    private static readonly string[] ConversationalPhrases = [
+        "ciao", "salve", "buongiorno", "buonasera", "buonanotte",
+        "grazie", "grazie mille", "ok", "va bene", "chi sei",
+        "come ti chiami", "cosa puoi fare", "hello", "hi", "thanks", "thank you"
+    ];
+
+    private static bool IsConversationalChatter(string message)
+    {
+        string trimmed = message.Trim().ToLowerInvariant();
+        return trimmed.Length <= 30 && ConversationalPhrases.Any(phrase => trimmed.Equals(phrase, StringComparison.OrdinalIgnoreCase));
     }
 }
 

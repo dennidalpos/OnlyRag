@@ -49,8 +49,8 @@ public static class ImageModelCatalog
             ModelProfile: "lcm-sdxl-olive",
             SupportedResolutions: ["1024x1024", "832x1216", "1216x832"],
             DefaultSteps: 6,
-            DefaultGuidance: 0,
-            Scheduler: "Euler Ancestral with trailing timestep spacing",
+            DefaultGuidance: 1.0,
+            Scheduler: "LCM with trailing timestep spacing",
             CompatibilityNotes: "DirectML GPU preferred on Windows, including NVIDIA GPUs; CPU fallback is supported for slower local validation.")
     ];
 

@@ -81,8 +81,44 @@ public sealed class DocumentTextChunker
                 continue;
             }
 
-            foreach (string line in paragraph.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            string[] lines = paragraph.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            int lineIndex = 0;
+            while (lineIndex < lines.Length)
             {
+                if (IsTableLine(lines[lineIndex]))
+                {
+                    List<string> tableBlockLines = [];
+                    while (lineIndex < lines.Length && IsTableLine(lines[lineIndex]))
+                    {
+                        tableBlockLines.Add(lines[lineIndex]);
+                        lineIndex++;
+                    }
+
+                    string tableText = string.Join("\n", tableBlockLines);
+                    int tableTokens = EstimateTokenCount(tableText);
+                    if (tableTokens > 0)
+                    {
+                        if (tableTokens <= DocumentIngestionOptions.MaximumChunkSizeTokens)
+                        {
+                            units.Add(new TextUnit(tableText, tableTokens));
+                        }
+                        else
+                        {
+                            // If single table block is huge, add as sub-line units
+                            foreach (string tLine in tableBlockLines)
+                            {
+                                int tTokens = EstimateTokenCount(tLine);
+                                if (tTokens > 0)
+                                {
+                                    units.Add(new TextUnit(tLine, tTokens));
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                string line = lines[lineIndex++];
                 int lineTokens = EstimateTokenCount(line);
                 if (lineTokens == 0)
                 {
@@ -100,6 +136,14 @@ public sealed class DocumentTextChunker
         }
 
         return units;
+    }
+
+    private static bool IsTableLine(string line)
+    {
+        string trimmed = line.Trim();
+        return (trimmed.StartsWith('|') && trimmed.EndsWith('|') && trimmed.Length > 2)
+            || trimmed.Contains("|---|", StringComparison.Ordinal)
+            || (trimmed.Contains('|') && trimmed.Count(c => c == '|') >= 2);
     }
 
     private static void AddWordUnits(string text, List<TextUnit> units)

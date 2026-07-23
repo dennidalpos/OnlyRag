@@ -203,5 +203,45 @@ public static partial class InProcessBackend
                 "Cartella immagini generate aperta.",
                 "Cartella immagini generate non aperta");
         });
+
+        app.MapPost("/api/images/translate-prompt", async (
+            ImagePromptTranslationRequest request,
+            Ollama.IOllamaClient ollamaClient,
+            Ollama.IOllamaSettingsService ollamaSettings,
+            CancellationToken cancellationToken) =>
+        {
+            string prompt = request.Prompt?.Trim() ?? string.Empty;
+            string sourceLang = (request.SourceLanguage ?? "en").Trim().ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(prompt) || sourceLang is "en" or "english")
+            {
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en"));
+            }
+
+            try
+            {
+                OllamaSettings settings = await ollamaSettings.GetAsync(cancellationToken);
+                string modelName = settings.DefaultChatModel ?? "qwen2.5:1.5b";
+
+                IReadOnlyList<OllamaChatMessage> messages = [
+                    new OllamaChatMessage("system", "You are an expert translator for Stable Diffusion / SDXL text-to-image prompts. Translate the user's prompt into descriptive, natural English text suitable for AI image generation. Output ONLY the English translation without quotes or preamble."),
+                    new OllamaChatMessage("user", prompt)
+                ];
+
+                string translated = await ollamaClient.GenerateChatAsync(modelName, messages, numCtx: 2048, cancellationToken);
+                string cleaned = translated.Trim().Trim('"').Trim('\'');
+                if (string.IsNullOrWhiteSpace(cleaned))
+                {
+                    cleaned = prompt;
+                }
+
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, cleaned, "en"));
+            }
+            catch
+            {
+                // Fallback gracefully if Ollama is not configured or fails
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en"));
+            }
+        });
     }
 }

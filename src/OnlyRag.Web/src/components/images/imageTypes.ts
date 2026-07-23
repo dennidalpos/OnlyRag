@@ -11,11 +11,43 @@ export const defaultSettings: ImageGenerationSettings = {
   preferGpu: true
 };
 
-export const sizePresets = [
-  { label: "Quadrata", width: 1024, height: 1024 },
-  { label: "Verticale", width: 832, height: 1216 },
-  { label: "Orizzontale", width: 1216, height: 832 }
+export const minSizePresets = [
+  { label: "512x512 (Veloce 1:1)", width: 512, height: 512 },
+  { label: "512x768 (2:3)", width: 512, height: 768 },
+  { label: "768x512 (3:2)", width: 768, height: 512 }
 ];
+
+export const standardSizePresets = [
+  { label: "768x768 (1:1)", width: 768, height: 768 },
+  { label: "1024x1024 (HD 1:1)", width: 1024, height: 1024 },
+  { label: "1216x832 (16:9)", width: 1216, height: 832 },
+  { label: "832x1216 (9:16)", width: 832, height: 1216 }
+];
+
+export const socialSizePresets = [
+  { label: "Instagram Post (1080x1080)", width: 1080, height: 1080 },
+  { label: "Instagram Story / Reel (1080x1920)", width: 1080, height: 1920 },
+  { label: "Instagram Portrait (1080x1350)", width: 1080, height: 1350 },
+  { label: "YouTube / Twitter (1280x720)", width: 1280, height: 720 },
+  { label: "TikTok / Short (1080x1920)", width: 1080, height: 1920 },
+  { label: "LinkedIn Post (1200x627)", width: 1200, height: 627 }
+];
+
+export const sizePresets = [
+  ...minSizePresets,
+  ...standardSizePresets,
+  ...socialSizePresets
+];
+
+export const promptLanguages = [
+  { value: "en", label: "Inglese (English)" },
+  { value: "it", label: "Italiano" },
+  { value: "es", label: "Español" },
+  { value: "fr", label: "Français" },
+  { value: "de", label: "Deutsch" }
+] as const;
+
+export type PromptLanguage = (typeof promptLanguages)[number]["value"];
 
 export const generationProfiles = [
   { label: "Qualità", value: "quality" },
@@ -83,7 +115,7 @@ export type CropSelection = {
   height: number;
 };
 
-export type EditTool = "move" | "crop" | "text";
+export type EditTool = "move" | "crop" | "text" | "arrow";
 
 export type TextLayer = {
   id: number;
@@ -94,13 +126,24 @@ export type TextLayer = {
   color: string;
 };
 
+export type ArrowLayer = {
+  id: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  strokeWidth: number;
+};
+
 export type ImageEditState = {
   crop: CropSelection | null;
   textLayers: TextLayer[];
+  arrowLayers: ArrowLayer[];
 };
 
 export function createEmptyEditState(): ImageEditState {
-  return { crop: null, textLayers: [] };
+  return { crop: null, textLayers: [], arrowLayers: [] };
 }
 
 

@@ -14,7 +14,7 @@ public static partial class InProcessBackend
             HttpRequest request,
             IDocumentLibraryService documents,
             LocalDocumentStorageGuard storageGuard,
-            OcrProcessingSettingsStore ocrProcessingSettings,
+            OcrSettingsStore ocrSettings,
             CancellationToken cancellationToken) =>
         {
             if (!request.HasFormContentType)
@@ -78,7 +78,7 @@ public static partial class InProcessBackend
                 StringComparison.OrdinalIgnoreCase);
             string ocrLanguage = await ResolveOcrLanguageAsync(
                 form["ocrLanguage"].ToString(),
-                ocrProcessingSettings,
+                ocrSettings,
                 cancellationToken);
 
             List<DocumentImportFileResult> results = [];
@@ -99,6 +99,34 @@ public static partial class InProcessBackend
                 results,
                 results.Any(result => !result.Succeeded)));
         });
+    }
+
+    private static void ValidateImportBatch(IFormFileCollection files, LocalDocumentStorageGuard storageGuard)
+    {
+        long totalBytes = 0;
+        foreach (IFormFile file in files)
+        {
+            string safeFileName = SafeDocumentPath.NormalizeFileName(file.FileName);
+            storageGuard.EnsureFileWithinLimits(safeFileName, file.Length);
+            totalBytes = checked(totalBytes + file.Length);
+        }
+
+        storageGuard.EnsureBatchWithinLimits(files.Count, totalBytes);
+        storageGuard.EnsureStorageAvailableForBytes(totalBytes);
+    }
+
+    private static IResult MapDocumentStorageLimitException(DocumentStorageLimitException exception)
+    {
+        int statusCode = exception.Kind == DocumentStorageLimitKind.TooManyFiles
+            ? StatusCodes.Status400BadRequest
+            : StatusCodes.Status413PayloadTooLarge;
+        return CreateProblem(
+            exception.Title,
+            exception.Message,
+            statusCode,
+            exception.Kind == DocumentStorageLimitKind.TooManyFiles
+                ? "document_too_many_files"
+                : "document_storage_limit");
     }
 
     private static IResult CreateRequestTooLargeProblem()

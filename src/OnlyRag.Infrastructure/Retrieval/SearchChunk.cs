@@ -7,4 +7,8 @@ public sealed record SearchChunk(
     int ChunkIndex,
     int? PageStart,
     int? PageEnd,
-    string Content);
+    string Content,
+    long? ParentChunkId = null,
+    string ChunkLevel = "Child",
+    string? SectionHeading = null,
+    string? ParentContent = null);

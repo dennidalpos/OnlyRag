@@ -27,9 +27,11 @@ public sealed class SqliteRetrievalChunkRepository : IRetrievalChunkRepository
         command.CommandText =
             $$"""
             SELECT c.id, c.document_id, d.original_file_name, c.chunk_index,
-                   c.page_start, c.page_end, c.content
+                   c.page_start, c.page_end, c.content, c.parent_chunk_id,
+                   c.chunk_level, c.section_heading, pc.content AS parent_content
             FROM chunks AS c
             INNER JOIN documents AS d ON d.id = c.document_id
+            LEFT JOIN chunks AS pc ON pc.id = c.parent_chunk_id
             WHERE c.id IN ({{parameters}});
             """;
 
@@ -44,7 +46,11 @@ public sealed class SqliteRetrievalChunkRepository : IRetrievalChunkRepository
                 reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetInt32(4),
                 reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                reader.GetString(6));
+                reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                reader.IsDBNull(8) ? "Child" : reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10));
             chunks[chunk.ChunkId] = chunk;
         }
 

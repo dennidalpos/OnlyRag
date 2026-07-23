@@ -138,7 +138,7 @@ public sealed class ChatServiceQdrantIntegrationTests
                 vectorStore,
                 new SqliteRetrievalChunkRepository(connectionFactory),
                 queryEmbeddingGenerator,
-                new HybridRetrievalOptions(
+                options: new HybridRetrievalOptions(
                     DefaultTopK: 5,
                     KeywordTopK: 5,
                     VectorTopK: 5,

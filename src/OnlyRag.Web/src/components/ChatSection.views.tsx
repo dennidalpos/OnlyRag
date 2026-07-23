@@ -222,11 +222,16 @@ export function ChatMainPanel({
                 <p>{message.content}</p>
                 {message.sources.length > 0 && (
                   <div className="chat-sources">
-                    <strong>Fonti</strong>
+                    <strong>Fonti (RAG Next-Gen)</strong>
                     {message.sources.map((source) => (
                       <details key={source.chunkId} className="chat-source">
                         <summary>
                           {source.documentName} - {formatPageRange(source.pageStart, source.pageEnd)}
+                          {source.score !== undefined && (
+                            <span className="badge badge--info" style={{ marginLeft: "8px" }}>
+                              Score: {source.score}
+                            </span>
+                          )}
                         </summary>
                         <button
                           className="button-secondary chat-source__open"
@@ -235,7 +240,7 @@ export function ChatMainPanel({
                         >
                           Apri pagina
                         </button>
-                        <p>{source.snippet}</p>
+                        <p><strong>Snippet Child:</strong> {source.snippet}</p>
                       </details>
                     ))}
                   </div>

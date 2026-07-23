@@ -21,7 +21,12 @@ public sealed record DocumentSearchResult(
     int? PageEnd,
     long ChunkId,
     string Snippet,
-    double Score);
+    double Score,
+    double? ReRankScore = null,
+    string? ParentContent = null,
+    string? QueryVariant = null,
+    string? SectionHeading = null,
+    string ChunkLevel = "Child");
 
 public sealed record DocumentSearchDocumentStatus(
     long DocumentId,

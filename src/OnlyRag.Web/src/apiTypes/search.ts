@@ -8,6 +8,11 @@ export type DocumentSearchResult = {
   chunkId: number;
   snippet: string;
   score: number;
+  reRankScore: number | null;
+  parentContent: string | null;
+  queryVariant: string | null;
+  sectionHeading: string | null;
+  chunkLevel: string;
 };
 
 export type DocumentSearchDocumentStatus = {

@@ -230,8 +230,8 @@ public sealed partial class OcrPipelineTests
     public async Task IngestAsync_Image_UsesStoredOcrProcessingSettings()
     {
         using TempStorage storage = await TempStorage.CreateInitializedAsync();
-        OcrProcessingSettingsStore settingsStore = new(storage.Settings);
-        await settingsStore.UpdateAsync(new OcrProcessingSettings(
+        OcrSettingsStore settingsStore = new(storage.Settings);
+        await settingsStore.UpdateProcessingAsync(new OcrProcessingSettings(
             Language: "en",
             MaxRetries: 0,
             PageTimeoutSeconds: 15,
