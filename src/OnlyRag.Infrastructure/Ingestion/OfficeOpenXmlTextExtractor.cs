@@ -50,14 +50,15 @@ public sealed class OfficeOpenXmlTextExtractor
                 if (IsHeadingParagraph(paragraph) && current.HasContent)
                 {
                     sections.Add(current);
-                    current = new(paragraphText);
+                    string headingTitle = paragraphText.TrimStart('#', ' ').Trim();
+                    current = new(headingTitle);
                     current.AppendHeading(paragraphText);
                     continue;
                 }
 
                 if (IsHeadingParagraph(paragraph))
                 {
-                    current.Title = paragraphText;
+                    current.Title = paragraphText.TrimStart('#', ' ').Trim();
                     current.AppendHeading(paragraphText);
                 }
                 else
@@ -108,35 +109,57 @@ public sealed class OfficeOpenXmlTextExtractor
             string relationshipId = sheet.Id?.Value
                 ?? throw new InvalidOperationException($"Il foglio '{sheetName}' non ha un riferimento valido.");
             WorksheetPart worksheet = (WorksheetPart)workbook.GetPartById(relationshipId);
-            StringBuilder contentBuilder = new();
 
             S.Worksheet worksheetDocument = worksheet.Worksheet
                 ?? throw new InvalidOperationException($"Il foglio '{sheetName}' non ha contenuto leggibile.");
+
+            List<List<string>> rows = [];
+            int maxCols = 0;
+
             foreach (S.Row row in worksheetDocument.Descendants<S.Row>())
             {
-                List<string> cells = [];
+                List<string> rowCells = [];
                 foreach (S.Cell cell in row.Elements<S.Cell>())
                 {
-                    string value = ExtractSpreadsheetCellValue(cell, sharedStrings).Trim();
-                    if (value.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    string coordinate = cell.CellReference?.Value ?? $"R{row.RowIndex?.Value ?? 0}";
-                    cells.Add($"[{coordinate}] {value}");
+                    string value = ExtractSpreadsheetCellValue(cell, sharedStrings).Trim().Replace("\r", " ").Replace("\n", " ");
+                    rowCells.Add(value);
                 }
 
-                if (cells.Count > 0)
+                if (rowCells.Any(c => !string.IsNullOrWhiteSpace(c)))
                 {
-                    contentBuilder.Append("Riga ").Append(row.RowIndex?.Value ?? 0).Append(": ")
-                        .AppendLine(string.Join(" | ", cells));
+                    maxCols = Math.Max(maxCols, rowCells.Count);
+                    rows.Add(rowCells);
                 }
             }
 
-            string text = contentBuilder.Length == 0
-                ? string.Empty
-                : $"Foglio: {sheetName}{Environment.NewLine}{contentBuilder}".Trim();
+            StringBuilder contentBuilder = new();
+            if (rows.Count > 0 && maxCols > 0)
+            {
+                contentBuilder.AppendLine($"## Foglio: {sheetName}");
+                contentBuilder.AppendLine();
+
+                // Format as Markdown Table
+                for (int r = 0; r < rows.Count; r++)
+                {
+                    List<string> row = rows[r];
+                    while (row.Count < maxCols)
+                    {
+                        row.Add(string.Empty);
+                    }
+
+                    string rowStr = "| " + string.Join(" | ", row.Select(c => string.IsNullOrWhiteSpace(c) ? "-" : c)) + " |";
+                    contentBuilder.AppendLine(rowStr);
+
+                    if (r == 0)
+                    {
+                        // Add separator header row
+                        string separator = "| " + string.Join(" | ", Enumerable.Repeat("---", maxCols)) + " |";
+                        contentBuilder.AppendLine(separator);
+                    }
+                }
+            }
+
+            string text = contentBuilder.ToString().Trim();
             units.Add(new OfficeOpenXmlTextUnit(sheetIndex, "sheet", sheetName, text));
         }
 
@@ -170,17 +193,20 @@ public sealed class OfficeOpenXmlTextExtractor
 
             P.Slide slide = slidePart.Slide
                 ?? throw new InvalidOperationException($"La slide {slideNumber} non ha contenuto leggibile.");
-            AppendDrawingParagraphs(contentBuilder, "Textbox", slide.Descendants<A.Paragraph>());
+
+            contentBuilder.AppendLine($"# Slide {slideNumber}");
+            contentBuilder.AppendLine();
+
+            AppendDrawingParagraphs(contentBuilder, slide.Descendants<A.Paragraph>());
 
             NotesSlidePart? notesPart = slidePart.NotesSlidePart;
             if (notesPart?.NotesSlide is not null)
             {
-                AppendDrawingParagraphs(contentBuilder, "Note", notesPart.NotesSlide.Descendants<A.Paragraph>());
+                contentBuilder.AppendLine().AppendLine("### Note slide:");
+                AppendDrawingParagraphs(contentBuilder, notesPart.NotesSlide.Descendants<A.Paragraph>());
             }
 
-            string text = contentBuilder.Length == 0
-                ? string.Empty
-                : $"Slide {slideNumber}{Environment.NewLine}{contentBuilder}".Trim();
+            string text = contentBuilder.ToString().Trim();
             units.Add(new OfficeOpenXmlTextUnit(
                 slideNumber,
                 "slide",
@@ -198,53 +224,139 @@ public sealed class OfficeOpenXmlTextExtractor
 
     private static string ExtractWordTableText(W.Table table)
     {
-        StringBuilder builder = new();
-        int rowNumber = 0;
+        List<List<string>> grid = [];
+        int maxCols = 0;
 
         foreach (W.TableRow row in table.Elements<W.TableRow>())
         {
-            rowNumber++;
-            List<string> cells = [];
-            int cellNumber = 0;
+            List<string> rowCells = [];
             foreach (W.TableCell cell in row.Elements<W.TableCell>())
             {
-                cellNumber++;
                 string cellText = string.Join(
                     " ",
                     cell.Elements<W.Paragraph>()
                         .Select(ExtractWordParagraphText)
                         .Where(text => !string.IsNullOrWhiteSpace(text)))
-                    .Trim();
-                cells.Add($"Cella {cellNumber}: {cellText}");
+                    .Trim()
+                    .Replace("\r", " ")
+                    .Replace("\n", " ");
+
+                rowCells.Add(cellText);
             }
 
-            builder.Append("Riga ").Append(rowNumber).Append(": ")
-                .AppendLine(string.Join(" | ", cells));
+            if (rowCells.Count > 0)
+            {
+                maxCols = Math.Max(maxCols, rowCells.Count);
+                grid.Add(rowCells);
+            }
         }
 
-        return builder.ToString().Trim();
+        if (grid.Count == 0 || maxCols == 0)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder tableBuilder = new();
+        for (int r = 0; r < grid.Count; r++)
+        {
+            List<string> row = grid[r];
+            while (row.Count < maxCols)
+            {
+                row.Add(string.Empty);
+            }
+
+            string rowLine = "| " + string.Join(" | ", row.Select(c => string.IsNullOrWhiteSpace(c) ? "-" : c)) + " |";
+            tableBuilder.AppendLine(rowLine);
+
+            if (r == 0)
+            {
+                string separator = "| " + string.Join(" | ", Enumerable.Repeat("---", maxCols)) + " |";
+                tableBuilder.AppendLine(separator);
+            }
+        }
+
+        return tableBuilder.ToString().Trim();
     }
 
     private static string ExtractWordParagraphText(W.Paragraph paragraph)
     {
         StringBuilder builder = new();
-        foreach (OpenXmlElement element in paragraph.Descendants())
+        bool isListItem = paragraph.ParagraphProperties?.NumberingProperties is not null;
+        string headingPrefix = GetHeadingPrefix(paragraph);
+
+        if (!string.IsNullOrEmpty(headingPrefix))
         {
-            switch (element)
+            builder.Append(headingPrefix).Append(' ');
+        }
+        else if (isListItem)
+        {
+            builder.Append("- ");
+        }
+
+        foreach (OpenXmlElement element in paragraph.Elements())
+        {
+            if (element is W.Run run)
             {
-                case W.Text text:
-                    builder.Append(text.Text);
-                    break;
-                case W.TabChar:
-                    builder.Append('\t');
-                    break;
-                case W.Break:
-                    builder.AppendLine();
-                    break;
+                string runText = ExtractRunText(run);
+                if (string.IsNullOrEmpty(runText))
+                {
+                    continue;
+                }
+
+                bool isBold = run.RunProperties?.Bold?.Val?.Value ?? (run.RunProperties?.Bold != null);
+                bool isItalic = run.RunProperties?.Italic?.Val?.Value ?? (run.RunProperties?.Italic != null);
+
+                if (isBold && isItalic)
+                {
+                    builder.Append("***").Append(runText.Trim()).Append("*** ");
+                }
+                else if (isBold)
+                {
+                    builder.Append("**").Append(runText.Trim()).Append("** ");
+                }
+                else if (isItalic)
+                {
+                    builder.Append('*').Append(runText.Trim()).Append("* ");
+                }
+                else
+                {
+                    builder.Append(runText);
+                }
+            }
+            else if (element is W.Text textElement)
+            {
+                builder.Append(textElement.Text);
             }
         }
 
-        return builder.ToString();
+        string result = builder.ToString().Trim();
+        if (isListItem && !result.StartsWith("- ") && !result.StartsWith('#'))
+        {
+            result = "- " + result;
+        }
+
+        return result;
+    }
+
+    private static string ExtractRunText(W.Run run)
+    {
+        StringBuilder runBuilder = new();
+        foreach (OpenXmlElement child in run.Elements())
+        {
+            switch (child)
+            {
+                case W.Text text:
+                    runBuilder.Append(text.Text);
+                    break;
+                case W.TabChar:
+                    runBuilder.Append('\t');
+                    break;
+                case W.Break:
+                    runBuilder.AppendLine();
+                    break;
+            }
+        }
+        return runBuilder.ToString();
     }
 
     private static bool IsHeadingParagraph(W.Paragraph paragraph)
@@ -254,6 +366,31 @@ public sealed class OfficeOpenXmlTextExtractor
             && (styleId.StartsWith("Heading", StringComparison.OrdinalIgnoreCase)
                 || styleId.Contains("Title", StringComparison.OrdinalIgnoreCase)
                 || styleId.Contains("Titolo", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetHeadingPrefix(W.Paragraph paragraph)
+    {
+        string? styleId = paragraph.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
+        if (string.IsNullOrWhiteSpace(styleId)) return string.Empty;
+
+        if (styleId.Equals("Heading1", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Heading 1", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Title", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Titolo", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#";
+        }
+        if (styleId.Equals("Heading2", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Heading 2", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Subtitle", StringComparison.OrdinalIgnoreCase))
+        {
+            return "##";
+        }
+        if (styleId.Equals("Heading3", StringComparison.OrdinalIgnoreCase) || styleId.Equals("Heading 3", StringComparison.OrdinalIgnoreCase))
+        {
+            return "###";
+        }
+        if (styleId.StartsWith("Heading", StringComparison.OrdinalIgnoreCase))
+        {
+            return "##";
+        }
+
+        return string.Empty;
     }
 
     private static string ExtractSpreadsheetCellValue(S.Cell cell, S.SharedStringTable? sharedStrings)
@@ -287,10 +424,8 @@ public sealed class OfficeOpenXmlTextExtractor
 
     private static void AppendDrawingParagraphs(
         StringBuilder builder,
-        string label,
         IEnumerable<A.Paragraph> paragraphs)
     {
-        int index = 0;
         foreach (A.Paragraph paragraph in paragraphs)
         {
             string text = string.Concat(paragraph.Descendants<A.Text>().Select(item => item.Text)).Trim();
@@ -299,8 +434,7 @@ public sealed class OfficeOpenXmlTextExtractor
                 continue;
             }
 
-            index++;
-            builder.Append(label).Append(' ').Append(index).Append(": ").AppendLine(text);
+            builder.AppendLine($"- {text}");
         }
     }
 
@@ -319,7 +453,8 @@ public sealed class OfficeOpenXmlTextExtractor
 
         public void AppendHeading(string text)
         {
-            AppendParagraph($"Titolo: {text}");
+            string headerLine = text.StartsWith('#') ? text : $"# {text}";
+            AppendParagraph(headerLine);
         }
 
         public void AppendParagraph(string text)
@@ -339,7 +474,7 @@ public sealed class OfficeOpenXmlTextExtractor
                 return;
             }
 
-            AppendParagraph($"Tabella:\n{text}");
+            AppendParagraph(text);
         }
 
         public string BuildText()

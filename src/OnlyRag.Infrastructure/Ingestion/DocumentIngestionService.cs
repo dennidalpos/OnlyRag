@@ -5,6 +5,7 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace OnlyRag.Infrastructure.Ingestion;
 
@@ -287,7 +288,19 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             string text;
             try
             {
-                text = forceOcr ? string.Empty : pdf.GetPage(pageNumber).Text.Trim();
+                if (forceOcr)
+                {
+                    text = string.Empty;
+                }
+                else
+                {
+                    Page pdfPage = pdf.GetPage(pageNumber);
+                    text = PdfLayoutTextExtractor.ExtractFormattedText(pdfPage);
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        text = pdfPage.Text.Trim();
+                    }
+                }
             }
             catch (Exception)
             {
