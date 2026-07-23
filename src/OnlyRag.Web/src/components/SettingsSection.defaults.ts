@@ -13,11 +13,13 @@ export const emptySettings: OllamaSettings = {
   defaultChatModel: null,
   defaultEmbeddingModel: null,
   defaultTranslationModel: null,
+  defaultCodingModel: null,
   requestTimeoutSeconds: 120,
   embeddingBatchSize: 1,
   embeddingNumCtx: null,
   chatNumCtx: null,
   translationNumCtx: null,
+  codingNumCtx: null,
   trustNonLocalEndpoint: false
 };
 

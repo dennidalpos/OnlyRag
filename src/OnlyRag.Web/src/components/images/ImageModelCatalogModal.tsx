@@ -1,12 +1,14 @@
 import { useState, type FormEvent, type RefObject } from "react";
-import type {
-  ImageGenerationSettings,
-  ImageModelCatalogEntry,
-  ImageModelCatalogEntryRequest,
-  ImageModelLocalState
+import {
+  apiRequest,
+  type ImageGenerationSettings,
+  type ImageModelCatalogEntry,
+  type ImageModelCatalogEntryRequest,
+  type ImageModelLocalState,
+  type ImageModelUrlVerificationResponse
 } from "../../api";
 import { formatFileSize } from "../DocumentsSection.formatting";
-import { createEmptyModelDraft, type ModelDraft } from "./imageTypes";
+import { createEmptyModelDraft, modelTemplates, type ModelDraft } from "./imageTypes";
 
 type Props = {
   isOpen: boolean;
@@ -24,6 +26,7 @@ type Props = {
   onSaveSettings: (settings: ImageGenerationSettings) => Promise<void>;
   onAskConsent: (modelId: string) => void;
   onDeleteModel: (modelId: string) => Promise<void>;
+  onDeleteCatalogModel?: (modelId: string) => Promise<void>;
   onUpsertCatalogModel?: (request: ImageModelCatalogEntryRequest) => Promise<void>;
 };
 
@@ -42,13 +45,76 @@ export function ImageModelCatalogModal({
   onSaveSettings,
   onAskConsent,
   onDeleteModel,
+  onDeleteCatalogModel,
   onUpsertCatalogModel
 }: Props) {
   const [localSettings, setLocalSettings] = useState<ImageGenerationSettings>(settings);
   const [showAddForm, setShowAddForm] = useState(false);
   const [draft, setDraft] = useState<ModelDraft>(createEmptyModelDraft("custom-sdxl-onnx"));
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [isVerifyingUrl, setIsVerifyingUrl] = useState(false);
+  const [verifyFeedback, setVerifyFeedback] = useState<{ tone: "success" | "error" | "warning"; message: string } | null>(null);
 
   if (!isOpen) return null;
+
+  function handleSelectTemplate(templateId: string) {
+    setSelectedTemplateId(templateId);
+    setVerifyFeedback(null);
+    const tmpl = modelTemplates.find((t) => t.id === templateId);
+    if (tmpl) {
+      setDraft((prev) => ({
+        ...prev,
+        id: tmpl.id,
+        displayName: tmpl.displayName,
+        downloadUrl: tmpl.downloadUrl,
+        licenseLabel: tmpl.licenseLabel,
+        expectedSizeBytes: tmpl.expectedSizeBytes,
+        modelType: tmpl.modelType,
+        modelProfile: tmpl.modelProfile,
+        supportedResolutions: tmpl.supportedResolutions,
+        defaultSteps: tmpl.defaultSteps,
+        defaultGuidance: tmpl.defaultGuidance,
+        scheduler: tmpl.scheduler,
+        compatibilityNotes: tmpl.compatibilityNotes,
+        requiredFiles: "model_index.json, scheduler/scheduler_config.json, text_encoder/model.onnx, text_encoder_2/model.onnx, tokenizer/merges.txt, tokenizer/special_tokens_map.json, tokenizer/tokenizer_config.json, tokenizer/vocab.json, tokenizer_2/merges.txt, tokenizer_2/special_tokens_map.json, tokenizer_2/tokenizer_config.json, tokenizer_2/vocab.json, unet/model.onnx, vae_decoder/model.onnx, vae_encoder/model.onnx"
+      }));
+    }
+  }
+
+  async function handleVerifyUrl() {
+    if (!draft.downloadUrl.trim()) {
+      setVerifyFeedback({ tone: "warning", message: "Inserisci prima un URL di download modello da verificare." });
+      return;
+    }
+
+    setIsVerifyingUrl(true);
+    setVerifyFeedback(null);
+    try {
+      const res = await apiRequest<ImageModelUrlVerificationResponse>("/api/images/models/verify-url", {
+        method: "POST",
+        body: JSON.stringify({ url: draft.downloadUrl.trim() })
+      });
+
+      if (res.isValid) {
+        setVerifyFeedback({ tone: "success", message: res.message });
+        setDraft((prev) => ({
+          ...prev,
+          displayName: prev.displayName.trim() || res.suggestedDisplayName,
+          expectedSizeBytes: res.totalSizeBytes > 0 ? res.totalSizeBytes.toString() : prev.expectedSizeBytes,
+          requiredFiles: res.suggestedRequiredFiles.length > 0 ? res.suggestedRequiredFiles.join(", ") : prev.requiredFiles
+        }));
+      } else {
+        setVerifyFeedback({ tone: "error", message: res.message });
+      }
+    } catch (err) {
+      setVerifyFeedback({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Verifica URL fallita."
+      });
+    } finally {
+      setIsVerifyingUrl(false);
+    }
+  }
 
   async function handleFormSubmit(event: FormEvent) {
     event.preventDefault();
@@ -142,6 +208,7 @@ export function ImageModelCatalogModal({
                 state={selectedModelState}
                 onAskConsent={() => onAskConsent(selectedModel.id)}
                 onDelete={() => onDeleteModel(selectedModel.id)}
+                onDeleteCatalogModel={onDeleteCatalogModel ? () => onDeleteCatalogModel(selectedModel.id) : undefined}
                 disabled={isModelActionRunning}
               />
             )}
@@ -166,6 +233,22 @@ export function ImageModelCatalogModal({
           {showAddForm && (
             <form className="image-advanced-options__content" onSubmit={handleAddCatalogModelSubmit}>
               <h4>➕ Aggiungi modello al catalogo</h4>
+
+              <label className="field-group">
+                <span>Template preconfigurato</span>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => handleSelectTemplate(e.target.value)}
+                >
+                  <option value="">-- Seleziona un modello o incollalo --</option>
+                  {modelTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.displayName} ({t.downloadUrl})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="settings-grid settings-grid--two">
                 <label className="field-group">
                   <span>ID Modello *</span>
@@ -190,16 +273,34 @@ export function ImageModelCatalogModal({
                 </label>
               </div>
 
-              <label className="field-group">
+              <div className="field-group">
                 <span>URL Download (Repository HF o file ONNX) *</span>
-                <input
-                  type="url"
-                  required
-                  value={draft.downloadUrl}
-                  onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })}
-                  placeholder="https://huggingface.co/owner/model-repo"
-                />
-              </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    type="url"
+                    required
+                    style={{ flex: 1 }}
+                    value={draft.downloadUrl}
+                    onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })}
+                    placeholder="https://huggingface.co/owner/model-repo"
+                  />
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={handleVerifyUrl}
+                    disabled={isVerifyingUrl || !draft.downloadUrl.trim()}
+                    title="Verifica accessibilita e file del repository prima di salvare"
+                  >
+                    {isVerifyingUrl ? "Verifica..." : "🔍 Verifica URL"}
+                  </button>
+                </div>
+              </div>
+
+              {verifyFeedback && (
+                <div className={`feedback-alert feedback-alert--${verifyFeedback.tone}`} role="alert">
+                  {verifyFeedback.message}
+                </div>
+              )}
 
               <div className="settings-grid settings-grid--two">
                 <label className="field-group">
@@ -224,7 +325,7 @@ export function ImageModelCatalogModal({
               </div>
 
               <div className="modal-footer">
-                <button type="submit" className="button-primary" disabled={isModelActionRunning}>
+                <button type="submit" className="button-primary" disabled={isModelActionRunning || isVerifyingUrl}>
                   Salva nel catalogo
                 </button>
               </div>
@@ -241,57 +342,121 @@ function ModelReadiness({
   state,
   onAskConsent,
   onDelete,
+  onDeleteCatalogModel,
   disabled
 }: {
   model: ImageModelCatalogEntry;
   state: ImageModelLocalState | null;
   onAskConsent: () => void;
   onDelete: () => void;
+  onDeleteCatalogModel?: () => void;
   disabled: boolean;
 }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const localSizeBytes = state?.localSizeBytes ?? 0;
+  const sizeFormatted = localSizeBytes > 0 ? formatFileSize(localSizeBytes) : null;
+  const isVerified = Boolean(state?.isVerified);
+
   return (
-    <div className={state?.isVerified ? "image-status image-status--online" : "image-status image-status--offline"}>
-      <strong>{model.displayName}</strong>
-      <span>{state?.state ?? "NotDownloaded"}</span>
-      <small>
-        {state?.isVerified
-          ? `${formatFileSize(state.localSizeBytes)} pronti`
+    <div className={isVerified ? "image-status image-status--online" : "image-status image-status--offline"} style={{ marginTop: "12px", padding: "12px", borderRadius: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+        <strong>{model.displayName}</strong>
+        <span className={`status-badge ${isVerified ? "status-badge--success" : "status-badge--warning"}`}>
+          {isVerified ? "✅ Pronto all'uso" : state?.state === "Downloading" ? "⏳ Download in corso..." : "⬇️ Non Presente Locale"}
+        </span>
+      </div>
+
+      <small style={{ display: "block", marginBottom: "8px", color: "var(--color-text-muted, #94a3b8)" }}>
+        {isVerified
+          ? `File verificati (${formatFileSize(state?.localSizeBytes ?? 0)}) · Modello locale pronto`
           : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
-      <dl className="image-model-metadata">
-        <div>
-          <dt>Tipo</dt>
-          <dd>{model.modelType}</dd>
-        </div>
-        <div>
-          <dt>Risoluzioni</dt>
-          <dd>{model.supportedResolutions.join(", ")}</dd>
-        </div>
-        <div>
-          <dt>Default</dt>
-          <dd>{model.defaultSteps} step · guidance {model.defaultGuidance}</dd>
-        </div>
-        <div>
-          <dt>Scheduler</dt>
-          <dd>{model.scheduler}</dd>
-        </div>
-        <div>
-          <dt>CPU/GPU</dt>
-          <dd>{model.compatibilityNotes}</dd>
-        </div>
-      </dl>
-      <div className="settings-actions">
-        {!state?.isVerified && (
-          <button type="button" className="button-primary" onClick={onAskConsent} disabled={disabled} title="Scarica i file del modello dal repository configurato">
+
+      {/* Main Download & Action Buttons */}
+      <div className="settings-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+        {!isVerified && (
+          <button
+            type="button"
+            className="button-primary"
+            onClick={onAskConsent}
+            disabled={disabled}
+            title="Scarica i file necessari del modello ONNX locale sul PC"
+          >
             Scarica modello
           </button>
         )}
+
+        <button
+          type="button"
+          className="button-secondary button-secondary--xs"
+          onClick={() => setShowDetails(!showDetails)}
+          title="Consulta i metadati, requisiti e parametri del modello"
+        >
+          ℹ️ {showDetails ? "Nascondi Info" : "Info e Configurazione"}
+        </button>
+
         {state?.isDownloaded && (
-          <button className="button-danger" type="button" onClick={onDelete} disabled={disabled} title="Rimuovi i file scaricati del modello dal disco">
-            Elimina modello
+          <button
+            className="button-danger button-danger--xs"
+            type="button"
+            onClick={onDelete}
+            disabled={disabled}
+            title={sizeFormatted ? `Elimina i file del modello dal disco (${sizeFormatted})` : "Elimina file dal disco"}
+          >
+            🗑️ Elimina file local {sizeFormatted ? `(${sizeFormatted})` : ""}
+          </button>
+        )}
+
+        {onDeleteCatalogModel && !model.isBuiltIn && (
+          <button
+            className="button-danger button-danger--xs"
+            type="button"
+            onClick={onDeleteCatalogModel}
+            disabled={disabled}
+            title="Rimuovi definitivamente questo modello dal catalogo"
+          >
+            ❌ Rimuovi dal catalogo
           </button>
         )}
       </div>
+
+      {/* Consultable / Configurable Info Metadata Drawer */}
+      {showDetails && (
+        <dl className="image-model-metadata" style={{ marginTop: "10px", padding: "10px", background: "rgba(0,0,0,0.15)", borderRadius: "6px" }}>
+          <div>
+            <dt>Tipo Modello</dt>
+            <dd>{model.modelType} ({model.modelProfile})</dd>
+          </div>
+          <div>
+            <dt>Risoluzioni Supportate</dt>
+            <dd>{model.supportedResolutions.join(", ")}</dd>
+          </div>
+          <div>
+            <dt>Default Consigliati</dt>
+            <dd>{model.defaultSteps} step · guidance scale {model.defaultGuidance}</dd>
+          </div>
+          <div>
+            <dt>Scheduler</dt>
+            <dd>{model.scheduler}</dd>
+          </div>
+          <div>
+            <dt>Licenza</dt>
+            <dd>{model.licenseLabel}</dd>
+          </div>
+          <div>
+            <dt>Compatibilità Windows</dt>
+            <dd>{model.compatibilityNotes}</dd>
+          </div>
+          <div>
+            <dt>URL Sorgente Upstream</dt>
+            <dd style={{ wordBreak: "break-all" }}>
+              <a href={model.downloadUrl} target="_blank" rel="noreferrer" style={{ color: "#38bdf8" }}>
+                {model.downloadUrl}
+              </a>
+            </dd>
+          </div>
+        </dl>
+      )}
     </div>
   );
 }

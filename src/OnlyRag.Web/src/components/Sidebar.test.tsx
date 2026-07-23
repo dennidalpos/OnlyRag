@@ -12,8 +12,8 @@ describe("Sidebar", () => {
           chat: "Chat",
           documents: "Documenti",
           images: "Immagini",
-          jobs: "Operazioni",
           translation: "Traduzione",
+          coding: "Coding",
           settings: "Impostazioni"
         }}
         onSectionChange={vi.fn()}

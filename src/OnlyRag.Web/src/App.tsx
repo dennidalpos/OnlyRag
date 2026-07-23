@@ -20,8 +20,8 @@ import { DocumentsSection } from "./components/DocumentsSection";
 import { SetupBanner } from "./components/SetupBanner";
 import { ImagesSection } from "./components/ImagesSection";
 import { JobsDrawer } from "./components/JobsDrawer";
-import { JobsSection } from "./components/JobsSection";
 import { SectionId, Sidebar } from "./components/Sidebar";
+import { CodingSection } from "./components/CodingSection";
 import { SettingsSection } from "./components/SettingsSection";
 import { TranslationSection } from "./components/TranslationSection";
 import { useOcrStartupPrompt } from "./components/useOcrStartupPrompt";
@@ -60,8 +60,8 @@ const sectionLabels: Record<SectionId, string> = {
   chat: "Chat",
   documents: "Documenti",
   images: "Immagini",
-  jobs: "Operazioni",
   translation: "Traduzione",
+  coding: "Coding",
   settings: "Impostazioni"
 };
 
@@ -370,9 +370,6 @@ export default function App() {
           </div>
           {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
           {activeSection === "images" && <ImagesSection />}
-          {activeSection === "jobs" && (
-            <JobsSection onJobsChanged={() => void refreshBackendStatus()} />
-          )}
           {activeSection === "translation" && (
             <TranslationSection
               models={ollamaModels}
@@ -381,6 +378,14 @@ export default function App() {
               loadError={ollamaLoadError}
             />
           )}
+          <div hidden={activeSection !== "coding"}>
+            <CodingSection
+              models={ollamaModels}
+              defaultModel={ollamaSettings?.defaultCodingModel ?? ollamaSettings?.defaultChatModel ?? null}
+              loadError={ollamaLoadError}
+              isActive={activeSection === "coding"}
+            />
+          </div>
           {activeSection === "settings" && (
             <SettingsSection
               settings={ollamaSettings}

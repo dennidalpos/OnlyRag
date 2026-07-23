@@ -279,6 +279,116 @@ public sealed class ImageModelManager
         return new ImageModelDownloadResponse(model.Id, "NotDownloaded", "File modello rimossi.");
     }
 
+    public async Task<ImageModelUrlVerificationResponse> VerifyModelUrlAsync(
+        string downloadUrl,
+        CancellationToken cancellationToken = default)
+    {
+        string trimmedUrl = downloadUrl?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmedUrl))
+        {
+            return new ImageModelUrlVerificationResponse(
+                IsValid: false,
+                Message: "Inserisci un URL di download modello valido.",
+                RepositoryId: null,
+                FoundFiles: [],
+                MissingFiles: [],
+                TotalSizeBytes: 0,
+                SuggestedDisplayName: string.Empty,
+                SuggestedRequiredFiles: ImageModelCatalog.RequiredSdxlSnapshotFiles);
+        }
+
+        if (!Uri.TryCreate(trimmedUrl, UriKind.Absolute, out Uri? uri) || uri.Scheme is not ("http" or "https" or "file"))
+        {
+            return new ImageModelUrlVerificationResponse(
+                IsValid: false,
+                Message: "L'URL del modello deve usare http, https o file.",
+                RepositoryId: null,
+                FoundFiles: [],
+                MissingFiles: [],
+                TotalSizeBytes: 0,
+                SuggestedDisplayName: string.Empty,
+                SuggestedRequiredFiles: ImageModelCatalog.RequiredSdxlSnapshotFiles);
+        }
+
+        if (IsHuggingFaceModelPage(uri, out string repositoryId))
+        {
+            try
+            {
+                IReadOnlyList<ModelSnapshotFile> files = await ListHuggingFaceSnapshotFilesAsync(repositoryId, cancellationToken);
+                HashSet<string> filePaths = files
+                    .Select(f => f.RelativePath.Replace('\\', '/'))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                List<string> found = [];
+                List<string> missing = [];
+                long totalBytes = 0;
+
+                foreach (string required in ImageModelCatalog.RequiredSdxlSnapshotFiles)
+                {
+                    if (filePaths.Contains(required))
+                    {
+                        found.Add(required);
+                    }
+                    else
+                    {
+                        missing.Add(required);
+                    }
+                }
+
+                foreach (ModelSnapshotFile f in files)
+                {
+                    if (f.SizeBytes.HasValue)
+                    {
+                        totalBytes += f.SizeBytes.Value;
+                    }
+                }
+
+                bool isValid = missing.Count == 0 || (filePaths.Contains("unet/model.onnx") && filePaths.Contains("text_encoder/model.onnx"));
+                string suggestedName = repositoryId.Split('/').LastOrDefault() ?? repositoryId;
+                suggestedName = string.Join(" ", suggestedName.Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Length > 0 ? char.ToUpperInvariant(s[0]) + s[1..] : s)) + " ONNX";
+
+                string message = isValid
+                    ? $"Repository Hugging Face verificato ed accessibile ({found.Count} file ONNX SDXL rilevati)."
+                    : $"Repository Hugging Face senza tutti i file richiesti SDXL. Mancanti: {string.Join(", ", missing)}";
+
+                return new ImageModelUrlVerificationResponse(
+                    IsValid: isValid,
+                    Message: message,
+                    RepositoryId: repositoryId,
+                    FoundFiles: found,
+                    MissingFiles: missing,
+                    TotalSizeBytes: totalBytes,
+                    SuggestedDisplayName: suggestedName,
+                    SuggestedRequiredFiles: found.Count > 0 ? found : ImageModelCatalog.RequiredSdxlSnapshotFiles);
+            }
+            catch (Exception ex)
+            {
+                return new ImageModelUrlVerificationResponse(
+                    IsValid: false,
+                    Message: $"Impossibile verificare repository Hugging Face: {ex.Message}",
+                    RepositoryId: repositoryId,
+                    FoundFiles: [],
+                    MissingFiles: ImageModelCatalog.RequiredSdxlSnapshotFiles,
+                    TotalSizeBytes: 0,
+                    SuggestedDisplayName: string.Empty,
+                    SuggestedRequiredFiles: ImageModelCatalog.RequiredSdxlSnapshotFiles);
+            }
+        }
+
+        RemoteFileInfo remoteInfo = await ProbeRemoteFileAsync(uri, cancellationToken);
+        bool fileValid = uri.Scheme == Uri.UriSchemeFile ? File.Exists(uri.LocalPath) : remoteInfo.ContentLength.HasValue;
+        return new ImageModelUrlVerificationResponse(
+            IsValid: fileValid,
+            Message: fileValid ? "URL file modello valido e raggiungibile." : "URL file non raggiungibile.",
+            RepositoryId: null,
+            FoundFiles: fileValid ? [ImageModelCatalog.RequiredModelFileName] : [],
+            MissingFiles: fileValid ? [] : [ImageModelCatalog.RequiredModelFileName],
+            TotalSizeBytes: remoteInfo.ContentLength ?? 0,
+            SuggestedDisplayName: Path.GetFileNameWithoutExtension(uri.AbsolutePath),
+            SuggestedRequiredFiles: [ImageModelCatalog.RequiredModelFileName]);
+    }
+
     public async Task<string> GetVerifiedModelFilePathAsync(string modelId, CancellationToken cancellationToken = default)
     {
         ImageModelLocalState state = await GetStateAsync(modelId, cancellationToken);

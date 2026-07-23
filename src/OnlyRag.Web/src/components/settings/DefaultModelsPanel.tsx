@@ -18,6 +18,9 @@ export function DefaultModelsPanel() {
     translationModelDetailsLoading,
     translationModelDetails,
     translationNumCtxRecommendation,
+    codingModelDetailsLoading,
+    codingModelDetails,
+    codingNumCtxRecommendation,
     unavailableDefaults,
     hasDirtyOllamaSettings,
     saveSettings,
@@ -148,6 +151,46 @@ export function DefaultModelsPanel() {
                 }
                 onValueChange={(value) =>
                   setFormState((current) => ({ ...current, translationNumCtx: value }))
+                }
+              />
+            )}
+            <label className="field-group" htmlFor="default-coding-model">
+              <span>Coding</span>
+              <select
+                id="default-coding-model"
+                value={formState.defaultCodingModel ?? ""}
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    defaultCodingModel: normalizeOptionalValue(event.target.value)
+                  }))
+                }
+              >
+                <option value="">Nessun modello selezionato</option>
+                {models.map((model) => (
+                  <option key={model.name} value={model.name}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {formState.defaultCodingModel && (
+              <AdjustableModelContextBar
+                title="Contesto coding (num_ctx)"
+                sliderLabel="num_ctx coding"
+                loading={codingModelDetailsLoading}
+                details={codingModelDetails}
+                fallbackText="Dettagli coding non disponibili."
+                value={formState.codingNumCtx}
+                recommendedValue={codingNumCtxRecommendation}
+                onAutoChange={(isAutomatic) =>
+                  setFormState((current) => ({
+                    ...current,
+                    codingNumCtx: isAutomatic ? null : codingNumCtxRecommendation ?? 2048
+                  }))
+                }
+                onValueChange={(value) =>
+                  setFormState((current) => ({ ...current, codingNumCtx: value }))
                 }
               />
             )}

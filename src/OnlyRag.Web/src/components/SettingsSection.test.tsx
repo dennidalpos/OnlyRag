@@ -338,11 +338,10 @@ describe("SettingsSection", () => {
       />
     );
 
-    expect(await screen.findByRole("heading", { name: "Connessioni" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "Prestazioni" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "OCR" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "Ingestione" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("heading", { name: "Diagnostica" }).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "Connessione & Modelli" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Ricerca RAG & Prestazioni" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "OCR & Documenti" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Manutenzione & Diagnostica" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("combobox", { name: "Profilo" })).toHaveAccessibleDescription(
       "Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
     );
@@ -361,9 +360,6 @@ describe("SettingsSection", () => {
     expect(screen.getByRole("slider", { name: "Chunk contesto" })).toHaveAccessibleDescription(
       "Limita quanti chunk recuperati entrano nella risposta RAG; num_ctx Ollama resta configurato nei modelli."
     );
-    expect(screen.getByRole("slider", { name: "Retry OCR" })).toHaveAccessibleDescription(
-      "Tentativi aggiuntivi per pagina quando OCR fallisce o produce risultati insufficienti."
-    );
     expect(screen.queryByText(/Chunk contesto limita quanti chunk/)).not.toBeInTheDocument();
     expect(screen.queryByText(/La lingua documento si sceglie durante import/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Ripristina default aggiorna solo le impostazioni/)).not.toBeInTheDocument();
@@ -373,9 +369,7 @@ describe("SettingsSection", () => {
     expect(screen.getByRole("button", { name: "Salva modelli predefiniti" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Salva prestazioni" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Salva ingestione" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Salva" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Salva OCR" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Salva OCR runtime" })).toBeDisabled();
 
     await userEvent.clear(screen.getByLabelText("URL Ollama"));
     await userEvent.type(screen.getByLabelText("URL Ollama"), "http://127.0.0.1:11434");
@@ -385,14 +379,8 @@ describe("SettingsSection", () => {
     fireEvent.change(screen.getByRole("slider", { name: /Dimensione chunk/ }), { target: { value: "850" } });
     expect(screen.getByRole("button", { name: "Salva ingestione" })).toBeEnabled();
 
-    fireEvent.change(screen.getByRole("slider", { name: /Timeout export/ }), { target: { value: "130" } });
-    expect(screen.getByRole("button", { name: "Salva" })).toBeEnabled();
-
     fireEvent.click(screen.getByLabelText("Orientamento righe testo"));
     expect(screen.getByRole("button", { name: "Salva OCR" })).toBeEnabled();
-
-    fireEvent.change(screen.getByRole("slider", { name: /Timeout pagina/ }), { target: { value: "195" } });
-    expect(screen.getByRole("button", { name: "Salva OCR runtime" })).toBeEnabled();
 
     await userEvent.selectOptions(screen.getByLabelText("Profilo prestazioni"), "power");
     expect(screen.getByRole("button", { name: "Salva prestazioni" })).toBeEnabled();

@@ -2,8 +2,6 @@ import { DefaultModelsPanel } from "./settings/DefaultModelsPanel";
 import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { IngestionSettingsPanel } from "./settings/IngestionSettingsPanel";
 import { ModelManagementPanel } from "./settings/ModelManagementPanel";
-import { OcrRuntimeSettingsPanel } from "./settings/OcrRuntimeSettingsPanel";
-import { PdfExportPanel } from "./settings/PdfExportPanel";
 import { OllamaConnectionPanel } from "./settings/OllamaConnectionPanel";
 import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
 import { PerformanceSettingsPanel } from "./settings/PerformanceSettingsPanel";
@@ -20,41 +18,33 @@ export function SettingsSectionPanels() {
       <div className="settings-panel" aria-label="Impostazioni principali">
         {infoMessage && <div className="feedback-banner feedback-banner--info settings-feedback" role="status">{infoMessage}</div>}
         {errorMessage && <div className="feedback-banner feedback-banner--error settings-feedback" role="alert">{errorMessage}</div>}
+
         <section className="settings-section" aria-labelledby="settings-connections-title">
-          <h3 id="settings-connections-title">Connessioni</h3>
+          <h3 id="settings-connections-title">Connessione &amp; Modelli</h3>
           <div className="settings-section__grid">
             <OllamaConnectionPanel />
             <DefaultModelsPanel />
             <ModelManagementPanel />
           </div>
         </section>
-        <section className="settings-section" aria-labelledby="settings-performance-title">
-          <h3 id="settings-performance-title">Prestazioni</h3>
+
+        <section className="settings-section" aria-labelledby="settings-rag-title">
+          <h3 id="settings-rag-title">Ricerca RAG &amp; Prestazioni</h3>
           <div className="settings-section__grid">
             <PerformanceSettingsPanel />
-          </div>
-        </section>
-        <section className="settings-section" aria-labelledby="settings-ocr-title">
-          <h3 id="settings-ocr-title">OCR</h3>
-          <div className="settings-section__grid">
-            <OcrEngineSettingsPanel />
-            <OcrRuntimeSettingsPanel />
-          </div>
-        </section>
-        <section className="settings-section" aria-labelledby="settings-ingestion-title">
-          <h3 id="settings-ingestion-title">Ingestione</h3>
-          <div className="settings-section__grid">
             <IngestionSettingsPanel />
           </div>
         </section>
-        <section className="settings-section" aria-labelledby="settings-export-title">
-          <h3 id="settings-export-title">Export</h3>
+
+        <section className="settings-section" aria-labelledby="settings-ocr-title">
+          <h3 id="settings-ocr-title">OCR &amp; Documenti</h3>
           <div className="settings-section__grid">
-            <PdfExportPanel />
+            <OcrEngineSettingsPanel />
           </div>
         </section>
+
         <section className="settings-section" aria-labelledby="settings-diagnostics-title">
-          <h3 id="settings-diagnostics-title">Diagnostica</h3>
+          <h3 id="settings-diagnostics-title">Manutenzione &amp; Diagnostica</h3>
           <div className="settings-section__grid">
             <DiagnosticsPanel />
           </div>
@@ -63,5 +53,3 @@ export function SettingsSectionPanels() {
     </div>
   );
 }
-
-

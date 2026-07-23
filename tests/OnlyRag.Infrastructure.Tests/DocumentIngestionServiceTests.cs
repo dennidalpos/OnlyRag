@@ -183,11 +183,10 @@ public sealed partial class DocumentIngestionServiceTests
         string joinedText = string.Join("\n", pages);
         Assert.Equal(2, result.PageCount);
         Assert.Equal(2, pages.Count);
-        Assert.Contains("Titolo: Executive Summary", joinedText, StringComparison.Ordinal);
-        Assert.Contains("Tabella:", joinedText, StringComparison.Ordinal);
-        Assert.Contains("Riga 1: Cella 1: Name | Cella 2: Value", joinedText, StringComparison.Ordinal);
+        Assert.Contains("# Executive Summary", joinedText, StringComparison.Ordinal);
+        Assert.Contains("| Name | Value |", joinedText, StringComparison.Ordinal);
         IReadOnlyList<string> chunks = await tempStorage.ReadChunkTextsAsync(document.Id);
-        Assert.Contains(chunks, chunk => chunk.Contains("Riga 1: Cella 1: Name | Cella 2: Value", StringComparison.Ordinal));
+        Assert.Contains(chunks, chunk => chunk.Contains("| Name | Value |", StringComparison.Ordinal));
         Assert.Equal(2, progress.Count);
         Assert.Equal(3, progress[^1].Checkpoint.NextBlock);
     }
@@ -215,8 +214,8 @@ public sealed partial class DocumentIngestionServiceTests
         Assert.Equal(2, result.PageCount);
         Assert.Equal(2, pages.Count);
         Assert.Contains("Foglio: Data", pages[0], StringComparison.Ordinal);
-        Assert.Contains("Riga 1: [A1] Name | [B1] Score", pages[0], StringComparison.Ordinal);
-        Assert.Contains("Riga 2: [A2] Alice | [B2] 42", pages[0], StringComparison.Ordinal);
+        Assert.Contains("| Name | Score |", pages[0], StringComparison.Ordinal);
+        Assert.Contains("| Alice | 42 |", pages[0], StringComparison.Ordinal);
         Assert.Contains("Foglio: Notes", pages[1], StringComparison.Ordinal);
         Assert.Equal(2, progress.Count);
     }
@@ -238,9 +237,10 @@ public sealed partial class DocumentIngestionServiceTests
         IReadOnlyList<string> pages = await tempStorage.ReadPageTextsAsync(document.Id);
         Assert.Equal(1, result.PageCount);
         Assert.Single(pages);
-        Assert.Contains("Textbox 1: Slide title", pages[0], StringComparison.Ordinal);
-        Assert.Contains("Textbox 2: Slide body", pages[0], StringComparison.Ordinal);
-        Assert.Contains("Note 1: Speaker note", pages[0], StringComparison.Ordinal);
+        Assert.Contains("# Slide 1", pages[0], StringComparison.Ordinal);
+        Assert.Contains("- Slide title", pages[0], StringComparison.Ordinal);
+        Assert.Contains("- Slide body", pages[0], StringComparison.Ordinal);
+        Assert.Contains("- Speaker note", pages[0], StringComparison.Ordinal);
     }
 
     [Fact]

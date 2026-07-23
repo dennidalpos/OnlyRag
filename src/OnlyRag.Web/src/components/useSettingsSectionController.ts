@@ -90,6 +90,9 @@ export function useSettingsSectionController({
   const { details: translationModelDetails, isLoading: translationModelDetailsLoading } = useSettingsModelDetails(
     formState.defaultTranslationModel
   );
+  const { details: codingModelDetails, isLoading: codingModelDetailsLoading } = useSettingsModelDetails(
+    formState.defaultCodingModel
+  );
 
   useEffect(() => {
     if (settings) {
@@ -131,13 +134,19 @@ export function useSettingsSectionController({
   const usesNonLocalOllamaEndpoint = useMemo(() => isNonLocalUrl(formState.ollamaBaseUrl), [formState.ollamaBaseUrl]);
   const unavailableDefaults = useMemo(
     () =>
-      [formState.defaultChatModel, formState.defaultEmbeddingModel, formState.defaultTranslationModel].filter(
+      [
+        formState.defaultChatModel,
+        formState.defaultEmbeddingModel,
+        formState.defaultTranslationModel,
+        formState.defaultCodingModel
+      ].filter(
         (value): value is string => Boolean(value && !installedModelNames.includes(value))
       ),
     [
       formState.defaultChatModel,
       formState.defaultEmbeddingModel,
       formState.defaultTranslationModel,
+      formState.defaultCodingModel,
       installedModelNames
     ]
   );
@@ -152,6 +161,10 @@ export function useSettingsSectionController({
   const translationNumCtxRecommendation = useMemo(
     () => buildNumCtxRecommendation(translationModelDetails?.numCtx ?? null),
     [translationModelDetails]
+  );
+  const codingNumCtxRecommendation = useMemo(
+    () => buildNumCtxRecommendation(codingModelDetails?.numCtx ?? null),
+    [codingModelDetails]
   );
   const recommendedMaxContextChunks = useMemo(
     () => buildContextChunkRecommendation(chatModelDetails?.numCtx ?? embeddingModelDetails?.numCtx ?? null),
@@ -324,14 +337,17 @@ export function useSettingsSectionController({
     embeddingModelDetails,
     chatModelDetails,
     translationModelDetails,
+    codingModelDetails,
     embeddingModelDetailsLoading,
     chatModelDetailsLoading,
     translationModelDetailsLoading,
+    codingModelDetailsLoading,
     usesNonLocalOllamaEndpoint,
     unavailableDefaults,
     embeddingRecommendations,
     chatNumCtxRecommendation,
     translationNumCtxRecommendation,
+    codingNumCtxRecommendation,
     recommendedMaxContextChunks,
     hasDirtyOllamaSettings,
     hasDirtyPdfExportSettings,

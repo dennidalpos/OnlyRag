@@ -37,6 +37,16 @@ internal interface IOllamaClient
         int? numCtx = null,
         CancellationToken cancellationToken = default);
 
+    async IAsyncEnumerable<string> GenerateChatStreamAsync(
+        string modelName,
+        IReadOnlyList<OllamaChatMessage> messages,
+        int? numCtx = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string response = await GenerateChatAsync(modelName, messages, numCtx, cancellationToken);
+        yield return response;
+    }
+
     Task<OllamaModelDetails> ShowModelAsync(string modelName, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<IReadOnlyList<float>>> GenerateEmbeddingsAsync(

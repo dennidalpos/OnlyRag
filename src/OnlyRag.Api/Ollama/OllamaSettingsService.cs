@@ -15,11 +15,13 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
     private const string DefaultChatModelKey = "ollama.defaultChatModel";
     private const string DefaultEmbeddingModelKey = "ollama.defaultEmbeddingModel";
     private const string DefaultTranslationModelKey = "ollama.defaultTranslationModel";
+    private const string DefaultCodingModelKey = "ollama.defaultCodingModel";
     private const string RequestTimeoutSecondsKey = "ollama.requestTimeoutSeconds";
     private const string EmbeddingBatchSizeKey = "ollama.embeddingBatchSize";
     private const string EmbeddingNumCtxKey = "ollama.embeddingNumCtx";
     private const string ChatNumCtxKey = "ollama.chatNumCtx";
     private const string TranslationNumCtxKey = "ollama.translationNumCtx";
+    private const string CodingNumCtxKey = "ollama.codingNumCtx";
     private const string TrustNonLocalEndpointKey = "ollama.trustNonLocalEndpoint";
     private const int MinNumCtx = 64;
     private const int MaxNumCtx = 131072;
@@ -41,11 +43,14 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             await settingsRepository.GetValueAsync(DefaultEmbeddingModelKey, cancellationToken));
         string? defaultTranslationModel = NormalizeOptionalValue(
             await settingsRepository.GetValueAsync(DefaultTranslationModelKey, cancellationToken));
+        string? defaultCodingModel = NormalizeOptionalValue(
+            await settingsRepository.GetValueAsync(DefaultCodingModelKey, cancellationToken));
         string? requestTimeoutValue = await settingsRepository.GetValueAsync(RequestTimeoutSecondsKey, cancellationToken);
         string? embeddingBatchSizeValue = await settingsRepository.GetValueAsync(EmbeddingBatchSizeKey, cancellationToken);
         string? embeddingNumCtxValue = await settingsRepository.GetValueAsync(EmbeddingNumCtxKey, cancellationToken);
         string? chatNumCtxValue = await settingsRepository.GetValueAsync(ChatNumCtxKey, cancellationToken);
         string? translationNumCtxValue = await settingsRepository.GetValueAsync(TranslationNumCtxKey, cancellationToken);
+        string? codingNumCtxValue = await settingsRepository.GetValueAsync(CodingNumCtxKey, cancellationToken);
         string? trustNonLocalEndpointValue = await settingsRepository.GetValueAsync(TrustNonLocalEndpointKey, cancellationToken);
 
         return new OllamaSettings(
@@ -55,9 +60,11 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             defaultTranslationModel,
             ParseRequestTimeoutSeconds(requestTimeoutValue),
             ParseEmbeddingBatchSize(embeddingBatchSizeValue),
+            defaultCodingModel,
             ParseNumCtx(embeddingNumCtxValue),
             ParseNumCtx(chatNumCtxValue),
             ParseNumCtx(translationNumCtxValue),
+            ParseNumCtx(codingNumCtxValue),
             ParseBoolean(trustNonLocalEndpointValue));
     }
 
@@ -68,10 +75,12 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         string? defaultChatModel = NormalizeOptionalValue(settings.DefaultChatModel);
         string? defaultEmbeddingModel = NormalizeOptionalValue(settings.DefaultEmbeddingModel);
         string? defaultTranslationModel = NormalizeOptionalValue(settings.DefaultTranslationModel);
+        string? defaultCodingModel = NormalizeOptionalValue(settings.DefaultCodingModel);
         int embeddingBatchSize = ValidateEmbeddingBatchSize(settings.EmbeddingBatchSize);
         int? embeddingNumCtx = ValidateEmbeddingNumCtx(settings.EmbeddingNumCtx);
         int? chatNumCtx = ValidateNumCtx(settings.ChatNumCtx, "chat");
         int? translationNumCtx = ValidateNumCtx(settings.TranslationNumCtx, "traduzione");
+        int? codingNumCtx = ValidateNumCtx(settings.CodingNumCtx, "coding");
 
         await settingsRepository.UpsertAsync(BaseUrlKey, normalizedBaseUrl, cancellationToken);
         await settingsRepository.UpsertAsync(RequestTimeoutSecondsKey, normalizedTimeout.ToString(), cancellationToken);
@@ -79,9 +88,11 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
         await settingsRepository.UpsertAsync(DefaultChatModelKey, defaultChatModel ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(DefaultEmbeddingModelKey, defaultEmbeddingModel ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(DefaultTranslationModelKey, defaultTranslationModel ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(DefaultCodingModelKey, defaultCodingModel ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(EmbeddingNumCtxKey, embeddingNumCtx?.ToString() ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(ChatNumCtxKey, chatNumCtx?.ToString() ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(TranslationNumCtxKey, translationNumCtx?.ToString() ?? string.Empty, cancellationToken);
+        await settingsRepository.UpsertAsync(CodingNumCtxKey, codingNumCtx?.ToString() ?? string.Empty, cancellationToken);
         await settingsRepository.UpsertAsync(
             TrustNonLocalEndpointKey,
             settings.TrustNonLocalEndpoint ? bool.TrueString : bool.FalseString,
@@ -94,9 +105,11 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
             defaultTranslationModel,
             normalizedTimeout,
             embeddingBatchSize,
+            defaultCodingModel,
             embeddingNumCtx,
             chatNumCtx,
             translationNumCtx,
+            codingNumCtx,
             settings.TrustNonLocalEndpoint);
     }
 
@@ -107,7 +120,8 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
 
         if (!string.Equals(current.DefaultChatModel, normalizedName, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(current.DefaultEmbeddingModel, normalizedName, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(current.DefaultTranslationModel, normalizedName, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(current.DefaultTranslationModel, normalizedName, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(current.DefaultCodingModel, normalizedName, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -123,7 +137,10 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
                     : current.DefaultEmbeddingModel,
                 DefaultTranslationModel = string.Equals(current.DefaultTranslationModel, normalizedName, StringComparison.OrdinalIgnoreCase)
                     ? null
-                    : current.DefaultTranslationModel
+                    : current.DefaultTranslationModel,
+                DefaultCodingModel = string.Equals(current.DefaultCodingModel, normalizedName, StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : current.DefaultCodingModel
             },
             cancellationToken);
     }

@@ -1,5 +1,6 @@
 export {
   apiRequest,
+  apiStreamRequest,
   markBackendOffline,
   markBackendOnline,
   resolveBackendBaseUrl,
@@ -8,4 +9,5 @@ export {
   resolveBackendSessionToken
 } from "./apiClient";
 export type { ApiProblemDetails, BackendBridge } from "./apiClient";
+export type * from "./apiTypes/workspace";
 export type * from "./apiTypes";

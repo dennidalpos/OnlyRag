@@ -14,6 +14,8 @@ internal static class InProcessBackendEndpointMapping
         InProcessBackend.MapDocumentEndpoints(app);
         InProcessBackend.MapTranslationEndpoints(app);
         InProcessBackend.MapImageEndpoints(app);
+        InProcessBackend.MapCodingEndpoints(app);
+        app.MapWorkspaceEndpoints();
         return app;
     }
 }

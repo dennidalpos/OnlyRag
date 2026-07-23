@@ -74,7 +74,7 @@ public sealed class DocumentFormattingTests
                     )
                 );
 
-                S.Sheets sheets = doc.WorkbookPart.Workbook.AppendChild(new S.Sheets());
+                S.Sheets sheets = doc.WorkbookPart!.Workbook!.AppendChild(new S.Sheets());
                 sheets.Append(new S.Sheet
                 {
                     Id = doc.WorkbookPart.GetIdOfPart(worksheetPart),

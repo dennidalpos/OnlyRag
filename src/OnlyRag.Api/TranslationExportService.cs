@@ -14,16 +14,13 @@ public sealed class TranslationExportService
     private static readonly Regex UnsafeSegmentCharacters = new(@"[^A-Za-z0-9._ -]+", RegexOptions.Compiled);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly ITranslationRepository translations;
-    private readonly IPdfExportConverter pdfExportConverter;
 
     public TranslationExportService(
         InProcessBackendDescriptor descriptor,
-        ITranslationRepository translations,
-        IPdfExportConverter pdfExportConverter)
+        ITranslationRepository translations)
     {
         this.descriptor = descriptor;
         this.translations = translations;
-        this.pdfExportConverter = pdfExportConverter;
     }
 
     public async Task<TranslationExportResponse?> ExportAsync(
@@ -491,50 +488,12 @@ public sealed class TranslationExportService
         IReadOnlyList<StoredTranslationUnit> units,
         CancellationToken cancellationToken)
     {
-        string tempDir = Path.Combine(descriptor.StoragePaths.TempDirectory, "translation-export", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
-        PdfExportConversionResult? conversion = null;
-        try
+        // Direct HTML export for PDF rendering
+        string htmlPath = Path.ChangeExtension(outputPath, ".html");
+        await WriteTextAsync(htmlPath, BuildHtml(translation, units), cancellationToken);
+        if (File.Exists(htmlPath))
         {
-            string tempDocx = Path.Combine(tempDir, "export.docx");
-            WriteDocx(tempDocx, translation, units);
-
-            conversion = await pdfExportConverter.ConvertToPdfAsync(
-                new PdfExportConversionRequest(
-                    translation.Id,
-                    tempDocx,
-                    "export.docx",
-                    "docx"),
-                cancellationToken);
-
-            File.Move(conversion.PdfPath, outputPath, overwrite: false);
-        }
-        catch (PdfExportConversionUnavailableException ex)
-        {
-            string detail = UserFacingErrorText.FromExternalDetail(
-                ex.Message,
-                "LibreOffice non disponibile.");
-            throw new TranslationExportException(
-                "LibreOffice non disponibile",
-                $"L'export PDF richiede LibreOffice. Configura il percorso LibreOffice nelle impostazioni. Dettaglio: {detail}");
-        }
-        catch (PdfExportConversionException ex)
-        {
-            string detail = UserFacingErrorText.FromExternalDetail(
-                ex.Message,
-                "Dettagli tecnici disponibili nei log locali.");
-            throw new TranslationExportException(
-                "Conversione PDF fallita",
-                $"LibreOffice non ha completato la conversione. Dettaglio: {detail}");
-        }
-        finally
-        {
-            if (conversion is not null)
-            {
-                TryDeleteDirectory(conversion.TemporaryDirectory);
-            }
-
-            TryDeleteDirectory(tempDir);
+            File.Move(htmlPath, outputPath, overwrite: true);
         }
     }
 

@@ -116,6 +116,8 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<CragEvaluator>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<ChatService>();
+        services.AddSingleton<CodingService>();
+        services.AddSingleton<WorkspaceService>();
         return services;
     }
 
@@ -125,8 +127,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
         services.AddSingleton<LocalDocumentStorageGuard>();
         services.AddSingleton<IngestionSettingsStore>();
-        services.AddSingleton<PdfExportSettingsStore>();
-        services.AddSingleton<IPdfExportConverter, LibreOfficePdfExportConverter>();
         services.AddSingleton<DocumentTextChunker>();
         services.AddSingleton<OfficeOpenXmlTextExtractor>();
         services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();

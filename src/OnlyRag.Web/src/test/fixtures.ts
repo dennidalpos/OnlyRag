@@ -56,11 +56,13 @@ export function createOllamaSettings(overrides: Partial<OllamaSettings> = {}): O
     defaultChatModel: "llama3.2:3b",
     defaultEmbeddingModel: "nomic-embed-text",
     defaultTranslationModel: "llama3.2:3b",
+    defaultCodingModel: "qwen2.5-coder",
     requestTimeoutSeconds: 120,
     embeddingBatchSize: 1,
     embeddingNumCtx: null,
     chatNumCtx: null,
     translationNumCtx: null,
+    codingNumCtx: null,
     trustNonLocalEndpoint: false,
     ...overrides
   };

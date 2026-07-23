@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BackendStatus } from "../App";
 import type { DiagnosticsResponse } from "../api";
 import { formatTime } from "../pollingStatus";
@@ -19,6 +19,7 @@ type AppHeaderProps = {
 export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJobsDrawer }: AppHeaderProps) {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
   const jobsBadge: StatusBadge = {
     label: "Operazioni",
@@ -42,12 +43,24 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
     return () => window.clearInterval(timerId);
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target as Node)) {
+        setShowStatusMenu(false);
+      }
+    }
+    if (showStatusMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showStatusMenu]);
+
   return (
     <header className="app-header">
       <h1 id="workspace-title" title={currentSection}>{currentSection}</h1>
       <div className="status-row">
         <div className="status-row__states" role="status" aria-label="Stato applicazione" aria-live="polite" aria-atomic="true">
-          <div className="status-menu-container">
+          <div className="status-menu-container" ref={statusMenuRef}>
             <button
               type="button"
               className={`status-badge status-badge--${isOverallHealthy ? "online" : "warning"}`}

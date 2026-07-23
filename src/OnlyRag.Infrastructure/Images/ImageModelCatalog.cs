@@ -51,7 +51,41 @@ public static class ImageModelCatalog
             DefaultSteps: 6,
             DefaultGuidance: 1.0,
             Scheduler: "LCM with trailing timestep spacing",
-            CompatibilityNotes: "DirectML GPU preferred on Windows, including NVIDIA GPUs; CPU fallback is supported for slower local validation.")
+            CompatibilityNotes: "DirectML GPU preferred on Windows, including NVIDIA GPUs; CPU fallback is supported for slower local validation."),
+        new(
+            "sdxl-turbo-onnx",
+            "SDXL Turbo ONNX",
+            "Profilo ultra-veloce (1-4 step) basato su SDXL Turbo per generazioni rapide.",
+            "https://huggingface.co/optimum/sdxl-turbo-onnx",
+            "OpenRAIL-M",
+            8_000_000_000,
+            RequiredSdxlSnapshotFiles,
+            string.Empty,
+            IsBuiltIn: true,
+            ModelType: "SDXL Turbo ONNX",
+            ModelProfile: "sdxl-turbo",
+            SupportedResolutions: ["512x512", "1024x1024"],
+            DefaultSteps: 2,
+            DefaultGuidance: 0.0,
+            Scheduler: "EulerAncestral / Timestep 1",
+            CompatibilityNotes: "DirectML GPU consigliato. Genera immagini in pochi secondi con 1-4 step."),
+        new(
+            "sdxl-base-1.0-onnx",
+            "SDXL Base 1.0 ONNX",
+            "Modello base SDXL alta fedelta per generazioni dettagliate a 1024x1024.",
+            "https://huggingface.co/optimum/sdxl-base-1.0-onnx",
+            "OpenRAIL-M",
+            12_000_000_000,
+            RequiredSdxlSnapshotFiles,
+            string.Empty,
+            IsBuiltIn: true,
+            ModelType: "SDXL Base ONNX",
+            ModelProfile: "sdxl-base",
+            SupportedResolutions: ["1024x1024", "832x1216", "1216x832"],
+            DefaultSteps: 30,
+            DefaultGuidance: 5.0,
+            Scheduler: "Euler",
+            CompatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM.")
     ];
 
     public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;

@@ -47,30 +47,11 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             }
             catch (Exception ex) when (IsRecoverableProviderException(ex))
             {
-                string reason = $"DirectML non disponibile per questo modello o dispositivo: {ex.Message}";
-                try
-                {
-                    ImageGenerationEngineResult cpu = await GenerateWithProviderAsync(
-                        request,
-                        modelDirectory,
-                        CreateCpuProvider(),
-                        CpuProvider,
-                        reason,
-                        cancellationToken);
-                    SetStatus(cpu.ActiveExecutionProvider, cpu.FallbackReason);
-                    return cpu;
-                }
-                catch (Exception cpuEx) when (IsRecoverableProviderException(cpuEx))
-                {
-                    SetStatus(CpuProvider, reason);
-                    string detailedMessage = cpuEx.Message.Contains("com.microsoft", StringComparison.OrdinalIgnoreCase)
-                        ? $"DirectML non disponibile e fallback CPU non riuscito: Il modello ONNX (Olive DirectML) richiede accelerazione GPU DirectML. Operatore non supportato su CPU ({cpuEx.Message})."
-                        : $"DirectML non disponibile e fallback CPU non riuscito: {cpuEx.Message}";
-                    throw new ImageGenerationException(
-                        ImageGenerationErrorKind.InvalidConfiguration,
-                        detailedMessage,
-                        cpuEx);
-                }
+                SetStatus(DirectMlProvider, $"DirectML GPU non disponibile: {ex.Message}");
+                throw new ImageGenerationException(
+                    ImageGenerationErrorKind.InvalidConfiguration,
+                    $"Generazione immagini GPU DirectML non riuscita: {ex.Message}. Esecuzione interrotta (Fail-Fast).",
+                    ex);
             }
         }
 

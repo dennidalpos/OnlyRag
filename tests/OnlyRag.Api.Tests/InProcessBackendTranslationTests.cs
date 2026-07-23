@@ -248,15 +248,14 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
-    public async Task TranslationExport_PostPdf_UsesAppTempDirectoryAndCleansIt()
+    public async Task TranslationExport_PostPdf_ExportsPdfFile()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create(new LocalJobQueueDescriptor("disabled-tests", Persistent: false, MaxParallelJobs: 1, MaxRetries: 0));
         await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
         SeededTranslation seeded = await CreateCompletedTranslationAsync(tempDescriptor, "pdf-source.docx");
         LocalSqliteConnectionFactory connectionFactory = new(tempDescriptor.Descriptor.Store);
         SqliteTranslationRepository translationRepository = new(connectionFactory);
-        FakePdfExportConverter converter = new(tempDescriptor.Descriptor.StoragePaths.TempDirectory);
-        TranslationExportService service = new(tempDescriptor.Descriptor, translationRepository, converter);
+        TranslationExportService service = new(tempDescriptor.Descriptor, translationRepository);
 
         TranslationExportResponse? exported = await service.ExportAsync(
             seeded.Translation.Id,
@@ -269,42 +268,6 @@ public sealed partial class InProcessBackendTests
             Path.GetFullPath(exported.OutputPath),
             StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(exported.OutputPath));
-        Assert.NotNull(converter.LastSourcePath);
-        Assert.StartsWith(
-            Path.GetFullPath(Path.Combine(tempDescriptor.Descriptor.StoragePaths.TempDirectory, "translation-export")),
-            Path.GetFullPath(converter.LastSourcePath),
-            StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(Directory.EnumerateDirectories(
-            Path.Combine(tempDescriptor.Descriptor.StoragePaths.TempDirectory, "translation-export")));
-    }
-
-    private sealed class FakePdfExportConverter : IPdfExportConverter
-    {
-        private readonly string tempRoot;
-
-        public FakePdfExportConverter(string tempRoot)
-        {
-            this.tempRoot = tempRoot;
-        }
-
-        public string? LastSourcePath { get; private set; }
-
-        public Task<PdfExportConverterAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new PdfExportConverterAvailability(true, "fake-soffice.exe", "Fake converter available.", null));
-        }
-
-        public async Task<PdfExportConversionResult> ConvertToPdfAsync(
-            PdfExportConversionRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            LastSourcePath = request.SourcePath;
-            string directory = Path.Combine(tempRoot, "translation-export", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(directory);
-            string pdfPath = Path.Combine(directory, "export.pdf");
-            await File.WriteAllBytesAsync(pdfPath, Encoding.ASCII.GetBytes("%PDF-1.4 fake"), cancellationToken);
-            return new PdfExportConversionResult(pdfPath, directory);
-        }
     }
 
     private static async Task<ImportedDocument> CreateIndexedDocumentWithPageAsync(

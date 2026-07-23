@@ -6,3 +6,5 @@ export type * from "./apiTypes/images";
 export type * from "./apiTypes/translations";
 export type * from "./apiTypes/diagnostics";
 export type * from "./apiTypes/jobs";
+export type * from "./apiTypes/coding";
+export type * from "./apiTypes/workspace";

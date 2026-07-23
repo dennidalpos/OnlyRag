@@ -81,15 +81,6 @@ public static partial class InProcessBackend
         };
     }
 
-    private static IResult MapPdfExportConversionException(PdfExportConversionException _)
-    {
-        return CreateProblem(
-            "Configurazione export PDF non valida",
-            "La configurazione dell'export PDF non e valida. Controlla il percorso LibreOffice e i permessi nelle impostazioni.",
-            StatusCodes.Status400BadRequest,
-            "pdf_export_invalid_configuration");
-    }
-
     private static IResult MapImageGenerationException(
         ImageGenerationException exception,
         IServiceProvider? services = null,
@@ -212,19 +203,6 @@ public static partial class InProcessBackend
         return string.IsNullOrWhiteSpace(correlationId)
             ? "Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali."
             : $"Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali con riferimento {correlationId}.";
-    }
-
-    private static PdfExportConverterStatusResponse CreatePdfExportConverterStatusResponse(
-        PdfExportConverterAvailability availability,
-        int timeoutSeconds)
-    {
-        return new PdfExportConverterStatusResponse(
-            availability.IsAvailable ? "Available" : "RequiresAdditionalComponent",
-            availability.IsAvailable,
-            availability.ExecutablePath,
-            availability.Message,
-            availability.Suggestion,
-            timeoutSeconds);
     }
 
     private static OllamaStatusResponse CreateStatusResponse(string baseUrl, OllamaApiException exception)

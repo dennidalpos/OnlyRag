@@ -11,32 +11,87 @@ export const defaultSettings: ImageGenerationSettings = {
   preferGpu: true
 };
 
-export const minSizePresets = [
-  { label: "512x512 (Veloce 1:1)", width: 512, height: 512 },
-  { label: "512x768 (2:3)", width: 512, height: 768 },
-  { label: "768x512 (3:2)", width: 768, height: 512 }
-];
+export type ResolutionPreset = {
+  label: string;
+  width: number;
+  height: number;
+};
 
-export const standardSizePresets = [
-  { label: "768x768 (1:1)", width: 768, height: 768 },
-  { label: "1024x1024 (HD 1:1)", width: 1024, height: 1024 },
-  { label: "1216x832 (16:9)", width: 1216, height: 832 },
-  { label: "832x1216 (9:16)", width: 832, height: 1216 }
-];
+export function getCompatiblePresets(selectedModel: ImageModelCatalogEntry | null): ResolutionPreset[] {
+  const supported = selectedModel?.supportedResolutions ?? ["1024x1024", "832x1216", "1216x832"];
+  const presets: ResolutionPreset[] = [];
 
-export const socialSizePresets = [
-  { label: "Instagram Post (1080x1080)", width: 1080, height: 1080 },
-  { label: "Instagram Story / Reel (1080x1920)", width: 1080, height: 1920 },
-  { label: "Instagram Portrait (1080x1350)", width: 1080, height: 1350 },
-  { label: "YouTube / Twitter (1280x720)", width: 1280, height: 720 },
-  { label: "TikTok / Short (1080x1920)", width: 1080, height: 1920 },
-  { label: "LinkedIn Post (1200x627)", width: 1200, height: 627 }
-];
+  for (const item of supported) {
+    const parts = item.trim().toLowerCase().split("x");
+    if (parts.length === 2) {
+      const w = parseInt(parts[0], 10);
+      const h = parseInt(parts[1], 10);
+      if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+        let arLabel = "";
+        const ratio = w / h;
+        if (Math.abs(ratio - 1.0) < 0.02) arLabel = " (1:1)";
+        else if (Math.abs(ratio - (16 / 9)) < 0.05) arLabel = " (16:9)";
+        else if (Math.abs(ratio - (9 / 16)) < 0.05) arLabel = " (9:16)";
+        else if (Math.abs(ratio - (3 / 2)) < 0.05) arLabel = " (3:2)";
+        else if (Math.abs(ratio - (2 / 3)) < 0.05) arLabel = " (2:3)";
+        else if (Math.abs(ratio - (4 / 3)) < 0.05) arLabel = " (4:3)";
+        else if (Math.abs(ratio - (3 / 4)) < 0.05) arLabel = " (3:4)";
 
-export const sizePresets = [
-  ...minSizePresets,
-  ...standardSizePresets,
-  ...socialSizePresets
+        presets.push({
+          label: `${w}x${h}${arLabel}`,
+          width: w,
+          height: h
+        });
+      }
+    }
+  }
+
+  return presets.length > 0 ? presets : [{ label: "1024x1024 (1:1)", width: 1024, height: 1024 }];
+}
+
+export const modelTemplates = [
+  {
+    id: "sdxl-turbo-onnx",
+    displayName: "SDXL Turbo ONNX",
+    downloadUrl: "https://huggingface.co/optimum/sdxl-turbo-onnx",
+    licenseLabel: "OpenRAIL-M",
+    expectedSizeBytes: "8000000000",
+    modelType: "SDXL Turbo ONNX",
+    modelProfile: "sdxl-turbo",
+    supportedResolutions: "512x512, 1024x1024",
+    defaultSteps: "2",
+    defaultGuidance: "0.0",
+    scheduler: "EulerAncestral",
+    compatibilityNotes: "DirectML GPU consigliato per generazioni ultra veloci (1-4 step)."
+  },
+  {
+    id: "sdxl-base-1.0-onnx",
+    displayName: "SDXL Base 1.0 ONNX",
+    downloadUrl: "https://huggingface.co/optimum/sdxl-base-1.0-onnx",
+    licenseLabel: "OpenRAIL-M",
+    expectedSizeBytes: "12000000000",
+    modelType: "SDXL Base ONNX",
+    modelProfile: "sdxl-base",
+    supportedResolutions: "1024x1024, 832x1216, 1216x832",
+    defaultSteps: "30",
+    defaultGuidance: "5.0",
+    scheduler: "Euler",
+    compatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM."
+  },
+  {
+    id: "lcm-sdxl-olive-onnx",
+    displayName: "LCM SDXL Olive ONNX",
+    downloadUrl: "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
+    licenseLabel: "OpenRAIL++",
+    expectedSizeBytes: "8000000000",
+    modelType: "SDXL Turbo/LCM ONNX",
+    modelProfile: "lcm-sdxl-olive",
+    supportedResolutions: "1024x1024, 832x1216, 1216x832",
+    defaultSteps: "6",
+    defaultGuidance: "1.0",
+    scheduler: "LCM",
+    compatibilityNotes: "DirectML GPU preferred on Windows; CPU fallback supported."
+  }
 ];
 
 export const promptLanguages = [
@@ -146,16 +201,37 @@ export function createEmptyEditState(): ImageEditState {
   return { crop: null, textLayers: [], arrowLayers: [] };
 }
 
+export function isEditStateEmpty(state: ImageEditState): boolean {
+  return !state.crop && state.textLayers.length === 0 && state.arrowLayers.length === 0;
+}
 
-export function resolveGenerationProfile(modelId: string, profile: Exclude<GenerationProfile, "custom">): { steps: number; batchSize: number } {
-  const isFastModel = /turbo|lcm/i.test(modelId);
+export type ImageEditHistory = {
+  past: ImageEditState[];
+  present: ImageEditState;
+  future: ImageEditState[];
+};
+
+export function createInitialHistory(): ImageEditHistory {
+  return {
+    past: [],
+    present: createEmptyEditState(),
+    future: []
+  };
+}
+
+
+export function resolveGenerationProfile(
+  modelId: string | null,
+  profile: Exclude<GenerationProfile, "custom">
+): { steps: number; guidanceScale: string; batchSize: number } {
+  const isFastModel = modelId ? /turbo|lcm/i.test(modelId) : true;
   if (profile === "quality") {
-    return { steps: isFastModel ? 10 : 52, batchSize: 1 };
+    return { steps: isFastModel ? 10 : 35, guidanceScale: isFastModel ? "1.5" : "6.5", batchSize: 1 };
   }
   if (profile === "performance") {
-    return { steps: isFastModel ? 5 : 18, batchSize: 1 };
+    return { steps: isFastModel ? 4 : 15, guidanceScale: isFastModel ? "1.0" : "4.0", batchSize: 1 };
   }
-  return { steps: isFastModel ? 7 : 30, batchSize: 1 };
+  return { steps: isFastModel ? 6 : 22, guidanceScale: isFastModel ? "1.0" : "5.0", batchSize: 1 };
 }
 
 export function createModelDraft(model: ImageModelCatalogEntry): ModelDraft {

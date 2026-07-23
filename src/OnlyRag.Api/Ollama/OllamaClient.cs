@@ -201,6 +201,75 @@ internal sealed partial class OllamaClient : IOllamaClient
         return content;
     }
 
+    public async IAsyncEnumerable<string> GenerateChatStreamAsync(
+        string modelName,
+        IReadOnlyList<OllamaChatMessage> messages,
+        int? numCtx = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
+        if (messages.Count == 0)
+        {
+            throw new OllamaApiException(
+                OllamaErrorKind.InvalidRequest,
+                "La richiesta chat deve contenere almeno un messaggio.");
+        }
+
+        OllamaRequestContext context = await BuildContextAsync(cancellationToken);
+        object requestBody = numCtx.HasValue
+            ? new
+            {
+                model = normalizedModelName,
+                stream = true,
+                messages = messages.Select(message => new
+                {
+                    role = message.Role,
+                    content = message.Content
+                }),
+                options = new { num_ctx = numCtx.Value }
+            }
+            : (object)new
+            {
+                model = normalizedModelName,
+                stream = true,
+                messages = messages.Select(message => new
+                {
+                    role = message.Role,
+                    content = message.Content
+                })
+            };
+
+        using HttpRequestMessage request = new(HttpMethod.Post, new Uri(context.BaseUri, "api/chat"))
+        {
+            Content = JsonContent.Create(requestBody)
+        };
+
+        using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        using System.IO.Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using System.IO.StreamReader reader = new(stream);
+
+        while (!cancellationToken.IsCancellationRequested && await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            OllamaChatResponse? chunk = null;
+            try
+            {
+                chunk = JsonSerializer.Deserialize<OllamaChatResponse>(line, JsonOptions);
+            }
+            catch { }
+
+            if (chunk?.Message?.Content is { } contentChunk && contentChunk.Length > 0)
+            {
+                yield return contentChunk;
+            }
+
+            if (chunk?.Done == true) break;
+        }
+    }
+
     public async Task EmbeddingsSmokeAsync(string modelName, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IReadOnlyList<float>> embeddings = await GenerateEmbeddingsAsync(

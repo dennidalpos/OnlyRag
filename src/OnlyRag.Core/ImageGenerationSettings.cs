@@ -7,9 +7,11 @@ public sealed record ImageGenerationSettings(
 
 public sealed record ImagePromptTranslationRequest(
     string Prompt,
-    string SourceLanguage);
+    string? SourceLanguage = null);
 
 public sealed record ImagePromptTranslationResponse(
     string OriginalPrompt,
     string TranslatedPrompt,
-    string TargetLanguage);
+    string TargetLanguage,
+    bool WasTranslated = false);
+

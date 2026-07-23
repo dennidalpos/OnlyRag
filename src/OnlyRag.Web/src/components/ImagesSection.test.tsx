@@ -168,9 +168,9 @@ describe("ImagesSection", () => {
       modelId: "lcm-sdxl-olive-onnx",
       width: 1024,
       height: 1024,
-      steps: 7,
+      steps: 6,
       batchSize: 1,
-      guidanceScale: null
+      guidanceScale: 1
     });
   });
 

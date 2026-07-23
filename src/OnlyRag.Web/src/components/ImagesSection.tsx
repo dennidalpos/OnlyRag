@@ -11,8 +11,10 @@ import {
   type ImageModelCatalogEntryRequest,
   type ImageModelDownloadResponse,
   type ImageModelLocalState,
+  type ImagePromptTranslationResponse,
   type OperationMessageResponse
 } from "../api";
+import { formatFileSize } from "./DocumentsSection.formatting";
 import { ImageCanvasEditor } from "./images/ImageCanvasEditor";
 import { ImageConsentDialog } from "./images/ImageConsentDialog";
 import { ImageGalleryGrid } from "./images/ImageGalleryGrid";
@@ -45,14 +47,13 @@ export function ImagesSection() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [promptLanguage, setPromptLanguage] = useState<PromptLanguage>("en");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
   const [generationProfile, setGenerationProfile] = useState<GenerationProfile>("balanced");
   const [steps, setSteps] = useState(resolveGenerationProfile(defaultModelId, "balanced").steps);
   const [batchSize, setBatchSize] = useState(resolveGenerationProfile(defaultModelId, "balanced").batchSize);
-  const [guidanceScale, setGuidanceScale] = useState("");
+  const [guidanceScale, setGuidanceScale] = useState(resolveGenerationProfile(defaultModelId, "balanced").guidanceScale);
   const [seed, setSeed] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +66,9 @@ export function ImagesSection() {
 
   // Edit state for Canvas Editor
   const [activeTool, setActiveTool] = useState<EditTool>("move");
-  const [editState, setEditState] = useState<ImageEditState>(createEmptyEditState());
+  const [pastEdits, setPastEdits] = useState<ImageEditState[]>([]);
+  const [editState, setEditStateRaw] = useState<ImageEditState>(createEmptyEditState());
+  const [futureEdits, setFutureEdits] = useState<ImageEditState[]>([]);
   const [isAddingText, setIsAddingText] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [textColor, setTextColor] = useState("#ffffff");
@@ -80,6 +83,15 @@ export function ImagesSection() {
   const [dragTarget, setDragTarget] = useState<"crop" | "text" | "arrow" | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [initialDragState, setInitialDragState] = useState<{ x: number; y: number } | null>(null);
+  const dragStateRef = useRef<{
+    target: "crop" | "text" | "arrow";
+    textId?: number;
+    arrowId?: number;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+  } | null>(null);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
   const settingsModalRef = useRef<HTMLDivElement | null>(null);
@@ -108,6 +120,132 @@ export function ImagesSection() {
   const selectedObjectUrl = useImageObjectUrl(selectedImage?.id ?? null);
   const canGenerate = Boolean(prompt.trim()) && Boolean(selectedModelState?.isVerified);
 
+  const selectedImageIndex = useMemo(() => {
+    return images.findIndex((img) => img.id === selectedImageId);
+  }, [images, selectedImageId]);
+
+  function pushEditState(nextState: ImageEditState | ((prev: ImageEditState) => ImageEditState)) {
+    setEditStateRaw((prev) => {
+      const updated = typeof nextState === "function" ? nextState(prev) : nextState;
+      setPastEdits((past) => [...past, prev]);
+      setFutureEdits([]);
+      return updated;
+    });
+  }
+
+  function setEditStateDirectly(nextState: ImageEditState) {
+    setEditStateRaw(nextState);
+    setPastEdits([]);
+    setFutureEdits([]);
+  }
+
+  function handleUndo() {
+    if (pastEdits.length === 0) return;
+    const previous = pastEdits[pastEdits.length - 1];
+    const newPast = pastEdits.slice(0, pastEdits.length - 1);
+    setFutureEdits((future) => [editState, ...future]);
+    setPastEdits(newPast);
+    setEditStateRaw(previous);
+  }
+
+  function handleRedo() {
+    if (futureEdits.length === 0) return;
+    const next = futureEdits[0];
+    const newFuture = futureEdits.slice(1);
+    setPastEdits((past) => [...past, editState]);
+    setFutureEdits(newFuture);
+    setEditStateRaw(next);
+  }
+
+  function handleResetEdits() {
+    pushEditState(createEmptyEditState());
+    setSelectedTextId(null);
+    setSelectedArrowId(null);
+  }
+
+  function handleRemoveCrop() {
+    pushEditState((prev) => ({ ...prev, crop: null }));
+  }
+
+  function handleDeleteSelectedArrow() {
+    if (selectedArrowId === null) return;
+    pushEditState((prev) => ({
+      ...prev,
+      arrowLayers: prev.arrowLayers.filter((a) => a.id !== selectedArrowId)
+    }));
+    setSelectedArrowId(null);
+  }
+
+  function handleDeleteSelectedText() {
+    if (selectedTextId === null) return;
+    pushEditState((prev) => ({
+      ...prev,
+      textLayers: prev.textLayers.filter((t) => t.id !== selectedTextId)
+    }));
+    setSelectedTextId(null);
+    setTextInput("");
+  }
+
+  function handleSelectPrevImage() {
+    if (selectedImageIndex > 0) {
+      setSelectedImageId(images[selectedImageIndex - 1].id);
+    }
+  }
+
+  function handleSelectNextImage() {
+    if (selectedImageIndex >= 0 && selectedImageIndex < images.length - 1) {
+      setSelectedImageId(images[selectedImageIndex + 1].id);
+    }
+  }
+
+  function handleCopyPrompt(promptText: string) {
+    if (!promptText) return;
+    navigator.clipboard.writeText(promptText).then(
+      () => setFeedback({ tone: "success", message: "Prompt copiato negli appunti!" }),
+      () => setFeedback({ tone: "warning", message: "Impossibile copiare il prompt." })
+    );
+  }
+
+  function handleDownloadImage(img: GeneratedImage) {
+    const url = `/api/images/${img.id}/file`;
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = img.fileName;
+    anchor.target = "_blank";
+    anchor.click();
+  }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedArrowId !== null) {
+          e.preventDefault();
+          handleDeleteSelectedArrow();
+        } else if (selectedTextId !== null) {
+          e.preventDefault();
+          handleDeleteSelectedText();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pastEdits, futureEdits, editState, selectedArrowId, selectedTextId]);
+
   useEffect(() => {
     if (generationProfile !== "custom") {
       const profile = resolveGenerationProfile(settings.selectedModelId, generationProfile);
@@ -128,8 +266,9 @@ export function ImagesSection() {
   }, [images, selectedImageId]);
 
   useEffect(() => {
-    setEditState(createEmptyEditState());
+    setEditStateDirectly(createEmptyEditState());
     setSelectedTextId(null);
+    setSelectedArrowId(null);
   }, [selectedImageId]);
 
   useEffect(() => {
@@ -230,17 +369,69 @@ export function ImagesSection() {
   }
 
   async function handleDeleteModel(modelId: string) {
-    if (!window.confirm("Rimuovere i file locali del modello?")) return;
+    const targetModel = catalog.find((m) => m.id === modelId);
+    const targetState = modelStates.find((s) => s.modelId === modelId);
+    const displayName = targetModel?.displayName ?? modelId;
+    const sizeText = targetState && targetState.localSizeBytes > 0 ? formatFileSize(targetState.localSizeBytes) : null;
+
+    let confirmMessage = `Confermi di voler eliminare i file di installazione del modello '${displayName}'?`;
+    if (sizeText) {
+      confirmMessage += `\n\nI file occupano ${sizeText} su disco. Eliminando i file libererai questo spazio.`;
+    } else {
+      confirmMessage += `\n\nQuesta operazione liberera lo spazio su disco occupato dal modello.`;
+    }
+
+    if (!window.confirm(confirmMessage)) return;
+
     setIsModelActionRunning(true);
     setFeedback(null);
     try {
       await apiRequest(`/api/images/models/${modelId}`, { method: "DELETE" });
       await refreshModelsAndStatus();
-      setFeedback({ tone: "success", message: "Modello rimosso dal disco." });
+      setFeedback({
+        tone: "success",
+        message: `File di installazione del modello '${displayName}' eliminati dal disco. Spazio liberato.`
+      });
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: error instanceof Error ? error.message : "Impossibile rimuovere il modello."
+        message: error instanceof Error ? error.message : "Impossibile rimuovere i file del modello."
+      });
+    } finally {
+      setIsModelActionRunning(false);
+    }
+  }
+
+  async function handleDeleteCatalogModel(modelId: string) {
+    const targetModel = catalog.find((m) => m.id === modelId);
+    const targetState = modelStates.find((s) => s.modelId === modelId);
+    const displayName = targetModel?.displayName ?? modelId;
+    const hasFiles = Boolean(targetState?.isDownloaded || (targetState?.localSizeBytes ?? 0) > 0);
+    const sizeText = targetState && targetState.localSizeBytes > 0 ? formatFileSize(targetState.localSizeBytes) : null;
+
+    let confirmMessage = `Sei sicuro di voler rimuovere il modello '${displayName}' dal catalogo?`;
+    if (hasFiles && sizeText) {
+      confirmMessage += `\n\n⚠️ Il modello ha file di installazione locali presenti su disco (${sizeText}).\n\nDesideri eliminare anche i file di installazione locali per liberare spazio su disco?`;
+    }
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsModelActionRunning(true);
+    setFeedback(null);
+    try {
+      if (hasFiles) {
+        await apiRequest(`/api/images/models/${modelId}`, { method: "DELETE" });
+      }
+      await apiRequest(`/api/images/models/catalog/${modelId}`, { method: "DELETE" });
+      await refreshModelsAndStatus();
+      setFeedback({
+        tone: "success",
+        message: `Modello '${displayName}' rimosso dal catalogo${hasFiles ? " e file di installazione eliminati dal disco." : "."}`
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Impossibile rimuovere il modello dal catalogo."
       });
     } finally {
       setIsModelActionRunning(false);
@@ -283,18 +474,18 @@ export function ImagesSection() {
     setFeedback(null);
     try {
       let finalPrompt = prompt.trim();
-      if (promptLanguage !== "en" && finalPrompt) {
+      if (finalPrompt) {
         try {
-          const trans = await apiRequest<{ originalPrompt: string; translatedPrompt: string }>("/api/images/translate-prompt", {
+          const trans = await apiRequest<ImagePromptTranslationResponse>("/api/images/translate-prompt", {
             method: "POST",
-            body: JSON.stringify({ prompt: finalPrompt, sourceLanguage: promptLanguage })
+            body: JSON.stringify({ prompt: finalPrompt })
           });
-          if (trans.translatedPrompt && trans.translatedPrompt !== finalPrompt) {
+          if (trans.wasTranslated && trans.translatedPrompt && trans.translatedPrompt !== finalPrompt) {
             finalPrompt = trans.translatedPrompt;
-            setFeedback({ tone: "success", message: `Prompt tradotto in inglese: "${finalPrompt}"` });
+            setFeedback({ tone: "success", message: `🌐 Prompt tradotto in inglese: "${finalPrompt}"` });
           }
         } catch {
-          // fallback to original if translation fails
+          // fallback to original prompt if translation service is offline
         }
       }
 
@@ -400,7 +591,7 @@ export function ImagesSection() {
 
       setImages((prev) => [newImg, ...prev]);
       setSelectedImageId(newImg.id);
-      setEditState(createEmptyEditState());
+      setEditStateDirectly(createEmptyEditState());
       setTextInput("");
       setIsAddingText(false);
       setSelectedArrowId(null);
@@ -425,7 +616,7 @@ export function ImagesSection() {
     if (activeTool === "crop") {
       setDragTarget("crop");
       setDragStart({ x: xPct, y: yPct });
-      setEditState((prev) => ({
+      pushEditState((prev) => ({
         ...prev,
         crop: { x: xPct, y: yPct, width: 0, height: 0 }
       }));
@@ -442,7 +633,7 @@ export function ImagesSection() {
       setDragTarget("arrow");
       setDragStart({ x: xPct, y: yPct });
       setSelectedArrowId(newArrow.id);
-      setEditState((prev) => ({
+      pushEditState((prev) => ({
         ...prev,
         arrowLayers: [...prev.arrowLayers, newArrow]
       }));
@@ -450,7 +641,10 @@ export function ImagesSection() {
   }
 
   function handlePreviewPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!dragTarget || !dragStart || !previewRef.current) return;
+    const drag = dragStateRef.current;
+    const activeTarget = drag?.target ?? dragTarget;
+    if (!activeTarget || !previewRef.current) return;
+
     const rect = previewRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
@@ -459,14 +653,14 @@ export function ImagesSection() {
     const xPct = Math.max(0, Math.min(100, rawXPct));
     const yPct = Math.max(0, Math.min(100, rawYPct));
 
-    if (dragTarget === "crop") {
-      const startX = Math.max(0, Math.min(100, dragStart.x));
-      const startY = Math.max(0, Math.min(100, dragStart.y));
+    if (activeTarget === "crop") {
+      const startX = Math.max(0, Math.min(100, dragStart?.x ?? 0));
+      const startY = Math.max(0, Math.min(100, dragStart?.y ?? 0));
       const minX = Math.min(startX, xPct);
       const minY = Math.min(startY, yPct);
       const w = Math.abs(xPct - startX);
       const h = Math.abs(yPct - startY);
-      setEditState((prev) => ({
+      setEditStateRaw((prev) => ({
         ...prev,
         crop: {
           x: Math.max(0, Math.min(100, minX)),
@@ -475,26 +669,36 @@ export function ImagesSection() {
           height: Math.max(0, Math.min(100 - minY, h))
         }
       }));
-    } else if (dragTarget === "arrow" && selectedArrowId) {
-      setEditState((prev) => ({
+    } else if (activeTarget === "arrow") {
+      const activeArrowId = drag?.arrowId ?? selectedArrowId;
+      if (!activeArrowId) return;
+      setEditStateRaw((prev) => ({
         ...prev,
         arrowLayers: prev.arrowLayers.map((arrow) =>
-          arrow.id === selectedArrowId
+          arrow.id === activeArrowId
             ? { ...arrow, x2: xPct, y2: yPct }
             : arrow
         )
       }));
-    } else if (dragTarget === "text" && selectedTextId && initialDragState) {
-      const dx = rawXPct - dragStart.x;
-      const dy = rawYPct - dragStart.y;
-      setEditState((prev) => ({
+    } else if (activeTarget === "text") {
+      const activeTextId = drag?.textId ?? selectedTextId;
+      const startX = drag?.startX ?? dragStart?.x ?? 0;
+      const startY = drag?.startY ?? dragStart?.y ?? 0;
+      const initX = drag?.initialX ?? initialDragState?.x ?? 0;
+      const initY = drag?.initialY ?? initialDragState?.y ?? 0;
+      if (!activeTextId) return;
+
+      const dx = rawXPct - startX;
+      const dy = rawYPct - startY;
+
+      setEditStateRaw((prev) => ({
         ...prev,
         textLayers: prev.textLayers.map((layer) =>
-          layer.id === selectedTextId
+          layer.id === activeTextId
             ? {
                 ...layer,
-                x: Math.max(5, Math.min(95, initialDragState.x + dx)),
-                y: Math.max(5, Math.min(95, initialDragState.y + dy))
+                x: Math.max(0, Math.min(95, initX + dx)),
+                y: Math.max(0, Math.min(95, initY + dy))
               }
             : layer
         )
@@ -503,6 +707,11 @@ export function ImagesSection() {
   }
 
   function handlePreviewPointerUp() {
+    const isTextDrag = dragStateRef.current?.target === "text" || dragTarget === "text";
+    if (isTextDrag) {
+      pushEditState((prev) => ({ ...prev }));
+    }
+    dragStateRef.current = null;
     setDragTarget(null);
     setDragStart(null);
     setInitialDragState(null);
@@ -519,6 +728,16 @@ export function ImagesSection() {
     const rect = previewRef.current.getBoundingClientRect();
     const xPct = ((event.clientX - rect.left) / rect.width) * 100;
     const yPct = ((event.clientY - rect.top) / rect.height) * 100;
+
+    dragStateRef.current = {
+      target: "text",
+      textId: layer.id,
+      startX: xPct,
+      startY: yPct,
+      initialX: layer.x,
+      initialY: layer.y
+    };
+
     setDragTarget("text");
     setDragStart({ x: xPct, y: yPct });
     setInitialDragState({ x: layer.x, y: layer.y });
@@ -534,13 +753,13 @@ export function ImagesSection() {
       fontSize: textSize,
       color: textColor
     };
-    setEditState((prev) => ({ ...prev, textLayers: [...prev.textLayers, newLayer] }));
+    pushEditState((prev) => ({ ...prev, textLayers: [...prev.textLayers, newLayer] }));
     setSelectedTextId(newLayer.id);
   }
 
   function handleUpdateTextLayer() {
     if (!selectedTextId || !textInput.trim()) return;
-    setEditState((prev) => ({
+    pushEditState((prev) => ({
       ...prev,
       textLayers: prev.textLayers.map((layer) =>
         layer.id === selectedTextId
@@ -552,7 +771,7 @@ export function ImagesSection() {
 
   function handleDeleteTextLayer() {
     if (!selectedTextId) return;
-    setEditState((prev) => ({
+    pushEditState((prev) => ({
       ...prev,
       textLayers: prev.textLayers.filter((layer) => layer.id !== selectedTextId)
     }));
@@ -566,7 +785,7 @@ export function ImagesSection() {
   }
 
   function handleClearArrows() {
-    setEditState((prev) => ({ ...prev, arrowLayers: [] }));
+    pushEditState((prev) => ({ ...prev, arrowLayers: [] }));
     setSelectedArrowId(null);
   }
 
@@ -603,23 +822,29 @@ export function ImagesSection() {
 
       <div className="images-workspace">
         <ImageGeneratorControls
+          selectedModel={selectedModel}
           prompt={prompt}
           onPromptChange={setPrompt}
-          promptLanguage={promptLanguage}
-          onPromptLanguageChange={setPromptLanguage}
           negativePrompt={negativePrompt}
           onNegativePromptChange={setNegativePrompt}
           width={width}
           height={height}
           onSizeChange={(w, h) => { setWidth(w); setHeight(h); }}
           generationProfile={generationProfile}
-          onGenerationProfileChange={setGenerationProfile}
+          onGenerationProfileChange={(prof) => {
+            setGenerationProfile(prof);
+            if (prof !== "custom") {
+              const res = resolveGenerationProfile(settings.selectedModelId, prof);
+              setSteps(res.steps);
+              setGuidanceScale(res.guidanceScale);
+            }
+          }}
           steps={steps}
           onStepsChange={(s) => { setSteps(s); setGenerationProfile("custom"); }}
           seed={seed}
           onSeedChange={setSeed}
           guidanceScale={guidanceScale}
-          onGuidanceScaleChange={setGuidanceScale}
+          onGuidanceScaleChange={(g) => { setGuidanceScale(g); setGenerationProfile("custom"); }}
           canGenerate={canGenerate}
           isGenerating={isGenerating}
           onGenerate={handleGenerate}
@@ -657,9 +882,17 @@ export function ImagesSection() {
               </button>
               <button
                 type="button"
-                className={`button-secondary ${isAddingText ? "button-secondary--active" : ""}`}
-                aria-pressed={isAddingText}
-                onClick={() => setIsAddingText(!isAddingText)}
+                className={`button-secondary ${activeTool === "text" || isAddingText ? "button-secondary--active" : ""}`}
+                aria-pressed={activeTool === "text" || isAddingText}
+                onClick={() => {
+                  const nextState = !isAddingText;
+                  setIsAddingText(nextState);
+                  if (nextState) {
+                    setActiveTool("text");
+                  } else if (activeTool === "text") {
+                    setActiveTool("move");
+                  }
+                }}
                 title="Mostra/nascondi il pannello per inserire e modificare il testo"
               >
                 Testo overlay
@@ -759,17 +992,41 @@ export function ImagesSection() {
             selectedTextId={selectedTextId}
             selectedArrowId={selectedArrowId}
             previewRef={previewRef}
+            canUndo={pastEdits.length > 0}
+            canRedo={futureEdits.length > 0}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onRemoveCrop={handleRemoveCrop}
+            onDeleteSelectedArrow={handleDeleteSelectedArrow}
+            onDeleteSelectedText={handleDeleteSelectedText}
+            onResetEdits={handleResetEdits}
             onPreviewPointerDown={handlePreviewPointerDown}
             onPreviewPointerMove={handlePreviewPointerMove}
             onPreviewPointerUp={handlePreviewPointerUp}
             onTextPointerDown={handleTextPointerDown}
             onArrowClick={(id) => setSelectedArrowId(id)}
+            onCopyPrompt={handleCopyPrompt}
+            onDownloadImage={handleDownloadImage}
+            onPrevImage={handleSelectPrevImage}
+            onNextImage={handleSelectNextImage}
+            hasPrevImage={selectedImageIndex > 0}
+            hasNextImage={selectedImageIndex >= 0 && selectedImageIndex < images.length - 1}
           />
 
           <ImageGalleryGrid
             images={images}
             selectedImageId={selectedImage?.id ?? null}
             onSelectImage={(id) => setSelectedImageId(id)}
+            onDownloadImage={handleDownloadImage}
+            onDeleteImage={(img) => {
+              if (window.confirm(`Eliminare l'immagine "${img.fileName}"?`)) {
+                apiRequest(`/api/images/${img.id}`, { method: "DELETE" }).then(() => {
+                  setImages((prev) => prev.filter((i) => i.id !== img.id));
+                  setFeedback({ tone: "success", message: "Immagine eliminata." });
+                });
+              }
+            }}
+            onCopyPrompt={handleCopyPrompt}
           />
         </div>
       </div>
@@ -790,6 +1047,7 @@ export function ImagesSection() {
         onSaveSettings={handleSaveSettings}
         onAskConsent={(modelId) => setPendingConsentModelId(modelId)}
         onDeleteModel={handleDeleteModel}
+        onDeleteCatalogModel={handleDeleteCatalogModel}
         onUpsertCatalogModel={handleUpsertCatalogModel}
       />
 

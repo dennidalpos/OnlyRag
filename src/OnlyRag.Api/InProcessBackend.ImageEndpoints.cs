@@ -67,11 +67,17 @@ public static partial class InProcessBackend
         app.MapDelete("/api/images/models/catalog/{modelId}", async (
             string modelId,
             ImageModelCatalogStore modelCatalog,
+            ImageModelManager models,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                return Results.Ok(await modelCatalog.ResetOrDeleteAsync(modelId, cancellationToken));
+                await models.DeleteAsync(modelId, cancellationToken);
+                ImageModelCatalogEntry? catalogEntry = await modelCatalog.ResetOrDeleteAsync(modelId, cancellationToken);
+                return Results.Ok(new ImageModelDownloadResponse(
+                    modelId,
+                    catalogEntry is not null ? "ResetToDefault" : "RemovedFromCatalog",
+                    catalogEntry is not null ? "Profilo integrato ripristinato ai valori predefiniti." : "Modello rimosso dal catalogo."));
             }
             catch (ImageGenerationException ex)
             {
@@ -211,11 +217,9 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             string prompt = request.Prompt?.Trim() ?? string.Empty;
-            string sourceLang = (request.SourceLanguage ?? "en").Trim().ToLowerInvariant();
-
-            if (string.IsNullOrWhiteSpace(prompt) || sourceLang is "en" or "english")
+            if (string.IsNullOrWhiteSpace(prompt))
             {
-                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en"));
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en", WasTranslated: false));
             }
 
             try
@@ -224,7 +228,7 @@ public static partial class InProcessBackend
                 string modelName = settings.DefaultChatModel ?? "qwen2.5:1.5b";
 
                 IReadOnlyList<OllamaChatMessage> messages = [
-                    new OllamaChatMessage("system", "You are an expert translator for Stable Diffusion / SDXL text-to-image prompts. Translate the user's prompt into descriptive, natural English text suitable for AI image generation. Output ONLY the English translation without quotes or preamble."),
+                    new OllamaChatMessage("system", "You are an expert image prompt language detector and translator for Stable Diffusion / SDXL. Detect the language of the prompt. If it is NOT in English, translate it into descriptive, natural English text suitable for AI image generation. If it is already in English, return it as is. Output ONLY the final English translation without quotes or preamble."),
                     new OllamaChatMessage("user", prompt)
                 ];
 
@@ -235,12 +239,13 @@ public static partial class InProcessBackend
                     cleaned = prompt;
                 }
 
-                return Results.Ok(new ImagePromptTranslationResponse(prompt, cleaned, "en"));
+                bool wasTranslated = !string.Equals(prompt, cleaned, StringComparison.OrdinalIgnoreCase);
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, cleaned, "en", WasTranslated: wasTranslated));
             }
             catch
             {
                 // Fallback gracefully if Ollama is not configured or fails
-                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en"));
+                return Results.Ok(new ImagePromptTranslationResponse(prompt, prompt, "en", WasTranslated: false));
             }
         });
     }

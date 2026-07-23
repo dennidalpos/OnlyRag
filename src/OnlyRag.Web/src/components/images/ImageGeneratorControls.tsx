@@ -1,20 +1,16 @@
 import type { FormEvent } from "react";
+import type { ImageModelCatalogEntry } from "../../api";
 import {
   generationProfiles,
+  getCompatiblePresets,
   imageTooltips,
-  minSizePresets,
-  promptLanguages,
-  socialSizePresets,
-  standardSizePresets,
-  type GenerationProfile,
-  type PromptLanguage
+  type GenerationProfile
 } from "./imageTypes";
 
 type ImageGeneratorControlsProps = {
+  selectedModel: ImageModelCatalogEntry | null;
   prompt: string;
   onPromptChange: (value: string) => void;
-  promptLanguage: PromptLanguage;
-  onPromptLanguageChange: (lang: PromptLanguage) => void;
   negativePrompt: string;
   onNegativePromptChange: (value: string) => void;
   width: number;
@@ -34,10 +30,9 @@ type ImageGeneratorControlsProps = {
 };
 
 export function ImageGeneratorControls({
+  selectedModel,
   prompt,
   onPromptChange,
-  promptLanguage,
-  onPromptLanguageChange,
   negativePrompt,
   onNegativePromptChange,
   width,
@@ -55,96 +50,59 @@ export function ImageGeneratorControls({
   isGenerating,
   onGenerate
 }: ImageGeneratorControlsProps) {
+  const compatiblePresets = getCompatiblePresets(selectedModel);
+
   return (
     <div className="images-controls-panel">
       <h3>Crea immagine</h3>
       <form onSubmit={onGenerate} className="images-form">
-        <div className="settings-grid settings-grid--two">
-          <label className="field-group" htmlFor="prompt-language">
-            <span>Lingua Prompt</span>
-            <select
-              id="prompt-language"
-              value={promptLanguage}
-              onChange={(e) => onPromptLanguageChange(e.target.value as PromptLanguage)}
-              title="Seleziona la lingua con cui scrivi il prompt. Se diversa da Inglese, verrà tradotto automaticamente."
-            >
-              {promptLanguages.map((lang) => (
-                <option key={lang.value} value={lang.value}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        {/* Quality Preset Buttons */}
+        <div className="field-group">
+          <span>Preset Qualità</span>
+          <div className="preset-buttons-row" style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+            {generationProfiles.map((prof) => {
+              const isActive = generationProfile === prof.value;
+              return (
+                <button
+                  type="button"
+                  key={prof.value}
+                  className={`button-secondary ${isActive ? "button-secondary--active" : ""}`}
+                  aria-pressed={isActive}
+                  onClick={() => onGenerationProfileChange(prof.value as GenerationProfile)}
+                >
+                  {prof.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
+        {/* Prompt Input */}
         <label className="field-group" htmlFor="image-prompt">
-          <span>Prompt {promptLanguage !== "en" ? "(Verrà tradotto in Inglese)" : ""}</span>
+          <span>Prompt</span>
           <textarea
             id="image-prompt"
             rows={3}
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
-            placeholder={
-              promptLanguage === "it"
-                ? "Un astronauta a cavallo di un cavallo dorato, stile cyberpunk..."
-                : "An astronaut riding a golden horse, cyberpunk style..."
-            }
+            placeholder="Descrivi l'immagine da creare (es: Un astronauta su Marte, stile fotorealistico, luci cinematografiche...)"
             required
           />
         </label>
-        <small className="image-prompt-hint">
-          {promptLanguage !== "en"
-            ? "🌐 Traduzione automatica attiva: il prompt verrà convertito in inglese prima della generazione."
-            : "💡 I modelli SDXL generano i migliori risultati con prompt in inglese."}
+        <small className="image-prompt-hint" style={{ color: "var(--color-text-muted, #94a3b8)", fontSize: "12px", display: "block", marginBottom: "12px" }}>
+          🌐 <strong>Auto-Rilevamento Lingua:</strong> Scrivi in italiano o qualsiasi altra lingua. Il prompt verrà tradotto automaticamente in inglese ottimizzato prima della generazione.
         </small>
 
+        {/* Resolution Preset */}
         <div className="field-group">
           <span>Preset Risoluzione</span>
-          
-          <div className="resolution-category">
-            <span className="resolution-category__title">⚡ Minima / Veloce</span>
-            <div className="preset-buttons-row">
-              {minSizePresets.map((preset) => {
-                const isActive = width === preset.width && height === preset.height;
-                return (
-                  <button
-                    type="button"
-                    key={preset.label}
-                    className={`button-secondary ${isActive ? "button-secondary--active" : ""}`}
-                    aria-pressed={isActive}
-                    onClick={() => onSizeChange(preset.width, preset.height)}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           <div className="resolution-category">
-            <span className="resolution-category__title">🖼️ Standard SDXL</span>
+            <span className="resolution-category__title">
+              🖼️ Formati supportati dal modello {selectedModel ? `(${selectedModel.displayName})` : ""}
+            </span>
             <div className="preset-buttons-row">
-              {standardSizePresets.map((preset) => {
-                const isActive = width === preset.width && height === preset.height;
-                return (
-                  <button
-                    type="button"
-                    key={preset.label}
-                    className={`button-secondary ${isActive ? "button-secondary--active" : ""}`}
-                    aria-pressed={isActive}
-                    onClick={() => onSizeChange(preset.width, preset.height)}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="resolution-category">
-            <span className="resolution-category__title">📱 Formati Social Media</span>
-            <div className="preset-buttons-row">
-              {socialSizePresets.map((preset) => {
+              {compatiblePresets.map((preset) => {
                 const isActive = width === preset.width && height === preset.height;
                 return (
                   <button
@@ -189,8 +147,9 @@ export function ImageGeneratorControls({
           </div>
         </div>
 
+        {/* Advanced Options */}
         <details className="image-advanced-options">
-          <summary>⚙️ Impostazioni avanzate</summary>
+          <summary>⚙️ Impostazioni avanzate ({steps} step · guidance {guidanceScale || "default"})</summary>
           <div className="image-advanced-options__content">
             <label className="field-group" htmlFor="image-negative-prompt">
               <span>Prompt negativo</span>
@@ -204,21 +163,6 @@ export function ImageGeneratorControls({
             </label>
 
             <div className="settings-grid settings-grid--two">
-              <label className="field-group" htmlFor="image-profile">
-                <span>Profilo</span>
-                <select
-                  id="image-profile"
-                  value={generationProfile}
-                  onChange={(e) => onGenerationProfileChange(e.target.value as GenerationProfile)}
-                >
-                  {generationProfiles.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <label className="field-group" htmlFor="image-steps">
                 <span>Step ({steps})</span>
                 <input
@@ -228,6 +172,17 @@ export function ImageGeneratorControls({
                   max={60}
                   value={steps}
                   onChange={(e) => onStepsChange(Number(e.target.value))}
+                />
+              </label>
+
+              <label className="field-group" htmlFor="image-guidance">
+                <span>Guidance Scale</span>
+                <input
+                  id="image-guidance"
+                  inputMode="decimal"
+                  value={guidanceScale}
+                  onChange={(e) => onGuidanceScaleChange(e.target.value)}
+                  placeholder="Default modello"
                 />
               </label>
             </div>
@@ -241,17 +196,6 @@ export function ImageGeneratorControls({
                   value={seed}
                   onChange={(e) => onSeedChange(e.target.value)}
                   placeholder="Casuale"
-                />
-              </label>
-
-              <label className="field-group" htmlFor="image-guidance">
-                <span>Guidance Scale</span>
-                <input
-                  id="image-guidance"
-                  inputMode="decimal"
-                  value={guidanceScale}
-                  onChange={(e) => onGuidanceScaleChange(e.target.value)}
-                  placeholder="Default modello"
                 />
               </label>
             </div>

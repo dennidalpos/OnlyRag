@@ -62,7 +62,7 @@ public sealed class ImageModelCatalogStore
         return normalized;
     }
 
-    public async Task<ImageModelCatalogEntry> ResetOrDeleteAsync(
+    public async Task<ImageModelCatalogEntry?> ResetOrDeleteAsync(
         string modelId,
         CancellationToken cancellationToken = default)
     {
@@ -76,10 +76,7 @@ public sealed class ImageModelCatalogStore
         }
 
         await SaveAsync(saved, cancellationToken);
-        return ImageModelCatalog.GetDefault(modelId)
-            ?? throw new ImageGenerationException(
-                ImageGenerationErrorKind.NotFound,
-                "Modello immagini rimosso dal catalogo.");
+        return ImageModelCatalog.GetDefault(modelId);
     }
 
     private async Task<List<ImageModelCatalogEntry>> ReadSavedAsync(CancellationToken cancellationToken)

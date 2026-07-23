@@ -70,6 +70,21 @@ export type ImageModelDownloadResponse = {
   message: string;
 };
 
+export type ImageModelUrlVerificationRequest = {
+  url: string;
+};
+
+export type ImageModelUrlVerificationResponse = {
+  isValid: boolean;
+  message: string;
+  repositoryId: string | null;
+  foundFiles: string[];
+  missingFiles: string[];
+  totalSizeBytes: number;
+  suggestedDisplayName: string;
+  suggestedRequiredFiles: string[];
+};
+
 export type ImageGenerationRequest = {
   prompt: string;
   negativePrompt: string | null;
@@ -103,4 +118,11 @@ export type GeneratedImage = {
   mimeType: string;
   fileSizeBytes: number;
   createdAtUtc: string;
+};
+
+export type ImagePromptTranslationResponse = {
+  originalPrompt: string;
+  translatedPrompt: string;
+  targetLanguage: string;
+  wasTranslated: boolean;
 };

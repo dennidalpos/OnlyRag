@@ -188,19 +188,21 @@ Be factual and concise. Do not claim production readiness unless relevant checks
 
 ## 13. Project Skills (`skills/`)
 
-The repository maintains project-specific skills under the `skills/` directory in the repository root. Each skill provides technical guidelines, official documentation references, and operational commands for a specific domain area:
+The repository maintains project-specific skills under the `skills/` directory in the repository root for portability across different development environments and PCs. Each skill provides technical guidelines, official documentation references, operational commands, and architectural standards for a specific domain area:
 
-- [`skills/onlyrag`](skills/onlyrag/SKILL.md): Primary project architecture, scripts, workflow commands, local app data paths, and gate verification.
+- [`skills/onlyrag`](skills/onlyrag/SKILL.md): Primary project architecture, scripts inventory, workflow commands, local app data paths, and gate verification.
 - [`skills/dotnet-wpf-minimal-api`](skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop bridge, SQLite storage, and xUnit testing.
 - [`skills/react-vite-frontend`](skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, and Playwright UI tests.
-- [`skills/rag-vector-retrieval`](skills/rag-vector-retrieval/SKILL.md): Local RAG architecture, SQLite FTS5 keyword indexing, Qdrant vector database, Ollama embeddings/chat, document parsing, and retrieval evaluation metrics.
+- [`skills/rag-vector-retrieval`](skills/rag-vector-retrieval/SKILL.md): Local RAG 2.0 architecture, SQLite FTS5 keyword indexing, Qdrant vector database, Ollama embeddings/chat, document parsing, and retrieval evaluation metrics.
 - [`skills/onnx-directml-image-gen`](skills/onnx-directml-image-gen/SKILL.md): ONNX Runtime with DirectML GPU acceleration and CPU fallback on Windows, SDXL/LCM models, Hugging Face metadata, SHA256 verification, and canvas editing.
 - [`skills/windows-packaging-signing`](skills/windows-packaging-signing/SKILL.md): NSIS packaging, `signtool.exe` signing, prerequisite checks, and release lifecycle testing.
 
 ### Agent Directives for Skills:
 
-1. **Load Skills**: When working on tasks in a specific domain area (e.g., frontend React, .NET backend, vector search, image generation, packaging), inspect and load the relevant `skills/<skill-name>/SKILL.md` instruction file.
-2. **Maintain and Update Skills**: Keep the skill files in `skills/` up to date whenever repository commands, architecture, dependencies, scripts, or official standards change.
-3. **Official Sources Only**: All skill content must rely strictly on official documentation sources (Microsoft Learn, React, Vite, SQLite, Qdrant, Ollama, ONNX Runtime, NSIS, etc.).
+1. **Load Skills at Task Start**: When working on tasks in a specific domain area (e.g., frontend React, .NET backend, vector search, image generation, packaging), inspect and load the relevant `skills/<skill-name>/SKILL.md` instruction file using `view_file`.
+2. **Maintain and Update Skills**: Continuously update and maintain the skill files under `skills/` whenever repository commands, architecture, dependencies, scripts, or official standards change.
+3. **Official Sources Only**: All skill instructions and reference links must rely strictly on official documentation sources (Microsoft Learn, React, Vite, SQLite, Qdrant, Ollama, ONNX Runtime, NSIS, etc.).
+4. **Cross-Machine Synchronization**: Ensure all skills under `skills/` remain checked into the root repository so they are immediately available on any PC or development environment.
+
 
 

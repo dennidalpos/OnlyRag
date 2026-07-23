@@ -199,39 +199,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
             Results.Ok(await settings.UpdateProcessingAsync(request, cancellationToken)));
 
-        app.MapGet("/api/settings/pdf-export", async (
-            PdfExportSettingsStore settings,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await settings.GetAsync(cancellationToken)));
-
         app.MapGet("/api/ocr/languages", () => Results.Ok(OcrLanguages.All));
-
-        app.MapPut("/api/settings/pdf-export", async (
-            PdfExportSettings request,
-            PdfExportSettingsStore settings,
-            CancellationToken cancellationToken) =>
-        {
-            try
-            {
-                return Results.Ok(await settings.UpdateAsync(request, cancellationToken));
-            }
-            catch (PdfExportConversionException ex)
-            {
-                return MapPdfExportConversionException(ex);
-            }
-        });
-
-        app.MapGet("/api/pdf-export/status", async (
-            IPdfExportConverter converter,
-            PdfExportSettingsStore settings,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await BuildPdfExportConverterStatusAsync(converter, settings, cancellationToken)));
-
-        app.MapPost("/api/pdf-export/test", async (
-            IPdfExportConverter converter,
-            PdfExportSettingsStore settings,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await BuildPdfExportConverterStatusAsync(converter, settings, cancellationToken)));
 
         app.MapGet("/api/ollama/status", async (
             IOllamaClient ollamaClient,
@@ -377,15 +345,7 @@ public static partial class InProcessBackend
                 cancellationToken));
     }
 
-    private static async Task<PdfExportConverterStatusResponse> BuildPdfExportConverterStatusAsync(
-        IPdfExportConverter converter,
-        PdfExportSettingsStore settings,
-        CancellationToken cancellationToken)
-    {
-        PdfExportSettings currentSettings = await settings.GetAsync(cancellationToken);
-        PdfExportConverterAvailability availability = await converter.CheckAvailabilityAsync(cancellationToken);
-        return CreatePdfExportConverterStatusResponse(availability, currentSettings.ConversionTimeoutSeconds);
-    }
+
 
     private static async Task<IResult> DeleteOllamaModelAsync(
         string name,

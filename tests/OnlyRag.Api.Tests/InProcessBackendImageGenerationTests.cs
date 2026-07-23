@@ -22,7 +22,7 @@ public sealed partial class InProcessBackendTests
         ImageModelLocalState[]? states = await httpClient.GetFromJsonAsync<ImageModelLocalState[]>("/api/images/models", JsonOptions);
 
         Assert.NotNull(catalog);
-        Assert.Single(catalog);
+        Assert.True(catalog.Length >= 3);
         ImageModelCatalogEntry model = Assert.Single(catalog, candidate => candidate.Id == ImageModelCatalog.DefaultModelId);
         Assert.Equal(ImageModelCatalog.DefaultModelId, model.Id);
         Assert.True(model.IsBuiltIn);

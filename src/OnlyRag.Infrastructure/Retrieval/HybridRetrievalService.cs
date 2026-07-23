@@ -99,10 +99,24 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             options.VectorTopK,
             cancellationToken);
 
-        // 4. 2nd-Stage Re-ranking (Cross-Encoder)
-        List<ReRankCandidate> candidates = coarseResults
-            .Select(r => new ReRankCandidate(r.ChunkId, r.Snippet))
-            .ToList();
+        // 4. Bulk fetch chunks & Parent-Child resolution BEFORE 2nd-Stage Re-ranking
+        long[] coarseChunkIds = coarseResults.Select(r => r.ChunkId).ToArray();
+        IReadOnlyDictionary<long, SearchChunk> rawChunkMap = await chunks.GetChunksAsync(coarseChunkIds, cancellationToken);
+
+        Dictionary<long, SearchChunk> resolvedChunkMap = new();
+        List<ReRankCandidate> candidates = new();
+
+        foreach (DocumentSearchResult coarse in coarseResults)
+        {
+            SearchChunk? rawChunk = rawChunkMap.TryGetValue(coarse.ChunkId, out SearchChunk? c) ? c : null;
+            SearchChunk? resolved = rawChunk is not null ? parentChildResolver.Resolve(rawChunk) : null;
+            if (resolved is not null)
+            {
+                resolvedChunkMap[coarse.ChunkId] = resolved;
+            }
+            string textToRank = resolved?.ParentContent ?? coarse.Snippet;
+            candidates.Add(new ReRankCandidate(coarse.ChunkId, textToRank));
+        }
 
         IReadOnlyList<ReRankResult> reRankedScores = await reRanker.ReRankAsync(query, candidates, cancellationToken);
         Dictionary<long, double> scoreMap = reRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
@@ -111,8 +125,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         foreach (DocumentSearchResult coarse in coarseResults)
         {
             double reRankScore = scoreMap.TryGetValue(coarse.ChunkId, out double score) ? score : coarse.Score;
-            SearchChunk? rawChunk = (await chunks.GetChunksAsync([coarse.ChunkId], cancellationToken)).Values.FirstOrDefault();
-            SearchChunk resolved = rawChunk is not null ? parentChildResolver.Resolve(rawChunk) : null!;
+            SearchChunk? resolved = resolvedChunkMap.TryGetValue(coarse.ChunkId, out SearchChunk? r) ? r : null;
 
             finalResults.Add(coarse with
             {

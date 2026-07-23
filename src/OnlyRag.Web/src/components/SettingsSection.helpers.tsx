@@ -47,11 +47,13 @@ export function normalizeOllamaSettings(settings: OllamaSettings): OllamaSetting
     defaultChatModel: normalizeOptionalValue(settings.defaultChatModel),
     defaultEmbeddingModel: normalizeOptionalValue(settings.defaultEmbeddingModel),
     defaultTranslationModel: normalizeOptionalValue(settings.defaultTranslationModel),
+    defaultCodingModel: normalizeOptionalValue(settings.defaultCodingModel ?? null),
     requestTimeoutSeconds: Number(settings.requestTimeoutSeconds),
     embeddingBatchSize: Number(settings.embeddingBatchSize),
     embeddingNumCtx: settings.embeddingNumCtx != null ? Number(settings.embeddingNumCtx) : null,
     chatNumCtx: settings.chatNumCtx != null ? Number(settings.chatNumCtx) : null,
     translationNumCtx: settings.translationNumCtx != null ? Number(settings.translationNumCtx) : null,
+    codingNumCtx: settings.codingNumCtx != null ? Number(settings.codingNumCtx) : null,
     trustNonLocalEndpoint: isNonLocalUrl(ollamaBaseUrl) && Boolean(settings.trustNonLocalEndpoint)
   };
 }

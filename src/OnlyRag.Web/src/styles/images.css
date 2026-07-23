@@ -322,6 +322,7 @@
   line-height: 1.1;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.72);
   cursor: move;
+  touch-action: none;
   overflow-wrap: anywhere;
 }
 

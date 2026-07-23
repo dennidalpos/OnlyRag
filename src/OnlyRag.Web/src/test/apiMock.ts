@@ -63,6 +63,16 @@ function jsonResponse(body: unknown, status: number, extraHeaders: Record<string
     return new Response(null, { status, headers: extraHeaders });
   }
 
+  if (typeof body === "string") {
+    return new Response(body, {
+      status,
+      headers: {
+        "Content-Type": "text/event-stream",
+        ...extraHeaders
+      }
+    });
+  }
+
   return new Response(JSON.stringify(body ?? null), {
     status,
     headers: {

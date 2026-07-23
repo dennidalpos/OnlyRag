@@ -5,9 +5,11 @@ export type OllamaSettings = {
   defaultTranslationModel: string | null;
   requestTimeoutSeconds: number;
   embeddingBatchSize: number;
+  defaultCodingModel: string | null;
   embeddingNumCtx: number | null;
   chatNumCtx: number | null;
   translationNumCtx: number | null;
+  codingNumCtx: number | null;
   trustNonLocalEndpoint: boolean;
 };
 
