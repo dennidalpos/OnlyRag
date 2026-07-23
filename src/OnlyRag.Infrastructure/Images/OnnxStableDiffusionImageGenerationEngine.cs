@@ -63,9 +63,12 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
                 catch (Exception cpuEx) when (IsRecoverableProviderException(cpuEx))
                 {
                     SetStatus(CpuProvider, reason);
+                    string detailedMessage = cpuEx.Message.Contains("com.microsoft", StringComparison.OrdinalIgnoreCase)
+                        ? $"DirectML non disponibile e fallback CPU non riuscito: Il modello ONNX (Olive DirectML) richiede accelerazione GPU DirectML. Operatore non supportato su CPU ({cpuEx.Message})."
+                        : $"DirectML non disponibile e fallback CPU non riuscito: {cpuEx.Message}";
                     throw new ImageGenerationException(
                         ImageGenerationErrorKind.InvalidConfiguration,
-                        $"DirectML non disponibile e fallback CPU non riuscito: {cpuEx.Message}",
+                        detailedMessage,
                         cpuEx);
                 }
             }
