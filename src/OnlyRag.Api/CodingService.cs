@@ -157,15 +157,17 @@ internal sealed class CodingService
         string systemInstruction;
         if (isPlanMode)
         {
-            systemInstruction = "Sei un Senior Software Architect e Code Planner in modalità PIANO / LETTURA (Antigravity Plan Mode). " +
+            systemInstruction = "Sei un Senior Software Architect e Code Planner in Modalità PIANO / LETTURA. " +
                 "Il tuo compito è analizzare la richiesta dell'utente, la struttura del progetto e i file forniti. " +
                 "Fornisci una risposta ben strutturata in markdown con: 1) Analisi dei Requisiti & Architettura, 2) Piano di Implementazione passo-passo, 3) File impattati e dipendenze, 4) Raccomandazioni e pseudocodice di riferimento.";
         }
         else
         {
             systemInstruction = $"{personaPrompt}\nLinguaggio target: {language}. " +
-                "Rispondi fornendo il codice completo e funzionante racchiuso in blocchi di codice markdown con la relativa sintassi. " +
-                "Indica 'Target File: [percorso]' se stai proponendo una modifica a un file specifico, seguito da una breve spiegazione architetturale.";
+                "Sei in Modalità SCRITTURA. Rispondi fornendo il codice completo e funzionante racchiuso in blocchi di codice markdown. " +
+                "Per ogni file da creare o modificare, specifica prima del blocco di codice: 'Target File: [percorso relativo]'. " +
+                "Se la richiesta riguarda l'eliminazione di un file, indica: 'ACTION: DELETE [percorso relativo]'. " +
+                "Se l'utente ti chiede di compilare o avviare l'applicazione, indica espressamente il comando con: 'COMMAND: [comando di build/run]'.";
         }
 
         var messages = new List<OllamaChatMessage>
@@ -175,7 +177,7 @@ internal sealed class CodingService
 
         if (!string.IsNullOrWhiteSpace(request.WorkspaceSummary))
         {
-            messages.Add(new("user", $"[INDICE E STRUTTURA DEL PROGETTO WORKSPACE (Antigravity Index)]\n{request.WorkspaceSummary}"));
+            messages.Add(new("user", $"[INDICE E STRUTTURA DEL PROGETTO WORKSPACE]\n{request.WorkspaceSummary}"));
         }
 
         if (!string.IsNullOrWhiteSpace(request.CodeContext))

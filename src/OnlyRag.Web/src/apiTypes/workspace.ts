@@ -45,7 +45,30 @@ export type OpenExternalFileRequest = {
   path: string;
 };
 
+export type DeleteWorkspaceFileRequest = {
+  relativePath: string;
+};
+
+export type DeleteWorkspaceFileResponse = {
+  relativePath: string;
+  success: boolean;
+  message: string;
+};
+
+export type ExecuteWorkspaceCommandRequest = {
+  command: string;
+  arguments?: string | null;
+};
+
+export type ExecuteWorkspaceCommandResponse = {
+  success: boolean;
+  exitCode: number;
+  output: string;
+  error: string;
+};
+
 export type PickWorkspaceFolderResponse = WorkspaceConfig & {
   cancelled?: boolean;
 };
+
 

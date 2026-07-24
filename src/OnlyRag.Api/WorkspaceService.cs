@@ -215,6 +215,75 @@ internal sealed class WorkspaceService
         return true;
     }
 
+    public async Task<DeleteWorkspaceFileResponse> DeleteFileAsync(DeleteWorkspaceFileRequest request, CancellationToken cancellationToken = default)
+    {
+        string safePath = await ResolveSafePathAsync(request.RelativePath, cancellationToken);
+        if (File.Exists(safePath))
+        {
+            File.Delete(safePath);
+            return new DeleteWorkspaceFileResponse(
+                RelativePath: request.RelativePath,
+                Success: true,
+                Message: $"File eliminato dal workspace ({request.RelativePath}).");
+        }
+        else if (Directory.Exists(safePath))
+        {
+            Directory.Delete(safePath, true);
+            return new DeleteWorkspaceFileResponse(
+                RelativePath: request.RelativePath,
+                Success: true,
+                Message: $"Cartella eliminata dal workspace ({request.RelativePath}).");
+        }
+
+        return new DeleteWorkspaceFileResponse(
+            RelativePath: request.RelativePath,
+            Success: false,
+            Message: $"Elemento non trovato nel workspace ({request.RelativePath}).");
+    }
+
+    public async Task<ExecuteWorkspaceCommandResponse> ExecuteCommandAsync(ExecuteWorkspaceCommandRequest request, CancellationToken cancellationToken = default)
+    {
+        WorkspaceConfig config = await GetConfigAsync(cancellationToken);
+        if (!config.IsAuthorized || string.IsNullOrWhiteSpace(config.RootPath) || !Directory.Exists(config.RootPath))
+        {
+            throw new InvalidOperationException("Nessun workspace di progetto autorizzato sul sistema per l'esecuzione di comandi.");
+        }
+
+        string cmd = (request.Command ?? "").Trim();
+        string args = (request.Arguments ?? "").Trim();
+        string fullCommandLine = string.IsNullOrWhiteSpace(args) ? cmd : $"{cmd} {args}";
+
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -NonInteractive -Command \"{fullCommandLine.Replace("\"", "\\\"")}\"",
+            WorkingDirectory = config.RootPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        using var process = new System.Diagnostics.Process { StartInfo = psi };
+        process.Start();
+
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+        await Task.WhenAll(outputTask, errorTask);
+        await process.WaitForExitAsync(cancellationToken);
+
+        string output = await outputTask;
+        string error = await errorTask;
+
+        return new ExecuteWorkspaceCommandResponse(
+            Success: process.ExitCode == 0,
+            ExitCode: process.ExitCode,
+            Output: output,
+            Error: error);
+    }
+
+
 
     private async Task<string> ResolveSafePathAsync(string relativePath, CancellationToken cancellationToken)
     {

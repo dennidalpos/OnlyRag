@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Infrastructure.Agent;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
@@ -118,6 +119,9 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ChatService>();
         services.AddSingleton<CodingService>();
         services.AddSingleton<WorkspaceService>();
+        services.AddSingleton<BackgroundTaskManager>();
+        services.AddSingleton<WorkspaceToolExecutor>();
+        services.AddSingleton<AgentLoopEngine>();
         return services;
     }
 

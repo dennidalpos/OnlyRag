@@ -2,28 +2,29 @@
 .settings-card {
   min-width: 0;
   display: grid;
-  gap: 7px;
-  padding: 12px;
-  border: 2px solid #cbd8e4;
-  border-radius: 8px;
-  background: #fbfdff;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04);
 }
 
 .settings-list {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 12px;
 }
 
 .settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 12px;
 }
 
 .settings-layout {
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 16px;
 }
 
 .settings-copy {
@@ -41,20 +42,20 @@
 .settings-section {
   min-width: 0;
   display: grid;
-  gap: 7px;
+  gap: 10px;
 }
 
 .settings-section > h3 {
   margin: 0;
-  color: #172033;
-  font-size: 15px;
+  color: var(--text-main);
+  font-size: 16px;
   font-weight: 750;
 }
 
 .settings-section__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
-  gap: 9px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -63,14 +64,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
 .settings-card__header h2,
 .settings-card__header h3 {
   margin: 0;
-  color: #172033;
-  font-size: 15px;
+  color: var(--text-main);
+  font-size: 16px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,23 +87,23 @@
 
 .settings-form {
   display: grid;
-  gap: 7px;
+  gap: 10px;
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 10px;
 }
 
 .field-group {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
 .field-group span {
-  color: #425066;
+  color: var(--text-main);
   font-size: 13px;
   font-weight: 650;
 }
@@ -111,19 +112,21 @@
 .field-group select,
 .field-group textarea {
   width: 100%;
-  min-height: 32px;
-  padding: 6px 8px;
-  border: 1px solid #cfd8e2;
-  border-radius: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: #ffffff;
-  color: #172033;
+  color: var(--text-main);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .field-group input:focus,
 .field-group select:focus,
 .field-group textarea:focus {
-  outline: 2px solid #2d6f8f;
-  border-color: #2d6f8f;
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 .field-group textarea {
@@ -133,13 +136,13 @@
 .ocr-field-label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
 .field-group .ocr-field-label,
 .field-group .ocr-field-label span {
-  color: #425066;
+  color: var(--text-main);
   font-size: 13px;
   font-weight: 650;
 }
@@ -148,12 +151,12 @@
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #cfd8e2;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-light);
   border-radius: 50%;
-  background: #f7f9fb;
-  color: #2d6f8f;
+  background: #f8fafc;
+  color: var(--primary);
   cursor: help;
   font-size: 12px;
   line-height: 1;
@@ -161,12 +164,12 @@
 
 .ocr-range-field {
   align-content: start;
-  gap: 5px;
+  gap: 6px;
 }
 
 .settings-range-field {
   align-content: start;
-  gap: 5px;
+  gap: 6px;
 }
 
 .field-group .settings-range-field__value {
@@ -176,11 +179,11 @@
   gap: 6px;
   justify-self: start;
   max-width: 100%;
-  padding: 2px 6px;
-  border: 1px solid #d9e0e8;
-  border-radius: 6px;
-  background: #f7f9fb;
-  color: #172033;
+  padding: 3px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  color: var(--text-main);
   font-size: 12px;
   font-weight: 700;
   overflow: hidden;
@@ -189,7 +192,7 @@
 }
 
 .field-group .settings-range-field__value small {
-  color: #627084;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 650;
 }
@@ -197,11 +200,11 @@
 .field-group .ocr-range-field__value {
   justify-self: start;
   max-width: 100%;
-  padding: 2px 6px;
-  border: 1px solid #d9e0e8;
-  border-radius: 6px;
-  background: #f7f9fb;
-  color: #172033;
+  padding: 3px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  color: var(--text-main);
   font-size: 12px;
   font-weight: 700;
   overflow: hidden;
@@ -214,7 +217,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  accent-color: #2d6f8f;
+  accent-color: var(--primary);
   cursor: pointer;
 }
 
@@ -223,7 +226,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  accent-color: #2d6f8f;
+  accent-color: var(--primary);
   cursor: pointer;
 }
 
@@ -233,13 +236,13 @@
 }
 
 .ocr-range-field input[type="range"]:focus {
-  outline: 2px solid #2d6f8f;
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
   border-color: transparent;
 }
 
 .settings-range-field input[type="range"]:focus {
-  outline: 2px solid #2d6f8f;
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
   border-color: transparent;
 }
@@ -251,7 +254,7 @@
 }
 
 .field-group .ocr-range-field__scale span {
-  color: #627084;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 650;
 }

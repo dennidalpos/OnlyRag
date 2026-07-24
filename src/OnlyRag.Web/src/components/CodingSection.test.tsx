@@ -29,12 +29,12 @@ describe("CodingSection", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: /Coding & Vibe Hub/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sfoglia Cartella \(Windows\)/i })).toBeInTheDocument();
-    expect(screen.getByText(/🎨 Audit UI\/UX/i)).toBeInTheDocument();
-    expect(screen.getByText(/⚙️ Audit Pipeline/i)).toBeInTheDocument();
-    expect(screen.getByText(/📚 Audit Documentazione/i)).toBeInTheDocument();
-    expect(screen.getByText(/🛠️ Audit Script Build \/ Package/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /Coding & Vibe Hub/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sfoglia Cartella/i })).toBeInTheDocument();
+    expect(screen.getByText(/Audit UI\/UX/i)).toBeInTheDocument();
+    expect(screen.getByText(/Audit Flussi & Logica/i)).toBeInTheDocument();
+    expect(screen.getByText(/Audit Documentazione/i)).toBeInTheDocument();
+    expect(screen.getByText(/Audit Build & Pacchetti/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /📖 Lettura \/ Piano/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✍️ Scrittura/i })).toBeInTheDocument();
   });

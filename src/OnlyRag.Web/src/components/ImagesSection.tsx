@@ -31,7 +31,6 @@ import {
   type Feedback,
   type GenerationProfile,
   type ImageEditState,
-  type PromptLanguage,
   type TextLayer
 } from "./images/imageTypes";
 import { ProgressBar } from "./ProgressBar";

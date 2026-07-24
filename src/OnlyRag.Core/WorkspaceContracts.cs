@@ -39,3 +39,22 @@ public sealed record WriteWorkspaceFileResponse(
 public sealed record OpenExternalFileRequest(
     string Path);
 
+public sealed record DeleteWorkspaceFileRequest(
+    string RelativePath);
+
+public sealed record DeleteWorkspaceFileResponse(
+    string RelativePath,
+    bool Success,
+    string Message);
+
+public sealed record ExecuteWorkspaceCommandRequest(
+    string Command,
+    string? Arguments = null);
+
+public sealed record ExecuteWorkspaceCommandResponse(
+    bool Success,
+    int ExitCode,
+    string Output,
+    string Error);
+
+

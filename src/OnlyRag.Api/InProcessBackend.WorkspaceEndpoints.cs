@@ -122,6 +122,37 @@ internal static class WorkspaceEndpoints
                 return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         });
+
+        group.MapPost("/delete-file", async (DeleteWorkspaceFileRequest request, WorkspaceService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await service.DeleteFileAsync(request, ct);
+                return Results.Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        });
+
+        group.MapPost("/execute-command", async (ExecuteWorkspaceCommandRequest request, WorkspaceService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await service.ExecuteCommandAsync(request, ct);
+                return Results.Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        });
     }
 }
+
 

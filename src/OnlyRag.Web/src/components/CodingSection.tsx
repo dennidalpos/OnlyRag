@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { apiRequest, apiStreamRequest, type OllamaModel } from "../api";
 import type {
   CodingTaskRequest,
+  DeleteWorkspaceFileRequest,
+  DeleteWorkspaceFileResponse,
+  ExecuteWorkspaceCommandRequest,
+  ExecuteWorkspaceCommandResponse,
   OpenExternalFileRequest,
   PickWorkspaceFolderResponse,
   ReadWorkspaceFileRequest,
@@ -21,12 +25,20 @@ import {
 } from "./CodingSection.storage";
 import { AttachedFileEditorModal, WorkspaceFilePickerModal } from "./CodingSection.views";
 
+type FileAction = {
+  file: string;
+  action: "write" | "delete";
+  code?: string;
+  applied?: boolean;
+};
+
 type CodingMessage = {
   id: string;
   sender: "user" | "assistant";
   content: string;
   timestamp: string;
   modifiedFiles?: string[];
+  fileActions?: FileAction[];
   attachedFile?: string;
   isStreaming?: boolean;
 };
@@ -194,6 +206,80 @@ export function CodingSection({
     }
   }
 
+  async function handleApplyCodeToFileSilently(relativePath: string, content: string) {
+    try {
+      await apiRequest<WriteWorkspaceFileResponse>("/api/workspace/write-file", {
+        method: "POST",
+        body: JSON.stringify({ relativePath, content } as WriteWorkspaceFileRequest)
+      });
+    } catch {
+      // Ignorato
+    }
+  }
+
+  async function handleDeleteWorkspaceFileSilently(relativePath: string) {
+    try {
+      await apiRequest<DeleteWorkspaceFileResponse>("/api/workspace/delete-file", {
+        method: "POST",
+        body: JSON.stringify({ relativePath } as DeleteWorkspaceFileRequest)
+      });
+    } catch {
+      // Ignorato
+    }
+  }
+
+  async function handleApplyCodeToFile(relativePath: string, content: string) {
+    try {
+      const res = await apiRequest<WriteWorkspaceFileResponse>("/api/workspace/write-file", {
+        method: "POST",
+        body: JSON.stringify({ relativePath, content } as WriteWorkspaceFileRequest)
+      });
+      setWorkspaceStatusMessage(res.message);
+      void fetchWorkspaceFiles();
+    } catch (err) {
+      setWorkspaceStatusMessage(err instanceof Error ? err.message : "Errore durante il salvataggio su disco.");
+    }
+  }
+
+  async function handleDeleteWorkspaceFile(relativePath: string) {
+    try {
+      const res = await apiRequest<DeleteWorkspaceFileResponse>("/api/workspace/delete-file", {
+        method: "POST",
+        body: JSON.stringify({ relativePath } as DeleteWorkspaceFileRequest)
+      });
+      setWorkspaceStatusMessage(res.message);
+      void fetchWorkspaceFiles();
+    } catch (err) {
+      setWorkspaceStatusMessage(err instanceof Error ? err.message : "Errore durante l'eliminazione del file.");
+    }
+  }
+
+  async function handleExecuteWorkspaceCommand(cmdToRun?: string) {
+    const cmd = cmdToRun || "dotnet build";
+    setWorkspaceStatusMessage(`Esecuzione comando nel workspace: ${cmd}...`);
+    try {
+      const res = await apiRequest<ExecuteWorkspaceCommandResponse>("/api/workspace/execute-command", {
+        method: "POST",
+        body: JSON.stringify({ command: cmd } as ExecuteWorkspaceCommandRequest)
+      });
+
+      const logMsg = `💻 **Esecuzione Comando**: \`${cmd}\`\n\n${res.success ? "✅ Esecuzione completata con successo (Exit 0)" : `❌ Esecuzione terminata con errore (Exit ${res.exitCode})`}\n\n\`\`\`text\n${res.output || res.error || "Nessun output restituito dal processo."}\n\`\`\``;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `cmd_${Date.now()}`,
+          sender: "assistant",
+          content: logMsg,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        }
+      ]);
+      setWorkspaceStatusMessage(res.success ? `Comando eseguito con successo (${cmd})` : `Comando completato con errore (${cmd})`);
+    } catch (err) {
+      setWorkspaceStatusMessage(err instanceof Error ? err.message : "Errore durante l'esecuzione del comando.");
+    }
+  }
+
   function handleAddPreset() {
     if (!newPresetTitle.trim() || !newPresetPrompt.trim()) return;
     const updated = saveCustomPreset({
@@ -221,19 +307,37 @@ export function CodingSection({
     }
   }
 
-  function extractModifiedFiles(text: string): string[] {
-    const files: string[] = [];
-    const regex = /(?:Target File|File|File Modificato|Salva in|Modificato):\s*`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
+  function extractFileActionsFromResponse(text: string): FileAction[] {
+    const actions: FileAction[] = [];
+
+    const fileRegex = /(?:Target File|File|File Modificato|Salva in|Modificato):\s*`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
     let match;
-    while ((match = regex.exec(text)) !== null) {
-      if (match[1] && !files.includes(match[1])) {
-        files.push(match[1]);
+    while ((match = fileRegex.exec(text)) !== null) {
+      const filePath = match[1];
+      if (filePath && !actions.some((a) => a.file === filePath)) {
+        const afterText = text.slice(match.index);
+        const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
+        actions.push({
+          file: filePath,
+          action: "write",
+          code: codeBlockMatch ? codeBlockMatch[1].trim() : undefined
+        });
       }
     }
-    if (selectedWorkspaceFile && !files.includes(selectedWorkspaceFile)) {
-      files.push(selectedWorkspaceFile);
+
+    const deleteRegex = /ACTION:\s*DELETE\s+`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
+    let delMatch;
+    while ((delMatch = deleteRegex.exec(text)) !== null) {
+      const filePath = delMatch[1];
+      if (filePath && !actions.some((a) => a.file === filePath)) {
+        actions.push({
+          file: filePath,
+          action: "delete"
+        });
+      }
     }
-    return files;
+
+    return actions;
   }
 
   async function handleSendMessage(overridePrompt?: string) {
@@ -291,7 +395,23 @@ export function CodingSection({
         }
       );
 
-      const modified = extractModifiedFiles(fullResponseText);
+      const actions = extractFileActionsFromResponse(fullResponseText);
+      const modified = actions.map((a) => a.file);
+
+      // In Write mode, automatically apply modifications / deletions to workspace files!
+      if (operatingMode === "write" && actions.length > 0 && workspaceConfig?.isAuthorized) {
+        for (const act of actions) {
+          if (act.action === "write" && act.code) {
+            await handleApplyCodeToFileSilently(act.file, act.code);
+            act.applied = true;
+          } else if (act.action === "delete") {
+            await handleDeleteWorkspaceFileSilently(act.file);
+            act.applied = true;
+          }
+        }
+        void fetchWorkspaceFiles();
+        setWorkspaceStatusMessage(`Modifiche applicate con successo al workspace (${actions.length} file).`);
+      }
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -299,11 +419,21 @@ export function CodingSection({
             ? {
                 ...msg,
                 isStreaming: false,
-                modifiedFiles: modified.length > 0 ? modified : undefined
+                modifiedFiles: modified.length > 0 ? modified : undefined,
+                fileActions: actions.length > 0 ? actions : undefined
               }
             : msg
         )
       );
+
+      // If response includes COMMAND: or prompt asks to build/run
+      const commandMatch = /COMMAND:\s*`?([^`\r\n]+)`?/i.exec(fullResponseText);
+      const lowerPrompt = textToSend.toLowerCase();
+      if (commandMatch && commandMatch[1]) {
+        void handleExecuteWorkspaceCommand(commandMatch[1].trim());
+      } else if (lowerPrompt.includes("compila") || lowerPrompt.includes("avvia") || lowerPrompt.includes("build") || lowerPrompt.includes("run")) {
+        void handleExecuteWorkspaceCommand("dotnet build");
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Errore durante la generazione.";
       setError(errMsg);
@@ -325,17 +455,17 @@ export function CodingSection({
       <header className="coding-section__header" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="coding-section__title-group">
           <h2 style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
-            <span>⚡</span> Coding & Vibe Hub (Antigravity Mode)
+            <span>⚡</span> Coding & Vibe Hub
           </h2>
           <p className="coding-section__subtitle" style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>
-            Assistente di sviluppo locale con indicizzazione automatica del progetto, editor di file allegati e modalità Piano/Scrittura.
+            Assistente per analisi, scrittura codice, gestione file e compilazione di progetto.
           </p>
         </div>
 
         <div className="coding-section__controls" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className="model-selector-group" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label htmlFor="coding-model-select" className="field-label-inline" style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>
-              Modello LLM:
+              Modello:
             </label>
             <select
               id="coding-model-select"
@@ -381,21 +511,32 @@ export function CodingSection({
             </strong>
             <div style={{ fontSize: "0.82rem", color: "#94a3b8", marginTop: 2 }}>
               {workspaceConfig?.isAuthorized
-                ? `${workspaceConfig.fileCount} file indicizzati • I prompt analizzeranno automaticamente il contesto del progetto`
-                : "Seleziona una cartella per attivare l'analisi automatica e il riferimento ai file (stile Codex / Antigravity)."}
+                ? `${workspaceConfig.fileCount} file indicizzati nel workspace`
+                : "Seleziona una cartella per abilitare l'analisi dei file e i comandi di build."}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {workspaceConfig?.isAuthorized && (
-            <button
-              type="button"
-              className="button button--secondary button--small"
-              onClick={() => setIsWorkspaceFilePickerOpen(true)}
-            >
-              📄 Esplora File ({workspaceFiles.length})
-            </button>
+            <>
+              <button
+                type="button"
+                className="button button--secondary button--small"
+                onClick={() => setIsWorkspaceFilePickerOpen(true)}
+              >
+                📄 File ({workspaceFiles.length})
+              </button>
+              <button
+                type="button"
+                className="button button--secondary button--small"
+                style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5" }}
+                onClick={() => void handleExecuteWorkspaceCommand()}
+                title="Esegui compilazione dotnet build nella root di progetto"
+              >
+                🚀 Compila & Avvia
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -403,7 +544,7 @@ export function CodingSection({
             style={{ background: "#2563eb", borderColor: "#3b82f6" }}
             onClick={() => void handlePickWindowsFolder()}
           >
-            📂 Sfoglia Cartella (Windows)
+            📂 Sfoglia Cartella
           </button>
           <button
             type="button"
@@ -446,7 +587,7 @@ export function CodingSection({
       <div className="vibe-presets-bar" style={{ marginBottom: 14, width: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1" }}>
-            ⚡ Preset Vibe Coding & Audit Codice (Click per incollare):
+            ⚡ Preset Vibe Coding & Audit:
           </span>
           <button
             type="button"
@@ -512,7 +653,7 @@ export function CodingSection({
         </div>
       )}
 
-      {/* MAIN ANTIGRAVITY CHAT CONTAINER */}
+      {/* MAIN CHAT CONTAINER */}
       <div
         ref={chatContainerRef}
         className="vibe-chat-messages"
@@ -535,10 +676,9 @@ export function CodingSection({
         {messages.length === 0 ? (
           <div style={{ margin: "auto", textAlign: "center", color: "#64748b", maxWidth: 500 }}>
             <div style={{ fontSize: "2.8rem", marginBottom: 8 }}>🚀</div>
-            <h3 style={{ color: "#e2e8f0", marginBottom: 6 }}>Antigravity Coding Hub</h3>
+            <h3 style={{ color: "#e2e8f0", marginBottom: 6 }}>Coding & Vibe Hub</h3>
             <p style={{ fontSize: "0.9rem", lineHeight: 1.5, color: "#94a3b8" }}>
-              Usa l&apos;interruttore in basso per passare da <strong>📖 Lettura / Piano</strong> a <strong>✍️ Scrittura</strong>.<br />
-              Collega la cartella del progetto per consentire all&apos;LLM di analizzare l&apos;intero workspace.
+              Seleziona la cartella del progetto per consentire all&apos;assistente di analizzare i file, applicare modifiche ed eseguire comandi.
             </p>
           </div>
         ) : (
@@ -558,7 +698,7 @@ export function CodingSection({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6, fontSize: "0.78rem", color: "#94a3b8" }}>
-                <strong>{msg.sender === "user" ? "👤 Tu" : `🤖 Antigravity Assistant (${selectedModel})`}</strong>
+                <strong>{msg.sender === "user" ? "👤 Tu" : `🤖 Assistant (${selectedModel})`}</strong>
                 <span>{msg.timestamp}</span>
               </div>
 
@@ -573,24 +713,50 @@ export function CodingSection({
                 {msg.isStreaming && <span className="streaming-cursor">▌</span>}
               </div>
 
-              {/* MODIFIED / IMPACTED FILES LIST */}
-              {msg.modifiedFiles && msg.modifiedFiles.length > 0 && (
+              {/* FILE ACTIONS & IMPACTED FILES */}
+              {msg.fileActions && msg.fileActions.length > 0 && (
                 <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #334155" }}>
                   <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#38bdf8", marginBottom: 6 }}>
-                    🛠️ File / Artefatti Impattati (Fai click per aprire sul PC):
+                    🛠️ Operazioni File Progetto:
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {msg.modifiedFiles.map((file) => (
-                      <button
-                        key={file}
-                        type="button"
-                        className="button button--secondary button--small"
-                        style={{ background: "#0f172a", borderColor: "#0284c7", color: "#38bdf8", fontFamily: "monospace" }}
-                        onClick={() => void handleOpenExternalFile(file)}
-                        title="Apri nel programma di sistema Windows"
-                      >
-                        🔗 {file}
-                      </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {msg.fileActions.map((act) => (
+                      <div key={act.file} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0f172a", padding: "6px 10px", borderRadius: 6, border: "1px solid #334155" }}>
+                        <span style={{ fontFamily: "monospace", fontSize: "0.82rem", color: act.action === "delete" ? "#fca5a5" : "#38bdf8" }}>
+                          {act.action === "delete" ? "🗑️ DELETE" : "📝 WRITE"}: {act.file}
+                          {act.applied && <span style={{ color: "#34d399", marginLeft: 8 }}>[Applicato su Disco]</span>}
+                        </span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {act.action === "write" && act.code && (
+                            <button
+                              type="button"
+                              className="button button--secondary button--small"
+                              style={{ fontSize: "0.75rem", background: "#0284c7", borderColor: "#38bdf8", color: "#fff" }}
+                              onClick={() => void handleApplyCodeToFile(act.file, act.code!)}
+                            >
+                              💾 Salva su Disco
+                            </button>
+                          )}
+                          {act.action === "delete" && (
+                            <button
+                              type="button"
+                              className="button button--secondary button--small"
+                              style={{ fontSize: "0.75rem", background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5" }}
+                              onClick={() => void handleDeleteWorkspaceFile(act.file)}
+                            >
+                              🗑️ Elimina
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            style={{ fontSize: "0.75rem" }}
+                            onClick={() => void handleOpenExternalFile(act.file)}
+                          >
+                            🔗 Apri
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -600,7 +766,7 @@ export function CodingSection({
         )}
       </div>
 
-      {/* FULL-WIDTH PROMPT CONTAINER (MATCHES CHAT WIDTH) */}
+      {/* FULL-WIDTH PROMPT CONTAINER */}
       <div
         className="full-width-prompt-card"
         style={{
@@ -642,7 +808,7 @@ export function CodingSection({
                 className="button button--secondary button--small"
                 style={{ fontSize: "0.78rem", background: "#0284c7", borderColor: "#38bdf8", color: "#fff" }}
                 onClick={() => setIsAttachedFileEditorOpen(true)}
-                title="Apri editor per modificare o correggere il contenuto prima dell'invio"
+                title="Apri editor per modificare il contenuto"
               >
                 ✏️ Modifica File
               </button>
@@ -687,8 +853,8 @@ export function CodingSection({
           rows={3}
           placeholder={
             operatingMode === "plan"
-              ? "Modalità PIANO / LETTURA: Descrivi cosa vuoi analizzare o pianificare sul tuo progetto (es. 'Crea un piano di rifattorizzazione per la gestione del DB SQLite')..."
-              : "Modalità SCRITTURA: Inserisci le istruzioni da implementare (es. 'Aggiungi la validazione dei campi in UserForm.tsx')..."
+              ? "Modalità PIANO: Descrivi l'analisi, i flussi o l'architettura da pianificare..."
+              : "Modalità SCRITTURA: Descrivi le modifiche al codice, i file da creare/eliminare o chiedi di compilare ed avviare l'app..."
           }
           value={promptInput}
           onChange={(e) => setPromptInput(e.target.value)}
@@ -701,11 +867,11 @@ export function CodingSection({
           disabled={isGenerating}
         />
 
-        {/* PROMPT ACTION TOOLBAR (SPANNING FULL WIDTH) */}
+        {/* PROMPT ACTION TOOLBAR */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           {/* MODE TOGGLE SWITCH: LETTURA / PIANO vs SCRITTURA */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 600 }}>Modalità Antigravity:</span>
+            <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 600 }}>Modalità:</span>
             <div style={{ display: "inline-flex", background: "#090d16", padding: 3, borderRadius: 8, border: "1px solid #334155" }}>
               <button
                 type="button"
@@ -721,7 +887,7 @@ export function CodingSection({
                   transition: "all 0.15s ease"
                 }}
                 onClick={() => setOperatingMode("plan")}
-                title="Modalità Piano/Lettura: genera analisi, roadmap e consigli senza sovrascrivere direttamente codice"
+                title="Modalità Piano/Lettura: analizza e pianifica senza modificare direttamente i file"
               >
                 📖 Lettura / Piano
               </button>
@@ -739,7 +905,7 @@ export function CodingSection({
                   transition: "all 0.15s ease"
                 }}
                 onClick={() => setOperatingMode("write")}
-                title="Modalità Scrittura: genera codice completo e diff da applicare direttamente sui file"
+                title="Modalità Scrittura: crea, modifica o elimina file nel workspace ed esegui comandi"
               >
                 ✍️ Scrittura
               </button>
@@ -817,7 +983,7 @@ export function CodingSection({
                 <textarea
                   className="input-control"
                   rows={4}
-                  placeholder="Testo del prompt che verrà incollato automaticamente..."
+                  placeholder="Testo del prompt da incollare automaticamente..."
                   value={newPresetPrompt}
                   onChange={(e) => setNewPresetPrompt(e.target.value)}
                 />

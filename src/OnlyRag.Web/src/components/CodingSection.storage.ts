@@ -14,61 +14,62 @@ export type VibePreset = {
 export const BUILT_IN_PRESETS: VibePreset[] = [
   {
     id: "preset_audit_ui_ux",
-    title: "🎨 Audit UI/UX",
+    title: "Audit UI/UX",
     icon: "🎨",
-    prompt: "Esegui un Audit UI/UX approfondito: esamina i componenti visuali, la gerarchia visiva, i design token, la reattività, le animazioni e l'usabilità complessiva dell'interfaccia.",
+    prompt: "Esegui un audit del codice UI/frontend: esamina la struttura visiva, la componibilità, l'usabilità, la reattività e l'accessibilità dell'interfaccia.",
     isBuiltIn: true
   },
   {
     id: "preset_audit_pipeline",
-    title: "⚙️ Audit Pipeline",
+    title: "Audit Flussi & Logica",
     icon: "⚙️",
-    prompt: "Esegui un Audit Pipeline del codice: esamina l'elaborazione dei dati, i flussi asincroni, le gestione delle eccezioni, il retry handling e le prestazioni delle code di lavoro in background.",
+    prompt: "Esegui un audit dei flussi dati e della logica di elaborazione: analizza la gestione delle eccezioni, la concorrenza/asincronia, le prestazioni e la robustezza del codice.",
     isBuiltIn: true
   },
   {
     id: "preset_audit_docs",
-    title: "📚 Audit Documentazione",
+    title: "Audit Documentazione",
     icon: "📚",
-    prompt: "Esegui un Audit Documentazione: analizza la presenza e chiarezza di README, commenti esplicativi di codice, guide di setup e documentazione delle API/interfacce.",
+    prompt: "Esegui un audit della documentazione del codice: verifica la presenza e la chiarezza di commenti, specifiche delle API, tipi/interfacce e guide di sviluppo.",
     isBuiltIn: true
   },
   {
     id: "preset_audit_build",
-    title: "🛠️ Audit Script Build / Package",
+    title: "Audit Build & Pacchetti",
     icon: "🛠️",
-    prompt: "Esegui un Audit Script Build & Package: esamina gli script di automazione PowerShell/npm, la configurazione di compilazione e gli installer/pacchetti eseguibili prodotti.",
+    prompt: "Esegui un audit della configurazione di build, compilazione e pacchettizzazione del progetto: verifica correttezza dei file di build, dipendenze ed efficienza.",
     isBuiltIn: true
   },
   {
     id: "preset_refactor",
-    title: "🚀 Rifattorizza & Pulisci",
+    title: "Rifattorizza & Pulisci",
     icon: "🚀",
-    prompt: "Rifattorizza il codice rendendolo pulito, leggibile, privo di duplicazioni e conforme ai principi SOLID.",
+    prompt: "Rifattorizza il codice rendendolo pulito, leggibile, privo di duplicazioni e conforme ai principi SOLID e alle best practice del linguaggio.",
     isBuiltIn: true
   },
   {
     id: "preset_unit_tests",
-    title: "🧪 Genera Unit Tests",
+    title: "Genera Unit Tests",
     icon: "🧪",
-    prompt: "Genera una suite completa ed esaustiva di test unitari con copertura dei casi limite ed eventuali mock.",
+    prompt: "Genera una suite completa di test unitari per questo codice, coprendo i flussi principali, i casi limite ed isolando le dipendenze esterne.",
     isBuiltIn: true
   },
   {
     id: "preset_fix_bug",
-    title: "🐛 Risolvi Bug",
+    title: "Risolvi Bug",
     icon: "🐛",
-    prompt: "Analizza l'errore o il comportamento inatteso, individua la causa radice e fornisci il codice corretto.",
+    prompt: "Analizza questo codice o l'errore riscontrato, individua la causa radice del problema e fornisci la soluzione corretta spiegando la modifica effettuata.",
     isBuiltIn: true
   },
   {
     id: "preset_architecture",
-    title: "🏗️ Analizza Architettura",
+    title: "Analizza Architettura",
     icon: "🏗️",
-    prompt: "Esamina la struttura e l'architettura di questo codice/progetto e proponi miglioramenti per modularità e manutenibilità.",
+    prompt: "Esamina la struttura e l'architettura complessiva di questo codice o progetto, evidenziando criticità e proponendo raccomandazioni di modularità e manutenibilità.",
     isBuiltIn: true
   }
 ];
+
 
 export function loadSavedPresets(): VibePreset[] {
   try {
