@@ -1,6 +1,6 @@
 ---
 name: rag-vector-retrieval
-description: Specialized skill for local Retrieval-Augmented Generation (RAG 2.0) in OnlyRag. Covers Dual-Tier Parent-Child document parsing (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV), SQLite FTS5 keyword indexing, Qdrant vector database storage, Query Transformation, Reciprocal Rank Fusion (RRF), ONNX Cross-Encoder 2nd-stage re-ranking, CRAG evaluation, Ollama embeddings/LLM inference, and retrieval evaluation metrics.
+description: Specialized skill for local Retrieval-Augmented Generation (RAG 2.0) in OnlyRag. Covers Dual-Tier Parent-Child document parsing (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV), SQLite FTS5 keyword indexing, Qdrant vector database storage, Query Transformation, Reciprocal Rank Fusion (RRF), Heuristic 2nd-stage re-ranking, CRAG evaluation, Ollama embeddings/LLM inference, and retrieval evaluation metrics.
 ---
 
 # Local RAG & Vector Retrieval Skill (Next-Gen 2.0)

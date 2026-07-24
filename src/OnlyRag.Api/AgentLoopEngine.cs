@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
@@ -66,11 +68,28 @@ internal sealed class AgentLoopEngine
             OllamaSettings settings = await settingsService.GetAsync(cancellationToken);
             int numCtx = settings.CodingNumCtx ?? DefaultNumCtx;
 
-            string responseText = await ollamaClient.GenerateChatAsync(
+            yield return new AgentStepEvent("thought", $"[Agent Step {iteration}/{MaxAgentIterations}] Elaborazione del modello in corso...");
+
+            var responseSb = new StringBuilder();
+            await foreach (string chunk in ollamaClient.GenerateChatStreamAsync(
                 model,
                 messages,
                 numCtx: numCtx,
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken))
+            {
+                responseSb.Append(chunk);
+                if (!string.IsNullOrEmpty(chunk))
+                {
+                    yield return new AgentStepEvent("thought_chunk", Content: chunk);
+                }
+            }
+
+            string responseText = responseSb.ToString();
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                yield return new AgentStepEvent("error", "Il modello non ha restituito alcun contenuto.");
+                yield break;
+            }
 
             messages.Add(new("assistant", responseText));
 
@@ -150,27 +169,52 @@ internal sealed class AgentLoopEngine
         yield return new AgentStepEvent("final_response", "Raggiunto il limite massimo di iterazioni dell'agente (10 passi).");
     }
 
-    private static AgentToolCall? TryExtractToolCall(string text)
+    internal static AgentToolCall? TryExtractToolCall(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
-        int jsonStart = text.IndexOf("```json", StringComparison.OrdinalIgnoreCase);
-        if (jsonStart != -1)
+        // 1. Cerca il primo blocco di codice markdown ```json ... ``` o ```JSON ... ``` (anche non chiuso se troncato)
+        var matchCodeBlock = Regex.Match(text, @"```(?:json|JSON)?\s*(\{[\s\S]*?\})\s*(?:```|$)", RegexOptions.Singleline);
+        if (matchCodeBlock.Success)
         {
-            int blockStart = jsonStart + 7;
-            int jsonEnd = text.IndexOf("```", blockStart);
-            if (jsonEnd != -1)
-            {
-                string jsonBody = text.Substring(blockStart, jsonEnd - blockStart).Trim();
-                return ParseToolCallJson(jsonBody);
-            }
+            var call = ParseToolCallJson(matchCodeBlock.Groups[1].Value);
+            if (call != null) return call;
         }
 
-        // Tenta il parsing diretto se l'intero testo è un oggetto JSON
-        string trimmed = text.Trim();
-        if (trimmed.StartsWith('{') && trimmed.EndsWith('}'))
+        // 2. Cerca qualsiasi oggetto JSON contenente la chiave "tool", "function" o "action"
+        var matchRawJson = Regex.Match(text, @"\{[^{}]*""(?:tool|tool_name|function|action|name)""\s*:\s*""[^""]+""[\s\S]*?\}", RegexOptions.Singleline);
+        if (matchRawJson.Success)
         {
-            return ParseToolCallJson(trimmed);
+            var call = ParseToolCallJson(matchRawJson.Value);
+            if (call != null) return call;
+        }
+
+        // 3. Fallback: bilanciamento graffe dal primo '{' al corrispettivo '}'
+        int firstBrace = text.IndexOf('{');
+        if (firstBrace != -1)
+        {
+            int openCount = 0;
+            int lastBrace = -1;
+            for (int i = firstBrace; i < text.Length; i++)
+            {
+                if (text[i] == '{') openCount++;
+                else if (text[i] == '}')
+                {
+                    openCount--;
+                    if (openCount == 0)
+                    {
+                        lastBrace = i;
+                        break;
+                    }
+                }
+            }
+
+            if (lastBrace > firstBrace)
+            {
+                string jsonCandidate = text.Substring(firstBrace, lastBrace - firstBrace + 1);
+                var call = ParseToolCallJson(jsonCandidate);
+                if (call != null) return call;
+            }
         }
 
         return null;
@@ -183,20 +227,29 @@ internal sealed class AgentLoopEngine
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("tool", out var toolProp))
+            string? toolRaw = null;
+            if (root.TryGetProperty("tool", out var toolProp)) toolRaw = toolProp.GetString();
+            else if (root.TryGetProperty("tool_name", out var toolNameProp)) toolRaw = toolNameProp.GetString();
+            else if (root.TryGetProperty("function", out var fnProp)) toolRaw = fnProp.GetString();
+            else if (root.TryGetProperty("action", out var actProp)) toolRaw = actProp.GetString();
+            else if (root.TryGetProperty("name", out var nameProp)) toolRaw = nameProp.GetString();
+
+            if (!string.IsNullOrWhiteSpace(toolRaw))
             {
-                string toolName = toolProp.GetString() ?? "";
-                string argsJson = root.TryGetProperty("arguments", out var argsProp) ? argsProp.GetRawText() : "{}";
+                string normalizedTool = NormalizeToolName(toolRaw);
+                string argsJson = "{}";
+                if (root.TryGetProperty("arguments", out var argsProp)) argsJson = argsProp.GetRawText();
+                else if (root.TryGetProperty("args", out var aProp)) argsJson = aProp.GetRawText();
+                else if (root.TryGetProperty("parameters", out var pProp)) argsJson = pProp.GetRawText();
+                else argsJson = json; // Fallback to entire object as args if top-level properties
+
                 string? explanation = root.TryGetProperty("explanation", out var expProp) ? expProp.GetString() : null;
 
-                if (!string.IsNullOrWhiteSpace(toolName))
-                {
-                    return new AgentToolCall(
-                        CallId: $"call_{Guid.NewGuid():N}"[..10],
-                        ToolName: toolName,
-                        ArgumentsJson: argsJson,
-                        Explanation: explanation);
-                }
+                return new AgentToolCall(
+                    CallId: $"call_{Guid.NewGuid():N}"[..10],
+                    ToolName: normalizedTool,
+                    ArgumentsJson: argsJson,
+                    Explanation: explanation);
             }
         }
         catch
@@ -205,6 +258,21 @@ internal sealed class AgentLoopEngine
         }
 
         return null;
+    }
+
+    private static string NormalizeToolName(string toolName)
+    {
+        string t = toolName.Trim().ToLowerInvariant();
+        return t switch
+        {
+            "list" or "listdir" or "ls" or "list_directory" => "list_dir",
+            "read" or "readfile" or "read_file_content" => "read_file",
+            "write" or "writefile" or "create_file" => "write_file",
+            "replace" or "replacefile" or "replace_content" or "edit_file" => "replace_file_content",
+            "grep" or "search" or "find" or "grep_search_files" => "grep_search",
+            "run" or "exec" or "execute" or "command" or "bash" or "powershell" or "terminal" => "run_command",
+            _ => t
+        };
     }
 
     private async Task<string> ResolveModelAsync(string? requestedModel, CancellationToken cancellationToken)
@@ -239,7 +307,7 @@ STRUMENTI DISPONIBILI:
 6. run_command({"commandLine": "string", "isAsync": false})
 
 REGOLE PER LE CHIAMATE DI STRUMENTO:
-Per invocare uno strumento, rispondi RIGOROSAMENTE ed ESCLUSIVAMENTE con un blocco di codice JSON racchiuso in ```json ... ``` con questo formato:
+Per invocare uno strumento, rispondi RIGOROSAMENTE con un blocco di codice JSON racchiuso in ```json ... ``` con questo formato:
 ```json
 {
   "tool": "nome_tool",
@@ -254,7 +322,9 @@ REGOLE COMPORTAMENTALI:
 1. Se devi comprendere il progetto, usa list_dir o grep_search per individuare i file rilevanti.
 2. Leggi sempre i file rilevanti con read_file prima di modificarli.
 3. In modalità 'plan' NON chiamare mai write_file, replace_file_content o run_command. Limitati all'esplorazione e alla pianificazione.
-4. Quando l'obiettivo è completato, fornisci una risposta finale in testo normale Markdown SENZA blocchi json tool.
+4. Fai UNA SOLA chiamata a uno strumento per ogni passaggio.
+5. Quando l'obiettivo è completato, fornisci la tua risposta finale spiegando il lavoro fatto in testo normale Markdown SENZA blocchi JSON di strumenti.
 """;
     }
 }
+

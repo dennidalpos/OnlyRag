@@ -193,16 +193,19 @@ The repository maintains project-specific skills under the `skills/` directory i
 - [`skills/onlyrag`](skills/onlyrag/SKILL.md): Primary project architecture, scripts inventory, workflow commands, local app data paths, and gate verification.
 - [`skills/dotnet-wpf-minimal-api`](skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop bridge, SQLite storage, and xUnit testing.
 - [`skills/react-vite-frontend`](skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, and Playwright UI tests.
-- [`skills/rag-vector-retrieval`](skills/rag-vector-retrieval/SKILL.md): Local RAG 2.0 architecture, SQLite FTS5 keyword indexing, Qdrant vector database, Ollama embeddings/chat, document parsing, and retrieval evaluation metrics.
+- [`skills/rag-vector-retrieval`](skills/rag-vector-retrieval/SKILL.md): Local RAG 2.0 architecture, SQLite FTS5 keyword indexing, Qdrant vector database, Ollama embeddings/chat, document parsing, heuristic re-ranking, and retrieval evaluation metrics.
 - [`skills/onnx-directml-image-gen`](skills/onnx-directml-image-gen/SKILL.md): ONNX Runtime with DirectML GPU acceleration and CPU fallback on Windows, SDXL/LCM models, Hugging Face metadata, SHA256 verification, and canvas editing.
 - [`skills/windows-packaging-signing`](skills/windows-packaging-signing/SKILL.md): NSIS packaging, `signtool.exe` signing, prerequisite checks, and release lifecycle testing.
+- [`skills/code-maintenance-automation`](skills/code-maintenance-automation/SKILL.md): Automated code formatting, static linting, and testing workflows across .NET and React.
 
-### Agent Directives for Skills:
+### Agent Directives for Skills & Maintenance:
 
-1. **Load Skills at Task Start**: When working on tasks in a specific domain area (e.g., frontend React, .NET backend, vector search, image generation, packaging), inspect and load the relevant `skills/<skill-name>/SKILL.md` instruction file using `view_file`.
+1. **Load Skills at Task Start**: When working on tasks in a specific domain area (e.g., frontend React, .NET backend, vector search, image generation, packaging, maintenance), inspect and load the relevant `skills/<skill-name>/SKILL.md` instruction file using `view_file`.
 2. **Maintain and Update Skills**: Continuously update and maintain the skill files under `skills/` whenever repository commands, architecture, dependencies, scripts, or official standards change.
-3. **Official Sources Only**: All skill instructions and reference links must rely strictly on official documentation sources (Microsoft Learn, React, Vite, SQLite, Qdrant, Ollama, ONNX Runtime, NSIS, etc.).
+3. **Official Sources Only**: All skill instructions and reference links must rely strictly on official documentation sources (Microsoft Learn, React, Vite, SQLite, Qdrant, Ollama, ONNX Runtime, NSIS, ESLint, Prettier, etc.).
 4. **Cross-Machine Synchronization**: Ensure all skills under `skills/` remain checked into the root repository so they are immediately available on any PC or development environment.
+5. **Code Quality & Maintenance Automation**: Use `pwsh .\scripts\Format-Code.ps1` for code formatting, `pwsh .\scripts\Lint-Code.ps1` for static linting/typechecking, `pwsh .\scripts\Test-Code.ps1` for automated unit tests, and `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` for canonical gate verification.
+
 
 
 

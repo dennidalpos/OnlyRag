@@ -6,7 +6,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    internal static void MapCodingEndpoints(WebApplication app)
+    internal static void MapCodingEndpoints(this WebApplication app)
     {
         app.MapPost("/api/coding/generate", async (
             CodingTaskRequest request,

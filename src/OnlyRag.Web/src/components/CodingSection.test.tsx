@@ -46,13 +46,18 @@ describe("CodingSection", () => {
         path: "/api/workspace/config",
         method: "GET",
         response: {
-          rootPath: null,
-          isAuthorized: false,
-          canRead: false,
-          canWrite: false,
-          fileCount: 0,
-          lastVerifiedAt: null
+          rootPath: "C:\\Projects\\App",
+          isAuthorized: true,
+          canRead: true,
+          canWrite: true,
+          fileCount: 10,
+          lastVerifiedAt: "2026-07-24T12:00:00Z"
         }
+      },
+      {
+        path: "/api/workspace/files",
+        method: "GET",
+        response: []
       },
       {
         path: "/api/coding/generate-stream",
@@ -68,6 +73,9 @@ describe("CodingSection", () => {
       />
     );
 
+    const modeBtn = screen.getByRole("button", { name: /✍️ Scrittura/i });
+    await user.click(modeBtn);
+
     const promptInput = screen.getByPlaceholderText(/Modalità SCRITTURA/i);
     await user.type(promptInput, "Crea Calculator");
 
@@ -75,7 +83,52 @@ describe("CodingSection", () => {
     await user.click(sendBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("public class Calculator {}")).toBeInTheDocument();
+      expect(screen.getByText(/public class Calculator/i)).toBeInTheDocument();
+    });
+  });
+
+  it("sends prompt in Agent mode and renders agent thought events", async () => {
+    const user = userEvent.setup();
+    mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: "C:\\Projects\\App",
+          isAuthorized: true,
+          canRead: true,
+          canWrite: true,
+          fileCount: 10,
+          lastVerifiedAt: "2026-07-24T12:00:00Z"
+        }
+      },
+      {
+        path: "/api/workspace/files",
+        method: "GET",
+        response: []
+      },
+      {
+        path: "/api/agent/run-stream",
+        method: "POST",
+        response: 'data: {"type":"thought","content":"[Agent Engine] Analizzo il progetto..."}\n\ndata: {"type":"thought_chunk","content":"Elaborazione in corso"}\n\ndata: {"type":"final_response","content":"Completato!"}\n\ndata: [DONE]\n\n'
+      }
+    ]);
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText(/Modalità Agente attiva/i);
+    await user.type(promptInput, "Analizza il codice");
+
+    const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Analizzo il progetto/i)).toBeInTheDocument();
     });
   });
 });

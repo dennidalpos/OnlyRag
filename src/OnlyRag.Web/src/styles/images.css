@@ -292,9 +292,9 @@
 .image-crop-box {
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid #f8fafc;
-  outline: 2px solid #2d6f8f;
-  background: rgba(45, 111, 143, 0.16);
+  border: 2px solid #ffffff;
+  outline: 2px solid var(--primary);
+  background: rgba(79, 70, 229, 0.16);
   pointer-events: none;
 }
 
@@ -313,22 +313,23 @@
   will-change: left, top;
   user-select: none;
   max-width: 90%;
-  padding: 2px 4px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.88);
   color: #ffffff;
-  font-weight: 800;
-  line-height: 1.1;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.72);
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   cursor: move;
   touch-action: none;
   overflow-wrap: anywhere;
 }
 
 .image-text-layer--selected {
-  border-color: #2d6f8f;
-  background: rgba(45, 111, 143, 0.18);
+  border-color: var(--primary);
+  background: rgba(79, 70, 229, 0.92);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 4px 14px rgba(79, 70, 229, 0.5);
 }
 
 .generated-image-preview--empty {
@@ -410,8 +411,8 @@
 }
 
 .generated-image-card--selected {
-  border-color: #2d6f8f;
-  box-shadow: 0 0 0 2px rgba(45, 111, 143, 0.18);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
 }
 
 .generated-image-card img,
@@ -607,7 +608,7 @@
   position: absolute;
   width: 10px;
   height: 10px;
-  background: #2d6f8f;
+  background: var(--primary);
   border: 1px solid #ffffff;
   border-radius: 2px;
 }

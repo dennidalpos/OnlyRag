@@ -59,7 +59,7 @@ export function ImageGeneratorControls({
         {/* Quality Preset Buttons */}
         <div className="field-group">
           <span>Preset Qualità</span>
-          <div className="preset-buttons-row" style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+          <div className="preset-buttons-row">
             {generationProfiles.map((prof) => {
               const isActive = generationProfile === prof.value;
               return (
@@ -85,12 +85,12 @@ export function ImageGeneratorControls({
             rows={3}
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
-            placeholder="Descrivi l'immagine da creare (es: Un astronauta su Marte, stile fotorealistico, luci cinematografiche...)"
+            placeholder="Descrivi l'immagine da creare..."
             required
           />
         </label>
-        <small className="image-prompt-hint" style={{ color: "var(--color-text-muted, #94a3b8)", fontSize: "12px", display: "block", marginBottom: "12px" }}>
-          🌐 <strong>Auto-Rilevamento Lingua:</strong> Scrivi in italiano o qualsiasi altra lingua. Il prompt verrà tradotto automaticamente in inglese ottimizzato prima della generazione.
+        <small className="image-prompt-hint">
+          🌐 Traduzione automatica attiva in inglese per la massima qualità di generazione.
         </small>
 
         {/* Resolution Preset */}

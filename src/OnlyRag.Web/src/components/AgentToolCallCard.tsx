@@ -36,12 +36,12 @@ function formatArgsSummary(toolName: string, argsJson: string): string {
 export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
 
-  if (event.type === "thought") {
+  if (event.type === "thought" || event.type === "thought_chunk") {
     return (
       <div className="agent-step agent-step--thought" style={{
         display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px",
         background: "#0c1322", borderRadius: 8, border: "1px solid #1e293b",
-        fontSize: "0.85rem", color: "#94a3b8", fontStyle: "italic"
+        fontSize: "0.85rem", color: "#94a3b8", fontStyle: "italic", whiteSpace: "pre-wrap"
       }}>
         <span>🧠</span>
         <span>{event.content}</span>

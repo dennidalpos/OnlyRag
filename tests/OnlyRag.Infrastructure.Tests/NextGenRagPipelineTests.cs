@@ -8,7 +8,7 @@ public sealed class NextGenRagPipelineTests
     [Fact]
     public async Task ReRanker_CalculatesCrossEncoderScores()
     {
-        OnnxCrossEncoderReRankerService reRanker = new();
+        HeuristicReRankerService reRanker = new();
         List<ReRankCandidate> candidates = new()
         {
             new ReRankCandidate(1, "Testo generico irrilevante"),

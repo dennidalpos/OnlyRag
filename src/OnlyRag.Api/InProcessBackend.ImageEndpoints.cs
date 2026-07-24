@@ -7,7 +7,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    internal static void MapImageEndpoints(WebApplication app)
+    internal static void MapImageEndpoints(this WebApplication app)
     {
         app.MapGet("/api/settings/image-generation", async (
             IImageGenerationSettingsService settings,

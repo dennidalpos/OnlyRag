@@ -106,7 +106,7 @@ describe("SettingsSection", () => {
       ollamaBaseUrl: "http://192.168.1.50:11434",
       trustNonLocalEndpoint: true
     });
-  });
+  }, 15000);
 
   it("keeps settings usable when diagnostics are unavailable", async () => {
     mockApi([

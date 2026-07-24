@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import type { WorkspaceConfig, WorkspaceFileItem } from "../apiTypes";
-import { generateHtmlSandboxDoc, personaOptions } from "./CodingSection.helpers";
+import { computeLineDiff, generateHtmlSandboxDoc, personaOptions } from "./CodingSection.helpers";
 import type { CodeSnippetItem, RefactorGoal, VibePersona } from "./CodingSection.types";
 
 type WorkbenchViewProps = {
@@ -132,7 +132,7 @@ export function WorkbenchView({
                 onClick={onOpenWorkspacePicker}
                 title="Scegli un file dalla cartella di progetto autorizzata"
               >
-                📂 Scegli da Progetto {selectedWorkspaceFile ? `(${selectedWorkspaceFile})` : ""}
+                Scegli da Progetto {selectedWorkspaceFile ? `(${selectedWorkspaceFile})` : ""}
               </button>
             )}
           </div>
@@ -152,13 +152,13 @@ export function WorkbenchView({
           disabled={isGenerating || !prompt.trim()}
           onClick={onGenerate}
         >
-          {isGenerating ? "Generazione in corso (Streaming)..." : "⚡ Genera Codice Vibe"}
+          {isGenerating ? "Generazione in corso (Streaming)..." : "Genera Codice"}
         </button>
       </div>
 
       <div className="coding-panel coding-panel--output">
         <div className="coding-panel__header">
-          <h3>2. Codice Generato {isGenerating && <span className="streaming-badge">🔴 Streaming...</span>}</h3>
+          <h3>2. Codice Generato {isGenerating && <span className="streaming-badge">Streaming...</span>}</h3>
           {generatedCode && (
             <div className="coding-actions-bar">
               <button type="button" className="button button--secondary button--small" onClick={handleCopy}>
@@ -166,7 +166,7 @@ export function WorkbenchView({
               </button>
               {(selectedLanguage === "javascript" || selectedLanguage === "html" || selectedLanguage === "typescript") && (
                 <button type="button" className="button button--secondary button--small" onClick={() => onOpenPreview(generatedCode)}>
-                  🌐 Anteprima Live
+                  Anteprima Live
                 </button>
               )}
               {workspaceConfig?.isAuthorized && selectedWorkspaceFile && onApplyToWorkspace && (
@@ -176,7 +176,7 @@ export function WorkbenchView({
                   onClick={() => onApplyToWorkspace(selectedWorkspaceFile, generatedCode)}
                   title={`Sovrascrivi ${selectedWorkspaceFile} nel progetto`}
                 >
-                  💾 Applica a {selectedWorkspaceFile}
+                  Applica a {selectedWorkspaceFile}
                 </button>
               )}
               <button
@@ -184,7 +184,7 @@ export function WorkbenchView({
                 className="button button--secondary button--small"
                 onClick={() => setShowSaveInput(!showSaveInput)}
               >
-                💾 Salva Snippet
+                Salva Snippet
               </button>
             </div>
           )}
@@ -653,6 +653,118 @@ export function AttachedFileEditorModal({
                 💾 Salva su Disco & Usa
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type DiffViewerModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  fileName: string | null;
+  originalContent: string;
+  modifiedContent: string;
+  onSaveToDisk?: () => void;
+};
+
+export function DiffViewerModal({
+  isOpen,
+  onClose,
+  fileName,
+  originalContent,
+  modifiedContent,
+  onSaveToDisk
+}: DiffViewerModalProps) {
+  if (!isOpen || !fileName) return null;
+
+  const diffLines = computeLineDiff(originalContent, modifiedContent);
+  const additions = diffLines.filter((l) => l.type === "add").length;
+  const deletions = diffLines.filter((l) => l.type === "delete").length;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: "95vw" }}>
+        <div className="modal-header">
+          <h3>
+            🔍 Diff Modifiche File: <span style={{ fontFamily: "monospace", color: "#38bdf8" }}>{fileName}</span>
+            <span style={{ fontSize: "0.8rem", marginLeft: 12 }}>
+              <span style={{ color: "#34d399", marginRight: 8 }}>+{additions}</span>
+              <span style={{ color: "#f87171" }}>-{deletions}</span>
+            </span>
+          </h3>
+          <button type="button" className="button-secondary" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div
+            style={{
+              maxHeight: 450,
+              overflowY: "auto",
+              background: "#090d16",
+              borderRadius: 8,
+              padding: 12,
+              fontFamily: "Consolas, Monaco, monospace",
+              fontSize: "0.85rem",
+              lineHeight: 1.5,
+              border: "1px solid #1e293b"
+            }}
+          >
+            {diffLines.map((line, idx) => {
+              const bg = line.type === "add"
+                ? "rgba(52, 211, 153, 0.12)"
+                : line.type === "delete"
+                  ? "rgba(248, 113, 113, 0.12)"
+                  : "transparent";
+              const color = line.type === "add"
+                ? "#34d399"
+                : line.type === "delete"
+                  ? "#f87171"
+                  : "#94a3b8";
+              const prefix = line.type === "add" ? "+" : line.type === "delete" ? "-" : " ";
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    background: bg,
+                    color: color,
+                    display: "grid",
+                    gridTemplateColumns: "40px 40px 18px 1fr",
+                    gap: 8,
+                    padding: "1px 4px",
+                    borderRadius: 2
+                  }}
+                >
+                  <span style={{ opacity: 0.4, textAlign: "right", userSelect: "none" }}>
+                    {line.oldLineNumber ?? ""}
+                  </span>
+                  <span style={{ opacity: 0.4, textAlign: "right", userSelect: "none" }}>
+                    {line.newLineNumber ?? ""}
+                  </span>
+                  <span style={{ fontWeight: 700, userSelect: "none" }}>{prefix}</span>
+                  <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{line.content}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+            <button type="button" className="button button--secondary button--small" onClick={onClose}>
+              Chiudi
+            </button>
+            {onSaveToDisk && (
+              <button
+                type="button"
+                className="button button--primary button--small"
+                onClick={() => {
+                  onSaveToDisk();
+                  onClose();
+                }}
+              >
+                💾 Applica Modifiche su Disco
+              </button>
+            )}
           </div>
         </div>
       </div>

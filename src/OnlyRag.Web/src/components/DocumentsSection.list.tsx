@@ -30,7 +30,7 @@ export function DocumentListRow({
   }
 
   return (
-    <article
+    <div
       className={isSelected ? "document-row document-row--selected" : "document-row"}
       role="option"
       tabIndex={isBusy ? -1 : 0}
@@ -58,6 +58,6 @@ export function DocumentListRow({
           {document.chunkCount > 0 && <span>Chunk: {document.chunkCount}</span>}
         </div>
       )}
-    </article>
+    </div>
   );
 }

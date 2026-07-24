@@ -85,11 +85,13 @@
   transition: all var(--transition-fast);
 }
 
-.document-row[role="option"] {
+.document-row[role="option"],
+.document-row[role="button"] {
   cursor: pointer;
 }
 
-.document-row[role="option"]:hover {
+.document-row[role="option"]:hover,
+.document-row[role="button"]:hover {
   border-color: rgba(99, 102, 241, 0.4);
   background: var(--primary-light);
   transform: translateY(-1px);
@@ -105,6 +107,12 @@
   border-color: var(--primary);
   background: var(--primary-light);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.document-row--selected .document-row__header span,
+.document-row--selected .document-row__meta span {
+  color: #334155;
+  font-weight: 500;
 }
 
 .document-row__header,

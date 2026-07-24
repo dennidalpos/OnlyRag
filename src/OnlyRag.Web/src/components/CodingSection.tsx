@@ -33,7 +33,7 @@ import {
   saveCustomPreset,
   type VibePreset
 } from "./CodingSection.storage";
-import { AttachedFileEditorModal, WorkspaceFilePickerModal } from "./CodingSection.views";
+import { AttachedFileEditorModal, DiffViewerModal, WorkspaceFilePickerModal } from "./CodingSection.views";
 
 type FileAction = {
   file: string;
@@ -69,7 +69,7 @@ export function CodingSection({
 }: CodingSectionProps) {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [operatingMode, setOperatingMode] = useState<"plan" | "write">("write");
-  const [useAgentMode, setUseAgentMode] = useState(false);
+  const [useAgentMode, setUseAgentMode] = useState(true);
   const [autoApproveCommands, setAutoApproveCommands] = useState(false);
   const [promptInput, setPromptInput] = useState("");
   const [messages, setMessages] = useState<CodingMessage[]>([]);
@@ -86,6 +86,11 @@ export function CodingSection({
   const [isAttachedFileEditorOpen, setIsAttachedFileEditorOpen] = useState(false);
   const [workspaceStatusMessage, setWorkspaceStatusMessage] = useState<string | null>(null);
 
+  // Diff Modal State
+  const [diffModalFile, setDiffModalFile] = useState<string | null>(null);
+  const [diffModalOriginalContent, setDiffModalOriginalContent] = useState<string>("");
+  const [diffModalModifiedContent, setDiffModalModifiedContent] = useState<string>("");
+
   // Vibe Presets state
   const [presets, setPresets] = useState<VibePreset[]>([]);
   const [showAddPresetModal, setShowAddPresetModal] = useState(false);
@@ -94,6 +99,7 @@ export function CodingSection({
   const [newPresetPrompt, setNewPresetPrompt] = useState("");
 
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (defaultModel) {
@@ -229,6 +235,43 @@ export function CodingSection({
       });
     } catch {
       // Ignorato
+    }
+  }
+
+  function handleCancelGeneration() {
+    abortControllerRef.current?.abort();
+    setIsGenerating(false);
+    setWorkspaceStatusMessage("Risposta interrotta dall'utente.");
+  }
+
+  function handleClearMessages() {
+    if (isGenerating) {
+      handleCancelGeneration();
+    }
+    setMessages([]);
+    setError(null);
+    setPromptInput("");
+  }
+
+  async function handleOpenDiff(relativePath: string, modifiedCode?: string) {
+    try {
+      let original = "";
+      if (workspaceConfig?.isAuthorized) {
+        const res = await apiRequest<ReadWorkspaceFileResponse>("/api/workspace/read-file", {
+          method: "POST",
+          body: JSON.stringify({ relativePath } as ReadWorkspaceFileRequest)
+        }).catch(() => null);
+        if (res) {
+          original = res.content;
+        }
+      }
+      setDiffModalFile(relativePath);
+      setDiffModalOriginalContent(original);
+      setDiffModalModifiedContent(modifiedCode ?? original);
+    } catch {
+      setDiffModalFile(relativePath);
+      setDiffModalOriginalContent("");
+      setDiffModalModifiedContent(modifiedCode ?? "");
     }
   }
 
@@ -375,6 +418,9 @@ export function CodingSection({
       agentEvents: []
     };
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setPromptInput("");
     setIsGenerating(true);
@@ -395,14 +441,31 @@ export function CodingSection({
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.id !== assistantMessageId) return msg;
-              const updatedEvents = [...(msg.agentEvents || []), event];
+
+              const existingEvents = msg.agentEvents ? [...msg.agentEvents] : [];
+
+              if (event.type === "thought_chunk" && event.content) {
+                const lastIdx = existingEvents.length - 1;
+                if (lastIdx >= 0 && (existingEvents[lastIdx].type === "thought_chunk" || existingEvents[lastIdx].type === "thought")) {
+                  existingEvents[lastIdx] = {
+                    ...existingEvents[lastIdx],
+                    content: (existingEvents[lastIdx].content || "") + event.content
+                  };
+                } else {
+                  existingEvents.push(event);
+                }
+                return { ...msg, agentEvents: existingEvents };
+              }
+
+              const updatedEvents = [...existingEvents, event];
               const finalContent = event.type === "final_response" && event.content
                 ? event.content
                 : msg.content;
               return { ...msg, agentEvents: updatedEvents, content: finalContent };
             })
           );
-        }
+        },
+        abortController.signal
       );
 
       setMessages((prev) =>
@@ -412,6 +475,15 @@ export function CodingSection({
       );
       void fetchWorkspaceFiles();
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setWorkspaceStatusMessage("Risposta agente interrotta.");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg
+          )
+        );
+        return;
+      }
       const errMsg = err instanceof Error ? err.message : "Errore durante l'esecuzione dell'agente.";
       setError(errMsg);
       setMessages((prev) =>
@@ -430,7 +502,12 @@ export function CodingSection({
     const textToSend = overridePrompt ?? promptInput;
     if (!textToSend.trim() || isGenerating) return;
 
-    if (useAgentMode && workspaceConfig?.isAuthorized) {
+    if (useAgentMode) {
+      if (!workspaceConfig?.isAuthorized) {
+        setWorkspaceStatusMessage("⚠️ Selezionare una cartella di progetto prima di avviare l'Agente Autonomo.");
+        void handlePickWindowsFolder();
+        return;
+      }
       return handleSendAgentMessage(textToSend);
     }
 
@@ -451,6 +528,9 @@ export function CodingSection({
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isStreaming: true
     };
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setPromptInput("");
@@ -482,7 +562,8 @@ export function CodingSection({
                 : msg
             )
           );
-        }
+        },
+        abortController.signal
       );
 
       const actions = extractFileActionsFromResponse(fullResponseText);
@@ -525,6 +606,15 @@ export function CodingSection({
         void handleExecuteWorkspaceCommand("dotnet build");
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setWorkspaceStatusMessage("Risposta interrotta.");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg
+          )
+        );
+        return;
+      }
       const errMsg = err instanceof Error ? err.message : "Errore durante la generazione.";
       setError(errMsg);
       setMessages((prev) =>
@@ -795,6 +885,15 @@ export function CodingSection({
                           {act.applied && <span style={{ color: "#34d399", marginLeft: 8 }}>[Applicato su Disco]</span>}
                         </span>
                         <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            style={{ fontSize: "0.75rem", background: "#0f172a", borderColor: "#38bdf8", color: "#38bdf8" }}
+                            onClick={() => void handleOpenDiff(act.file, act.code)}
+                            title="Visualizza il confronto diff delle modifiche"
+                          >
+                            🔍 Diff
+                          </button>
                           {act.action === "write" && act.code && (
                             <button
                               type="button"
@@ -920,9 +1019,11 @@ export function CodingSection({
           }}
           rows={3}
           placeholder={
-            operatingMode === "plan"
-              ? "Modalità PIANO: Descrivi l'analisi, i flussi o l'architettura da pianificare..."
-              : "Modalità SCRITTURA: Descrivi le modifiche al codice, i file da creare/eliminare o chiedi di compilare ed avviare l'app..."
+            useAgentMode
+              ? "Modalità AGENTE AUTONOMO: Inserisci l'obiettivo (es: analizza il progetto, correggi il bug ed esegui i test)..."
+              : operatingMode === "plan"
+                ? "Modalità PIANO: Descrivi l'analisi, i flussi o l'architettura da pianificare..."
+                : "Modalità SCRITTURA: Descrivi le modifiche al codice, i file da creare/eliminare o chiedi di compilare ed avviare l'app..."
           }
           value={promptInput}
           onChange={(e) => setPromptInput(e.target.value)}
@@ -1036,21 +1137,32 @@ export function CodingSection({
               <button
                 type="button"
                 className="button button--secondary button--small"
-                onClick={() => setMessages([])}
-                disabled={isGenerating}
+                onClick={handleClearMessages}
+                title="Svuota la chat ed interrompe eventuali generazioni in corso"
               >
                 Pulisci Chat
               </button>
             )}
-            <button
-              type="button"
-              className="button button--primary"
-              style={{ background: "#2563eb", borderColor: "#3b82f6", minWidth: 140 }}
-              disabled={isGenerating || !promptInput.trim()}
-              onClick={() => void handleSendMessage()}
-            >
-              {isGenerating ? "Generazione in corso..." : "⚡ Invia (Ctrl+Enter)"}
-            </button>
+            {isGenerating ? (
+              <button
+                type="button"
+                className="button button--danger button--small"
+                style={{ background: "#991b1b", borderColor: "#ef4444", color: "#ffffff", fontWeight: 600 }}
+                onClick={handleCancelGeneration}
+              >
+                ⛔ Interrompi Risposta
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button button--primary"
+                style={{ background: "#2563eb", borderColor: "#3b82f6", minWidth: 140 }}
+                disabled={!promptInput.trim()}
+                onClick={() => void handleSendMessage()}
+              >
+                ⚡ Invia (Ctrl+Enter)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1140,6 +1252,20 @@ export function CodingSection({
       <BackgroundTaskDrawer
         isOpen={isTaskDrawerOpen}
         onClose={() => setIsTaskDrawerOpen(false)}
+      />
+
+      {/* DIFF VIEWER MODAL */}
+      <DiffViewerModal
+        isOpen={Boolean(diffModalFile)}
+        fileName={diffModalFile}
+        originalContent={diffModalOriginalContent}
+        modifiedContent={diffModalModifiedContent}
+        onClose={() => setDiffModalFile(null)}
+        onSaveToDisk={
+          diffModalFile
+            ? () => void handleApplyCodeToFile(diffModalFile, diffModalModifiedContent)
+            : undefined
+        }
       />
     </section>
   );

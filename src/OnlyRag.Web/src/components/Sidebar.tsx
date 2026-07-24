@@ -92,7 +92,7 @@ export function Sidebar({
             aria-current={section === activeSection ? "page" : undefined}
             onClick={() => onSectionChange(section)}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
+            <span className="nav-item__content">
               <SectionIcon section={section} />
               <span className="nav-item__label">{sections[section]}</span>
             </span>
@@ -109,7 +109,7 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
     return (
       <section className="sidebar-metrics" aria-label="Metriche sistema">
         <div className="sidebar-metrics__header">
-          <span>Metriche</span>
+          <span>Sistema</span>
           <small>in attesa</small>
         </div>
       </section>
@@ -122,7 +122,6 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
   const cudaValue = diagnostics.ocrGpuCapability.compiledWithCuda === null
     ? "n/d"
     : diagnostics.ocrGpuCapability.compiledWithCuda ? "Sì" : "No";
-
   const ramUsedPercent = telemetry.memory.totalBytes > 0
     ? Math.round(((telemetry.memory.totalBytes - telemetry.memory.availableBytes) / telemetry.memory.totalBytes) * 100)
     : 0;
@@ -130,47 +129,37 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
   return (
     <section className="sidebar-metrics" aria-label="Metriche sistema">
       <div className="sidebar-metrics__header">
-        <span>Metriche</span>
+        <span>Sistema</span>
         <small>live</small>
       </div>
       <div className="sidebar-metrics__grid">
         <MetricRow
           label="CPU"
           value={formatTelemetryPercent(telemetry.cpu.usagePercent)}
-          detail={`${telemetry.cpu.logicalProcessorCount} thread`}
           percent={telemetry.cpu.usagePercent}
         />
         <MetricRow
           label="RAM"
-          value={formatTelemetryBytes(telemetry.memory.availableBytes)}
-          detail={`liberi di ${formatTelemetryBytes(telemetry.memory.totalBytes)}`}
+          value={`${ramUsedPercent}%`}
           percent={ramUsedPercent}
         />
+        {gpu && (
+          <MetricRow
+            label="GPU"
+            value={formatTelemetryPercent(gpu.usagePercent)}
+            percent={gpu.usagePercent}
+          />
+        )}
+        {hasNvidiaContext && (
+          <MetricRow
+            label="CUDA Paddle"
+            value={cudaValue}
+          />
+        )}
         <MetricRow
           label={`Disco ${telemetry.systemDisk.name}`}
-          value={formatTelemetryBytes(telemetry.systemDisk.availableBytes)}
-          detail={`liberi di ${formatTelemetryBytes(telemetry.systemDisk.totalBytes)}`}
+          value={`${formatTelemetryBytes(telemetry.systemDisk.availableBytes)} liberi`}
         />
-        {hasNvidiaContext && (
-          <>
-            <MetricRow
-              label="GPU"
-              value={gpu ? formatTelemetryPercent(gpu.usagePercent) : "n/d"}
-              detail={gpu ? `${gpu.name} ${gpu.driverVersion}` : "NVIDIA non disponibile"}
-              percent={gpu?.usagePercent}
-            />
-            <MetricRow
-              label="VRAM"
-              value={gpu?.memoryAvailableBytes != null ? formatTelemetryBytes(gpu.memoryAvailableBytes) : "n/d"}
-              detail={gpu?.memoryTotalBytes != null ? `liberi di ${formatTelemetryBytes(gpu.memoryTotalBytes)}` : "memoria non disponibile"}
-            />
-            <MetricRow
-              label="CUDA Paddle"
-              value={cudaValue}
-              detail={`${diagnostics.ocrGpuCapability.cudaDeviceCount ?? 0} dispositivi, ${diagnostics.ocrGpuCapability.activeDevice ?? "nessuno"}`}
-            />
-          </>
-        )}
       </div>
     </section>
   );
@@ -179,12 +168,10 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
 function MetricRow({
   label,
   value,
-  detail,
   percent
 }: {
   label: string;
   value: string;
-  detail: string;
   percent?: number | null;
 }) {
   return (
@@ -192,11 +179,13 @@ function MetricRow({
       <span>{label}</span>
       <strong>{value}</strong>
       {percent != null && (
-        <div className="sidebar-metric__bar-bg" style={{ gridColumn: "1 / -1", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", overflow: "hidden", marginTop: "2px" }}>
-          <div className="sidebar-metric__bar-fill" style={{ width: `${Math.min(100, Math.max(0, percent))}%`, height: "100%", background: percent > 85 ? "#ef4444" : "var(--primary-gradient)", transition: "width 0.3s ease" }} />
+        <div className="sidebar-metric__bar-bg">
+          <div
+            className="sidebar-metric__bar-fill"
+            style={{ width: `${Math.min(100, Math.max(0, percent))}%`, background: percent > 85 ? "#ef4444" : "var(--primary-gradient)" }}
+          />
         </div>
       )}
-      <small>{detail}</small>
     </div>
   );
 }

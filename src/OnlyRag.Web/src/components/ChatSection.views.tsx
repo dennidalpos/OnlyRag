@@ -43,9 +43,9 @@ export function ChatDocumentsPanel({
               />
               <span className="chat-document-row__text">
                 <strong>{document.originalFileName}</strong>
-                <small>
-                  {document.chunkCount === 0 ? "Non ancora pronto per la ricerca" : "Pronto per la ricerca"}
-                </small>
+                <span className={`status-badge status-badge--${document.chunkCount > 0 ? "online" : "warning"}`}>
+                  {document.chunkCount > 0 ? "Pronto" : "Elaborazione"}
+                </span>
               </span>
             </label>
           ))
@@ -222,13 +222,13 @@ export function ChatMainPanel({
                 <p>{message.content}</p>
                 {message.sources.length > 0 && (
                   <div className="chat-sources">
-                    <strong>Fonti (RAG Next-Gen)</strong>
+                    <strong>Fonti RAG</strong>
                     {message.sources.map((source) => (
                       <details key={source.chunkId} className="chat-source">
                         <summary>
                           {source.documentName} - {formatPageRange(source.pageStart, source.pageEnd)}
                           {source.score !== undefined && (
-                            <span className="badge badge--info" style={{ marginLeft: "8px" }}>
+                            <span className="status-badge status-badge--online chat-source__score">
                               Score: {source.score}
                             </span>
                           )}
@@ -240,7 +240,7 @@ export function ChatMainPanel({
                         >
                           Apri pagina
                         </button>
-                        <p><strong>Snippet Child:</strong> {source.snippet}</p>
+                        <p><strong>Estratto:</strong> {source.snippet}</p>
                       </details>
                     ))}
                   </div>

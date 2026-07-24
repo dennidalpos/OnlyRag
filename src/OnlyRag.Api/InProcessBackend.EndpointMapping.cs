@@ -6,16 +6,17 @@ internal static class InProcessBackendEndpointMapping
 {
     public static WebApplication MapOnlyRagFeatureEndpoints(this WebApplication app)
     {
-        InProcessBackend.MapAppEndpoints(app);
-        InProcessBackend.MapRetrievalEndpoints(app);
-        InProcessBackend.MapSettingsEndpoints(app);
-        InProcessBackend.MapDependencyEndpoints(app);
-        InProcessBackend.MapJobEndpoints(app);
-        InProcessBackend.MapDocumentEndpoints(app);
-        InProcessBackend.MapTranslationEndpoints(app);
-        InProcessBackend.MapImageEndpoints(app);
-        InProcessBackend.MapCodingEndpoints(app);
+        app.MapAppEndpoints();
+        app.MapRetrievalEndpoints();
+        app.MapSettingsEndpoints();
+        app.MapDependencyEndpoints();
+        app.MapJobEndpoints();
+        app.MapDocumentEndpoints();
+        app.MapTranslationEndpoints();
+        app.MapImageEndpoints();
+        app.MapCodingEndpoints();
         app.MapWorkspaceEndpoints();
         return app;
     }
 }
+

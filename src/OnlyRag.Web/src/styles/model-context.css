@@ -54,7 +54,7 @@
 
 .model-context-bar__fill {
   height: 100%;
-  background: #2d6f8f;
+  background: var(--primary);
   border-radius: 4px;
   transition: width 0.25s ease;
   min-width: 4px;

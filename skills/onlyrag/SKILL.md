@@ -39,7 +39,28 @@ OnlyRag is a local-first Windows desktop app combining:
 - **Installed Target Path**: `%LOCALAPPDATA%\Programs\OnlyRag`.
 - **PowerShell Version**: PowerShell 7 (`pwsh`). Run commands from the repository root.
 
-## 4. Primary Command Workflows
+### Code Maintenance & Quality Commands
+```powershell
+# Format code (.NET + Web Prettier)
+pwsh .\scripts\Format-Code.ps1
+
+# Static analysis and linting (TypeScript + ESLint + .NET analyzers)
+pwsh .\scripts\Lint-Code.ps1
+
+# Run full test suite (.NET xUnit + Vitest component tests)
+pwsh .\scripts\Test-Code.ps1
+```
+
+## 5. Project Skills Inventory (`skills/`)
+
+The repository includes porting skills checked into `skills/`:
+- [`skills/onlyrag`](file:///d:/GITHUB/OnlyRag/skills/onlyrag/SKILL.md): Primary architecture, workflows, local data paths, and gate check.
+- [`skills/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop, SQLite.
+- [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright.
+- [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, Heuristic Re-ranking, CRAG evaluation.
+- [`skills/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skills/onnx-directml-image-gen/SKILL.md): ONNX DirectML GPU / CPU fallback, SDXL/LCM models, SHA256 integrity, Canvas editor.
+- [`skills/windows-packaging-signing`](file:///d:/GITHUB/OnlyRag/skills/windows-packaging-signing/SKILL.md): NSIS packaging, signtool.exe signing, prerequisite testing, installer release lifecycle.
+- [`skills/code-maintenance-automation`](file:///d:/GITHUB/OnlyRag/skills/code-maintenance-automation/SKILL.md): Automated code formatting, static linting, and testing workflows.
 
 ### Setup & Prerequisites Bootstrap
 ```powershell

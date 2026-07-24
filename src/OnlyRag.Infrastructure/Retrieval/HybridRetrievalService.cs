@@ -39,7 +39,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         this.vectorSearch = vectorSearch;
         this.chunks = chunks;
         this.queryEmbeddingGenerator = queryEmbeddingGenerator;
-        this.reRanker = reRanker ?? new OnnxCrossEncoderReRankerService();
+        this.reRanker = reRanker ?? new HeuristicReRankerService();
         this.queryTransformer = queryTransformer ?? new OllamaQueryTransformationService();
         this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver();
         this.cragEvaluator = cragEvaluator ?? new CragEvaluator();

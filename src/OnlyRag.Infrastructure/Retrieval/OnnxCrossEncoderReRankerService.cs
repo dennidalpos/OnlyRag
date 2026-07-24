@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
-public sealed class OnnxCrossEncoderReRankerService : IReRankerService
+public sealed class HeuristicReRankerService : IReRankerService
 {
     private static readonly Regex WordRegex = new(@"\w+", RegexOptions.Compiled);
 
@@ -66,5 +66,19 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService
 
         double finalScore = Math.Clamp(termOverlapRatio * 0.8d + positionBonus, 0.05d, 0.99d);
         return finalScore;
+    }
+}
+
+[Obsolete("Usa HeuristicReRankerService al posto di OnnxCrossEncoderReRankerService.")]
+public class OnnxCrossEncoderReRankerService : IReRankerService
+{
+    private readonly HeuristicReRankerService inner = new();
+
+    public Task<IReadOnlyList<ReRankResult>> ReRankAsync(
+        string query,
+        IReadOnlyList<ReRankCandidate> candidates,
+        CancellationToken cancellationToken = default)
+    {
+        return inner.ReRankAsync(query, candidates, cancellationToken);
     }
 }

@@ -118,7 +118,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2d6f8f;
+  background: var(--primary);
   flex-shrink: 0;
   animation: dot-blink 0.9s ease-in-out infinite alternate;
 }
@@ -175,14 +175,14 @@
 }
 
 .doc-action-btn--primary {
-  border: 1px solid #2d6f8f;
-  background: #2d6f8f;
+  border: 1px solid var(--primary);
+  background: var(--primary);
   color: #fff;
 }
 
 .doc-action-btn--primary:hover:not(:disabled) {
-  background: #235c78;
-  border-color: #235c78;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .doc-action-btn--recovery {
@@ -263,8 +263,8 @@
 }
 
 .ocr-choice-option:hover {
-  border-color: #2d6f8f;
-  background: #e9f3f8;
+  border-color: var(--primary);
+  background: var(--primary-light);
 }
 
 .ocr-choice-option strong {

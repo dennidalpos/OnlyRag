@@ -17,7 +17,6 @@ type AppHeaderProps = {
 };
 
 export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJobsDrawer }: AppHeaderProps) {
-  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
@@ -37,11 +36,6 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
   ].filter((badge): badge is StatusBadge => badge !== null);
 
   const isOverallHealthy = backendStatus.backendTone === "online" && backendStatus.ollamaTone === "online";
-
-  useEffect(() => {
-    const timerId = window.setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => window.clearInterval(timerId);
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -105,10 +99,10 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
           </button>
           <span
             className="status-badge status-badge--neutral status-row__clock"
-            title={`Ora corrente ${formatTime(currentTime.toISOString())}`}
+            title={`Ora corrente ${formatTime(new Date().toISOString())}`}
           >
             <span>Ora</span>
-            <strong>{formatTime(currentTime.toISOString())}</strong>
+            <strong>{formatTime(new Date().toISOString())}</strong>
           </span>
         </div>
       </div>

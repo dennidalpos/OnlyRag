@@ -30,10 +30,9 @@ export function JobsDrawer({ isOpen, onClose, onJobsChanged }: JobsDrawerProps) 
           <h2 className="jobs-drawer__title">Operazioni in background</h2>
           <button
             type="button"
-            className="button-secondary"
+            className="button-secondary px-2.5 py-1"
             onClick={onClose}
             aria-label="Chiudi pannello operazioni"
-            style={{ padding: "4px 10px" }}
           >
             ✕
           </button>

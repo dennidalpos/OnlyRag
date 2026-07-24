@@ -1,4 +1,5 @@
-using System.Diagnostics;
+
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
@@ -13,7 +14,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    internal static void MapAppEndpoints(WebApplication app)
+    internal static void MapAppEndpoints(this WebApplication app)
     {
         app.MapGet("/health", () =>
             Results.Ok(new BackendHealthResponse("Healthy")));

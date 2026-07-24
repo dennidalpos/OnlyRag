@@ -11,7 +11,7 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    internal static void MapSettingsEndpoints(WebApplication app)
+    internal static void MapSettingsEndpoints(this WebApplication app)
     {
         app.MapGet("/api/settings/ollama", async (IOllamaSettingsService settings, CancellationToken cancellationToken) =>
             Results.Ok(await settings.GetAsync(cancellationToken)));

@@ -83,68 +83,60 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
       onClick={onClose}
     >
       <div
-        className="modal-content animate-fade-in"
+        className="modal-content animate-fade-in max-w-[700px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 700, maxHeight: "80vh", display: "flex", flexDirection: "column" }}
       >
-        <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="modal-header flex justify-between items-center">
+          <h3 className="m-0 flex items-center gap-2 text-base font-semibold">
             <span>💻</span> Processi in Background ({tasks.length})
           </h3>
           <button type="button" className="button-secondary" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-body" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="modal-body flex-1 overflow-y-auto flex flex-col gap-2.5">
           {tasks.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#64748b", padding: 32 }}>
-              <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
+            <div className="text-center text-slate-500 py-8">
+              <div className="text-3xl mb-2">📋</div>
               <p>Nessun processo in background attivo.</p>
             </div>
           ) : (
             tasks.map((task) => (
               <div
                 key={task.taskId}
-                style={{
-                  background: "#111827",
-                  borderRadius: 8,
-                  border: task.isRunning ? "1px solid #3b82f6" : "1px solid #334155",
-                  overflow: "hidden"
-                }}
+                className={`bg-slate-900 rounded-lg overflow-hidden border ${
+                  task.isRunning ? "border-blue-500" : "border-slate-700"
+                }`}
               >
                 {/* Task header */}
                 <div
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 14px", cursor: "pointer"
-                  }}
+                  className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer hover:bg-slate-800/50 transition-colors"
                   onClick={() => handleToggleExpand(task.taskId)}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: "0.9rem" }}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm">
                       {task.isRunning ? "🟢" : (task.exitCode === 0 ? "✅" : "❌")}
                     </span>
                     <div>
-                      <div style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "#e2e8f0", fontWeight: 600 }}>
+                      <div className="font-mono text-xs text-slate-200 font-semibold">
                         {task.command.length > 60 ? task.command.slice(0, 60) + "…" : task.command}
                       </div>
-                      <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 2 }}>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
                         ID: {task.taskId} · Avviato: {new Date(task.startedAt).toLocaleTimeString()}
                         {!task.isRunning && task.exitCode !== null && ` · Exit: ${task.exitCode}`}
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div className="flex gap-1.5 items-center">
                     {task.isRunning && (
                       <button
                         type="button"
-                        className="button button--small"
-                        style={{ background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5", fontSize: "0.75rem", padding: "3px 8px", borderRadius: 6 }}
+                        className="button button--small bg-red-950 border-red-500 text-red-300 text-xs px-2 py-0.5 rounded-md hover:bg-red-900"
                         onClick={(e) => { e.stopPropagation(); void handleKillTask(task.taskId); }}
                       >
                         ⬛ Kill
                       </button>
                     )}
-                    <span style={{ color: "#64748b", fontSize: "0.8rem" }}>
+                    <span className="text-slate-500 text-xs">
                       {expandedTaskId === task.taskId ? "▲" : "▼"}
                     </span>
                   </div>
@@ -152,21 +144,16 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
 
                 {/* Expanded logs */}
                 {expandedTaskId === task.taskId && (
-                  <div style={{ borderTop: "1px solid #1e293b" }}>
-                    <pre style={{
-                      margin: 0, padding: "10px 14px", background: "#090d16",
-                      fontSize: "0.78rem", color: "#cbd5e1", maxHeight: 250,
-                      overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace"
-                    }}>
+                  <div className="border-t border-slate-800">
+                    <pre className="m-0 p-3 bg-slate-950 text-[11px] text-slate-300 max-h-[250px] overflow-y-auto whitespace-pre-wrap font-mono">
                       {taskLogs[task.taskId] || "Caricamento log..."}
                     </pre>
 
                     {task.isRunning && (
-                      <div style={{ display: "flex", gap: 6, padding: "8px 14px", borderTop: "1px solid #1e293b" }}>
+                      <div className="flex gap-1.5 p-3 border-t border-slate-800">
                         <input
                           type="text"
-                          className="input-control"
-                          style={{ flex: 1, fontSize: "0.82rem" }}
+                          className="input-control flex-1 text-xs"
                           placeholder="Invia input allo stdin del processo..."
                           value={sendInputValue}
                           onChange={(e) => setSendInputValue(e.target.value)}
@@ -179,8 +166,7 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
                         />
                         <button
                           type="button"
-                          className="button button--primary button--small"
-                          style={{ fontSize: "0.78rem" }}
+                          className="button button--primary button--small text-xs"
                           onClick={() => void handleSendInput(task.taskId)}
                         >
                           Invia
@@ -188,11 +174,10 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
                       </div>
                     )}
 
-                    <div style={{ padding: "6px 14px", display: "flex", justifyContent: "flex-end" }}>
+                    <div className="p-2 flex justify-end">
                       <button
                         type="button"
-                        className="button button--secondary button--small"
-                        style={{ fontSize: "0.75rem" }}
+                        className="button button--secondary button--small text-xs"
                         onClick={() => void fetchTaskLogs(task.taskId)}
                       >
                         🔄 Aggiorna Log
@@ -208,3 +193,4 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
     </div>
   );
 }
+

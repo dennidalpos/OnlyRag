@@ -263,22 +263,25 @@ public sealed class LocalJobWorkerServiceTests
 
         private static void DeleteDirectoryWithRetry(string path)
         {
-            const int maxAttempts = 20;
+            const int maxAttempts = 30;
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 ReleaseSqliteFileHandles();
                 try
                 {
-                    Directory.Delete(path, recursive: true);
+                    if (Directory.Exists(path))
+                    {
+                        Directory.Delete(path, recursive: true);
+                    }
                     return;
                 }
                 catch (IOException) when (attempt < maxAttempts)
                 {
-                    Thread.Sleep(100 * attempt);
+                    Thread.Sleep(150 * attempt);
                 }
                 catch (UnauthorizedAccessException) when (attempt < maxAttempts)
                 {
-                    Thread.Sleep(100 * attempt);
+                    Thread.Sleep(150 * attempt);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -294,6 +297,7 @@ public sealed class LocalJobWorkerServiceTests
             SqliteConnection.ClearAllPools();
             GC.Collect();
             GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
     }
 }

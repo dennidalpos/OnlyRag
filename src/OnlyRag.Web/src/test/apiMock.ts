@@ -64,7 +64,7 @@ function jsonResponse(body: unknown, status: number, extraHeaders: Record<string
   }
 
   if (typeof body === "string") {
-    return new Response(body, {
+    return new Response(new TextEncoder().encode(body), {
       status,
       headers: {
         "Content-Type": "text/event-stream",

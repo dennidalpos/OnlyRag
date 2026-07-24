@@ -85,7 +85,7 @@ export function ImageCanvasEditor({
               disabled={!hasPrevImage}
               title="Immagine precedente nella galleria"
             >
-              ◀ Precedente
+              Precedente
             </button>
           )}
           {onNextImage && (
@@ -96,7 +96,7 @@ export function ImageCanvasEditor({
               disabled={!hasNextImage}
               title="Immagine successiva nella galleria"
             >
-              Successiva ▶
+              Successiva
             </button>
           )}
           {onCopyPrompt && (
@@ -106,7 +106,7 @@ export function ImageCanvasEditor({
               onClick={() => onCopyPrompt(selectedImage.prompt)}
               title="Copia il prompt dell'immagine negli appunti"
             >
-              📋 Copia Prompt
+              Copia Prompt
             </button>
           )}
           {onDownloadImage && (
@@ -116,15 +116,15 @@ export function ImageCanvasEditor({
               onClick={() => onDownloadImage(selectedImage)}
               title="Scarica l'immagine originale sul PC locale"
             >
-              💾 Scarica File
+              Scarica File
             </button>
           )}
         </div>
       </div>
 
       {/* Edit History Toolbar (Undo, Redo, Specific Element Deletion) */}
-      <div className="edit-history-toolbar" style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "var(--color-bg-subtle, #1e293b)", padding: "6px 12px", borderRadius: "6px" }}>
-        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginRight: "4px" }}>Storico Modifiche:</span>
+      <div className="edit-history-toolbar" style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "#f8fafc", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-light)" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginRight: "4px" }}>Storico:</span>
         <button
           type="button"
           className="button-secondary button-secondary--xs"
@@ -132,7 +132,7 @@ export function ImageCanvasEditor({
           disabled={!canUndo}
           title="Annulla l'ultima modifica applicata (Ctrl+Z)"
         >
-          ↩️ Annulla (Undo)
+          Annulla (Undo)
         </button>
 
         <button
@@ -142,7 +142,7 @@ export function ImageCanvasEditor({
           disabled={!canRedo}
           title="Ripristina la modifica annullata (Ctrl+Y)"
         >
-          ↪️ Ripristina (Redo)
+          Ripristina (Redo)
         </button>
 
         {editState.crop && (
@@ -152,7 +152,7 @@ export function ImageCanvasEditor({
             onClick={onRemoveCrop}
             title="Rimuovi il rettangolo di ritaglio dal canvas"
           >
-            ❌ Rimuovi Ritaglio
+            Rimuovi Ritaglio
           </button>
         )}
 
@@ -163,7 +163,7 @@ export function ImageCanvasEditor({
             onClick={onDeleteSelectedArrow}
             title="Elimina la freccia attualmente selezionata"
           >
-            🗑️ Elimina Freccia
+            Elimina Freccia
           </button>
         )}
 
@@ -174,7 +174,7 @@ export function ImageCanvasEditor({
             onClick={onDeleteSelectedText}
             title="Elimina il testo attualmente selezionato"
           >
-            🗑️ Elimina Testo
+            Elimina Testo
           </button>
         )}
 
@@ -185,7 +185,7 @@ export function ImageCanvasEditor({
             onClick={onResetEdits}
             title="Azzera e cancella tutte le modifiche e sovrapposizioni sul canvas"
           >
-            🧹 Annulla Tutte le Modifiche
+            Azzera Modifiche
           </button>
         )}
       </div>

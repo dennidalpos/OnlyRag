@@ -104,9 +104,9 @@
 }
 
 .preview-page-btn--active {
-  border-color: #2d6f8f;
-  background: #e9f3f8;
-  color: #16324f;
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
   font-weight: 700;
 }
 
