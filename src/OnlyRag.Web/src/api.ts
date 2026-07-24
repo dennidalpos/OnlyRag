@@ -1,4 +1,5 @@
 export {
+  apiAgentStreamRequest,
   apiRequest,
   apiStreamRequest,
   markBackendOffline,

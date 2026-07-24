@@ -168,7 +168,7 @@ internal sealed class AgentLoopEngine
 
         // Tenta il parsing diretto se l'intero testo è un oggetto JSON
         string trimmed = text.Trim();
-        if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+        if (trimmed.StartsWith('{') && trimmed.EndsWith('}'))
         {
             return ParseToolCallJson(trimmed);
         }

@@ -165,6 +165,67 @@ export async function apiStreamRequest(
   }
 }
 
+export async function apiAgentStreamRequest(
+  path: string,
+  body: unknown,
+  onEvent: (event: unknown) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const baseUrl = resolveBackendBaseUrl();
+  if (!baseUrl) {
+    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile. Riavviare l'applicazione.");
+  }
+
+  const requestUrl = resolveBackendRequestUrl(path, baseUrl);
+  const headers = new Headers();
+  headers.set("Content-Type", "application/json");
+
+  const sessionToken = resolveBackendSessionToken();
+  if (!sessionToken) {
+    throw new Error("Il token di sessione del backend locale non è disponibile. Riavviare l'applicazione.");
+  }
+  headers.set(sessionToken.headerName, sessionToken.token);
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal
+  });
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response));
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const dataStr = trimmed.slice(6);
+      if (dataStr === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(dataStr) as unknown;
+        onEvent(parsed);
+      } catch {
+        // Ignora JSON non valido
+      }
+    }
+  }
+}
+
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
   const url = new URL(path, baseUrl);
   const backendOrigin = new URL(baseUrl).origin;

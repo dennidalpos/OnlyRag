@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { apiRequest, apiStreamRequest, type OllamaModel } from "../api";
+import {
+  apiAgentStreamRequest,
+  apiRequest,
+  apiStreamRequest,
+  type AgentRunRequest,
+  type AgentStepEvent,
+  type ApproveToolCallRequest,
+  type OllamaModel
+} from "../api";
 import type {
   CodingTaskRequest,
   DeleteWorkspaceFileRequest,
@@ -10,12 +18,14 @@ import type {
   PickWorkspaceFolderResponse,
   ReadWorkspaceFileRequest,
   ReadWorkspaceFileResponse,
-  SelectWorkspaceRequest,
+
   WorkspaceConfig,
   WorkspaceFileItem,
   WriteWorkspaceFileRequest,
   WriteWorkspaceFileResponse
 } from "../apiTypes";
+import { AgentToolCallCard } from "./AgentToolCallCard";
+import { BackgroundTaskDrawer } from "./BackgroundTaskDrawer";
 import { formatWorkspaceTreeSummary } from "./CodingSection.helpers";
 import {
   deleteCustomPreset,
@@ -41,6 +51,7 @@ type CodingMessage = {
   fileActions?: FileAction[];
   attachedFile?: string;
   isStreaming?: boolean;
+  agentEvents?: AgentStepEvent[];
 };
 
 type CodingSectionProps = {
@@ -58,10 +69,13 @@ export function CodingSection({
 }: CodingSectionProps) {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [operatingMode, setOperatingMode] = useState<"plan" | "write">("write");
+  const [useAgentMode, setUseAgentMode] = useState(false);
+  const [autoApproveCommands, setAutoApproveCommands] = useState(false);
   const [promptInput, setPromptInput] = useState("");
   const [messages, setMessages] = useState<CodingMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
 
   // Workspace state
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
@@ -70,8 +84,6 @@ export function CodingSection({
   const [attachedFileContent, setAttachedFileContent] = useState<string | null>(null);
   const [isWorkspaceFilePickerOpen, setIsWorkspaceFilePickerOpen] = useState(false);
   const [isAttachedFileEditorOpen, setIsAttachedFileEditorOpen] = useState(false);
-  const [showManualFolderInput, setShowManualFolderInput] = useState(false);
-  const [manualFolderPath, setManualFolderPath] = useState("");
   const [workspaceStatusMessage, setWorkspaceStatusMessage] = useState<string | null>(null);
 
   // Vibe Presets state
@@ -101,6 +113,13 @@ export function CodingSection({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isGenerating]);
+
+  // Auto-dismiss workspace status messages after 5 seconds
+  useEffect(() => {
+    if (!workspaceStatusMessage) return;
+    const timer = setTimeout(() => setWorkspaceStatusMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [workspaceStatusMessage]);
 
   async function refreshWorkspaceConfig() {
     try {
@@ -141,22 +160,7 @@ export function CodingSection({
     }
   }
 
-  async function handleManualSelectFolder() {
-    if (!manualFolderPath.trim()) return;
-    try {
-      const config = await apiRequest<WorkspaceConfig>("/api/workspace/select", {
-        method: "POST",
-        body: JSON.stringify({ folderPath: manualFolderPath } as SelectWorkspaceRequest)
-      });
-      setWorkspaceConfig(config);
-      setWorkspaceStatusMessage(`Cartella autorizzata: ${config.rootPath}`);
-      setShowManualFolderInput(false);
-      setManualFolderPath("");
-      void fetchWorkspaceFiles();
-    } catch (err) {
-      setWorkspaceStatusMessage(err instanceof Error ? err.message : "Errore autorizzazione cartella.");
-    }
-  }
+
 
   async function handleAttachWorkspaceFile(relativePath: string) {
     try {
@@ -340,9 +344,95 @@ export function CodingSection({
     return actions;
   }
 
+  async function handleApproveAgentToolCall(callId: string, approved: boolean) {
+    try {
+      await apiRequest<{ success: boolean }>("/api/agent/approve-tool", {
+        method: "POST",
+        body: JSON.stringify({ callId, approved } as ApproveToolCallRequest)
+      });
+    } catch {
+      // Ignorato
+    }
+  }
+
+  async function handleSendAgentMessage(textToSend: string) {
+    const userMessageId = `user_${Date.now()}`;
+    const userMsg: CodingMessage = {
+      id: userMessageId,
+      sender: "user",
+      content: textToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      attachedFile: selectedWorkspaceFile ?? undefined
+    };
+
+    const assistantMessageId = `agent_${Date.now()}`;
+    const assistantMsg: CodingMessage = {
+      id: assistantMessageId,
+      sender: "assistant",
+      content: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isStreaming: true,
+      agentEvents: []
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setPromptInput("");
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      await apiAgentStreamRequest(
+        "/api/agent/run-stream",
+        {
+          goal: textToSend,
+          model: selectedModel || null,
+          mode: operatingMode,
+          workspaceRoot: workspaceConfig?.rootPath || null,
+          autoApproveCommands
+        } as AgentRunRequest,
+        (rawEvent) => {
+          const event = rawEvent as AgentStepEvent;
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== assistantMessageId) return msg;
+              const updatedEvents = [...(msg.agentEvents || []), event];
+              const finalContent = event.type === "final_response" && event.content
+                ? event.content
+                : msg.content;
+              return { ...msg, agentEvents: updatedEvents, content: finalContent };
+            })
+          );
+        }
+      );
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg
+        )
+      );
+      void fetchWorkspaceFiles();
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Errore durante l'esecuzione dell'agente.";
+      setError(errMsg);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: `⚠️ Errore: ${errMsg}`, isStreaming: false }
+            : msg
+        )
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   async function handleSendMessage(overridePrompt?: string) {
     const textToSend = overridePrompt ?? promptInput;
     if (!textToSend.trim() || isGenerating) return;
+
+    if (useAgentMode && workspaceConfig?.isAuthorized) {
+      return handleSendAgentMessage(textToSend);
+    }
 
     const userMessageId = `user_${Date.now()}`;
     const userMsg: CodingMessage = {
@@ -519,24 +609,13 @@ export function CodingSection({
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {workspaceConfig?.isAuthorized && (
-            <>
-              <button
-                type="button"
-                className="button button--secondary button--small"
-                onClick={() => setIsWorkspaceFilePickerOpen(true)}
-              >
-                📄 File ({workspaceFiles.length})
-              </button>
-              <button
-                type="button"
-                className="button button--secondary button--small"
-                style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5" }}
-                onClick={() => void handleExecuteWorkspaceCommand()}
-                title="Esegui compilazione dotnet build nella root di progetto"
-              >
-                🚀 Compila & Avvia
-              </button>
-            </>
+            <button
+              type="button"
+              className="button button--secondary button--small"
+              onClick={() => setIsWorkspaceFilePickerOpen(true)}
+            >
+              📄 File ({workspaceFiles.length})
+            </button>
           )}
           <button
             type="button"
@@ -546,36 +625,9 @@ export function CodingSection({
           >
             📂 Sfoglia Cartella
           </button>
-          <button
-            type="button"
-            className="button button--secondary button--small"
-            onClick={() => setShowManualFolderInput(!showManualFolderInput)}
-            title="Inserisci percorso manuale"
-          >
-            ⚙️
-          </button>
         </div>
       </div>
 
-      {/* MANUAL FOLDER OVERLAY */}
-      {showManualFolderInput && (
-        <div style={{ marginBottom: 14, display: "flex", gap: 8, background: "#1e293b", padding: 12, borderRadius: 8, border: "1px solid #475569", width: "100%" }}>
-          <input
-            type="text"
-            className="input-control"
-            placeholder="Percorso completo della cartella Windows (es. D:\Progetti\MiaApp)..."
-            value={manualFolderPath}
-            onChange={(e) => setManualFolderPath(e.target.value)}
-          />
-          <button
-            type="button"
-            className="button button--primary button--small"
-            onClick={() => void handleManualSelectFolder()}
-          >
-            Imposta Cartella
-          </button>
-        </div>
-      )}
 
       {workspaceStatusMessage && (
         <div className="feedback-banner feedback-banner--info" style={{ marginBottom: 14 }}>
@@ -675,10 +727,12 @@ export function CodingSection({
       >
         {messages.length === 0 ? (
           <div style={{ margin: "auto", textAlign: "center", color: "#64748b", maxWidth: 500 }}>
-            <div style={{ fontSize: "2.8rem", marginBottom: 8 }}>🚀</div>
-            <h3 style={{ color: "#e2e8f0", marginBottom: 6 }}>Coding & Vibe Hub</h3>
+            <div style={{ fontSize: "2.8rem", marginBottom: 8 }}>{useAgentMode ? "🤖" : "🚀"}</div>
+            <h3 style={{ color: "#e2e8f0", marginBottom: 6 }}>{useAgentMode ? "Agente Autonomo" : "Coding & Vibe Hub"}</h3>
             <p style={{ fontSize: "0.9rem", lineHeight: 1.5, color: "#94a3b8" }}>
-              Seleziona la cartella del progetto per consentire all&apos;assistente di analizzare i file, applicare modifiche ed eseguire comandi.
+              {useAgentMode
+                ? "Modalità Agente attiva. Scrivi un obiettivo in linguaggio naturale e l'agente esplorerà il progetto, leggerà i file, applicherà le modifiche ed eseguirà i comandi necessari."
+                : "Seleziona la cartella del progetto per consentire all'assistente di analizzare i file, applicare modifiche ed eseguire comandi."}
             </p>
           </div>
         ) : (
@@ -688,7 +742,7 @@ export function CodingSection({
               style={{
                 alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
                 maxWidth: "92%",
-                width: "fit-content",
+                width: msg.agentEvents && msg.agentEvents.length > 0 ? "100%" : "fit-content",
                 background: msg.sender === "user" ? "#1e3a8a" : "#1e293b",
                 color: "#f8fafc",
                 borderRadius: 10,
@@ -698,7 +752,7 @@ export function CodingSection({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6, fontSize: "0.78rem", color: "#94a3b8" }}>
-                <strong>{msg.sender === "user" ? "👤 Tu" : `🤖 Assistant (${selectedModel})`}</strong>
+                <strong>{msg.sender === "user" ? "👤 Tu" : (msg.agentEvents ? `🤖 Agente (${selectedModel})` : `🤖 Assistant (${selectedModel})`)}</strong>
                 <span>{msg.timestamp}</span>
               </div>
 
@@ -708,10 +762,24 @@ export function CodingSection({
                 </div>
               )}
 
-              <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.sender === "assistant" ? "monospace" : "inherit", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                {msg.content}
-                {msg.isStreaming && <span className="streaming-cursor">▌</span>}
-              </div>
+              {/* AGENT EVENTS RENDERING */}
+              {msg.agentEvents && msg.agentEvents.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {msg.agentEvents.map((evt, idx) => (
+                    <AgentToolCallCard
+                      key={`${msg.id}_evt_${idx}`}
+                      event={evt}
+                      onApprove={(callId, approved) => void handleApproveAgentToolCall(callId, approved)}
+                    />
+                  ))}
+                  {msg.isStreaming && <span className="streaming-cursor">▌</span>}
+                </div>
+              ) : (
+                <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.sender === "assistant" ? "monospace" : "inherit", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                  {msg.content}
+                  {msg.isStreaming && <span className="streaming-cursor">▌</span>}
+                </div>
+              )}
 
               {/* FILE ACTIONS & IMPACTED FILES */}
               {msg.fileActions && msg.fileActions.length > 0 && (
@@ -869,8 +937,8 @@ export function CodingSection({
 
         {/* PROMPT ACTION TOOLBAR */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          {/* MODE TOGGLE SWITCH: LETTURA / PIANO vs SCRITTURA */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* MODE TOGGLE SWITCH: LETTURA / PIANO vs SCRITTURA vs AGENTE */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 600 }}>Modalità:</span>
             <div style={{ display: "inline-flex", background: "#090d16", padding: 3, borderRadius: 8, border: "1px solid #334155" }}>
               <button
@@ -882,11 +950,11 @@ export function CodingSection({
                   fontSize: "0.82rem",
                   fontWeight: 600,
                   cursor: "pointer",
-                  background: operatingMode === "plan" ? "#312e81" : "transparent",
-                  color: operatingMode === "plan" ? "#c7d2fe" : "#94a3b8",
+                  background: !useAgentMode && operatingMode === "plan" ? "#312e81" : "transparent",
+                  color: !useAgentMode && operatingMode === "plan" ? "#c7d2fe" : "#94a3b8",
                   transition: "all 0.15s ease"
                 }}
-                onClick={() => setOperatingMode("plan")}
+                onClick={() => { setOperatingMode("plan"); setUseAgentMode(false); }}
                 title="Modalità Piano/Lettura: analizza e pianifica senza modificare direttamente i file"
               >
                 📖 Lettura / Piano
@@ -900,16 +968,56 @@ export function CodingSection({
                   fontSize: "0.82rem",
                   fontWeight: 600,
                   cursor: "pointer",
-                  background: operatingMode === "write" ? "#1e3a8a" : "transparent",
-                  color: operatingMode === "write" ? "#60a5fa" : "#94a3b8",
+                  background: !useAgentMode && operatingMode === "write" ? "#1e3a8a" : "transparent",
+                  color: !useAgentMode && operatingMode === "write" ? "#60a5fa" : "#94a3b8",
                   transition: "all 0.15s ease"
                 }}
-                onClick={() => setOperatingMode("write")}
+                onClick={() => { setOperatingMode("write"); setUseAgentMode(false); }}
                 title="Modalità Scrittura: crea, modifica o elimina file nel workspace ed esegui comandi"
               >
                 ✍️ Scrittura
               </button>
+              <button
+                type="button"
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 6,
+                  border: "none",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: useAgentMode ? "#064e3b" : "transparent",
+                  color: useAgentMode ? "#6ee7b7" : "#94a3b8",
+                  transition: "all 0.15s ease"
+                }}
+                onClick={() => setUseAgentMode(true)}
+                title="Modalità Agente Autonomo: esplora il progetto, legge file, applica modifiche ed esegue comandi in loop"
+              >
+                🤖 Agente
+              </button>
             </div>
+
+            {useAgentMode && (
+              <>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.78rem", color: "#94a3b8", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={autoApproveCommands}
+                    onChange={(e) => setAutoApproveCommands(e.target.checked)}
+                    style={{ accentColor: "#10b981" }}
+                  />
+                  Auto-Approva Comandi
+                </label>
+                <button
+                  type="button"
+                  className="button button--secondary button--small"
+                  style={{ fontSize: "0.78rem" }}
+                  onClick={() => setIsTaskDrawerOpen(true)}
+                >
+                  💻 Processi
+                </button>
+              </>
+            )}
 
             {workspaceConfig?.isAuthorized && !selectedWorkspaceFile && (
               <button
@@ -1026,6 +1134,12 @@ export function CodingSection({
         fileName={selectedWorkspaceFile}
         content={attachedFileContent || ""}
         onSaveContent={(updatedContent, saveToDisk) => void handleSaveAttachedFileContent(updatedContent, saveToDisk)}
+      />
+
+      {/* BACKGROUND TASK DRAWER */}
+      <BackgroundTaskDrawer
+        isOpen={isTaskDrawerOpen}
+        onClose={() => setIsTaskDrawerOpen(false)}
       />
     </section>
   );

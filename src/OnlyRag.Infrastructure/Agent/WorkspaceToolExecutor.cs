@@ -7,6 +7,8 @@ namespace OnlyRag.Infrastructure.Agent;
 
 public sealed class WorkspaceToolExecutor
 {
+    private static readonly JsonSerializerOptions s_indentedOptions = new() { WriteIndented = true };
+
     private readonly BackgroundTaskManager taskManager;
 
     public WorkspaceToolExecutor(BackgroundTaskManager taskManager)
@@ -60,7 +62,7 @@ public sealed class WorkspaceToolExecutor
 
         var dir = new DirectoryInfo(safePath);
         var entries = dir.EnumerateFileSystemInfos("*", SearchOption.TopDirectoryOnly)
-            .Where(e => !e.Name.StartsWith(".") && e.Name != "node_modules" && e.Name != "bin" && e.Name != "obj")
+            .Where(e => !e.Name.StartsWith('.') && e.Name != "node_modules" && e.Name != "bin" && e.Name != "obj")
             .Take(100)
             .Select(e => new
             {
@@ -70,7 +72,7 @@ public sealed class WorkspaceToolExecutor
                 relativePath = Path.GetRelativePath(rootPath, e.FullName).Replace('\\', '/')
             });
 
-        string json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+        string json = JsonSerializer.Serialize(entries, s_indentedOptions);
         return new AgentToolResult(callId, toolName, true, json);
     }
 
