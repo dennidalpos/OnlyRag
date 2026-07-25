@@ -50,4 +50,35 @@ public sealed class AgentLoopEngineTests
         Assert.Null(requestUnlimited.MaxIterations);
         Assert.Equal(50, requestCustom.MaxIterations);
     }
+
+    [Fact]
+    public void EnrichGoalWithWorkspaceContext_InjectsWorkspaceMetadata()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "OnlyRagTestWorkspace_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "AGENTS.md"), "# Rules");
+            File.WriteAllText(Path.Combine(tempDir, "workspace_settings.json"), "{\"preset\": \"vibe\"}");
+
+            // Call internal EnrichGoalWithWorkspaceContext via reflection or method call
+            var method = typeof(AgentLoopEngine).GetMethod("EnrichGoalWithWorkspaceContext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.NotNull(method);
+
+            string result = (string)method.Invoke(null, new object[] { "Analizza il codice", tempDir })!;
+
+            Assert.Contains("Analizza il codice", result);
+            Assert.Contains("[CONTESTO WORKSPACE ATTIVO]", result);
+            Assert.Contains("AGENTS.md", result);
+            Assert.Contains("workspace_settings.json", result);
+            Assert.Contains("{\"preset\": \"vibe\"}", result);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }

@@ -589,9 +589,14 @@ internal sealed class AgentLoopEngine
             "read" or "readfile" or "read_file_content" or "view_file" or "cat" => "read_file",
             "write" or "writefile" or "create_file" or "create" or "write_to_file" => "write_file",
             "replace" or "replacefile" or "replace_content" or "edit" or "edit_file" => "replace_file_content",
+            "multi_replace" or "multi_replace_file_content" or "batch_replace" => "multi_replace_file_content",
             "grep" or "search" or "find" or "grep_search" or "find_in_files" => "grep_search",
+            "git_diff" or "git_status" or "git_diff_inspect" or "git" => "git_diff_inspect",
             "run" or "exec" or "execute" or "command" or "terminal" or "run_command" or "cmd" or "powershell" => "run_command",
             "web_search" or "search_web" or "internet_search" or "online_search" or "ddg" or "google" => "web_search",
+            "ingest_office" or "ingest_office_doc" or "office_ingest" or "ingest_document" => "ingest_office_doc",
+            "generate_image" or "generate_image_onnx" or "image_gen" or "create_image" => "generate_image_onnx",
+            "query_retrieval" or "query_retrieval_index" or "search_retrieval" or "vector_search" => "query_retrieval_index",
             "subagent" or "invoke_subagent" or "sub_agent" => "invoke_subagent",
             "task" or "manage_task" => "manage_task",
             _ => t
@@ -634,10 +639,15 @@ STRUMENTI DISPONIBILI:
 2. read_file({"relativePath": "string", "startLine": 1, "endLine": 100}) [Alias: view_file]
 3. write_file({"relativePath": "string", "content": "string"}) [Alias: write_to_file]
 4. replace_file_content({"relativePath": "string", "targetContent": "string", "replacementContent": "string"})
-5. grep_search({"query": "string", "searchPath": "string"})
-6. run_command({"commandLine": "string", "isAsync": false})
-7. web_search({"query": "string", "domain": "string"}) [Ricerca online su documentazione e fonti ufficiali: Microsoft, .NET, React, Vite, Ollama, Python, MDN]
-8. manage_task({"action": "list|status|kill|send_input", "taskId": "string"})
+5. multi_replace_file_content({"relativePath": "string", "chunks": [{"targetContent": "string", "replacementContent": "string"}]})
+6. grep_search({"query": "string", "searchPath": "string"})
+7. git_diff_inspect({"relativePath": "string"}) [Analisi dello stato Git e diff delle modifiche locale]
+8. run_command({"commandLine": "string", "isAsync": false})
+9. web_search({"query": "string", "domain": "string"}) [Ricerca online su documentazione e fonti ufficiali]
+10. ingest_office_doc({"relativePath": "string", "forceOcr": false}) [Ingestion RAG di file Office/PDF tramite LibreOffice & PaddleOCR GPU]
+11. generate_image_onnx({"prompt": "string", "aspectRatio": "1:1|16:9|9:16"}) [Generazione/editing immagini tramite ONNX DirectML GPU]
+12. query_retrieval_index({"query": "string", "topK": 5}) [Interrogazione diretta indici SQLite FTS5 e Qdrant vectors]
+13. manage_task({"action": "list|status|kill|send_input", "taskId": "string"})
 
 REGOLE PER LE CHIAMATE DI STRUMENTO (UNIVERSAL LLM FORMAT):
 Per invocare uno strumento, rispondi RIGOROSAMENTE con un blocco di codice JSON racchiuso in ```json ... ``` o con il tag <tool_call> ... </tool_call> nel formato:
@@ -655,8 +665,8 @@ REGOLE COMPORTAMENTALI (ANTIGRAVITY DIRECTIVES):
 1. **PRIMO PASSO OBBLIGATORIO**: Inizia SEMPRE con una chiamata a list_dir con relativePath "." per esplorare la struttura del workspace. Non rispondere MAI direttamente all'utente senza prima aver esplorato il progetto.
 2. **Uso di Percorsi Reali**: Non ipotizzare mai percorsi o nomi di cartelle non esistenti. Esamina i file restituiti da list_dir o grep_search e usa ESATTAMENTE quei percorsi. Se un file/cartella non viene trovata, torna ad esplorare la radice con list_dir con relativePath: ".".
 3. **Esplorazione Approfondita & Fonti Ufficiali**: Usa read_file e grep_search per il codice locale. Se necessiti di verificare documentazione o standard ufficiali, usa web_search con query mirate.
-4. **MODALITÀ SCRITTURA (MODIFICA OBBLIGATORIA SU DISCO)**: Quando sei in modalità 'write' e l'utente ti chiede di creare, modificare o rifattorizzare codice, DEVI OBBLIGATORIAMENTE chiamare `write_file` o `replace_file_content` per applicare le modifiche direttamente sul disco prima di concludere! NON limitarti a stampare il codice nel testo finale senza aver invocato il tool di scrittura.
-5. **Modalità Plan**: In modalità 'plan', NON chiamare mai write_file, replace_file_content o run_command. Concentrati sull'analisi architetturale e la pianificazione.
+4. **MODALITÀ SCRITTURA (MODIFICA OBBLIGATORIA SU DISCO)**: Quando sei in modalità 'write' e l'utente ti chiede di creare, modificare o rifattorizzare codice, DEVI OBBLIGATORIAMENTE chiamare `write_file`, `replace_file_content` o `multi_replace_file_content` per applicare le modifiche direttamente sul disco prima di concludere! NON limitarti a stampare il codice nel testo finale senza aver invocato il tool di scrittura.
+5. **Modalità Plan**: In modalità 'plan', NON chiamare mai write_file, replace_file_content, multi_replace_file_content o run_command. Concentrati sull'analisi architetturale e la pianificazione.
 6. **Lavoro Diretto**: Esegui le operazioni direttamente con i tool forniti.
 7. **Una Chiamata per Passo**: Esegui una sola chiamata di strumento per ciascuna risposta.
 8. **Risposta Finale**: Soltanto DOPO aver eseguito i tool di scrittura necessari per completare l'obiettivo, fornisci la tua sintesi finale in Markdown normale SENZA blocchi JSON di strumenti.
@@ -670,12 +680,86 @@ REGOLE COMPORTAMENTALI (ANTIGRAVITY DIRECTIVES):
             return goal;
         }
 
-        return $"""
-{goal}
+        var sb = new StringBuilder();
+        sb.AppendLine(goal);
+        sb.AppendLine();
+        sb.AppendLine("[CONTESTO WORKSPACE ATTIVO]");
+        sb.AppendLine($"Cartella radice del progetto: {workspaceRoot}");
 
-[CONTESTO WORKSPACE]
-Il workspace del progetto è attivo alla cartella: {workspaceRoot}
-Inizia esplorando la struttura del progetto con list_dir per comprendere il contesto prima di agire.
-""";
+        try
+        {
+            if (Directory.Exists(workspaceRoot))
+            {
+                var detectedItems = new List<string>();
+
+                string agentsPath = Path.Combine(workspaceRoot, "AGENTS.md");
+                if (File.Exists(agentsPath))
+                {
+                    detectedItems.Add("- AGENTS.md (Istruzioni e convenzioni generali del repository)");
+                }
+
+                string statusPath = Path.Combine(workspaceRoot, "PROJECT_STATUS.json");
+                if (File.Exists(statusPath))
+                {
+                    detectedItems.Add("- PROJECT_STATUS.json (Todo attivi e stato del progetto)");
+                }
+
+                string settingsPath = Path.Combine(workspaceRoot, "workspace_settings.json");
+                if (File.Exists(settingsPath))
+                {
+                    detectedItems.Add("- workspace_settings.json (Impostazioni e switch attivi del workspace)");
+                }
+
+                string readmePath = Path.Combine(workspaceRoot, "README.md");
+                if (File.Exists(readmePath))
+                {
+                    detectedItems.Add("- README.md (Panoramica e guida principale del repository)");
+                }
+
+                string skillsDir = Path.Combine(workspaceRoot, "skills");
+                if (Directory.Exists(skillsDir))
+                {
+                    detectedItems.Add("- skills/ (Directory skill e linee guida di dominio del progetto)");
+                }
+
+                if (detectedItems.Count > 0)
+                {
+                    sb.AppendLine("File di contesto e configurazione identificati nella radice del progetto:");
+                    foreach (var item in detectedItems)
+                    {
+                        sb.AppendLine(item);
+                    }
+                }
+
+                if (File.Exists(settingsPath))
+                {
+                    try
+                    {
+                        string settingsJson = File.ReadAllText(settingsPath, Encoding.UTF8);
+                        if (!string.IsNullOrWhiteSpace(settingsJson) && settingsJson.Length < 2000)
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine("Contenuto switch/configurazione di workspace_settings.json:");
+                            sb.AppendLine(settingsJson.Trim());
+                        }
+                    }
+                    catch
+                    {
+                        // Safe fallback
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Safe fallback
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("ISTRUZIONI PER L'AGENTE:");
+        sb.AppendLine("1. Esegui sempre list_dir con relativePath: \".\" al primo passo per esplorare l'albero dei file ed identificare i moduli.");
+        sb.AppendLine("2. Se presenti, leggi prioritariamente AGENTS.md, PROJECT_STATUS.json o workspace_settings.json per rispettare le convenzioni del progetto, le responsabilita dei file e gli switch di configurazione.");
+
+        return sb.ToString();
     }
 }

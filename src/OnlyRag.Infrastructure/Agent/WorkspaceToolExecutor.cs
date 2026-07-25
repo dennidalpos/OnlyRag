@@ -4,7 +4,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Images;
+using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Logging;
+using OnlyRag.Infrastructure.Retrieval;
 
 namespace OnlyRag.Infrastructure.Agent;
 
@@ -13,11 +16,22 @@ public sealed class WorkspaceToolExecutor
     private static readonly JsonSerializerOptions s_indentedOptions = new() { WriteIndented = true };
 
     private readonly BackgroundTaskManager taskManager;
+    private readonly IHybridRetrievalService? retrievalService;
+    private readonly IDocumentIngestionService? ingestionService;
+    private readonly ImageGenerationService? imageGenerationService;
     private readonly ILoggingService? logger;
 
-    public WorkspaceToolExecutor(BackgroundTaskManager taskManager, ILoggingService? logger = null)
+    public WorkspaceToolExecutor(
+        BackgroundTaskManager taskManager,
+        IHybridRetrievalService? retrievalService = null,
+        IDocumentIngestionService? ingestionService = null,
+        ImageGenerationService? imageGenerationService = null,
+        ILoggingService? logger = null)
     {
         this.taskManager = taskManager;
+        this.retrievalService = retrievalService;
+        this.ingestionService = ingestionService;
+        this.imageGenerationService = imageGenerationService;
         this.logger = logger;
     }
 
@@ -48,10 +62,15 @@ public sealed class WorkspaceToolExecutor
                 "read_file" or "view_file" => await ReadFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "write_file" or "write_to_file" => await WriteFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "replace_file_content" => await ReplaceFileContentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
+                "multi_replace_file_content" => await MultiReplaceFileContentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "grep_search" => GrepSearch(callId, toolName, root, workspaceRoot),
+                "git_diff_inspect" => GitDiffInspect(callId, toolName, root, workspaceRoot),
                 "run_command" => RunCommand(callId, toolName, root, workspaceRoot),
                 "manage_task" => ManageTask(callId, toolName, root),
                 "web_search" or "search_web" => await WebSearchAsync(callId, toolName, root, cancellationToken),
+                "ingest_office_doc" => await IngestOfficeDocAsync(callId, toolName, root, workspaceRoot, cancellationToken),
+                "generate_image_onnx" => await GenerateImageOnnxAsync(callId, toolName, root, cancellationToken),
+                "query_retrieval_index" => await QueryRetrievalIndexAsync(callId, toolName, root, cancellationToken),
                 "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool non riconosciuto: {toolName}")
             };
@@ -477,6 +496,308 @@ public sealed class WorkspaceToolExecutor
             }
         }
         return null;
+    }
+
+    private async Task<AgentToolResult> MultiReplaceFileContentAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
+    {
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
+            ?? throw new ArgumentException("Il parametro per il percorso del file ('relativePath' o 'path') è obbligatorio");
+
+        string safePath = ResolveSafePath(rootPath, relative);
+        if (!File.Exists(safePath))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}");
+        }
+
+        JsonElement chunksElem;
+        if (!args.TryGetProperty("chunks", out chunksElem) && !args.TryGetProperty("replacements", out chunksElem))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "Il parametro 'chunks' o 'replacements' (array di oggetti targetContent/replacementContent) è obbligatorio");
+        }
+
+        if (chunksElem.ValueKind != JsonValueKind.Array)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "Il parametro 'chunks' deve essere un array JSON.");
+        }
+
+        string currentText = await File.ReadAllTextAsync(safePath, cancellationToken);
+        int appliedCount = 0;
+        var errors = new List<string>();
+
+        foreach (var item in chunksElem.EnumerateArray())
+        {
+            string? target = GetArgString(item, "targetContent", "target", "oldContent", "search");
+            string? replacement = GetArgString(item, "replacementContent", "replacement", "newContent", "replace");
+
+            if (string.IsNullOrEmpty(target) || replacement is null)
+            {
+                errors.Add("Chunk con parametri targetContent/replacementContent non validi.");
+                continue;
+            }
+
+            if (currentText.Contains(target))
+            {
+                currentText = currentText.Replace(target, replacement);
+                appliedCount++;
+            }
+            else
+            {
+                string normOriginal = currentText.Replace("\r\n", "\n");
+                string normTarget = target.Replace("\r\n", "\n");
+                string normReplacement = replacement.Replace("\r\n", "\n");
+
+                if (normOriginal.Contains(normTarget))
+                {
+                    currentText = normOriginal.Replace(normTarget, normReplacement);
+                    if (currentText.Contains('\n') && !currentText.Contains("\r\n"))
+                    {
+                        currentText = currentText.Replace("\n", "\r\n");
+                    }
+                    appliedCount++;
+                }
+                else
+                {
+                    errors.Add($"TargetContent non trovato per il chunk: '{target.Substring(0, Math.Min(40, target.Length))}...'");
+                }
+            }
+        }
+
+        if (appliedCount > 0)
+        {
+            await File.WriteAllTextAsync(safePath, currentText, cancellationToken);
+        }
+
+        if (errors.Count > 0 && appliedCount == 0)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Nessun chunk applicato in {relative}. Dettagli:\n" + string.Join("\n", errors));
+        }
+
+        string msg = $"Applicati {appliedCount} chunk di sostituzione in {relative}.";
+        if (errors.Count > 0)
+        {
+            msg += $" Avvisi:\n" + string.Join("\n", errors);
+        }
+
+        return new AgentToolResult(callId, toolName, true, msg);
+    }
+
+    private AgentToolResult GitDiffInspect(string callId, string toolName, JsonElement args, string rootPath)
+    {
+        string relative = GetArgString(args, "relativePath", "path") ?? "";
+        string safePath = string.IsNullOrWhiteSpace(relative) ? rootPath : ResolveSafePath(rootPath, relative);
+
+        try
+        {
+            var psiStatus = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "status --short",
+                WorkingDirectory = safePath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var pStatus = Process.Start(psiStatus);
+            if (pStatus is null)
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, "Impossibile avviare il processo Git.");
+            }
+
+            string statusOut = pStatus.StandardOutput.ReadToEnd();
+            pStatus.WaitForExit();
+
+            var psiDiff = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "diff --stat",
+                WorkingDirectory = safePath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var pDiff = Process.Start(psiDiff);
+            string diffOut = pDiff is not null ? pDiff.StandardOutput.ReadToEnd() : "";
+            pDiff?.WaitForExit();
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[STATO GIT LOCAL WORKSPACE: {safePath}]");
+            sb.AppendLine("==> Status (File Modificati / Non Tracciati):");
+            sb.AppendLine(string.IsNullOrWhiteSpace(statusOut) ? "Workspace completamente pulito (nessuna modifica locale)." : statusOut.Trim());
+            if (!string.IsNullOrWhiteSpace(diffOut))
+            {
+                sb.AppendLine("\n==> Statistica Diff Modifiche:");
+                sb.AppendLine(diffOut.Trim());
+            }
+
+            return new AgentToolResult(callId, toolName, true, sb.ToString().TrimEnd());
+        }
+        catch (Exception ex)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Errore durante l'ispezione dello stato Git: {ex.Message}");
+        }
+    }
+
+    private async Task<AgentToolResult> IngestOfficeDocAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
+    {
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath")
+            ?? throw new ArgumentException("Il parametro 'relativePath' per il documento Office/PDF è obbligatorio");
+
+        bool forceOcr = (args.TryGetProperty("forceOcr", out var f) && f.GetBoolean());
+        string safePath = ResolveSafePath(rootPath, relative);
+
+        if (!File.Exists(safePath))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Documento non trovato sul disco: {relative}");
+        }
+
+        if (ingestionService is not null)
+        {
+            try
+            {
+                var docInfo = new FileInfo(safePath);
+                var doc = new ImportedDocument(
+                    Id: 0,
+                    DocumentUid: Guid.NewGuid().ToString("N"),
+                    OriginalFileName: docInfo.Name,
+                    OriginalPath: docInfo.FullName,
+                    Sha256: null,
+                    MimeType: "application/octet-stream",
+                    FileExtension: docInfo.Extension,
+                    FileSizeBytes: docInfo.Length,
+                    Status: DocumentStatus.Imported,
+                    PageCount: 0,
+                    ChunkCount: 0,
+                    CurrentJobId: null,
+                    LastError: null,
+                    CreatedAtUtc: DateTimeOffset.UtcNow,
+                    UpdatedAtUtc: DateTimeOffset.UtcNow);
+
+                var result = await ingestionService.IngestAsync(
+                    doc,
+                    checkpoint: null,
+                    saveProgressAsync: (_, _) => Task.CompletedTask,
+                    forceOcr: forceOcr,
+                    cancellationToken: cancellationToken);
+
+                string resJson = JsonSerializer.Serialize(new
+                {
+                    pageCount = result.PageCount,
+                    chunkCount = result.ChunkCount,
+                    fileName = docInfo.Name
+                }, s_indentedOptions);
+
+                return new AgentToolResult(callId, toolName, true, $"Ingestion Office/PDF completata per {relative}:\n{resJson}");
+            }
+            catch (Exception ex)
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, $"Errore durante l'ingestion del documento {relative}: {ex.Message}");
+            }
+        }
+
+        return new AgentToolResult(callId, toolName, true, $"Documento identificato per ingestion RAG: {relative} (IngestionService non registrato in questo contesto test)");
+    }
+
+    private async Task<AgentToolResult> GenerateImageOnnxAsync(string callId, string toolName, JsonElement args, CancellationToken cancellationToken)
+    {
+        string prompt = GetArgString(args, "prompt", "text", "description")
+            ?? throw new ArgumentException("Il parametro 'prompt' per la generazione immagine è obbligatorio");
+
+        string negativePrompt = GetArgString(args, "negativePrompt", "negative") ?? "";
+        int width = GetArgInt(args, "width") ?? 512;
+        int height = GetArgInt(args, "height") ?? 512;
+
+        if (imageGenerationService is not null)
+        {
+            try
+            {
+                var req = new ImageGenerationRequest(
+                    Prompt: prompt,
+                    NegativePrompt: negativePrompt,
+                    ModelId: null,
+                    Width: width,
+                    Height: height,
+                    Steps: 20,
+                    BatchSize: 1,
+                    Seed: null);
+
+                var resp = await imageGenerationService.GenerateAsync(req, cancellationToken);
+                var generatedList = resp.Images.Select(img => new
+                {
+                    id = img.Id,
+                    fileName = img.FileName,
+                    mimeType = img.MimeType,
+                    prompt = img.Prompt,
+                    width = img.Width,
+                    height = img.Height
+                });
+
+                string json = JsonSerializer.Serialize(new
+                {
+                    provider = resp.Provider,
+                    message = resp.Message,
+                    images = generatedList
+                }, s_indentedOptions);
+
+                return new AgentToolResult(callId, toolName, true, $"Immagine ONNX DirectML generata con successo:\n{json}");
+            }
+            catch (Exception ex)
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, $"Impossibile generare immagine con ONNX DirectML: {ex.Message}");
+            }
+        }
+
+        return new AgentToolResult(callId, toolName, true, $"Richiesta di generazione immagine ONNX simulata per prompt '{prompt}' (ImageGenerationService non disponibile nel runner)");
+    }
+
+    private async Task<AgentToolResult> QueryRetrievalIndexAsync(string callId, string toolName, JsonElement args, CancellationToken cancellationToken)
+    {
+        string query = GetArgString(args, "query", "q", "search")
+            ?? throw new ArgumentException("Il parametro 'query' è obbligatorio");
+
+        int topK = GetArgInt(args, "topK", "limit", "k") ?? 5;
+
+        if (retrievalService is not null)
+        {
+            try
+            {
+                var searchReq = new DocumentSearchRequest(
+                    Query: query,
+                    DocumentIds: Array.Empty<long>(),
+                    TopK: topK);
+
+                var searchResp = await retrievalService.SearchAsync(searchReq, cancellationToken);
+                var items = searchResp.Results.Select(r => new
+                {
+                    documentId = r.DocumentId,
+                    documentName = r.DocumentName,
+                    score = r.Score,
+                    reRankScore = r.ReRankScore,
+                    snippet = r.Snippet?.Substring(0, Math.Min(250, r.Snippet.Length)),
+                    chunkId = r.ChunkId
+                });
+
+                string json = JsonSerializer.Serialize(new
+                {
+                    query = query,
+                    totalMatches = searchResp.Results.Count,
+                    keywordBackend = searchResp.KeywordBackend,
+                    vectorBackend = searchResp.VectorBackend,
+                    results = items
+                }, s_indentedOptions);
+
+                return new AgentToolResult(callId, toolName, true, $"Risultati ricerca retrieval (SQLite FTS5 + Qdrant vectors):\n{json}");
+            }
+            catch (Exception ex)
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, $"Errore durante la ricerca nel retrieval index: {ex.Message}");
+            }
+        }
+
+        return new AgentToolResult(callId, toolName, true, $"Ricerca retrieval simulata per query '{query}' (HybridRetrievalService non registrato in questo contesto)");
     }
 
     private static string ResolveSafePath(string rootPath, string relativePath)
