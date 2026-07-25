@@ -757,6 +757,7 @@ export function CodingSection({
             </label>
             <select
               id="coding-model-select"
+              aria-label="Modello LLM Coding"
               className="input-control select-control--inline"
               style={{ background: "#0f172a", border: "1px solid #334155", color: "#f8fafc", padding: "4px 8px", borderRadius: 6 }}
               value={selectedModel}

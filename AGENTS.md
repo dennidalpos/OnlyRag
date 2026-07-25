@@ -188,7 +188,9 @@ Be factual and concise. Do not claim production readiness unless relevant checks
 
 ## 13. Project Skills (`skills/`)
 
-The repository maintains project-specific skills under the `skills/` directory in the repository root for portability across different development environments and PCs. Each skill provides technical guidelines, official documentation references, operational commands, and architectural standards for a specific domain area:- [`skills/onlyrag`](skills/onlyrag/SKILL.md): Primary project architecture, scripts inventory, workflow commands, local app data paths, and gate verification.
+The repository maintains project-specific skills under the `skills/` directory in the repository root for portability across different development environments and PCs. Each skill provides technical guidelines, official documentation references, operational commands, and architectural standards for a specific domain area:
+
+- [`skills/onlyrag`](skills/onlyrag/SKILL.md): Primary project architecture, scripts inventory, workflow commands, local app data paths, and gate verification.
 - [`skills/dotnet-wpf-minimal-api`](skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop bridge, SQLite storage, and xUnit testing.
 - [`skills/react-vite-frontend`](skills/react-vite-frontend/SKILL.md): React 19, Vite 8, TypeScript 5.9, Tailwind CSS, Vitest 4, ESLint 10, Prettier 3.9, and Playwright 1.62 UI tests.
 - [`skills/rag-vector-retrieval`](skills/rag-vector-retrieval/SKILL.md): Local RAG 2.0 architecture, Dual-Tier Parent-Child chunking, SQLite FTS5 keyword indexing, Qdrant vector database, Ollama embeddings/chat, ONNX Cross-Encoder re-ranking, CRAG confidence evaluation, and retrieval metrics.

@@ -91,6 +91,7 @@ export function WorkbenchView({
           <label htmlFor="coding-lang-select" className="field-label">Linguaggio Target:</label>
           <select
             id="coding-lang-select"
+            aria-label="Linguaggio Target"
             className="input-control"
             value={selectedLanguage}
             onChange={(e) => onSelectLanguage(e.target.value)}
