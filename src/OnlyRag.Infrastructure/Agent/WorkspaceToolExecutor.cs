@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Logging;
 
@@ -49,6 +51,7 @@ public sealed class WorkspaceToolExecutor
                 "grep_search" => GrepSearch(callId, toolName, root, workspaceRoot),
                 "run_command" => RunCommand(callId, toolName, root, workspaceRoot),
                 "manage_task" => ManageTask(callId, toolName, root),
+                "web_search" or "search_web" => await WebSearchAsync(callId, toolName, root, cancellationToken),
                 "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool non riconosciuto: {toolName}")
             };
@@ -315,6 +318,96 @@ public sealed class WorkspaceToolExecutor
         }
 
         return new AgentToolResult(callId, toolName, false, string.Empty, $"Azione task sconosciuta: {action}");
+    }
+
+    private async Task<AgentToolResult> WebSearchAsync(
+        string callId,
+        string toolName,
+        JsonElement args,
+        CancellationToken cancellationToken)
+    {
+        string query = GetArgString(args, "query", "search", "q", "pattern") ?? "";
+        string domain = GetArgString(args, "domain", "site", "source") ?? "";
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "Il parametro 'query' per la ricerca web è obbligatorio.");
+        }
+
+        string searchQuery = string.IsNullOrWhiteSpace(domain) ? query : $"{query} site:{domain}";
+        logger?.LogInfo("AgentEngine", $"[WEB SEARCH] Query: '{searchQuery}'");
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            string searchUrl = $"https://html.duckduckgo.com/html/?q={Uri.EscapeDataString(searchQuery)}";
+            HttpResponseMessage resp = await http.GetAsync(searchUrl, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, $"Ricerca web fallita con codice HTTP {(int)resp.StatusCode}");
+            }
+
+            string html = await resp.Content.ReadAsStringAsync(cancellationToken);
+            var results = ParseDuckDuckGoSearchResults(html);
+
+            if (results.Count == 0)
+            {
+                return new AgentToolResult(callId, toolName, true, $"Nessun risultato trovato per la ricerca web: '{searchQuery}'. Provare a riformulare la query.");
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[RISULTATI RICERCA WEB UFFICIALE: '{searchQuery}']\n");
+            int idx = 1;
+            foreach (var res in results.Take(6))
+            {
+                sb.AppendLine($"{idx}. **{res.Title}**");
+                sb.AppendLine($"   URL: {res.Url}");
+                sb.AppendLine($"   Estratto: {res.Snippet}\n");
+                idx++;
+            }
+
+            return new AgentToolResult(callId, toolName, true, sb.ToString().TrimEnd());
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning("AgentEngine", $"Errore durante la ricerca web per '{searchQuery}': {ex.Message}");
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Impossibile completare la ricerca sul web: {ex.Message}");
+        }
+    }
+
+    private static List<(string Title, string Url, string Snippet)> ParseDuckDuckGoSearchResults(string html)
+    {
+        var results = new List<(string Title, string Url, string Snippet)>();
+        if (string.IsNullOrWhiteSpace(html)) return results;
+
+        var matches = Regex.Matches(html, @"<a class=""result__a"" href=""([^""]+)""[^>]*>(.*?)</a>[\s\S]*?<a class=""result__snippet""[^>]*>(.*?)</a>", RegexOptions.Singleline);
+        foreach (Match match in matches)
+        {
+            string rawUrl = match.Groups[1].Value;
+            string rawTitle = match.Groups[2].Value;
+            string rawSnippet = match.Groups[3].Value;
+
+            string cleanTitle = Regex.Replace(rawTitle, "<.*?>", "").Trim();
+            string cleanSnippet = Regex.Replace(rawSnippet, "<.*?>", "").Trim();
+            cleanTitle = System.Net.WebUtility.HtmlDecode(cleanTitle);
+            cleanSnippet = System.Net.WebUtility.HtmlDecode(cleanSnippet);
+
+            string cleanUrl = rawUrl;
+            var uddgMatch = Regex.Match(rawUrl, @"uddg=([^&]+)");
+            if (uddgMatch.Success)
+            {
+                cleanUrl = Uri.UnescapeDataString(uddgMatch.Groups[1].Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(cleanTitle) && !string.IsNullOrWhiteSpace(cleanUrl))
+            {
+                results.Add((cleanTitle, cleanUrl, cleanSnippet));
+            }
+        }
+
+        return results;
     }
 
     private Task<AgentToolResult> InvokeSubagentAsync(

@@ -1,15 +1,9 @@
 import type { PerformanceProfile, PerformanceSettings } from "../../api";
 import { performanceProfilePresets } from "../SettingsSection.defaults";
-import { SettingsFieldLabel, SettingsRangeField } from "../SettingsSection.helpers";
+import { SettingsRangeField, UnifiedPresetBar, type UnifiedPresetLevel } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
 
-const profileOptions: Array<{ value: PerformanceProfile; label: string; detail: string }> = [
-  { value: "auto", label: "Auto", detail: "Selezione automatica da RAM e CPU locali." },
-  { value: "eco", label: "Eco", detail: "1 job, batch minimi e timeout piu lungo." },
-  { value: "balanced", label: "Bilanciato", detail: "2 job e batch moderati per uso quotidiano." },
-  { value: "power", label: "Potente", detail: "4 job e batch ampi: usa piu RAM/VRAM, CPU e carico Ollama." },
-  { value: "custom", label: "Personalizzato", detail: "Valori manuali salvati dagli slider." }
-];
+
 
 function applyPerformanceProfile(
   current: PerformanceSettings,
@@ -52,36 +46,34 @@ export function PerformanceSettingsPanel() {
   } = useSettingsSectionContext();
 
   const manualControlsEnabled = performanceFormState.profile === "custom";
-  const currentProfile = profileOptions.find((option) => option.value === performanceFormState.profile)
-    ?? profileOptions[0];
+
+  const activePreset: UnifiedPresetLevel =
+    performanceFormState.profile === "eco" ? "basso" :
+    performanceFormState.profile === "balanced" ? "medio" :
+    performanceFormState.profile === "power" ? "alto" : "custom";
+
+  function handleSelectPreset(preset: UnifiedPresetLevel) {
+    let targetProfile: PerformanceProfile = "custom";
+    if (preset === "basso") targetProfile = "eco";
+    else if (preset === "medio") targetProfile = "balanced";
+    else if (preset === "alto") targetProfile = "power";
+
+    setPerformanceFormState((current) => applyPerformanceProfile(current, targetProfile));
+  }
 
   return (
         <div className="settings-card">
           <div className="settings-card__header">
-            <h3>Prestazioni</h3>
-            <span className="status-chip status-chip--muted">
-              Effettivo: {profileOptions.find((option) => option.value === performanceFormState.effectiveProfile)?.label ?? "Auto"}
-            </span>
+            <h3>Prestazioni &amp; Hardware</h3>
           </div>
           <div className="settings-form">
-            <label className="field-group" htmlFor="performance-profile">
-              <SettingsFieldLabel text="Profilo prestazioni" tooltip={currentProfile.detail} />
-              <select
-                id="performance-profile"
-                value={performanceFormState.profile}
-                title={currentProfile.detail}
-                aria-label="Profilo prestazioni"
-                onChange={(event) =>
-                  setPerformanceFormState((current) =>
-                    applyPerformanceProfile(current, event.target.value as PerformanceProfile)
-                  )
-                }
-              >
-                {profileOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+            <UnifiedPresetBar
+              title="Preset Prestazioni"
+              subtitle="Standardizza l'uso di risorse CPU/RAM/VRAM per tutti gli elaboratori locali."
+              allowedPresets={["basso", "medio", "alto", "custom"]}
+              activePreset={activePreset}
+              onSelectPreset={handleSelectPreset}
+            />
             <div className="settings-grid">
               <SettingsRangeField
                 id="max-parallel-jobs"

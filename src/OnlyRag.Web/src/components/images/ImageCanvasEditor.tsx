@@ -123,8 +123,8 @@ export function ImageCanvasEditor({
       </div>
 
       {/* Edit History Toolbar (Undo, Redo, Specific Element Deletion) */}
-      <div className="edit-history-toolbar" style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "#f8fafc", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-light)" }}>
-        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginRight: "4px" }}>Storico:</span>
+      <div className="edit-history-toolbar" style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "#1e293b", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid #334155" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1", marginRight: "4px" }}>Storico:</span>
         <button
           type="button"
           className="button-secondary button-secondary--xs"

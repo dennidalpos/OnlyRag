@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import {
   OcrRangeField,
   OcrSelectField,
+  UnifiedPresetBar,
   formatOcrDecimal,
-  getOcrSelectOptions
+  getOcrSelectOptions,
+  type UnifiedPresetLevel
 } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
 
@@ -33,27 +35,31 @@ export function OcrEngineSettingsPanel() {
     }
   }, [hasNvidiaGpu, ocrFormState.device, updateOcrSettings]);
 
+  const activePreset: UnifiedPresetLevel =
+    ocrFormState.profile === "fast" ? "basso" :
+    ocrFormState.profile === "balanced" ? "medio" :
+    ocrFormState.profile === "accurate" ? "alto" : "custom";
+
+  function handleSelectPreset(preset: UnifiedPresetLevel) {
+    if (preset === "basso") applyOcrProfile("fast");
+    else if (preset === "medio") applyOcrProfile("balanced");
+    else if (preset === "alto") applyOcrProfile("accurate");
+  }
+
   return (
         <div className="settings-card settings-card--wide">
           <div className="settings-card__header">
             <h3>OCR PaddleOCR</h3>
-            <span className="status-chip status-chip--muted">{ocrFormState.profile}</span>
           </div>
           <div className="settings-form">
+            <UnifiedPresetBar
+              title="Preset OCR Engine"
+              subtitle="Seleziona la precisione dell'estrazione testo e risoluzione DPI per PDF/Immagini."
+              allowedPresets={["basso", "medio", "alto", "custom"]}
+              activePreset={activePreset}
+              onSelectPreset={handleSelectPreset}
+            />
             <div className="settings-grid">
-              <OcrSelectField
-                id="ocr-profile"
-                label="Profilo"
-                tooltip="Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
-                value={ocrFormState.profile}
-                options={[
-                  { value: "fast", label: "Veloce" },
-                  { value: "balanced", label: "Bilanciato" },
-                  { value: "accurate", label: "Accurato" },
-                  { value: "custom", label: "Personalizzato" }
-                ]}
-                onChange={applyOcrProfile}
-              />
               <OcrSelectField
                 id="ocr-device"
                 label="Dispositivo"

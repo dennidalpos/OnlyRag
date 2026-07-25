@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { SettingsSection } from "./SettingsSection";
@@ -342,9 +342,6 @@ describe("SettingsSection", () => {
     expect(screen.getAllByRole("heading", { name: "Ricerca RAG & Prestazioni" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "OCR & Documenti" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Manutenzione & Diagnostica" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("combobox", { name: "Profilo" })).toHaveAccessibleDescription(
-      "Profilo generale del bridge OCR. Veloce riduce costo, accurato privilegia qualita e controlli piu conservativi."
-    );
     expect(screen.getByRole("combobox", { name: "Dispositivo" })).toHaveAccessibleDescription(
       "CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Installa OCR quando disponibile."
     );
@@ -382,7 +379,9 @@ describe("SettingsSection", () => {
     fireEvent.click(screen.getByLabelText("Orientamento righe testo"));
     expect(screen.getByRole("button", { name: "Salva OCR" })).toBeEnabled();
 
-    await userEvent.selectOptions(screen.getByLabelText("Profilo prestazioni"), "power");
+    const perfPresetGroup = screen.getByRole("group", { name: "Preset Prestazioni" });
+    const powerPresetButton = within(perfPresetGroup).getByRole("button", { name: /Alto/ });
+    await userEvent.click(powerPresetButton);
     expect(screen.getByRole("button", { name: "Salva prestazioni" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Salva prestazioni" }));
 
@@ -490,10 +489,10 @@ describe("SettingsSection", () => {
     );
 
     const saveButton = await screen.findByRole("button", { name: "Salva OCR" });
-    const profileSelect = document.querySelector("#ocr-profile") as HTMLSelectElement | null;
-    expect(profileSelect).not.toBeNull();
+    const ocrPresetButtons = screen.getAllByRole("button", { name: /Alto/ });
+    const ocrAltoButton = ocrPresetButtons[ocrPresetButtons.length - 1];
 
-    await userEvent.selectOptions(profileSelect!, "accurate");
+    await userEvent.click(ocrAltoButton);
     await userEvent.click(saveButton);
 
     const saveCall = api.calls.find((call) => call.path === "/api/settings/ocr" && call.method === "PUT");

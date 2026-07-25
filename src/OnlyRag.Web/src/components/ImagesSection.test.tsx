@@ -158,7 +158,7 @@ describe("ImagesSection", () => {
     await userEvent.click(screen.getByRole("button", { name: "Genera" }));
 
     expect(await screen.findByText("Immagine generata.")).toBeInTheDocument();
-    expect(screen.getAllByAltText("Una libreria futuristica").length).toBeGreaterThan(0);
+    expect((await screen.findAllByAltText("Una libreria futuristica")).length).toBeGreaterThan(0);
     await waitFor(() => expect(createObjectUrl).toHaveBeenCalled());
 
     const generateCall = api.calls.find((call) => call.path === "/api/images/generate");

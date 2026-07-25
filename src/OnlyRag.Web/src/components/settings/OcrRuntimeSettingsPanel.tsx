@@ -14,12 +14,6 @@ export function OcrRuntimeSettingsPanel() {
         <div className="settings-card">
           <div className="settings-card__header">
             <h3>OCR runtime</h3>
-            <span
-              className="status-chip status-chip--muted"
-              title="La lingua documento si sceglie durante import, reindicizzazione o OCR e viene riproposta alla prossima operazione."
-            >
-              Lingua per operazione
-            </span>
           </div>
           <div className="settings-form">
             <SettingsRangeField

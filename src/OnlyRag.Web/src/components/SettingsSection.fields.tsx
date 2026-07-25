@@ -265,3 +265,59 @@ export function SettingsFieldLabel({ text, tooltip }: { text: string; tooltip?: 
     </span>
   );
 }
+
+export type UnifiedPresetLevel = "basso" | "medio" | "alto" | "auto" | "disattivato" | "custom";
+
+export function UnifiedPresetBar({
+  title,
+  subtitle,
+  activePreset,
+  onSelectPreset,
+  allowedPresets = ["basso", "medio", "alto", "custom"],
+  disabledOptions = []
+}: {
+  title: string;
+  subtitle?: string;
+  activePreset: UnifiedPresetLevel;
+  onSelectPreset: (preset: UnifiedPresetLevel) => void;
+  allowedPresets?: UnifiedPresetLevel[];
+  disabledOptions?: UnifiedPresetLevel[];
+}) {
+  const allOptions: { id: UnifiedPresetLevel; label: string; icon: string }[] = [
+    { id: "basso", label: "Basso", icon: "🌱" },
+    { id: "medio", label: "Medio", icon: "⚖️" },
+    { id: "alto", label: "Alto", icon: "🚀" },
+    { id: "custom", label: "Personalizzato", icon: "🎨" },
+    { id: "auto", label: "Auto", icon: "⚡" },
+    { id: "disattivato", label: "Disattivato", icon: "⏸️" }
+  ];
+
+  const options = allOptions.filter((opt) => allowedPresets.includes(opt.id));
+
+  return (
+    <div className="unified-preset-bar">
+      <div className="unified-preset-bar__header">
+        <span className="unified-preset-bar__title">{title}</span>
+        {subtitle && <span className="unified-preset-bar__subtitle">{subtitle}</span>}
+      </div>
+      <div className="unified-preset-bar__buttons" role="group" aria-label={title}>
+        {options.map((opt) => {
+          const isDisabled = disabledOptions.includes(opt.id);
+          const isActive = activePreset === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              className={`unified-preset-btn ${isActive ? "unified-preset-btn--active" : ""}`}
+              disabled={isDisabled}
+              onClick={() => onSelectPreset(opt.id)}
+            >
+              <span>{opt.icon}</span>
+              <span>{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

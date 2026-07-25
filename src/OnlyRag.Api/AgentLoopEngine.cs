@@ -11,7 +11,6 @@ namespace OnlyRag.Api;
 
 internal sealed class AgentLoopEngine
 {
-    private const int MaxAgentIterations = 10;
     private const int MaxJsonRetries = 2;
     private const int DefaultNumCtx = 16384;
 
@@ -85,10 +84,11 @@ internal sealed class AgentLoopEngine
 
         yield return new AgentStepEvent("thought", $"[Agent Engine] Inizio elaborazione dell'obiettivo in modalità '{request.Mode}' con il modello '{model}'. Caricamento del modello ed elaborazione in corso...");
 
+        int maxIterations = request.MaxIterations ?? 0;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int iteration = 0;
         int jsonRetryCount = 0;
-        while (iteration < MaxAgentIterations)
+        while (maxIterations <= 0 || iteration < maxIterations)
         {
             iteration++;
             cancellationToken.ThrowIfCancellationRequested();
@@ -104,9 +104,10 @@ internal sealed class AgentLoopEngine
             }
 
             int numCtx = settings?.CodingNumCtx ?? DefaultNumCtx;
-            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iteration}/{MaxAgentIterations}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
+            string iterLabel = maxIterations > 0 ? $"{iteration}/{maxIterations}" : $"{iteration}";
+            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
 
-            yield return new AgentStepEvent("thought", $"[Agent Step {iteration}/{MaxAgentIterations}] Generazione risposta LLM e analisi azioni necessarie...");
+            yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generazione risposta LLM e analisi azioni necessarie...");
 
             var responseSb = new StringBuilder();
             IAsyncEnumerator<string>? enumerator = null;
@@ -284,8 +285,11 @@ internal sealed class AgentLoopEngine
             messages.Add(new("user", toolResultMsg));
         }
 
-        logger?.LogWarning("AgentEngine", $"[AGENT LOOP END] Raggiunto limite massimo di {MaxAgentIterations} iterazioni.");
-        yield return new AgentStepEvent("final_response", "Raggiunto il limite massimo di iterazioni dell'agente (10 passi).");
+        if (maxIterations > 0 && iteration >= maxIterations)
+        {
+            logger?.LogWarning("AgentEngine", $"[AGENT LOOP END] Raggiunto limite massimo di {maxIterations} iterazioni.");
+            yield return new AgentStepEvent("final_response", $"Raggiunto il limite massimo di iterazioni dell'agente ({maxIterations} passi).");
+        }
     }
 
     internal static AgentToolCall? TryExtractToolCall(string text, ILoggingService? logger = null)
@@ -478,6 +482,7 @@ internal sealed class AgentLoopEngine
             "replace" or "replacefile" or "replace_content" => "replace_file_content",
             "grep" or "search" or "find" or "grep_search" => "grep_search",
             "run" or "exec" or "execute" or "command" or "terminal" or "run_command" => "run_command",
+            "web_search" or "search_web" or "internet_search" or "online_search" or "ddg" => "web_search",
             "subagent" or "invoke_subagent" or "sub_agent" => "invoke_subagent",
             "task" or "manage_task" => "manage_task",
             _ => t
@@ -509,7 +514,7 @@ internal sealed class AgentLoopEngine
     {
         string currentMode = mode ?? "write";
         return $$"""
-Sei Antigravity Code Agent, un assistente agentico di sviluppo software di livello esperto per Windows 10/11 (PowerShell 7).
+Sei Antigravity Code Agent, un assistente agentico di sviluppo software di livello esperto compatibile con qualsiasi modello LLM (Qwen, Llama, DeepSeek, Mistral, Phi, Gemma).
 Modalità operativa: {{currentMode}}
 Auto-Approvazione comandi: {{autoApprove}}
 
@@ -522,9 +527,11 @@ STRUMENTI DISPONIBILI:
 4. replace_file_content({"relativePath": "string", "targetContent": "string", "replacementContent": "string"})
 5. grep_search({"query": "string", "searchPath": "string"})
 6. run_command({"commandLine": "string", "isAsync": false})
+7. web_search({"query": "string", "domain": "string"}) [Ricerca online su documentazione e fonti ufficiali: Microsoft, .NET, React, Vite, Ollama, Python, MDN]
+8. manage_task({"action": "list|status|kill|send_input", "taskId": "string"})
 
-REGOLE PER LE CHIAMATE DI STRUMENTO:
-Per invocare uno strumento, rispondi RIGOROSAMENTE con un blocco di codice JSON racchiuso in ```json ... ``` con questo formato:
+REGOLE PER LE CHIAMATE DI STRUMENTO (UNIVERSAL LLM FORMAT):
+Per invocare uno strumento, rispondi RIGOROSAMENTE con un blocco di codice JSON racchiuso in ```json ... ``` o con il tag <tool_call> ... </tool_call> nel formato:
 ```json
 {
   "tool": "nome_tool",
@@ -538,10 +545,10 @@ Per invocare uno strumento, rispondi RIGOROSAMENTE con un blocco di codice JSON 
 REGOLE COMPORTAMENTALI (ANTIGRAVITY DIRECTIVES):
 1. **PRIMO PASSO OBBLIGATORIO**: Inizia SEMPRE con una chiamata a list_dir con relativePath "." per esplorare la struttura del workspace. Non rispondere MAI direttamente all'utente senza prima aver esplorato il progetto.
 2. **Uso di Percorsi Reali**: Non ipotizzare mai percorsi o nomi di cartelle non esistenti. Esamina i file restituiti da list_dir o grep_search e usa ESATTAMENTE quei percorsi. Se un file/cartella non viene trovata, torna ad esplorare la radice con list_dir con relativePath: ".".
-3. **Esplorazione Approfondita**: Usa read_file per leggere i file sorgente rilevanti e grep_search per cercare pattern specifici. Non fornire mai analisi senza aver letto il codice sorgente effettivo.
+3. **Esplorazione Approfondita & Fonti Ufficiali**: Usa read_file e grep_search per il codice locale. Se necessiti di verificare documentazione o standard ufficiali, usa web_search con query mirate.
 4. **Scrittura Precisa**: Usa replace_file_content per modifiche mirate a blocchi di testo, oppure write_file per creare nuovi file o riscrivere file completi.
 5. **Modalità Plan**: In modalità 'plan', NON chiamare mai write_file, replace_file_content o run_command. Concentrati sull'analisi architetturale e la pianificazione.
-6. **Lavoro Diretto**: Devi fare il lavoro tu stesso con i tool disponibili. NON delegare il lavoro a subagenti o tool inesistenti.
+6. **Lavoro Diretto**: Esegui le operazioni direttamente con i tool forniti.
 7. **Una Chiamata per Passo**: Esegui una sola chiamata di strumento per ciascuna risposta.
 8. **Risposta Finale**: Quando l'obiettivo è completato, fornisci la tua sintesi finale in Markdown normale SENZA blocchi JSON di strumenti.
 """;

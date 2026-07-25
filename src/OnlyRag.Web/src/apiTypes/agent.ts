@@ -20,6 +20,7 @@ export type AgentRunRequest = {
   mode?: "plan" | "write";
   workspaceRoot?: string | null;
   autoApproveCommands?: boolean;
+  maxIterations?: number | null;
 };
 
 export type AgentStepEvent = {

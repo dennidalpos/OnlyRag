@@ -15,6 +15,8 @@ const TOOL_ICONS: Record<string, string> = {
   replace_file_content: "EDIT",
   grep_search: "SEARCH",
   run_command: "CMD",
+  web_search: "WEB",
+  search_web: "WEB",
   invoke_subagent: "SUBAGENT",
   manage_task: "TASK"
 };
@@ -31,6 +33,7 @@ function formatArgsSummary(toolName: string, argsJson: string): string {
     if (toolName === "replace_file_content") return `${args.relativePath}`;
     if (toolName === "grep_search") return `"${args.query}" in ${args.searchPath || "."}`;
     if (toolName === "run_command") return `${args.commandLine}`;
+    if (toolName === "web_search" || toolName === "search_web") return `"${args.query}" ${args.domain ? `su ${args.domain}` : "(fonti ufficiali)"}`;
     if (toolName === "invoke_subagent") return `[${args.role || "Subagente"}] ${args.prompt || ""}`;
     if (toolName === "manage_task") return `Action: ${args.action || "list"} (Task: ${args.taskId || "all"})`;
     return JSON.stringify(args).slice(0, 120);

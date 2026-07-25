@@ -263,11 +263,22 @@ textarea {
   padding: 8px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
-  background: #ffffff;
+  background: #0f172a;
   color: var(--text-main);
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+select option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 input:hover:not(:disabled),
@@ -487,6 +498,13 @@ textarea:hover:not(:disabled) {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-row__states,
+.status-row__operations {
+  display: flex;
   align-items: center;
   gap: 8px;
 }

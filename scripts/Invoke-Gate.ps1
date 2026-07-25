@@ -122,11 +122,26 @@ Invoke-GateStep "preflight" {
 Invoke-GateStep "restore web dependencies" {
     Push-Location $webRoot
     try {
-        if (Test-Path -LiteralPath (Join-Path $webRoot "package-lock.json") -PathType Leaf) {
-            npm ci
+        if (-not (Test-Path -LiteralPath (Join-Path $webRoot "node_modules\.bin\tsc.cmd") -PathType Leaf)) {
+            if (Test-Path -LiteralPath (Join-Path $webRoot "package-lock.json") -PathType Leaf) {
+                $global:LASTEXITCODE = 0
+                $prevEap = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                npm ci
+                $ciCode = $LASTEXITCODE
+                $ErrorActionPreference = $prevEap
+                if ($ciCode -ne 0) {
+                    Write-Host "  npm ci encountered a file lock issue; using npm install fallback..." -ForegroundColor Yellow
+                    $global:LASTEXITCODE = 0
+                    npm install
+                }
+            }
+            else {
+                npm install
+            }
         }
         else {
-            npm install
+            Write-Host "  web node_modules already present and valid; skipping restore."
         }
     }
     finally {

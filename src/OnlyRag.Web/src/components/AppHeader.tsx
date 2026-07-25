@@ -91,11 +91,12 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
         <div className="status-row__operations">
           <button
             type="button"
-            className="button-secondary"
+            className={`status-badge status-badge--${jobsBadge.tone}`}
             onClick={onOpenJobsDrawer}
             title="Apri pannello operazioni in background"
           >
-            <StatusBadgeView badge={jobsBadge} />
+            <span>{jobsBadge.label}</span>
+            <strong>{jobsBadge.value}</strong>
           </button>
           <span
             className="status-badge status-badge--neutral status-row__clock"
@@ -110,14 +111,7 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
   );
 }
 
-function StatusBadgeView({ badge }: { badge: StatusBadge }) {
-  return (
-    <span className={`status-badge status-badge--${badge.tone}`} title={`${badge.label} ${badge.value}`}>
-      <span>{badge.label}</span>
-      <strong>{badge.value}</strong>
-    </span>
-  );
-}
+
 
 function buildQdrantBadge(
   diagnostics: DiagnosticsResponse | null,

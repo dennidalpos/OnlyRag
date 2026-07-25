@@ -51,7 +51,50 @@ describe("apiRequest", () => {
       }
     ]);
 
-    await expect(apiRequest("/api/documents/404")).rejects.toThrow("Documento non trovato");
+    await expect(apiRequest("/api/documents/404", { retries: 0 })).rejects.toThrow("Documento non trovato");
+  });
+
+  it("retries on transient status codes like 404 and succeeds when subsequent attempt returns 200", async () => {
+    let attempts = 0;
+    mockApi([
+      {
+        path: "/api/transient-test",
+        handler: () => {
+          attempts++;
+          if (attempts === 1) {
+            return { status: 404, body: { title: "Not yet ready" } };
+          }
+          return { status: 200, body: { success: true } };
+        }
+      }
+    ]);
+
+    const result = await apiRequest<{ success: boolean }>("/api/transient-test", {
+      retries: 2,
+      retryDelayMs: 10
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(attempts).toBe(2);
+  });
+
+  it("exhausts retries and throws the final problem error if transient 404 persists", async () => {
+    let attempts = 0;
+    mockApi([
+      {
+        path: "/api/persistent-404",
+        handler: () => {
+          attempts++;
+          return { status: 404, body: { detail: "Endpoint non trovato dopo retries" } };
+        }
+      }
+    ]);
+
+    await expect(
+      apiRequest("/api/persistent-404", { retries: 2, retryDelayMs: 10 })
+    ).rejects.toThrow("Endpoint non trovato dopo retries");
+
+    expect(attempts).toBe(3);
   });
 
   it("tracks backend bridge online and offline state", () => {

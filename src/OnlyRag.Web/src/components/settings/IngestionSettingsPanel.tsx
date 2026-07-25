@@ -1,5 +1,7 @@
 import {
-  SettingsRangeField
+  SettingsRangeField,
+  UnifiedPresetBar,
+  type UnifiedPresetLevel
 } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
 
@@ -13,10 +15,26 @@ export function IngestionSettingsPanel() {
     hasDirtyIngestionSettings
   } = useSettingsSectionContext();
 
+  const activePreset: UnifiedPresetLevel =
+    ingestionFormState.chunkSizeTokens === 400 && ingestionFormState.overlapTokens === 60 ? "basso" :
+    ingestionFormState.chunkSizeTokens === 800 && ingestionFormState.overlapTokens === 120 ? "medio" :
+    ingestionFormState.chunkSizeTokens === 1600 && ingestionFormState.overlapTokens === 240 ? "alto" :
+    "custom";
+
+  function handleSelectPreset(preset: UnifiedPresetLevel) {
+    if (preset === "basso") {
+      setIngestionFormState({ chunkSizeTokens: 400, overlapTokens: 60 });
+    } else if (preset === "medio") {
+      setIngestionFormState({ chunkSizeTokens: 800, overlapTokens: 120 });
+    } else if (preset === "alto") {
+      setIngestionFormState({ chunkSizeTokens: 1600, overlapTokens: 240 });
+    }
+  }
+
   return (
         <div className="settings-card">
           <div className="settings-card__header">
-            <h3>Ingestione</h3>
+            <h3>Ingestione &amp; RAG</h3>
             {embeddingRecommendations && (
               <span
                 className="status-chip status-chip--muted"
@@ -28,6 +46,13 @@ export function IngestionSettingsPanel() {
             )}
           </div>
           <div className="settings-form">
+            <UnifiedPresetBar
+              title="Preset Chunking"
+              subtitle="Configura la dimensione dei blocchi di testo per indicizzazione e vector search."
+              allowedPresets={["basso", "medio", "alto", "custom"]}
+              activePreset={activePreset}
+              onSelectPreset={handleSelectPreset}
+            />
             <SettingsRangeField
               id="ingestion-chunk-size"
               label="Dimensione chunk"

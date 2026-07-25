@@ -15,7 +15,9 @@ export {
   OcrRangeField,
   OcrSelectField,
   SettingsFieldLabel,
-  SettingsRangeField
+  SettingsRangeField,
+  UnifiedPresetBar,
+  type UnifiedPresetLevel
 } from "./SettingsSection.fields";
 export {
   formatModelSize,

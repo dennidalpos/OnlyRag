@@ -25,7 +25,6 @@ import type {
   WriteWorkspaceFileResponse
 } from "../apiTypes";
 import { AgentToolCallCard } from "./AgentToolCallCard";
-import { BackgroundTaskDrawer } from "./BackgroundTaskDrawer";
 import { formatWorkspaceTreeSummary } from "./CodingSection.helpers";
 import {
   deleteCustomPreset,
@@ -75,7 +74,6 @@ export function CodingSection({
   const [messages, setMessages] = useState<CodingMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
 
   // Workspace state
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
@@ -856,34 +854,50 @@ export function CodingSection({
               )}
 
               {/* AGENT EVENTS RENDERING */}
-              {msg.agentEvents && msg.agentEvents.length > 0 ? (
+              {(useAgentMode && msg.sender === "assistant") || (msg.agentEvents && msg.agentEvents.length > 0) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {msg.agentEvents.map((evt, idx) => (
+                  {msg.agentEvents?.map((evt, idx) => (
                     <AgentToolCallCard
                       key={`${msg.id}_evt_${idx}`}
                       event={evt}
                       onApprove={(callId, approved) => void handleApproveAgentToolCall(callId, approved)}
                     />
                   ))}
-                  {msg.isStreaming && (
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
-                      border: "1px solid #6366f1",
-                      color: "#c7d2fe",
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      fontSize: "0.84rem",
-                      fontWeight: 600,
-                      marginTop: 4,
-                      boxShadow: "0 0 12px rgba(99,102,241,0.2)"
-                    }}>
-                      <span style={{ fontSize: "1.1rem", animation: "spin 1.5s linear infinite" }}>⏳</span>
-                      <span>Agente in esecuzione: caricamento modello LLM o elaborazione tool in corso...</span>
-                    </div>
-                  )}
+                  {msg.isStreaming && (() => {
+                    const lastEvt = msg.agentEvents && msg.agentEvents.length > 0 ? msg.agentEvents[msg.agentEvents.length - 1] : null;
+                    let statusText = "Agente in esecuzione: caricamento modello LLM ed elaborazione in corso...";
+                    if (lastEvt) {
+                      if (lastEvt.type === "tool_proposed" && lastEvt.toolCall) {
+                        statusText = `🛠️ Richiesta tool '${lastEvt.toolCall.toolName}' in corso...`;
+                      } else if (lastEvt.type === "tool_result" && lastEvt.toolResult) {
+                        statusText = `✅ Completato tool '${lastEvt.toolResult.toolName}'. Analisi dei risultati...`;
+                      } else if (lastEvt.type === "thought" || lastEvt.type === "thought_chunk") {
+                        const snippet = (lastEvt.content || "").trim().slice(-120);
+                        statusText = snippet ? `⚡ ${snippet}` : "⚡ Pensiero ed elaborazione LLM in corso...";
+                      } else if (lastEvt.type === "approval_required" && lastEvt.toolCall) {
+                        statusText = `⚠️ In attesa di approvazione utente per '${lastEvt.toolCall.toolName}'...`;
+                      }
+                    }
+                    return (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
+                        border: "1px solid #6366f1",
+                        color: "#c7d2fe",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        fontSize: "0.84rem",
+                        fontWeight: 600,
+                        marginTop: 4,
+                        boxShadow: "0 0 12px rgba(99,102,241,0.2)"
+                      }}>
+                        <span style={{ fontSize: "1.1rem", animation: "spin 1.5s linear infinite" }}>⏳</span>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{statusText}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.sender === "assistant" ? "monospace" : "inherit", fontSize: "0.9rem", lineHeight: 1.6 }}>
@@ -1146,14 +1160,6 @@ export function CodingSection({
                   />
                   Auto-Approva Comandi
                 </label>
-                <button
-                  type="button"
-                  className="button button--secondary button--small"
-                  style={{ fontSize: "0.78rem" }}
-                  onClick={() => setIsTaskDrawerOpen(true)}
-                >
-                  💻 Processi
-                </button>
               </>
             )}
 
@@ -1285,11 +1291,7 @@ export function CodingSection({
         onSaveContent={(updatedContent, saveToDisk) => void handleSaveAttachedFileContent(updatedContent, saveToDisk)}
       />
 
-      {/* BACKGROUND TASK DRAWER */}
-      <BackgroundTaskDrawer
-        isOpen={isTaskDrawerOpen}
-        onClose={() => setIsTaskDrawerOpen(false)}
-      />
+
 
       {/* DIFF VIEWER MODAL */}
       <DiffViewerModal

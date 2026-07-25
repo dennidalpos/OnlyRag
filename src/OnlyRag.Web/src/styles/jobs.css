@@ -40,10 +40,10 @@
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px solid var(--border-light);
+  border: 1px solid #334155;
   border-radius: var(--radius-md);
-  background: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  background: #1e293b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .job-row__header,
@@ -63,7 +63,7 @@
 }
 
 .job-row__header strong {
-  color: var(--text-main);
+  color: #f8fafc;
   font-size: 14px;
   min-width: 0;
   overflow: hidden;
@@ -73,7 +73,7 @@
 
 .job-row__header span,
 .job-row__meta {
-  color: var(--text-muted);
+  color: #cbd5e1;
   font-size: 13px;
   min-width: 0;
 }
@@ -82,10 +82,10 @@
   max-width: 100%;
   min-width: 88px;
   padding: 4px 10px;
-  border: 1px solid var(--border-light);
+  border: 1px solid #334155;
   border-radius: var(--radius-full);
-  background: #f8fafc;
-  color: var(--text-muted);
+  background: #0f172a;
+  color: #cbd5e1;
   font-size: 12px;
   font-weight: 700;
   text-align: center;
@@ -100,31 +100,32 @@
 .job-status--queued,
 .job-status--processing,
 .job-status--indexed {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
+  border-color: #10b981;
+  background: #064e3b;
+  color: #6ee7b7;
 }
 
 .job-status--failed,
 .job-status--cancelled {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border-color: #ef4444;
+  background: #7f1d1d;
+  color: #fca5a5;
 }
 
 .job-status--paused,
 .job-status--pausing,
 .job-status--pending {
-  border-color: #fef08a;
-  background: #fefce8;
-  color: #854d0e;
+  border-color: #f59e0b;
+  background: #78350f;
+  color: #fde047;
 }
 
 .progress-track {
   height: 8px;
   overflow: hidden;
   border-radius: var(--radius-full);
-  background: #e2e8f0;
+  background: #0f172a;
+  border: 1px solid #334155;
 }
 
 .progress-fill {
@@ -136,10 +137,10 @@
 
 .job-error-message {
   padding: 10px 12px;
-  border: 1px solid #fecaca;
+  border: 1px solid #ef4444;
   border-radius: var(--radius-md);
-  background: #fef2f2;
-  color: #991b1b;
+  background: #450a0a;
+  color: #fca5a5;
   font-size: 13px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;

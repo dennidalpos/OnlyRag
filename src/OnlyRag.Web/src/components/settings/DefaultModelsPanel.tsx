@@ -1,6 +1,8 @@
 import {
   AdjustableModelContextBar,
-  normalizeOptionalValue
+  UnifiedPresetBar,
+  normalizeOptionalValue,
+  type UnifiedPresetLevel
 } from "../SettingsSection.helpers";
 import { useSettingsSectionContext } from "../SettingsSectionContext";
 
@@ -27,12 +29,40 @@ export function DefaultModelsPanel() {
     isBusy
   } = useSettingsSectionContext();
 
+  const ctxVal = formState.chatNumCtx ?? formState.codingNumCtx;
+  const activePreset: UnifiedPresetLevel =
+    ctxVal === null ? "auto" :
+    ctxVal <= 2048 ? "disattivato" :
+    ctxVal <= 4096 ? "basso" :
+    ctxVal <= 8192 ? "medio" : "alto";
+
+  function handleSelectPreset(preset: UnifiedPresetLevel) {
+    if (preset === "basso") {
+      setFormState((curr) => ({ ...curr, chatNumCtx: 4096, translationNumCtx: 4096, codingNumCtx: 4096 }));
+    } else if (preset === "medio") {
+      setFormState((curr) => ({ ...curr, chatNumCtx: 8192, translationNumCtx: 8192, codingNumCtx: 8192 }));
+    } else if (preset === "alto") {
+      setFormState((curr) => ({ ...curr, chatNumCtx: 16384, translationNumCtx: 16384, codingNumCtx: 16384 }));
+    } else if (preset === "disattivato") {
+      setFormState((curr) => ({ ...curr, chatNumCtx: 2048, translationNumCtx: 2048, codingNumCtx: 2048 }));
+    } else if (preset === "auto") {
+      setFormState((curr) => ({ ...curr, chatNumCtx: null, embeddingNumCtx: null, translationNumCtx: null, codingNumCtx: null }));
+    }
+  }
+
   return (
         <div className="settings-card settings-card--wide">
           <div className="settings-card__header">
-            <h3>Modelli predefiniti</h3>
+            <h3>Modelli &amp; Finestra Contesto</h3>
           </div>
           <div className="settings-form">
+            <UnifiedPresetBar
+              title="Preset Finestra Contesto (num_ctx)"
+              subtitle="Imposta rapidamente il limite token per Chat, Traduzione e Coding."
+              allowedPresets={["basso", "medio", "alto", "auto", "disattivato"]}
+              activePreset={activePreset}
+              onSelectPreset={handleSelectPreset}
+            />
             <label className="field-group" htmlFor="default-chat-model">
               <span>Chat</span>
               <select

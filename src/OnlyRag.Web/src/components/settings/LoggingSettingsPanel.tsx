@@ -86,7 +86,7 @@ export function LoggingSettingsPanel() {
                 Sistema di Log & Diagnostic Debug
               </h3>
               <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.85rem" }}>
-                Configura la verbosità per intercettare gli errori e analizzare la Modalità Agente in dettaglio.
+                Configura la verbosità per intercettare gli errori e analizzare l'applicazione in dettaglio.
               </p>
             </div>
           </div>
@@ -130,7 +130,7 @@ export function LoggingSettingsPanel() {
           {/* SELETTORE VERBOSITÀ */}
           <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 16 }}>
             <label style={{ display: "block", color: "#cbd5e1", fontSize: "0.88rem", fontWeight: 600, marginBottom: 8 }}>
-              Livello Verbosità Log (Debug):
+              Livello Verbosità Log:
             </label>
             <select
               value={minLevel}
@@ -148,7 +148,7 @@ export function LoggingSettingsPanel() {
                 outline: "none"
               }}
             >
-              <option value="Trace">🔍 Trace - Massimo Verboso (Predefinito - Consigliato per Agente)</option>
+              <option value="Trace">🔍 Trace - Massimo Verboso (Predefinito)</option>
               <option value="Debug">🐛 Debug - Dettagliato</option>
               <option value="Information">ℹ️ Information - Informativo Generico</option>
               <option value="Warning">⚠️ Warning - Solo Avvisi ed Errori</option>
@@ -156,7 +156,7 @@ export function LoggingSettingsPanel() {
               <option value="None">🚫 None - Log Disattivati</option>
             </select>
             <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 8 }}>
-              Impostato di default su <strong>Trace (Massimo Verboso)</strong> per catturare ogni passaggio, tool call ed eventuale errore dell'agente.
+              Impostato di default su <strong>Trace (Massimo Verboso)</strong>.
             </span>
           </div>
 

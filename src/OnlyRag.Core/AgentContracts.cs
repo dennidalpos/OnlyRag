@@ -19,7 +19,8 @@ public sealed record AgentRunRequest(
     string? Model = null,
     string? Mode = "write",
     string? WorkspaceRoot = null,
-    bool AutoApproveCommands = false);
+    bool AutoApproveCommands = false,
+    int? MaxIterations = null);
 
 public sealed record AgentStepEvent(
     string Type,
