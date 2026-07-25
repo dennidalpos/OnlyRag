@@ -1,5 +1,3 @@
 {
-  "todos": [
-    "Run the final image workflow validation on CPU and DirectML GPU hardware, including an NVIDIA 8 GB VRAM card."
-  ]
+  "todos": []
 }

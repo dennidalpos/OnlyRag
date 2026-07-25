@@ -387,6 +387,23 @@ textarea:hover:not(:disabled) {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
 }
 
+.nav-item__content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.nav-item__content svg {
+  flex-shrink: 0;
+  display: block;
+}
+
+.nav-item__label {
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .nav-badge {
   flex-shrink: 0;
   min-width: 20px;

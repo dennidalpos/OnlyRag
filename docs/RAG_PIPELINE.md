@@ -1,6 +1,6 @@
 # RAG Pipeline (Next-Gen 2.0)
 
-OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking con Cross-Encoder ONNX, risoluzione Parent-Child e valutazione di confidenza Self-Corrective RAG (CRAG).
+OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking con HeuristicReRankerService, risoluzione Parent-Child e valutazione di confidenza Self-Corrective RAG (CRAG).
 
 ---
 
@@ -46,7 +46,7 @@ Il recupero è orchestrato da [`HybridRetrievalService`](../src/OnlyRag.Infrastr
 
 1. **Query Transformation**: Espansione di varianti sintattiche/semantiche della query tramite [`IQueryTransformationService`](../src/OnlyRag.Infrastructure/Retrieval/IQueryTransformationService.cs) (Multi-Query, Sub-Query, HyDE).
 2. **Ricerca Ibrida di 1° Stadio**: Combinazione dei candidati FTS5 e Qdrant tramite l'algoritmo **Reciprocal Rank Fusion (RRF)**.
-3. **Re-ranking di 2° Stadio**: Calcolo del punteggio di pertinenza incrociata `(Query, Chunk)` tramite il modello Cross-Encoder locale [`IReRankerService`](../src/OnlyRag.Infrastructure/Retrieval/IReRankerService.cs).
+3. **Re-ranking di 2° Stadio**: Calcolo del punteggio di pertinenza incrociata `(Query, Chunk)` tramite il re-ranker [`IReRankerService`](../src/OnlyRag.Infrastructure/Retrieval/IReRankerService.cs) (`HeuristicReRankerService`).
 4. **Parent-Child Resolver**: Risoluzione dei Child Chunk selezionati nei corrispondenti Parent Chunk tramite [`ParentChildChunkResolver`](../src/OnlyRag.Infrastructure/Retrieval/ParentChildChunkResolver.cs).
 5. **Valutazione CRAG (Self-Corrective RAG)**: Valutazione della confidenza dei risultati tramite [`CragEvaluator`](../src/OnlyRag.Infrastructure/Retrieval/CragEvaluator.cs) e assemblaggio del contesto.
 6. **Generazione LLM & Citazioni Interattive**: Invio del contesto arricchito a Ollama e generazione di risposte grounded corredate da citazioni interattive `[Pag. X, Chunk Y]`.

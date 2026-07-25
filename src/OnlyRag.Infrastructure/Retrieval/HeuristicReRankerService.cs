@@ -68,17 +68,3 @@ public sealed class HeuristicReRankerService : IReRankerService
         return finalScore;
     }
 }
-
-[Obsolete("Usa HeuristicReRankerService al posto di OnnxCrossEncoderReRankerService.")]
-public class OnnxCrossEncoderReRankerService : IReRankerService
-{
-    private readonly HeuristicReRankerService inner = new();
-
-    public Task<IReadOnlyList<ReRankResult>> ReRankAsync(
-        string query,
-        IReadOnlyList<ReRankCandidate> candidates,
-        CancellationToken cancellationToken = default)
-    {
-        return inner.ReRankAsync(query, candidates, cancellationToken);
-    }
-}

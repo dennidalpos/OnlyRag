@@ -88,10 +88,6 @@
   color: #94a3b8;
 }
 
-.pipeline-phase--obsolete {
-  background: #78350f;
-  color: #fde047;
-}
 
 @keyframes pipeline-pulse {
   0%, 100% { opacity: 1; }
