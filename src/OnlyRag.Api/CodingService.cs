@@ -6,8 +6,6 @@ namespace OnlyRag.Api;
 
 internal sealed class CodingService
 {
-    private const int DefaultCodingNumCtx = 16384;
-
     private readonly IOllamaClient ollamaClient;
     private readonly IOllamaSettingsService settingsService;
 
@@ -28,10 +26,11 @@ internal sealed class CodingService
 
         List<OllamaChatMessage> messages = BuildPromptMessages(request, language);
 
+        int? numCtx = await ResolveNumCtxAsync(cancellationToken);
         string rawResponse = await ollamaClient.GenerateChatAsync(
             model,
             messages,
-            numCtx: DefaultCodingNumCtx,
+            numCtx: numCtx,
             cancellationToken: cancellationToken);
 
         (string generatedCode, string explanation) = ExtractCodeAndExplanation(rawResponse, language);
@@ -74,10 +73,11 @@ internal sealed class CodingService
             new("user", userMessage)
         };
 
+        int? numCtx = await ResolveNumCtxAsync(cancellationToken);
         string rawResponse = await ollamaClient.GenerateChatAsync(
             model,
             messages,
-            numCtx: DefaultCodingNumCtx,
+            numCtx: numCtx,
             cancellationToken: cancellationToken);
 
         (string modifiedCode, string explanation) = ExtractCodeAndExplanation(rawResponse, language);
@@ -114,10 +114,11 @@ internal sealed class CodingService
             new("user", userMessage)
         };
 
+        int? numCtx = await ResolveNumCtxAsync(cancellationToken);
         string rawResponse = await ollamaClient.GenerateChatAsync(
             model,
             messages,
-            numCtx: DefaultCodingNumCtx,
+            numCtx: numCtx,
             cancellationToken: cancellationToken);
 
         (string fixedCode, string analysis) = ExtractCodeAndExplanation(rawResponse, language);
@@ -140,8 +141,7 @@ internal sealed class CodingService
 
         List<OllamaChatMessage> messages = BuildPromptMessages(request, language);
 
-        OllamaSettings settings = await settingsService.GetAsync(cancellationToken);
-        int numCtx = settings.CodingNumCtx ?? DefaultCodingNumCtx;
+        int? numCtx = await ResolveNumCtxAsync(cancellationToken);
 
         await foreach (string chunk in ollamaClient.GenerateChatStreamAsync(model, messages, numCtx: numCtx, cancellationToken: cancellationToken))
         {
@@ -254,5 +254,11 @@ internal sealed class CodingService
         }
 
         return $"- {original}\n+ {modified}";
+    }
+
+    private async Task<int?> ResolveNumCtxAsync(CancellationToken cancellationToken)
+    {
+        OllamaSettings settings = await settingsService.GetAsync(cancellationToken);
+        return settings.CodingNumCtx ?? settings.ChatNumCtx;
     }
 }

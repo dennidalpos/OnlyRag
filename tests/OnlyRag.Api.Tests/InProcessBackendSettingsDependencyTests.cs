@@ -397,4 +397,43 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(new OcrProcessingSettings("de", 2, 600, 0.01d), saved);
         Assert.Equal(saved, current);
     }
+
+    [Fact]
+    public async Task PdfExportSettings_CanBeSavedAndReadBack()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        PdfExportSettings initial = await httpClient.GetFromJsonAsync<PdfExportSettings>("/api/settings/pdf-export") ?? throw new InvalidOperationException();
+        Assert.Null(initial.LibreOfficePath);
+        Assert.Equal(120, initial.ConversionTimeoutSeconds);
+
+        PdfExportSettings request = new("C:\\CustomPath\\soffice.exe", 240);
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/pdf-export", request);
+        PdfExportSettings? saved = await putResponse.Content.ReadFromJsonAsync<PdfExportSettings>();
+        PdfExportSettings? current = await httpClient.GetFromJsonAsync<PdfExportSettings>("/api/settings/pdf-export");
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        Assert.NotNull(saved);
+        Assert.NotNull(current);
+        Assert.Equal("C:\\CustomPath\\soffice.exe", saved.LibreOfficePath);
+        Assert.Equal(240, saved.ConversionTimeoutSeconds);
+        Assert.Equal(saved, current);
+    }
+
+    [Fact]
+    public async Task PdfExportStatus_ReturnsValidStatusResponse()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        PdfExportConverterStatusResponse? status = await httpClient.GetFromJsonAsync<PdfExportConverterStatusResponse>("/api/pdf-export/status");
+
+        Assert.NotNull(status);
+        Assert.False(string.IsNullOrWhiteSpace(status.State));
+        Assert.False(string.IsNullOrWhiteSpace(status.Message));
+        Assert.Equal(120, status.ConversionTimeoutSeconds);
+    }
 }

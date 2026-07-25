@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Infrastructure.Agent;
+using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
@@ -152,6 +153,7 @@ internal static class InProcessBackendServiceRegistration
     {
         services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
+        services.AddSingleton<PdfExportSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.ILoggingService, OnlyRag.Infrastructure.Logging.LoggingService>();
         services.AddSingleton<OllamaGenerationCoordinator>();

@@ -6,6 +6,11 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
+    private static readonly System.Text.Json.JsonSerializerOptions CamelCaseOptions = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+    };
+
     internal static void MapCodingEndpoints(this WebApplication app)
     {
         app.MapPost("/api/coding/generate", async (
@@ -52,7 +57,7 @@ public static partial class InProcessBackend
             {
                 await foreach (string chunk in codingService.GenerateCodeStreamAsync(request, cancellationToken))
                 {
-                    string data = System.Text.Json.JsonSerializer.Serialize(new { chunk });
+                    string data = System.Text.Json.JsonSerializer.Serialize(new { chunk }, CamelCaseOptions);
                     await response.WriteAsync($"data: {data}\n\n", cancellationToken);
                     await response.Body.FlushAsync(cancellationToken);
                 }
@@ -61,7 +66,7 @@ public static partial class InProcessBackend
             }
             catch (Exception ex)
             {
-                string errData = System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message });
+                string errData = System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message }, CamelCaseOptions);
                 await response.WriteAsync($"data: {errData}\n\n", cancellationToken);
                 await response.Body.FlushAsync(cancellationToken);
             }
@@ -145,7 +150,7 @@ public static partial class InProcessBackend
             {
                 await foreach (AgentStepEvent stepEvent in agentEngine.RunAgentLoopAsync(runReq, cancellationToken))
                 {
-                    string data = System.Text.Json.JsonSerializer.Serialize(stepEvent);
+                    string data = System.Text.Json.JsonSerializer.Serialize(stepEvent, CamelCaseOptions);
                     await response.WriteAsync($"data: {data}\n\n", cancellationToken);
                     await response.Body.FlushAsync(cancellationToken);
                 }
@@ -155,7 +160,7 @@ public static partial class InProcessBackend
             catch (Exception ex)
             {
                 loggingService.LogError("AgentEngine", $"Eccezione non gestita durante l'esecuzione dell'agente: {ex.Message}", ex);
-                string errData = System.Text.Json.JsonSerializer.Serialize(new AgentStepEvent("error", ex.Message));
+                string errData = System.Text.Json.JsonSerializer.Serialize(new AgentStepEvent("error", ex.Message), CamelCaseOptions);
                 await response.WriteAsync($"data: {errData}\n\n", cancellationToken);
                 await response.Body.FlushAsync(cancellationToken);
             }

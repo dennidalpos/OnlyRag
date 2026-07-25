@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Vector;
@@ -200,6 +201,22 @@ public static partial class InProcessBackend
             Results.Ok(await settings.UpdateProcessingAsync(request, cancellationToken)));
 
         app.MapGet("/api/ocr/languages", () => Results.Ok(OcrLanguages.All));
+
+        app.MapGet("/api/settings/pdf-export", async (
+            PdfExportSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetAsync(cancellationToken)));
+
+        app.MapPut("/api/settings/pdf-export", async (
+            PdfExportSettings request,
+            PdfExportSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.UpdateAsync(request, cancellationToken)));
+
+        app.MapGet("/api/pdf-export/status", async (
+            PdfExportSettingsStore settings,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settings.GetStatusAsync(cancellationToken)));
 
         app.MapGet("/api/ollama/status", async (
             IOllamaClient ollamaClient,

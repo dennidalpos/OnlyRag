@@ -12,6 +12,7 @@ namespace OnlyRag.Api;
 internal sealed class AgentLoopEngine
 {
     private const int MaxJsonRetries = 2;
+    public const int DefaultMaxIterations = 500;
     private const int DefaultNumCtx = 16384;
 
     private readonly IOllamaClient ollamaClient;
@@ -84,11 +85,11 @@ internal sealed class AgentLoopEngine
 
         yield return new AgentStepEvent("thought", $"[Agent Engine] Inizio elaborazione dell'obiettivo in modalità '{request.Mode}' con il modello '{model}'. Caricamento del modello ed elaborazione in corso...");
 
-        int maxIterations = request.MaxIterations ?? 0;
+        int maxIterations = (request.MaxIterations.HasValue && request.MaxIterations.Value > 0) ? request.MaxIterations.Value : DefaultMaxIterations;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int iteration = 0;
         int jsonRetryCount = 0;
-        while (maxIterations <= 0 || iteration < maxIterations)
+        while (iteration < maxIterations)
         {
             iteration++;
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,9 +104,10 @@ internal sealed class AgentLoopEngine
                 logger?.LogWarning("AgentEngine", $"Impossibile recuperare le impostazioni Ollama, uso context default: {ex.Message}");
             }
 
-            int numCtx = settings?.CodingNumCtx ?? DefaultNumCtx;
-            string iterLabel = maxIterations > 0 ? $"{iteration}/{maxIterations}" : $"{iteration}";
-            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
+            int? numCtx = settings?.CodingNumCtx ?? settings?.ChatNumCtx;
+            string numCtxLabel = numCtx.HasValue ? numCtx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "Auto (default modello LLM)";
+            string iterLabel = $"{iteration}/{maxIterations}";
+            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtxLabel}, Messages: {messages.Count})");
 
             yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generazione risposta LLM e analisi azioni necessarie...");
 
@@ -135,6 +137,7 @@ internal sealed class AgentLoopEngine
 
             if (enumerator != null)
             {
+                var chunkBatch = new StringBuilder();
                 await using (enumerator)
                 {
                     while (true)
@@ -156,12 +159,26 @@ internal sealed class AgentLoopEngine
                             break;
                         }
 
-                        if (!hasMore) break;
+                        if (!hasMore)
+                        {
+                            if (chunkBatch.Length > 0)
+                            {
+                                yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
+                                chunkBatch.Clear();
+                            }
+                            break;
+                        }
 
                         if (!string.IsNullOrEmpty(chunk))
                         {
                             responseSb.Append(chunk);
-                            yield return new AgentStepEvent("thought_chunk", Content: chunk);
+                            chunkBatch.Append(chunk);
+
+                            if (chunkBatch.Length >= 40 || chunk.Contains('\n'))
+                            {
+                                yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
+                                chunkBatch.Clear();
+                            }
                         }
                     }
                 }
@@ -216,10 +233,11 @@ internal sealed class AgentLoopEngine
             if (failedToolSignatures.Contains(callSignature))
             {
                 logger?.LogWarning("AgentEngine", $"[LOOP GUARD TRIGGERED] Chiamata ripetuta già fallita bloccata: {callSignature}");
-                yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Rilevato tentativo di rieseguire una chiamata di strumento già fallita ({toolCall.ToolName}). Invio istruzione per esplorare la radice del progetto...");
-                messages.Add(new("user",
-                    $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. " +
-                    $"NON ripetere percorsi o comandi non esistenti! Inizia eseguendo list_dir con relativePath: \".\" per esaminare la struttura effettiva del workspace."));
+                yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Rilevato tentativo di rieseguire una chiamata di strumento già fallita ({toolCall.ToolName}). Invio istruzione di correzione...");
+                string correctionPrompt = toolCall.ToolName.Equals("replace_file_content", StringComparison.OrdinalIgnoreCase)
+                    ? $"[SYSTEM CORRECTION WARNING] Il tool 'replace_file_content' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO perché TargetContent non è stato trovato nel file. NON ripetere la stessa stringa! Esegui prima read_file per verificare le righe esatte oppure usa write_file per riscrivere il file completo."
+                    : $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. NON ripetere percorsi o comandi non esistenti!";
+                messages.Add(new("user", correctionPrompt));
                 continue;
             }
 
@@ -296,8 +314,8 @@ internal sealed class AgentLoopEngine
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
-        // 1. Cerca tag <tool_call> ... </tool_call> (tipici di molti modelli open source come Qwen/DeepSeek/Llama)
-        var matchTagBlock = Regex.Match(text, @"<tool_call>\s*(\{[\s\S]*?\})\s*</tool_call>", RegexOptions.Singleline);
+        // 1. Cerca tag XML (<tool_call>, <tool>, <function_call>)
+        var matchTagBlock = Regex.Match(text, @"<(?:tool_call|tool|function_call)>\s*(\{[\s\S]*?\})\s*</(?:tool_call|tool|function_call)>", RegexOptions.Singleline);
         if (matchTagBlock.Success)
         {
             var call = ParseToolCallJson(matchTagBlock.Groups[1].Value, logger);
@@ -335,12 +353,16 @@ internal sealed class AgentLoopEngine
             if (lastBrace > firstBrace)
             {
                 string jsonCandidate = text.Substring(firstBrace, lastBrace - firstBrace + 1);
-                var call = ParseToolCallJson(jsonCandidate, logger);
-                if (call != null) return call;
+                string preview = jsonCandidate.Substring(0, Math.Min(120, jsonCandidate.Length)).ToLowerInvariant();
+                if (preview.Contains("\"tool\"") || preview.Contains("\"tool_name\"") || preview.Contains("\"function\"") || preview.Contains("\"action\"") || preview.Contains("\"name\""))
+                {
+                    var call = ParseToolCallJson(jsonCandidate, logger);
+                    if (call != null) return call;
+                }
             }
         }
 
-        if (text.Contains("\"tool\"") || text.Contains("\"tool_name\"") || text.Contains("\"action\"") || text.Contains("<tool_call>"))
+        if (text.Contains("\"tool\"") || text.Contains("\"tool_name\"") || text.Contains("\"action\"") || text.Contains("<tool_call>") || text.Contains("<tool>"))
         {
             logger?.LogTrace("AgentEngine", "Testo LLM contiene chiavi di tool ma l'estrazione JSON non ha restituito una chiamata valida.");
         }
@@ -381,24 +403,52 @@ internal sealed class AgentLoopEngine
         {
             var root = doc.RootElement;
 
+            // Supporto per formato OpenAI: {"function": {"name": "...", "arguments": {...}}} oppure {"type": "function", "function": ...}
+            JsonElement targetElement = root;
+            if (root.TryGetProperty("function", out var fnObj) && fnObj.ValueKind == JsonValueKind.Object)
+            {
+                targetElement = fnObj;
+            }
+
             string? toolRaw = null;
-            if (root.TryGetProperty("tool", out var toolProp)) toolRaw = toolProp.GetString();
-            else if (root.TryGetProperty("tool_name", out var toolNameProp)) toolRaw = toolNameProp.GetString();
-            else if (root.TryGetProperty("function", out var fnProp)) toolRaw = fnProp.GetString();
-            else if (root.TryGetProperty("action", out var actProp)) toolRaw = actProp.GetString();
-            else if (root.TryGetProperty("name", out var nameProp)) toolRaw = nameProp.GetString();
+            if (targetElement.TryGetProperty("tool", out var toolProp)) toolRaw = toolProp.GetString();
+            else if (targetElement.TryGetProperty("tool_name", out var toolNameProp)) toolRaw = toolNameProp.GetString();
+            else if (targetElement.TryGetProperty("function", out var fnProp) && fnProp.ValueKind == JsonValueKind.String) toolRaw = fnProp.GetString();
+            else if (targetElement.TryGetProperty("action", out var actProp)) toolRaw = actProp.GetString();
+            else if (targetElement.TryGetProperty("name", out var nameProp)) toolRaw = nameProp.GetString();
 
             if (!string.IsNullOrWhiteSpace(toolRaw))
             {
                 string normalizedTool = NormalizeToolName(toolRaw);
                 string argsJson = "{}";
-                if (root.TryGetProperty("arguments", out var argsProp)) argsJson = argsProp.GetRawText();
-                else if (root.TryGetProperty("args", out var aProp)) argsJson = aProp.GetRawText();
-                else if (root.TryGetProperty("parameters", out var pProp)) argsJson = pProp.GetRawText();
-                else if (root.TryGetProperty("inputs", out var iProp)) argsJson = iProp.GetRawText();
-                else if (root.TryGetProperty("input", out var inProp)) argsJson = inProp.GetRawText();
+
+                JsonElement? argsElem = null;
+                if (targetElement.TryGetProperty("arguments", out var argsProp)) argsElem = argsProp;
+                else if (targetElement.TryGetProperty("args", out var aProp)) argsElem = aProp;
+                else if (targetElement.TryGetProperty("parameters", out var pProp)) argsElem = pProp;
+                else if (targetElement.TryGetProperty("inputs", out var iProp)) argsElem = iProp;
+                else if (targetElement.TryGetProperty("input", out var inProp)) argsElem = inProp;
+                else if (root.TryGetProperty("arguments", out var rootArgsProp)) argsElem = rootArgsProp;
+                else if (root.TryGetProperty("parameters", out var rootParamProp)) argsElem = rootParamProp;
+
+                if (argsElem.HasValue)
+                {
+                    if (argsElem.Value.ValueKind == JsonValueKind.String)
+                    {
+                        string strVal = argsElem.Value.GetString() ?? "{}";
+                        argsJson = strVal.Trim().StartsWith('{') ? strVal : "{ \"input\": " + JsonSerializer.Serialize(strVal) + " }";
+                    }
+                    else
+                    {
+                        argsJson = argsElem.Value.GetRawText();
+                    }
+                }
 
                 string? explanation = root.TryGetProperty("explanation", out var expProp) ? expProp.GetString() : null;
+                if (string.IsNullOrWhiteSpace(explanation) && targetElement.TryGetProperty("explanation", out var expProp2))
+                {
+                    explanation = expProp2.GetString();
+                }
 
                 return new AgentToolCall(
                     CallId: $"call_{Guid.NewGuid():N}"[..10],
@@ -417,14 +467,14 @@ internal sealed class AgentLoopEngine
 
         string repaired = rawJson;
 
-        // 1. Rimuove commenti single-line (// ...) fuori dalle stringhe
-        repaired = Regex.Replace(repaired, @"(?<!:)//[^\n]*", "");
+        // 1. Ripara tabulazioni (0x09) ed a capo non-escaped all'interno di stringhe JSON
+        repaired = FixUnescapedControlCharsInJsonStrings(repaired);
 
-        // 2. Rimuove commenti multi-line (/* ... */)
-        repaired = Regex.Replace(repaired, @"/\*.*?\*/", "", RegexOptions.Singleline);
-
-        // 3. Ripara a capo unescaped all'interno dei campi di codice stringa
+        // 2. Ripara a capo unescaped per campi noti
         repaired = FixUnescapedStringLiterals(repaired);
+
+        // 3. Ripara backslash unescaped nei percorsi Windows e nelle stringhe (es. \M, \P, \O, \S, \C, \W, \U che non siano \n \r \t \\ \" \/)
+        repaired = Regex.Replace(repaired, @"\\(?![\\""/bfnrt]|u[0-9a-fA-F]{4})", @"\\");
 
         // 4. Sostituisce apici singoli con virgolette doppie per chiavi e valori stringa
         repaired = Regex.Replace(repaired, @"'([^'\\]*(?:\\.[^'\\]*)*?)'", "\"$1\"");
@@ -441,6 +491,65 @@ internal sealed class AgentLoopEngine
         repaired = Regex.Replace(repaired, @"(?<=:\s*)None(?=\s*[,}\]])", "null");
 
         return repaired;
+    }
+
+    private static string FixUnescapedControlCharsInJsonStrings(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return json;
+
+        var sb = new StringBuilder(json.Length + 64);
+        bool inString = false;
+        bool isEscaped = false;
+
+        for (int i = 0; i < json.Length; i++)
+        {
+            char c = json[i];
+
+            if (inString)
+            {
+                if (isEscaped)
+                {
+                    sb.Append(c);
+                    isEscaped = false;
+                }
+                else if (c == '\\')
+                {
+                    sb.Append(c);
+                    isEscaped = true;
+                }
+                else if (c == '"')
+                {
+                    sb.Append(c);
+                    inString = false;
+                }
+                else if (c == '\t')
+                {
+                    sb.Append("\\t");
+                }
+                else if (c == '\r')
+                {
+                    sb.Append("\\r");
+                }
+                else if (c == '\n')
+                {
+                    sb.Append("\\n");
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            else
+            {
+                if (c == '"')
+                {
+                    inString = true;
+                }
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString();
     }
 
     private static string FixUnescapedStringLiterals(string text)
@@ -460,12 +569,12 @@ internal sealed class AgentLoopEngine
         bool hasToolKeyword = lower.Contains("\"tool\"") || lower.Contains("\"tool_name\"") ||
                               lower.Contains("\"action\"") || lower.Contains("\"function\"") ||
                               lower.Contains("'tool'") || lower.Contains("'tool_name'") ||
-                              lower.Contains("<tool_call>");
+                              lower.Contains("<tool_call>") || lower.Contains("<tool>");
         bool hasArgumentsKeyword = lower.Contains("\"arguments\"") || lower.Contains("\"args\"") ||
                                    lower.Contains("\"parameters\"") || lower.Contains("\"inputs\"") ||
                                    lower.Contains("'arguments'") || lower.Contains("'args'");
         bool hasJsonBlock = text.Contains("```json") || text.Contains("```JSON") ||
-                            text.Contains("<tool_call>") ||
+                            text.Contains("<tool_call>") || text.Contains("<tool>") ||
                             (text.Contains('{') && text.Contains('}'));
 
         return hasToolKeyword && (hasArgumentsKeyword || hasJsonBlock);
@@ -476,13 +585,13 @@ internal sealed class AgentLoopEngine
         string t = toolName.Trim().ToLowerInvariant();
         return t switch
         {
-            "list" or "listdir" or "ls" or "list_directory" => "list_dir",
-            "read" or "readfile" or "read_file_content" or "view_file" => "read_file",
-            "write" or "writefile" or "create_file" or "write_to_file" => "write_file",
-            "replace" or "replacefile" or "replace_content" => "replace_file_content",
-            "grep" or "search" or "find" or "grep_search" => "grep_search",
-            "run" or "exec" or "execute" or "command" or "terminal" or "run_command" => "run_command",
-            "web_search" or "search_web" or "internet_search" or "online_search" or "ddg" => "web_search",
+            "list" or "listdir" or "ls" or "dir" or "list_directory" or "list_files" => "list_dir",
+            "read" or "readfile" or "read_file_content" or "view_file" or "cat" => "read_file",
+            "write" or "writefile" or "create_file" or "create" or "write_to_file" => "write_file",
+            "replace" or "replacefile" or "replace_content" or "edit" or "edit_file" => "replace_file_content",
+            "grep" or "search" or "find" or "grep_search" or "find_in_files" => "grep_search",
+            "run" or "exec" or "execute" or "command" or "terminal" or "run_command" or "cmd" or "powershell" => "run_command",
+            "web_search" or "search_web" or "internet_search" or "online_search" or "ddg" or "google" => "web_search",
             "subagent" or "invoke_subagent" or "sub_agent" => "invoke_subagent",
             "task" or "manage_task" => "manage_task",
             _ => t
@@ -546,11 +655,11 @@ REGOLE COMPORTAMENTALI (ANTIGRAVITY DIRECTIVES):
 1. **PRIMO PASSO OBBLIGATORIO**: Inizia SEMPRE con una chiamata a list_dir con relativePath "." per esplorare la struttura del workspace. Non rispondere MAI direttamente all'utente senza prima aver esplorato il progetto.
 2. **Uso di Percorsi Reali**: Non ipotizzare mai percorsi o nomi di cartelle non esistenti. Esamina i file restituiti da list_dir o grep_search e usa ESATTAMENTE quei percorsi. Se un file/cartella non viene trovata, torna ad esplorare la radice con list_dir con relativePath: ".".
 3. **Esplorazione Approfondita & Fonti Ufficiali**: Usa read_file e grep_search per il codice locale. Se necessiti di verificare documentazione o standard ufficiali, usa web_search con query mirate.
-4. **Scrittura Precisa**: Usa replace_file_content per modifiche mirate a blocchi di testo, oppure write_file per creare nuovi file o riscrivere file completi.
+4. **MODALITÀ SCRITTURA (MODIFICA OBBLIGATORIA SU DISCO)**: Quando sei in modalità 'write' e l'utente ti chiede di creare, modificare o rifattorizzare codice, DEVI OBBLIGATORIAMENTE chiamare `write_file` o `replace_file_content` per applicare le modifiche direttamente sul disco prima di concludere! NON limitarti a stampare il codice nel testo finale senza aver invocato il tool di scrittura.
 5. **Modalità Plan**: In modalità 'plan', NON chiamare mai write_file, replace_file_content o run_command. Concentrati sull'analisi architetturale e la pianificazione.
 6. **Lavoro Diretto**: Esegui le operazioni direttamente con i tool forniti.
 7. **Una Chiamata per Passo**: Esegui una sola chiamata di strumento per ciascuna risposta.
-8. **Risposta Finale**: Quando l'obiettivo è completato, fornisci la tua sintesi finale in Markdown normale SENZA blocchi JSON di strumenti.
+8. **Risposta Finale**: Soltanto DOPO aver eseguito i tool di scrittura necessari per completare l'obiettivo, fornisci la tua sintesi finale in Markdown normale SENZA blocchi JSON di strumenti.
 """;
     }
 

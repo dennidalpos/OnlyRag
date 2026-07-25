@@ -177,15 +177,30 @@ public sealed class WorkspaceToolExecutor
         }
 
         string original = await File.ReadAllTextAsync(safePath, cancellationToken);
-        if (!original.Contains(target))
+        if (original.Contains(target))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"TargetContent non trovato nel file {relative}. Verificare l'esattezza dei caratteri o della spaziatura.");
+            string updated = original.Replace(target, replacement);
+            await File.WriteAllTextAsync(safePath, updated, cancellationToken);
+            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata con successo nel file: {relative}");
         }
 
-        string updated = original.Replace(target, replacement);
-        await File.WriteAllTextAsync(safePath, updated, cancellationToken);
+        // Fallback con normalizzazione fine riga (CRLF vs LF)
+        string normOriginal = original.Replace("\r\n", "\n");
+        string normTarget = target.Replace("\r\n", "\n");
+        string normReplacement = replacement.Replace("\r\n", "\n");
 
-        return new AgentToolResult(callId, toolName, true, $"Sostituzione completata con successo nel file: {relative}");
+        if (normOriginal.Contains(normTarget))
+        {
+            string updated = normOriginal.Replace(normTarget, normReplacement);
+            if (original.Contains("\r\n"))
+            {
+                updated = updated.Replace("\n", "\r\n");
+            }
+            await File.WriteAllTextAsync(safePath, updated, cancellationToken);
+            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata (con normalizzazione a capo) nel file: {relative}");
+        }
+
+        return new AgentToolResult(callId, toolName, false, string.Empty, $"TargetContent non trovato nel file {relative}. Usa read_file per leggere l'esatta sintassi delle righe di {relative} oppure usa write_file per riscrivere l'intero file.");
     }
 
     private AgentToolResult GrepSearch(string callId, string toolName, JsonElement args, string rootPath)
@@ -467,11 +482,22 @@ public sealed class WorkspaceToolExecutor
     private static string ResolveSafePath(string rootPath, string relativePath)
     {
         string root = Path.GetFullPath(rootPath);
-        string target = Path.GetFullPath(Path.Combine(root, (relativePath ?? "").TrimStart('/', '\\')));
+        string cleanedRelative = (relativePath ?? "").Trim();
 
-        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        string target;
+        if (Path.IsPathRooted(cleanedRelative))
         {
-            throw new UnauthorizedAccessException("Path Traversal bloccato: tentativo di accedere ad una risorsa esterna al workspace.");
+            target = Path.GetFullPath(cleanedRelative);
+        }
+        else
+        {
+            target = Path.GetFullPath(Path.Combine(root, cleanedRelative.TrimStart('/', '\\')));
+        }
+
+        string relFromRoot = Path.GetRelativePath(root, target);
+        if (relFromRoot.StartsWith("..") || Path.IsPathRooted(relFromRoot))
+        {
+            throw new UnauthorizedAccessException($"Path Traversal bloccato: il percorso '{relativePath}' è all'esterno della cartella del workspace '{rootPath}'.");
         }
 
         return target;

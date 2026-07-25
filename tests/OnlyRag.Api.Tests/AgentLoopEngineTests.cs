@@ -16,8 +16,13 @@ public sealed class AgentLoopEngineTests
     [InlineData("```json\n{\n  \"tool\": \"web_search\",\n  \"arguments\": { \"query\": \"C# 13 features\", \"domain\": \"learn.microsoft.com\" }\n}\n```", "web_search")] // Web search tool
     [InlineData("```json\n{\n  \"tool\": \"search_web\",\n  \"arguments\": { \"query\": \"React 19 hooks\" }\n}\n```", "web_search")] // Web search alias
     [InlineData("<tool_call>\n{\n  \"name\": \"list_dir\",\n  \"inputs\": { \"relativePath\": \".\" }\n}\n</tool_call>", "list_dir")] // Open source <tool_call> tag format
+    [InlineData("<tool>\n{\n  \"name\": \"dir\",\n  \"parameters\": { \"relativePath\": \".\" }\n}\n</tool>", "list_dir")] // <tool> tag with dir alias
+    [InlineData("```json\n{\n  \"type\": \"function\",\n  \"function\": {\n    \"name\": \"cat\",\n    \"arguments\": { \"relativePath\": \"README.md\" }\n  }\n}\n```", "read_file")] // OpenAI function object format with cat alias
+    [InlineData("```json\n{\n  \"tool\": \"powershell\",\n  \"arguments\": \"{\\\"commandLine\\\": \\\"dotnet build\\\"}\"\n}\n```", "run_command")] // Stringified arguments with powershell alias
     [InlineData("Ecco la modifica:\n```json\n{\n  \"tool\": \"write_file\",\n  \"arguments\": {\n    \"relativePath\": \"test.cs\",\n    \"content\": \"using System;\nclass P {}\"\n  }\n}\n```", "write_file")] // Unescaped newlines in JSON string
     [InlineData("```json\n{\n  tool: 'list_dir',\n  arguments: { relativePath: '.' },\n}\n```", "list_dir")] // Malformed JSON (single quotes, unquoted keys, trailing comma)
+    [InlineData("```json\n{\n  \"tool\": \"replace_file_content\",\n  \"arguments\": {\n    \"relativePath\": \"src\\OnlyFirmaOutlook\\Program.cs\",\n    \"targetContent\": \"class Program\",\n    \"replacementContent\": \"// \\M Comment\\nclass Program\"\n  }\n}\n```", "replace_file_content")] // Unescaped backslashes in Windows paths & C# comments
+    [InlineData("```json\n{\n  \"tool\": \"write_file\",\n  \"arguments\": {\n    \"relativePath\": \"test.cs\",\n    \"content\": \"using System;\n\tclass P {}\"\n  }\n}\n```", "write_file")] // Literal tab character (0x09) in code string
     public void TryExtractToolCall_ParsesVariousValidToolCalls(string llmOutput, string expectedToolName)
     {
         AgentToolCall? toolCall = AgentLoopEngine.TryExtractToolCall(llmOutput);

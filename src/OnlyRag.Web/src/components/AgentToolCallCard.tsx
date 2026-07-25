@@ -42,11 +42,24 @@ function formatArgsSummary(toolName: string, argsJson: string): string {
   }
 }
 
+function cleanThoughtContent(text?: string | null): string {
+  if (!text) return "";
+  if (!text.includes("```") && !text.includes("<tool") && !text.includes("<function_call") && !text.includes("{")) {
+    return text.trim();
+  }
+  let cleaned = text.replace(/```(?:json|JSON)?\s*[\s\S]*?(?:```|$)/g, "");
+  cleaned = cleaned.replace(/<(?:tool_call|tool|function_call)>[\s\S]*?(?:<\/(?:tool_call|tool|function_call)>|$)/g, "");
+  return cleaned.trim();
+}
+
 export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (event.type === "thought" || event.type === "thought_chunk") {
     const isStepThought = event.content?.includes("[Agent Step") || event.content?.includes("Elaborazione");
+    const cleanedText = isStepThought ? event.content : cleanThoughtContent(event.content);
+    if (!cleanedText) return null;
+
     return (
       <div className="agent-step agent-step--thought" style={{
         display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px",
@@ -57,7 +70,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
       }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
+          <polyline points="12 6 12 16 14" />
         </svg>
         <div style={{ flex: 1 }}>
           {isStepThought && (
@@ -65,7 +78,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
               Pensiero & Inizializzazione LLM
             </div>
           )}
-          <span>{event.content}</span>
+          <span>{cleanedText}</span>
         </div>
       </div>
     );

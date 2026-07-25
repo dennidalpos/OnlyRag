@@ -355,7 +355,7 @@ export function CodingSection({
   function extractFileActionsFromResponse(text: string): FileAction[] {
     const actions: FileAction[] = [];
 
-    const fileRegex = /(?:Target File|File|File Modificato|Salva in|Modificato):\s*`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
+    const fileRegex = /(?:Target File|File|File Modificato|Salva in|Modificato|Nel file|Codice per|Refattorizzato):\s*`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
     let match;
     while ((match = fileRegex.exec(text)) !== null) {
       const filePath = match[1];
@@ -367,6 +367,46 @@ export function CodingSection({
           action: "write",
           code: codeBlockMatch ? codeBlockMatch[1].trim() : undefined
         });
+      }
+    }
+
+    const headerRegex = /(?:###|\*\*|`)\s*([a-zA-Z0-9_\-./\\]+\.(?:cs|ts|tsx|js|jsx|json|xml|csproj|sln|md|txt))\b/gi;
+    let headerMatch;
+    while ((headerMatch = headerRegex.exec(text)) !== null) {
+      const filePath = headerMatch[1];
+      if (filePath && !actions.some((a) => a.file === filePath)) {
+        const afterText = text.slice(headerMatch.index);
+        const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
+        if (codeBlockMatch) {
+          actions.push({
+            file: filePath,
+            action: "write",
+            code: codeBlockMatch[1].trim()
+          });
+        }
+      }
+    }
+
+    // Match percorsi esistenti del workspace
+    if (workspaceFiles && workspaceFiles.length > 0) {
+      for (const wf of workspaceFiles) {
+        if (!wf.isDirectory && wf.relativePath) {
+          const fileName = wf.relativePath.split("/").pop() || wf.relativePath;
+          if (!actions.some((a) => a.file === wf.relativePath || a.file === fileName)) {
+            const idx = text.indexOf(fileName);
+            if (idx !== -1) {
+              const afterText = text.slice(idx);
+              const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
+              if (codeBlockMatch) {
+                actions.push({
+                  file: wf.relativePath,
+                  action: "write",
+                  code: codeBlockMatch[1].trim()
+                });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -456,10 +496,50 @@ export function CodingSection({
               }
 
               const updatedEvents = [...existingEvents, event];
+
+              // Estrai file actions quando un tool di scrittura/sostituzione file ha successo
+              const currentActions = msg.fileActions ? [...msg.fileActions] : [];
+              if (event.type === "tool_result" && event.toolResult && event.toolResult.success) {
+                const tr = event.toolResult;
+                const toolName = tr.toolName.toLowerCase();
+                if (toolName === "write_file" || toolName === "write_to_file" || toolName === "replace_file_content") {
+                  // Trova la chiamata proposta corrispondente per estratte i parametri
+                  const matchingProp = existingEvents.find(
+                    (e) => e.type === "tool_proposed" && e.toolCall && e.toolCall.callId === tr.callId
+                  );
+                  if (matchingProp?.toolCall) {
+                    try {
+                      const args = JSON.parse(matchingProp.toolCall.argumentsJson) as Record<string, string>;
+                      const filePath = args.relativePath || args.path || args.file;
+                      if (filePath && !currentActions.some((a) => a.file === filePath)) {
+                        currentActions.push({
+                          file: filePath,
+                          action: "write",
+                          code: args.content || args.replacementContent,
+                          applied: true
+                        });
+                      }
+                    } catch {
+                      // Ignora se i parametri non sono JSON valido
+                    }
+                  }
+                  void fetchWorkspaceFiles();
+                }
+              }
+
               const finalContent = event.type === "final_response" && event.content
                 ? event.content
                 : msg.content;
-              return { ...msg, agentEvents: updatedEvents, content: finalContent };
+
+              const modified = currentActions.map((a) => a.file);
+
+              return {
+                ...msg,
+                agentEvents: updatedEvents,
+                content: finalContent,
+                fileActions: currentActions.length > 0 ? currentActions : undefined,
+                modifiedFiles: modified.length > 0 ? modified : undefined
+              };
             })
           );
         },
@@ -467,9 +547,39 @@ export function CodingSection({
       );
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg
-        )
+        prev.map((msg) => {
+          if (msg.id !== assistantMessageId) return msg;
+
+          const actions = msg.fileActions ? [...msg.fileActions] : [];
+          if (msg.content) {
+            const extracted = extractFileActionsFromResponse(msg.content);
+            for (const ext of extracted) {
+              if (!actions.some((a) => a.file === ext.file)) {
+                actions.push(ext);
+              }
+            }
+          }
+
+          if (operatingMode === "write" && actions.length > 0 && workspaceConfig?.isAuthorized) {
+            for (const act of actions) {
+              if (!act.applied && act.action === "write" && act.code) {
+                void handleApplyCodeToFileSilently(act.file, act.code);
+                act.applied = true;
+              } else if (!act.applied && act.action === "delete") {
+                void handleDeleteWorkspaceFileSilently(act.file);
+                act.applied = true;
+              }
+            }
+          }
+
+          const modified = actions.map((a) => a.file);
+          return {
+            ...msg,
+            isStreaming: false,
+            fileActions: actions.length > 0 ? actions : undefined,
+            modifiedFiles: modified.length > 0 ? modified : undefined
+          };
+        })
       );
       void fetchWorkspaceFiles();
     } catch (err) {
@@ -749,9 +859,9 @@ export function CodingSection({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  background: preset.id.startsWith("preset_audit") ? "#1e1b4b" : "#1e293b",
-                  borderColor: preset.id.startsWith("preset_audit") ? "#6366f1" : "#475569",
-                  color: preset.id.startsWith("preset_audit") ? "#c7d2fe" : "#f1f5f9",
+                  background: "#1e293b",
+                  borderColor: "#475569",
+                  color: "#f1f5f9",
                   borderRadius: preset.isBuiltIn ? 6 : "6px 0 0 6px",
                   fontWeight: 600
                 }}
@@ -864,37 +974,49 @@ export function CodingSection({
                     />
                   ))}
                   {msg.isStreaming && (() => {
-                    const lastEvt = msg.agentEvents && msg.agentEvents.length > 0 ? msg.agentEvents[msg.agentEvents.length - 1] : null;
-                    let statusText = "Agente in esecuzione: caricamento modello LLM ed elaborazione in corso...";
+                    const events = msg.agentEvents || [];
+                    const lastEvt = events.length > 0 ? events[events.length - 1] : null;
+
+                    // Calcola il numero del passo corrente
+                    const stepMatch = events.map((e) => (e.content || "").match(/\[Agent Step (\d+(?:\/\d+)?)\]/)).filter(Boolean);
+                    const currentStepLabel = stepMatch.length > 0 ? stepMatch[stepMatch.length - 1]![1] : String(events.length || 1);
+
+                    let statusText = `⚡ Passo ${currentStepLabel}: Caricamento modello ed elaborazione LLM in corso...`;
                     if (lastEvt) {
                       if (lastEvt.type === "tool_proposed" && lastEvt.toolCall) {
-                        statusText = `🛠️ Richiesta tool '${lastEvt.toolCall.toolName}' in corso...`;
+                        statusText = `🛠️ Passo ${currentStepLabel}: Esecuzione strumento '${lastEvt.toolCall.toolName}'...`;
                       } else if (lastEvt.type === "tool_result" && lastEvt.toolResult) {
-                        statusText = `✅ Completato tool '${lastEvt.toolResult.toolName}'. Analisi dei risultati...`;
+                        statusText = `✅ Passo ${currentStepLabel}: Completato '${lastEvt.toolResult.toolName}'. Analisi del risultato...`;
                       } else if (lastEvt.type === "thought" || lastEvt.type === "thought_chunk") {
-                        const snippet = (lastEvt.content || "").trim().slice(-120);
-                        statusText = snippet ? `⚡ ${snippet}` : "⚡ Pensiero ed elaborazione LLM in corso...";
+                        const snippet = (lastEvt.content || "").trim().slice(-140);
+                        statusText = snippet
+                          ? `⚡ Passo ${currentStepLabel}: ${snippet}`
+                          : `⚡ Passo ${currentStepLabel}: Pensiero ed elaborazione in corso...`;
                       } else if (lastEvt.type === "approval_required" && lastEvt.toolCall) {
-                        statusText = `⚠️ In attesa di approvazione utente per '${lastEvt.toolCall.toolName}'...`;
+                        statusText = `⚠️ Passo ${currentStepLabel}: Attesa approvazione utente per '${lastEvt.toolCall.toolName}'...`;
                       }
                     }
                     return (
                       <div style={{
                         display: "flex",
-                        alignItems: "center",
-                        gap: 10,
+                        flexDirection: "column",
+                        gap: 4,
                         background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
                         border: "1px solid #6366f1",
                         color: "#c7d2fe",
-                        padding: "8px 12px",
+                        padding: "10px 14px",
                         borderRadius: 8,
-                        fontSize: "0.84rem",
+                        fontSize: "0.85rem",
                         fontWeight: 600,
                         marginTop: 4,
-                        boxShadow: "0 0 12px rgba(99,102,241,0.2)"
+                        boxShadow: "0 0 16px rgba(99,102,241,0.25)"
                       }}>
-                        <span style={{ fontSize: "1.1rem", animation: "spin 1.5s linear infinite" }}>⏳</span>
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{statusText}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: "1.1rem", animation: "spin 1.5s linear infinite" }}>⏳</span>
+                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {statusText}
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}

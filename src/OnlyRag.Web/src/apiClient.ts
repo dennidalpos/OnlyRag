@@ -321,8 +321,8 @@ export async function apiAgentStreamRequest(
       try {
         const parsed = JSON.parse(dataStr) as unknown;
         onEvent(parsed);
-      } catch {
-        // Ignora JSON non valido
+      } catch (err) {
+        console.warn("[apiAgentStreamRequest] Errore di parsing dell'evento SSE:", err, "Dati grezzi:", dataStr);
       }
     }
   }
