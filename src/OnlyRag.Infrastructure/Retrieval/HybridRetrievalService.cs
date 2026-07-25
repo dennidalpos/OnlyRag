@@ -129,7 +129,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
             finalResults.Add(coarse with
             {
-                Score = Math.Round((coarse.Score + reRankScore) / 2d, 4),
+                Score = reRankScore,
                 ReRankScore = reRankScore,
                 ParentContent = resolved?.ParentContent ?? coarse.Snippet,
                 SectionHeading = resolved?.SectionHeading,
@@ -199,25 +199,11 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
             return result;
         }
-        catch (QueryEmbeddingUnavailableException)
-        {
-            notices.Add(new RetrievalNotice(
-                "vector_embedding_unavailable",
-                "Embedding query non disponibile: continuo con retrieval keyword locale."));
-            return null;
-        }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is QueryEmbeddingUnavailableException or InvalidOperationException or NotSupportedException)
         {
             notices.Add(new RetrievalNotice(
                 "vector_embedding_unavailable",
                 $"Embedding query non disponibile: {ex.Message} Continuo con retrieval keyword locale."));
-            return null;
-        }
-        catch (NotSupportedException ex)
-        {
-            notices.Add(new RetrievalNotice(
-                "vector_embedding_unavailable",
-                $"Generatore embedding query non supportato: {ex.Message} Continuo con retrieval keyword locale."));
             return null;
         }
     }

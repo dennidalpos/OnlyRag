@@ -42,19 +42,19 @@
   display: grid;
   gap: 3px;
   padding: 8px;
-  border: 1px solid #d9e0e8;
+  border: 1px solid #334155;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #1e293b;
 }
 
 .image-status--online {
-  border-color: #b9d8c5;
-  background: #edf8f1;
+  border-color: #10b981;
+  background: #064e3b;
 }
 
 .image-status--offline {
-  border-color: #e7c9c9;
-  background: #fff4f3;
+  border-color: #ef4444;
+  background: #7f1d1d;
 }
 
 .image-status strong,
@@ -71,13 +71,13 @@
 }
 
 .image-status span {
-  color: #172033;
+  color: #f8fafc;
   font-size: 13px;
   font-weight: 700;
 }
 
 .image-status small {
-  color: #627084;
+  color: #cbd5e1;
   font-size: 12px;
   line-height: 1.35;
 }
@@ -102,17 +102,17 @@
   display: grid;
   gap: 12px;
   padding: 14px;
-  border: 1px solid rgba(215, 225, 234, 0.6);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .images-controls-panel:hover,
 .images-canvas-panel:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .images-form {
@@ -135,8 +135,7 @@
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid;
-  border-image: linear-gradient(to right, transparent, rgba(99, 102, 241, 0.2), transparent) 1;
+  border-bottom: 1px solid #334155;
 }
 
 .canvas-toolbar__tools,
@@ -156,9 +155,9 @@
 
 .image-mode-control {
   padding: 8px;
-  border: 1px solid #d9e0e8;
+  border: 1px solid #334155;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #1e293b;
 }
 
 .image-mode-control label,
@@ -171,7 +170,7 @@
 
 .image-mode-control label {
   align-items: center;
-  color: #172033;
+  color: #f8fafc;
   font-size: 13px;
 }
 
@@ -181,20 +180,20 @@
 
 .image-mode-control__labels,
 .image-mode-control small {
-  color: #627084;
+  color: #cbd5e1;
   font-size: 12px;
 }
 
 .image-advanced-options {
   padding: 10px 12px;
-  border: 1px solid #d7e1ea;
+  border: 1px solid #334155;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #1e293b;
 }
 
 .image-advanced-options summary {
   cursor: pointer;
-  color: #172033;
+  color: #f8fafc;
   font-size: 13px;
   font-weight: 700;
   user-select: none;
@@ -205,7 +204,7 @@
   gap: 10px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #334155;
 }
 
 .image-consent-summary {

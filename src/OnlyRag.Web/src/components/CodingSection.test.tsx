@@ -121,7 +121,7 @@ describe("CodingSection", () => {
       />
     );
 
-    const promptInput = screen.getByPlaceholderText(/Modalità Agente attiva/i);
+    const promptInput = screen.getByPlaceholderText(/Modalità AGENTE AUTONOMO/i);
     await user.type(promptInput, "Analizza il codice");
 
     const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });

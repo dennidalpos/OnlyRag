@@ -86,17 +86,20 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
         className="modal-content animate-fade-in max-w-[700px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header flex justify-between items-center">
-          <h3 className="m-0 flex items-center gap-2 text-base font-semibold">
-            <span>💻</span> Processi in Background ({tasks.length})
+        <div className="modal-header flex justify-between items-center pb-3 mb-3 border-b border-slate-700">
+          <h3 className="m-0 flex items-center gap-2 text-base font-semibold text-slate-100">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            Processi in Background ({tasks.length})
           </h3>
-          <button type="button" className="button-secondary" onClick={onClose}>✕</button>
+          <button type="button" className="button button--secondary button--small" onClick={onClose}>✕</button>
         </div>
 
         <div className="modal-body flex-1 overflow-y-auto flex flex-col gap-2.5">
           {tasks.length === 0 ? (
             <div className="text-center text-slate-500 py-8">
-              <div className="text-3xl mb-2">📋</div>
               <p>Nessun processo in background attivo.</p>
             </div>
           ) : (
@@ -113,8 +116,10 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
                   onClick={() => handleToggleExpand(task.taskId)}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="text-sm">
-                      {task.isRunning ? "🟢" : (task.exitCode === 0 ? "✅" : "❌")}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      task.isRunning ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : (task.exitCode === 0 ? "bg-slate-800 text-slate-300" : "bg-red-950 text-red-400 border border-red-800")
+                    }`}>
+                      {task.isRunning ? "RUNNING" : (task.exitCode === 0 ? "DONE" : "FAIL")}
                     </span>
                     <div>
                       <div className="font-mono text-xs text-slate-200 font-semibold">
@@ -133,11 +138,11 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
                         className="button button--small bg-red-950 border-red-500 text-red-300 text-xs px-2 py-0.5 rounded-md hover:bg-red-900"
                         onClick={(e) => { e.stopPropagation(); void handleKillTask(task.taskId); }}
                       >
-                        ⬛ Kill
+                        Kill
                       </button>
                     )}
                     <span className="text-slate-500 text-xs">
-                      {expandedTaskId === task.taskId ? "▲" : "▼"}
+                      {expandedTaskId === task.taskId ? "Nascondi" : "Log"}
                     </span>
                   </div>
                 </div>
@@ -180,7 +185,7 @@ export function BackgroundTaskDrawer({ isOpen, onClose }: BackgroundTaskDrawerPr
                         className="button button--secondary button--small text-xs"
                         onClick={() => void fetchTaskLogs(task.taskId)}
                       >
-                        🔄 Aggiorna Log
+                        Aggiorna Log
                       </button>
                     </div>
                   </div>

@@ -29,21 +29,21 @@ export const BUILT_IN_PRESETS: VibePreset[] = [
   {
     id: "preset_audit_docs",
     title: "Audit Documentazione",
-    icon: "📚",
+    icon: "📝",
     prompt: "Esegui un audit della documentazione del codice: verifica la presenza e la chiarezza di commenti, specifiche delle API, tipi/interfacce e guide di sviluppo.",
     isBuiltIn: true
   },
   {
     id: "preset_audit_build",
     title: "Audit Build & Pacchetti",
-    icon: "🛠️",
+    icon: "📦",
     prompt: "Esegui un audit della configurazione di build, compilazione e pacchettizzazione del progetto: verifica correttezza dei file di build, dipendenze ed efficienza.",
     isBuiltIn: true
   },
   {
     id: "preset_refactor",
     title: "Rifattorizza & Pulisci",
-    icon: "🚀",
+    icon: "🧹",
     prompt: "Rifattorizza il codice rendendolo pulito, leggibile, privo di duplicazioni e conforme ai principi SOLID e alle best practice del linguaggio.",
     isBuiltIn: true
   },

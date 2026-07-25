@@ -1,6 +1,7 @@
 import { DefaultModelsPanel } from "./settings/DefaultModelsPanel";
 import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { IngestionSettingsPanel } from "./settings/IngestionSettingsPanel";
+import { LoggingSettingsPanel } from "./settings/LoggingSettingsPanel";
 import { ModelManagementPanel } from "./settings/ModelManagementPanel";
 import { OllamaConnectionPanel } from "./settings/OllamaConnectionPanel";
 import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
@@ -46,6 +47,7 @@ export function SettingsSectionPanels() {
         <section className="settings-section" aria-labelledby="settings-diagnostics-title">
           <h3 id="settings-diagnostics-title">Manutenzione &amp; Diagnostica</h3>
           <div className="settings-section__grid">
+            <LoggingSettingsPanel />
             <DiagnosticsPanel />
           </div>
         </section>

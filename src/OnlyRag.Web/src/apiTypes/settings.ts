@@ -154,6 +154,7 @@ export type DependencyActionResponse = {
   message: string;
 };
 
+
 export type OcrProvisionRequest = {
   confirmed: boolean;
   runtimeTarget?: "auto" | "cpu" | "nvidia";
@@ -193,6 +194,30 @@ export type OcrStartupAnalysis = {
   title: string;
   message: string;
   findings: string[];
+};
+
+export type AppLogLevel = "Trace" | "Debug" | "Information" | "Warning" | "Error" | "None";
+
+export type LoggingSettings = {
+  minLevel: AppLogLevel;
+};
+
+export type LogEntry = {
+  id: string;
+  timestampUtc: string;
+  level: AppLogLevel;
+  category: string;
+  message: string;
+  exceptionDetails: string | null;
+  dataJson: string | null;
+};
+
+export type LogStorageInfo = {
+  totalSizeBytes: number;
+  formattedSize: string;
+  memoryEntryCount: number;
+  fileCount: number;
+  logDirectory: string;
 };
 
 export type OcrLanguage = {

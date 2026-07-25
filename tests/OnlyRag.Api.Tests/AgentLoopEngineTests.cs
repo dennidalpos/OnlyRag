@@ -13,6 +13,8 @@ public sealed class AgentLoopEngineTests
     [InlineData("```json\n{\n  \"action\": \"readfile\",\n  \"args\": { \"relativePath\": \"README.md\" }\n}\n```", "read_file")] // Alias readfile & action key
     [InlineData("```json\n{\n  \"function\": \"exec\",\n  \"parameters\": { \"commandLine\": \"dotnet test\" }\n}\n```", "run_command")] // Alias exec & function key
     [InlineData("```json\n{\n  \"tool_name\": \"ls\",\n  \"arguments\": { \"relativePath\": \".\" }\n}\n```", "list_dir")] // Alias ls & tool_name key
+    [InlineData("<tool_call>\n{\n  \"name\": \"list_dir\",\n  \"inputs\": { \"relativePath\": \".\" }\n}\n</tool_call>", "list_dir")] // Open source <tool_call> tag format
+    [InlineData("Ecco la modifica:\n```json\n{\n  \"tool\": \"write_file\",\n  \"arguments\": {\n    \"relativePath\": \"test.cs\",\n    \"content\": \"using System;\nclass P {}\"\n  }\n}\n```", "write_file")] // Unescaped newlines in JSON string
     public void TryExtractToolCall_ParsesVariousValidToolCalls(string llmOutput, string expectedToolName)
     {
         AgentToolCall? toolCall = AgentLoopEngine.TryExtractToolCall(llmOutput);

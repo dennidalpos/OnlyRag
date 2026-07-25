@@ -117,6 +117,7 @@ public static partial class InProcessBackend
             AgentRunRequest request,
             AgentLoopEngine agentEngine,
             WorkspaceService workspaceService,
+            OnlyRag.Infrastructure.Logging.ILoggingService loggingService,
             HttpResponse response,
             CancellationToken cancellationToken) =>
         {
@@ -153,6 +154,7 @@ public static partial class InProcessBackend
             }
             catch (Exception ex)
             {
+                loggingService.LogError("AgentEngine", $"Eccezione non gestita durante l'esecuzione dell'agente: {ex.Message}", ex);
                 string errData = System.Text.Json.JsonSerializer.Serialize(new AgentStepEvent("error", ex.Message));
                 await response.WriteAsync($"data: {errData}\n\n", cancellationToken);
                 await response.Body.FlushAsync(cancellationToken);

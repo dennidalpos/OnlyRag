@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Logging;
 
 namespace OnlyRag.Infrastructure.Agent;
 
@@ -10,10 +11,12 @@ public sealed class WorkspaceToolExecutor
     private static readonly JsonSerializerOptions s_indentedOptions = new() { WriteIndented = true };
 
     private readonly BackgroundTaskManager taskManager;
+    private readonly ILoggingService? logger;
 
-    public WorkspaceToolExecutor(BackgroundTaskManager taskManager)
+    public WorkspaceToolExecutor(BackgroundTaskManager taskManager, ILoggingService? logger = null)
     {
         this.taskManager = taskManager;
+        this.logger = logger;
     }
 
     public async Task<AgentToolResult> ExecuteToolAsync(
@@ -23,9 +26,13 @@ public sealed class WorkspaceToolExecutor
         string workspaceRoot,
         CancellationToken cancellationToken = default)
     {
+        logger?.LogTrace("AgentEngine", $"[TOOL EXEC START] Tool: '{toolName}', CallID: '{callId}', Args: {argumentsJson}");
+
         if (string.IsNullOrWhiteSpace(workspaceRoot) || !Directory.Exists(workspaceRoot))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, "Nessuna cartella di progetto autorizzata sul sistema.");
+            string err = "Nessuna cartella di progetto autorizzata sul sistema.";
+            logger?.LogWarning("AgentEngine", $"[TOOL EXEC FAIL] {err}");
+            return new AgentToolResult(callId, toolName, false, string.Empty, err);
         }
 
         try
@@ -33,26 +40,41 @@ public sealed class WorkspaceToolExecutor
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
             var root = doc.RootElement;
 
-            return toolName.ToLowerInvariant() switch
+            AgentToolResult result = toolName.ToLowerInvariant() switch
             {
                 "list_dir" => ListDir(callId, toolName, root, workspaceRoot),
-                "read_file" => await ReadFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
-                "write_file" => await WriteFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
+                "read_file" or "view_file" => await ReadFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
+                "write_file" or "write_to_file" => await WriteFileAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "replace_file_content" => await ReplaceFileContentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "grep_search" => GrepSearch(callId, toolName, root, workspaceRoot),
                 "run_command" => RunCommand(callId, toolName, root, workspaceRoot),
+                "manage_task" => ManageTask(callId, toolName, root),
+                "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool non riconosciuto: {toolName}")
             };
+
+            if (result.Success)
+            {
+                logger?.LogDebug("AgentEngine", $"[TOOL EXEC SUCCESS] Tool: '{toolName}', CallID: '{callId}'");
+            }
+            else
+            {
+                logger?.LogWarning("AgentEngine", $"[TOOL EXEC FAIL] Tool: '{toolName}', CallID: '{callId}', Error: {result.Error}");
+            }
+
+            return result;
         }
         catch (Exception ex)
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"Errore durante l'esecuzione del tool: {ex.Message}");
+            string err = $"Errore durante l'esecuzione del tool '{toolName}': {ex.Message}";
+            logger?.LogError("AgentEngine", err, ex);
+            return new AgentToolResult(callId, toolName, false, string.Empty, err);
         }
     }
 
     private AgentToolResult ListDir(string callId, string toolName, JsonElement args, string rootPath)
     {
-        string relative = args.TryGetProperty("relativePath", out var p) ? p.GetString() ?? "" : "";
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target") ?? "";
         string safePath = ResolveSafePath(rootPath, relative);
 
         if (!Directory.Exists(safePath))
@@ -78,9 +100,11 @@ public sealed class WorkspaceToolExecutor
 
     private async Task<AgentToolResult> ReadFileAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = args.GetProperty("relativePath").GetString() ?? throw new ArgumentException("relativePath e obbligatorio");
-        int? startLine = args.TryGetProperty("startLine", out var sl) && sl.ValueKind == JsonValueKind.Number ? sl.GetInt32() : null;
-        int? endLine = args.TryGetProperty("endLine", out var el) && el.ValueKind == JsonValueKind.Number ? el.GetInt32() : null;
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
+            ?? throw new ArgumentException("Il parametro per il percorso del file ('relativePath' o 'path') è obbligatorio");
+
+        int? startLine = GetArgInt(args, "startLine", "start", "fromLine");
+        int? endLine = GetArgInt(args, "endLine", "end", "toLine");
 
         string safePath = ResolveSafePath(rootPath, relative);
         if (!File.Exists(safePath))
@@ -116,8 +140,10 @@ public sealed class WorkspaceToolExecutor
 
     private async Task<AgentToolResult> WriteFileAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = args.GetProperty("relativePath").GetString() ?? throw new ArgumentException("relativePath e obbligatorio");
-        string content = args.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
+            ?? throw new ArgumentException("Il parametro per il percorso del file ('relativePath' o 'path') è obbligatorio");
+
+        string content = GetArgString(args, "content", "text", "code", "fileContent") ?? "";
 
         string safePath = ResolveSafePath(rootPath, relative);
         string? parent = Path.GetDirectoryName(safePath);
@@ -132,9 +158,14 @@ public sealed class WorkspaceToolExecutor
 
     private async Task<AgentToolResult> ReplaceFileContentAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = args.GetProperty("relativePath").GetString() ?? throw new ArgumentException("relativePath e obbligatorio");
-        string target = args.GetProperty("targetContent").GetString() ?? throw new ArgumentException("targetContent e obbligatorio");
-        string replacement = args.GetProperty("replacementContent").GetString() ?? throw new ArgumentException("replacementContent e obbligatorio");
+        string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
+            ?? throw new ArgumentException("Il parametro per il percorso del file ('relativePath' o 'path') è obbligatorio");
+
+        string target = GetArgString(args, "targetContent", "target", "oldContent", "old_string", "search")
+            ?? throw new ArgumentException("Il parametro 'targetContent' è obbligatorio");
+
+        string replacement = GetArgString(args, "replacementContent", "replacement", "newContent", "new_string", "replace")
+            ?? throw new ArgumentException("Il parametro 'replacementContent' è obbligatorio");
 
         string safePath = ResolveSafePath(rootPath, relative);
         if (!File.Exists(safePath))
@@ -145,7 +176,7 @@ public sealed class WorkspaceToolExecutor
         string original = await File.ReadAllTextAsync(safePath, cancellationToken);
         if (!original.Contains(target))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"TargetContent non trovato nel file {relative}. Verificare l'esattezza dei caratteri o dello spaziatura.");
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"TargetContent non trovato nel file {relative}. Verificare l'esattezza dei caratteri o della spaziatura.");
         }
 
         string updated = original.Replace(target, replacement);
@@ -156,8 +187,10 @@ public sealed class WorkspaceToolExecutor
 
     private AgentToolResult GrepSearch(string callId, string toolName, JsonElement args, string rootPath)
     {
-        string query = args.GetProperty("query").GetString() ?? throw new ArgumentException("query e obbligatorio");
-        string relative = args.TryGetProperty("searchPath", out var sp) ? sp.GetString() ?? "" : "";
+        string query = GetArgString(args, "query", "pattern", "search", "text")
+            ?? throw new ArgumentException("Il parametro 'query' è obbligatorio");
+
+        string relative = GetArgString(args, "searchPath", "path", "directory", "dir", "relativePath") ?? "";
 
         string targetDir = ResolveSafePath(rootPath, relative);
         if (!Directory.Exists(targetDir) && File.Exists(targetDir))
@@ -203,8 +236,11 @@ public sealed class WorkspaceToolExecutor
 
     private AgentToolResult RunCommand(string callId, string toolName, JsonElement args, string rootPath)
     {
-        string commandLine = args.GetProperty("commandLine").GetString() ?? throw new ArgumentException("commandLine e obbligatorio");
-        bool isAsync = args.TryGetProperty("isAsync", out var a) && a.GetBoolean();
+        string commandLine = GetArgString(args, "commandLine", "command", "cmd", "script")
+            ?? throw new ArgumentException("Il parametro 'commandLine' è obbligatorio");
+
+        bool isAsync = (args.TryGetProperty("isAsync", out var a) && a.GetBoolean()) ||
+                       (args.TryGetProperty("async", out var a2) && a2.GetBoolean());
 
         if (isAsync)
         {
@@ -212,7 +248,6 @@ public sealed class WorkspaceToolExecutor
             return new AgentToolResult(callId, toolName, true, $"Comando avviato in background con TaskID: {taskInfo.TaskId}\nUtilizzare manage_task per controllare lo stato ed i log.");
         }
 
-        // Synchronous execution
         var psi = new ProcessStartInfo
         {
             FileName = "powershell.exe",
@@ -244,6 +279,96 @@ public sealed class WorkspaceToolExecutor
             process.ExitCode == 0,
             combined,
             process.ExitCode == 0 ? null : $"Processo terminato con exit code {process.ExitCode}");
+    }
+
+    private AgentToolResult ManageTask(string callId, string toolName, JsonElement args)
+    {
+        string action = GetArgString(args, "action", "act", "type") ?? "list";
+        string taskId = GetArgString(args, "taskId", "id", "task") ?? "";
+        string input = GetArgString(args, "input", "text") ?? "";
+
+        if (string.Equals(action, "list", StringComparison.OrdinalIgnoreCase))
+        {
+            var tasks = taskManager.ListTasks();
+            string json = JsonSerializer.Serialize(tasks, s_indentedOptions);
+            return new AgentToolResult(callId, toolName, true, json);
+        }
+        else if (string.Equals(action, "kill", StringComparison.OrdinalIgnoreCase))
+        {
+            bool killed = taskManager.KillTask(taskId);
+            return new AgentToolResult(callId, toolName, killed, killed ? $"Task {taskId} terminato." : $"Impossibile terminare il task {taskId}.");
+        }
+        else if (string.Equals(action, "send_input", StringComparison.OrdinalIgnoreCase))
+        {
+            bool sent = taskManager.SendInput(taskId, input);
+            return new AgentToolResult(callId, toolName, sent, sent ? $"Input inviato al task {taskId}." : $"Impossibile inviare input al task {taskId}.");
+        }
+        else if (string.Equals(action, "status", StringComparison.OrdinalIgnoreCase))
+        {
+            var status = taskManager.GetTaskStatusAndLogs(taskId);
+            if (status.HasValue)
+            {
+                string res = $"[STATUS: {status.Value.Info.IsRunning}]\nLOGS:\n{status.Value.Logs}";
+                return new AgentToolResult(callId, toolName, true, res);
+            }
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Task {taskId} non trovato.");
+        }
+
+        return new AgentToolResult(callId, toolName, false, string.Empty, $"Azione task sconosciuta: {action}");
+    }
+
+    private Task<AgentToolResult> InvokeSubagentAsync(
+        string callId,
+        string toolName,
+        JsonElement args,
+        string rootPath,
+        CancellationToken cancellationToken)
+    {
+        string prompt = GetArgString(args, "prompt", "goal", "task") ?? "";
+
+        return Task.FromResult(new AgentToolResult(
+            callId,
+            toolName,
+            false,
+            string.Empty,
+            $"Il tool 'invoke_subagent' non è abilitato in questo ambiente. Esegui il lavoro direttamente utilizzando " +
+            $"i tool list_dir, read_file, write_file, replace_file_content, grep_search e run_command. " +
+            $"Obiettivo da eseguire direttamente: '{prompt}'"));
+    }
+
+    private static string? GetArgString(JsonElement root, params string[] propertyNames)
+    {
+        foreach (var prop in propertyNames)
+        {
+            if (root.TryGetProperty(prop, out var elem) && elem.ValueKind == JsonValueKind.String)
+            {
+                return elem.GetString();
+            }
+        }
+        // Tentativo insensibile al maiuscolo/minuscolo
+        foreach (var prop in root.EnumerateObject())
+        {
+            if (propertyNames.Any(p => p.Equals(prop.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (prop.Value.ValueKind == JsonValueKind.String)
+                {
+                    return prop.Value.GetString();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static int? GetArgInt(JsonElement root, params string[] propertyNames)
+    {
+        foreach (var prop in propertyNames)
+        {
+            if (root.TryGetProperty(prop, out var elem) && elem.ValueKind == JsonValueKind.Number)
+            {
+                return elem.GetInt32();
+            }
+        }
+        return null;
     }
 
     private static string ResolveSafePath(string rootPath, string relativePath)

@@ -12,7 +12,6 @@ namespace OnlyRag.Infrastructure.Ingestion;
 public sealed class DocumentIngestionService : IDocumentIngestionService
 {
     private const int TextBlockTargetCharacters = 64 * 1024;
-    private const string OcrMaxParallelPagesSettingKey = "performance.maxOcrParallelPages";
 
     private readonly IDocumentRepository documents;
     private readonly ISettingsRepository settings;
@@ -285,27 +284,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string text;
-            try
-            {
-                if (forceOcr)
-                {
-                    text = string.Empty;
-                }
-                else
-                {
-                    Page pdfPage = pdf.GetPage(pageNumber);
-                    text = PdfLayoutTextExtractor.ExtractFormattedText(pdfPage);
-                    if (string.IsNullOrWhiteSpace(text))
-                    {
-                        text = pdfPage.Text.Trim();
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                text = string.Empty;
-            }
+            string text = ExtractPdfPageText(pdf, pageNumber, forceOcr);
             IngestedDocumentPage page = string.IsNullOrWhiteSpace(text)
                 ? await RunOcrForPageAsync(document, "pdf", pageNumber, totalPages, nextChunkOrdinal, forceOcr, ocrLanguage, saveProgressAsync, cancellationToken)
                 : new IngestedDocumentPage(pageNumber, text);
@@ -522,7 +501,6 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         string? languageOverride,
         CancellationToken cancellationToken)
     {
-        string? maxParallelPagesValue = await settings.GetValueAsync(OcrMaxParallelPagesSettingKey, cancellationToken);
         OcrProcessingSettings processingSettings = await ocrSettingsStore.GetProcessingAsync(cancellationToken);
         OcrSettings ocrSettings = await ocrSettingsStore.GetAsync(cancellationToken);
 
@@ -531,7 +509,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             processingSettings.MaxRetries,
             processingSettings.PageTimeoutSeconds,
             processingSettings.LowConfidenceThreshold,
-            int.TryParse(maxParallelPagesValue, out int maxParallelPages) ? maxParallelPages : null,
+            null,
             ocrSettings);
     }
 
@@ -545,6 +523,25 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         {
             throw new InvalidOperationException(
                 $"Impossibile aprire il file PDF. Il file potrebbe essere cifrato, danneggiato o in un formato non supportato. Dettaglio: {ex.Message}", ex);
+        }
+    }
+
+    private static string ExtractPdfPageText(PdfDocument pdf, int pageNumber, bool forceOcr)
+    {
+        if (forceOcr)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            Page pdfPage = pdf.GetPage(pageNumber);
+            string formatted = PdfLayoutTextExtractor.ExtractFormattedText(pdfPage);
+            return string.IsNullOrWhiteSpace(formatted) ? pdfPage.Text.Trim() : formatted;
+        }
+        catch
+        {
+            return string.Empty;
         }
     }
 

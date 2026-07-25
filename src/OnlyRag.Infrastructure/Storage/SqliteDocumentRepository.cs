@@ -79,7 +79,22 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
         command.AddParameter("$updatedAtUtc", request.UpdatedAtUtc.ToString("O"));
 
         long id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
-        return (await GetAsync(id, cancellationToken))!;
+        return new ImportedDocument(
+            Id: id,
+            DocumentUid: request.DocumentUid,
+            OriginalFileName: request.OriginalFileName,
+            OriginalPath: request.OriginalPath,
+            Sha256: request.Sha256,
+            MimeType: request.MimeType,
+            FileExtension: request.FileExtension,
+            FileSizeBytes: request.FileSizeBytes,
+            Status: request.Status,
+            PageCount: request.PageCount,
+            ChunkCount: 0,
+            CurrentJobId: request.CurrentJobId,
+            LastError: request.LastError,
+            CreatedAtUtc: request.CreatedAtUtc,
+            UpdatedAtUtc: request.UpdatedAtUtc);
     }
 
     public async Task<ImportedDocument?> UpdateStatusAsync(

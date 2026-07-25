@@ -12,31 +12,26 @@ public sealed class OcrRetryPolicy
 
         Exception? lastError = null;
         OcrPageResult? lowConfidenceResult = null;
-        int attempts = options.MaxRetries + 1;
+        int maxAttempts = Math.Max(1, options.MaxRetries + 1);
 
-        for (int attempt = 1; attempt <= attempts; attempt++)
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            using CancellationTokenSource pageTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            pageTimeout.CancelAfter(options.PageTimeout);
-
             try
             {
-                OcrPageResult result = await recognizeAsync(pageTimeout.Token);
+                OcrPageResult result = await recognizeAsync(cancellationToken);
                 if (result.AverageConfidence is null || result.AverageConfidence >= options.LowConfidenceThreshold)
                 {
                     return result;
                 }
 
                 lowConfidenceResult = result;
-                lastError = new InvalidOperationException(
-                    $"Confidence OCR bassa ({result.AverageConfidence:0.000}).");
+                lastError = new InvalidOperationException($"Confidence OCR bassa ({result.AverageConfidence:0.000}).");
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                lastError = new TimeoutException(
-                    $"Timeout OCR pagina dopo {options.PageTimeout.TotalSeconds:0} secondi.");
+                throw;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException)
             {
@@ -50,8 +45,9 @@ public sealed class OcrRetryPolicy
         }
 
         string message = lastError is null
-            ? "OCR pagina fallito dopo i retry configurati."
-            : $"OCR pagina fallito dopo i retry configurati: {lastError.Message}";
+            ? "OCR pagina fallito."
+            : $"OCR pagina fallito: {lastError.Message}";
         throw new InvalidOperationException(message, lastError);
     }
 }
+

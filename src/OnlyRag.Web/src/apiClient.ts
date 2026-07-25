@@ -239,9 +239,17 @@ function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
 async function readProblemMessage(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as ApiProblemDetails;
-
-    return payload.detail ?? payload.title ?? `Richiesta fallita con stato ${response.status}.`;
+    const msg = payload.detail ?? payload.title;
+    if (msg && msg.trim().length > 0) {
+      return msg;
+    }
   } catch {
-    return `Richiesta fallita con stato ${response.status}.`;
+    // Risposta non JSON
   }
+
+  if (response.status === 404) {
+    return "Risorsa o endpoint non trovato (404). Verificare che il backend locale e il servizio Ollama siano attivi.";
+  }
+
+  return `Richiesta fallita con stato ${response.status}.`;
 }

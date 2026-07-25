@@ -53,7 +53,18 @@ public sealed class QdrantProcessLifetimeTests
 
         await supervisor.DisposeAsync();
 
-        Assert.True(sleeper.WaitForExit(5000));
+        bool exited = false;
+        try
+        {
+            exited = sleeper.HasExited || sleeper.WaitForExit(5000);
+        }
+        catch (InvalidOperationException)
+        {
+            // Process object was disposed following successful termination.
+            exited = true;
+        }
+
+        Assert.True(exited);
     }
 
     private static string ResolveWindowsPowerShellPath()

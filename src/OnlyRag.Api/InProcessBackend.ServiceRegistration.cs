@@ -152,6 +152,8 @@ internal static class InProcessBackendServiceRegistration
     {
         services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
         services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
+        services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingSettingsStore>();
+        services.AddSingleton<OnlyRag.Infrastructure.Logging.ILoggingService, OnlyRag.Infrastructure.Logging.LoggingService>();
         services.AddSingleton<OllamaGenerationCoordinator>();
         services.AddSingleton<DependencyProvisioningService>();
         services.AddSingleton<DiagnosticsProbeCacheService>();

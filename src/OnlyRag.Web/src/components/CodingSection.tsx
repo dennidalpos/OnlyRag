@@ -95,7 +95,7 @@ export function CodingSection({
   const [presets, setPresets] = useState<VibePreset[]>([]);
   const [showAddPresetModal, setShowAddPresetModal] = useState(false);
   const [newPresetTitle, setNewPresetTitle] = useState("");
-  const [newPresetIcon, setNewPresetIcon] = useState("⚡");
+  const [newPresetIcon, setNewPresetIcon] = useState("CODE");
   const [newPresetPrompt, setNewPresetPrompt] = useState("");
 
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -446,7 +446,7 @@ export function CodingSection({
 
               if (event.type === "thought_chunk" && event.content) {
                 const lastIdx = existingEvents.length - 1;
-                if (lastIdx >= 0 && (existingEvents[lastIdx].type === "thought_chunk" || existingEvents[lastIdx].type === "thought")) {
+                if (lastIdx >= 0 && existingEvents[lastIdx].type === "thought_chunk") {
                   existingEvents[lastIdx] = {
                     ...existingEvents[lastIdx],
                     content: (existingEvents[lastIdx].content || "") + event.content
@@ -748,11 +748,14 @@ export function CodingSection({
                 type="button"
                 className="button button--secondary button--small"
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                   background: preset.id.startsWith("preset_audit") ? "#1e1b4b" : "#1e293b",
-                  borderColor: preset.id.startsWith("preset_audit") ? "#4338ca" : "#334155",
-                  color: preset.id.startsWith("preset_audit") ? "#a5b4fc" : "#f1f5f9",
+                  borderColor: preset.id.startsWith("preset_audit") ? "#6366f1" : "#475569",
+                  color: preset.id.startsWith("preset_audit") ? "#c7d2fe" : "#f1f5f9",
                   borderRadius: preset.isBuiltIn ? 6 : "6px 0 0 6px",
-                  fontWeight: preset.id.startsWith("preset_audit") ? 600 : "normal"
+                  fontWeight: 600
                 }}
                 onClick={() => applyPreset(preset)}
               >
@@ -764,7 +767,7 @@ export function CodingSection({
                   type="button"
                   style={{
                     background: "#7f1d1d",
-                    border: "1px solid #334155",
+                    border: "1px solid #475569",
                     borderLeft: "none",
                     color: "#fca5a5",
                     padding: "4px 6px",
@@ -805,9 +808,9 @@ export function CodingSection({
           minHeight: 360,
           maxHeight: 520,
           overflowY: "auto",
-          background: "#090d16",
+          background: "#060911",
           borderRadius: 10,
-          border: "1px solid #1e293b",
+          border: "1px solid #334155",
           padding: 16,
           marginBottom: 14,
           display: "flex",
@@ -862,12 +865,46 @@ export function CodingSection({
                       onApprove={(callId, approved) => void handleApproveAgentToolCall(callId, approved)}
                     />
                   ))}
-                  {msg.isStreaming && <span className="streaming-cursor">▌</span>}
+                  {msg.isStreaming && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
+                      border: "1px solid #6366f1",
+                      color: "#c7d2fe",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      fontSize: "0.84rem",
+                      fontWeight: 600,
+                      marginTop: 4,
+                      boxShadow: "0 0 12px rgba(99,102,241,0.2)"
+                    }}>
+                      <span style={{ fontSize: "1.1rem", animation: "spin 1.5s linear infinite" }}>⏳</span>
+                      <span>Agente in esecuzione: caricamento modello LLM o elaborazione tool in corso...</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.sender === "assistant" ? "monospace" : "inherit", fontSize: "0.9rem", lineHeight: 1.6 }}>
                   {msg.content}
-                  {msg.isStreaming && <span className="streaming-cursor">▌</span>}
+                  {msg.isStreaming && (
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: "#1e293b",
+                      border: "1px solid #3b82f6",
+                      color: "#60a5fa",
+                      padding: "4px 10px",
+                      borderRadius: 6,
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      marginTop: 6
+                    }}>
+                      <span>⏳ Generazione risposta con Ollama...</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1007,8 +1044,8 @@ export function CodingSection({
           className="input-control"
           style={{
             width: "100%",
-            background: "#090d16",
-            border: "1px solid #1e293b",
+            background: "#060911",
+            border: "1px solid #334155",
             color: "#f8fafc",
             borderRadius: 8,
             padding: 12,

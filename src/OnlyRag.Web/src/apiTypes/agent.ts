@@ -23,7 +23,7 @@ export type AgentRunRequest = {
 };
 
 export type AgentStepEvent = {
-  type: "thought" | "thought_chunk" | "tool_proposed" | "approval_required" | "tool_result" | "final_response" | "error";
+  type: "thought" | "thought_chunk" | "tool_proposed" | "approval_required" | "tool_result" | "final_response" | "json_parse_warning" | "error";
   content?: string | null;
   toolCall?: AgentToolCall | null;
   toolResult?: AgentToolResult | null;
