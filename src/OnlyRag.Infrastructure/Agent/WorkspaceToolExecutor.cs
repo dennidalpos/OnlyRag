@@ -128,10 +128,11 @@ public sealed class WorkspaceToolExecutor
         int? startLine = GetArgInt(args, "startLine", "start", "fromLine");
         int? endLine = GetArgInt(args, "endLine", "end", "toLine");
 
-        string safePath = ResolveSafePath(rootPath, relative);
+        string safePath = ResolveSafePathWithSmartFallback(rootPath, relative, out string actualRelative);
         if (!File.Exists(safePath))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}");
+            string suggestions = GetNearbyFileSuggestions(rootPath, relative);
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}.{suggestions}");
         }
 
         string[] lines = await File.ReadAllLinesAsync(safePath, cancellationToken);
@@ -189,10 +190,11 @@ public sealed class WorkspaceToolExecutor
         string replacement = GetArgString(args, "replacementContent", "replacement", "newContent", "new_string", "replace")
             ?? throw new ArgumentException("Il parametro 'replacementContent' è obbligatorio");
 
-        string safePath = ResolveSafePath(rootPath, relative);
+        string safePath = ResolveSafePathWithSmartFallback(rootPath, relative, out string actualRelative);
         if (!File.Exists(safePath))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}");
+            string suggestions = GetNearbyFileSuggestions(rootPath, relative);
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}.{suggestions}");
         }
 
         string original = await File.ReadAllTextAsync(safePath, cancellationToken);
@@ -503,10 +505,11 @@ public sealed class WorkspaceToolExecutor
         string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
             ?? throw new ArgumentException("Il parametro per il percorso del file ('relativePath' o 'path') è obbligatorio");
 
-        string safePath = ResolveSafePath(rootPath, relative);
+        string safePath = ResolveSafePathWithSmartFallback(rootPath, relative, out string actualRelative);
         if (!File.Exists(safePath))
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}");
+            string suggestions = GetNearbyFileSuggestions(rootPath, relative);
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"File non trovato: {relative}.{suggestions}");
         }
 
         JsonElement chunksElem;
@@ -822,5 +825,71 @@ public sealed class WorkspaceToolExecutor
         }
 
         return target;
+    }
+
+    private static string ResolveSafePathWithSmartFallback(string rootPath, string relativePath, out string resolvedRelativePath)
+    {
+        string safePath = ResolveSafePath(rootPath, relativePath);
+        resolvedRelativePath = (relativePath ?? "").Trim().Replace('\\', '/');
+
+        if (File.Exists(safePath) || Directory.Exists(safePath))
+        {
+            return safePath;
+        }
+
+        string? fileName = Path.GetFileName(relativePath);
+        if (!string.IsNullOrWhiteSpace(fileName))
+        {
+            try
+            {
+                var candidates = Directory.EnumerateFiles(rootPath, fileName, SearchOption.AllDirectories)
+                    .Where(f => !f.Contains("\\.git\\") && !f.Contains("\\node_modules\\") && !f.Contains("\\bin\\") && !f.Contains("\\obj\\"))
+                    .ToList();
+
+                if (candidates.Count > 0)
+                {
+                    string candidate = candidates[0];
+                    resolvedRelativePath = Path.GetRelativePath(rootPath, candidate).Replace('\\', '/');
+                    return candidate;
+                }
+            }
+            catch
+            {
+                // Fallback safe
+            }
+        }
+
+        return safePath;
+    }
+
+    private static string GetNearbyFileSuggestions(string rootPath, string relativePath)
+    {
+        string? fileName = Path.GetFileName(relativePath);
+        if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
+
+        string ext = Path.GetExtension(fileName);
+        string nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+        if (string.IsNullOrWhiteSpace(nameWithoutExt)) return string.Empty;
+
+        try
+        {
+            var suggestions = Directory.EnumerateFiles(rootPath, string.IsNullOrEmpty(ext) ? "*.*" : $"*{ext}", SearchOption.AllDirectories)
+                .Where(f => !f.Contains("\\.git\\") && !f.Contains("\\node_modules\\") && !f.Contains("\\bin\\") && !f.Contains("\\obj\\"))
+                .Select(f => Path.GetRelativePath(rootPath, f).Replace('\\', '/'))
+                .Where(rel => rel.Contains(nameWithoutExt, StringComparison.OrdinalIgnoreCase) || nameWithoutExt.Contains(Path.GetFileNameWithoutExtension(rel), StringComparison.OrdinalIgnoreCase))
+                .Take(5)
+                .ToList();
+
+            if (suggestions.Count > 0)
+            {
+                return $"\n[SUGGERIMENTO FILE REALI] File reali con nome o estensione simile trovati nel workspace:\n- " + string.Join("\n- ", suggestions);
+            }
+        }
+        catch
+        {
+            // Safe fallback
+        }
+
+        return string.Empty;
     }
 }

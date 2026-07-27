@@ -297,7 +297,14 @@ internal sealed class AgentLoopEngine
             {
                 failedToolSignatures.Add(callSignature);
                 toolResultMsg += $"\nErrore: {result.Error}";
-                toolResultMsg += "\n[SUGGERIMENTO SISTEMA] L'operazione ha restituito un errore. Esamina attentamente la struttura dei file del progetto eseguendo list_dir con relativePath: \".\" prima di tentare altri percorsi.";
+                if (result.Error.Contains("File non trovato", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("Cartella non trovata", StringComparison.OrdinalIgnoreCase))
+                {
+                    toolResultMsg += "\n[SUGGERIMENTO SISTEMA] Il percorso specificato NON ESISTE sul disco! NON ipotizzare prefissi o sotto-cartelle (es. 'src/.../Views/...') se non sono state elencate da list_dir. Utilizza grep_search per cercare la posizione esatta del file oppure esegui list_dir con relativePath: \".\" per esplorare il workspace.";
+                }
+                else
+                {
+                    toolResultMsg += "\n[SUGGERIMENTO SISTEMA] L'operazione ha restituito un errore. Esamina attentamente la struttura del workspace ed i parametri prima di ritentare.";
+                }
             }
 
             messages.Add(new("user", toolResultMsg));
