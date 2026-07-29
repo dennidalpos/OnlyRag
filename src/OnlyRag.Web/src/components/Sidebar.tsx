@@ -14,7 +14,7 @@ type SidebarProps = {
   diagnostics?: DiagnosticsResponse | null;
 };
 
-const sectionOrder: SectionId[] = ["chat", "documents", "images", "translation", "coding", "settings"];
+const sectionOrder: SectionId[] = ["coding", "chat", "documents", "images", "translation", "settings"];
 
 function SectionIcon({ section }: { section: SectionId }) {
   switch (section) {

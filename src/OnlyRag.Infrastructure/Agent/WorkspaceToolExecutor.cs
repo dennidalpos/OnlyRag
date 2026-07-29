@@ -808,6 +808,11 @@ public sealed class WorkspaceToolExecutor
         string root = Path.GetFullPath(rootPath);
         string cleanedRelative = (relativePath ?? "").Trim();
 
+        if (!string.IsNullOrWhiteSpace(cleanedRelative) && cleanedRelative.Contains(',') && !File.Exists(Path.Combine(root, cleanedRelative)))
+        {
+            cleanedRelative = cleanedRelative.Split(',')[0].Trim();
+        }
+
         string target;
         if (Path.IsPathRooted(cleanedRelative))
         {

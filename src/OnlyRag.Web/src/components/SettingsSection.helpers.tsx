@@ -247,7 +247,7 @@ export function buildEmbeddingRecommendations(numCtx: number | null): {
     return null;
   }
 
-  const embeddingNumCtx = clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
+  const embeddingNumCtx = clampNumber(Math.round(numCtx / 64) * 64, 64, 262144);
   const chunkMinimum = clampNumber(Math.round(numCtx * 0.1 / 50) * 50, 100, 4000);
   const chunkMaximum = Math.max(
     chunkMinimum,
@@ -262,7 +262,7 @@ export function buildNumCtxRecommendation(numCtx: number | null): number | null 
     return null;
   }
 
-  return clampNumber(Math.round(numCtx / 64) * 64, 64, 131072);
+  return clampNumber(Math.round(numCtx / 64) * 64, 64, 262144);
 }
 
 export function buildContextChunkRecommendation(numCtx: number | null): number | null {

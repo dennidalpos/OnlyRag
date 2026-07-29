@@ -69,7 +69,11 @@ export function OcrEngineSettingsPanel() {
                   { value: "cpu", label: "CPU" },
                   ...(hasNvidiaGpu ? [{ value: "gpu", label: "GPU", disabled: !isGpuUsable }] : [])
                 ]}
-                onChange={(value) => updateOcrSettings({ device: value })}
+                onChange={(value) =>
+                  ocrFormState.profile !== "custom"
+                    ? applyOcrProfile(ocrFormState.profile, value)
+                    : updateOcrSettings({ device: value })
+                }
               />
               <OcrRangeField
                 id="ocr-pdf-dpi"

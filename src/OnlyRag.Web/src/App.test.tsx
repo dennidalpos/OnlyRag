@@ -61,7 +61,7 @@ describe("App initial setup", () => {
       "href",
       "#main-workspace"
     );
-    expect(screen.getByRole("main", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Coding" })).toBeInTheDocument();
 
     const status = await screen.findByLabelText("Stato applicazione");
     await waitFor(() => {

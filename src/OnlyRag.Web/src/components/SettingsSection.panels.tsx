@@ -5,6 +5,7 @@ import { LoggingSettingsPanel } from "./settings/LoggingSettingsPanel";
 import { ModelManagementPanel } from "./settings/ModelManagementPanel";
 import { OllamaConnectionPanel } from "./settings/OllamaConnectionPanel";
 import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
+import { PdfExportPanel } from "./settings/PdfExportPanel";
 import { PerformanceSettingsPanel } from "./settings/PerformanceSettingsPanel";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
@@ -41,6 +42,7 @@ export function SettingsSectionPanels() {
           <h3 id="settings-ocr-title">OCR &amp; Documenti</h3>
           <div className="settings-section__grid">
             <OcrEngineSettingsPanel />
+            <PdfExportPanel />
           </div>
         </section>
 

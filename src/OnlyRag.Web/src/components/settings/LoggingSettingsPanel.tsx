@@ -70,83 +70,32 @@ export function LoggingSettingsPanel() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{
-        background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
-        border: "1px solid #4338ca",
-        borderRadius: 12,
-        padding: 20,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "1.5rem" }}>🪵</span>
-            <div>
-              <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem", fontWeight: 600 }}>
-                Sistema di Log & Diagnostic Debug
-              </h3>
-              <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.85rem" }}>
-                Configura la verbosità per intercettare gli errori e analizzare l'applicazione in dettaglio.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowLogViewer(true)}
-            style={{
-              background: "#3b82f6",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: 8,
-              padding: "8px 16px",
-              fontWeight: 600,
-              fontSize: "0.88rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 2px 8px rgba(59,130,246,0.3)"
-            }}
-          >
-            🔍 Visualizza Log Live
-          </button>
-        </div>
-
+    <div className="settings-card settings-card--wide">
+      <div className="settings-card__header">
+        <h3>Sistema di Log &amp; Diagnostica Live</h3>
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={() => setShowLogViewer(true)}
+        >
+          🔍 Visualizza Log Live
+        </button>
+      </div>
+      <div className="settings-form">
         {statusMessage && (
-          <div style={{
-            background: "#1e293b",
-            border: "1px solid #38bdf8",
-            color: "#38bdf8",
-            padding: "10px 14px",
-            borderRadius: 8,
-            fontSize: "0.85rem",
-            marginBottom: 16
-          }}>
-            {statusMessage}
+          <div className="panel-note" role="status">
+            <p>{statusMessage}</p>
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {/* SELETTORE VERBOSITÀ */}
-          <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 16 }}>
-            <label style={{ display: "block", color: "#cbd5e1", fontSize: "0.88rem", fontWeight: 600, marginBottom: 8 }}>
-              Livello Verbosità Log:
-            </label>
+        <div className="settings-grid">
+          <label className="field-group" htmlFor="logging-min-level">
+            <span>Livello Verbosità Log</span>
             <select
+              id="logging-min-level"
               value={minLevel}
               disabled={isLoading || isSaving}
               onChange={(e) => void handleSaveLevel(e.target.value as AppLogLevel)}
-              style={{
-                width: "100%",
-                background: "#1e293b",
-                border: "1px solid #475569",
-                color: "#f8fafc",
-                padding: "8px 12px",
-                borderRadius: 6,
-                fontSize: "0.9rem",
-                fontWeight: 600,
-                outline: "none"
-              }}
             >
               <option value="Trace">🔍 Trace - Massimo Verboso (Predefinito)</option>
               <option value="Debug">🐛 Debug - Dettagliato</option>
@@ -155,68 +104,43 @@ export function LoggingSettingsPanel() {
               <option value="Error">❌ Error - Solo Errori Critici</option>
               <option value="None">🚫 None - Log Disattivati</option>
             </select>
-            <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 8 }}>
-              Impostato di default su <strong>Trace (Massimo Verboso)</strong>.
-            </span>
-          </div>
+          </label>
 
-          {/* STATISTICHE SPAZIO SU DISCO */}
-          <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 16 }}>
-            <span style={{ display: "block", color: "#cbd5e1", fontSize: "0.88rem", fontWeight: 600, marginBottom: 8 }}>
-              Spazio Occupato dai Log:
+          <div className="diagnostic-row">
+            <span className="diagnostic-label">Spazio occupato</span>
+            <span className="diagnostic-value">
+              {storageInfo ? storageInfo.formattedSize : "... KB"}
+              {storageInfo && ` (${storageInfo.memoryEntryCount} voci RAM, ${storageInfo.fileCount} file disco)`}
             </span>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span style={{ fontSize: "1.6rem", fontWeight: 700, color: "#38bdf8" }}>
-                {storageInfo ? storageInfo.formattedSize : "... KB"}
-              </span>
-              <span style={{ color: "#94a3b8", fontSize: "0.82rem" }}>
-                ({storageInfo ? `${storageInfo.memoryEntryCount} voci in memoria, ${storageInfo.fileCount} file su disco` : "caricamento..."})
-              </span>
-            </div>
-
-            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => void handleClearLogs()}
-                disabled={isLoading || isSaving}
-                style={{
-                  background: "linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)",
-                  color: "#fecaca",
-                  border: "1px solid #ef4444",
-                  borderRadius: 6,
-                  padding: "6px 12px",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  cursor: "pointer"
-                }}
-              >
-                🗑️ Cancella / Azzera Log
-              </button>
-              <button
-                type="button"
-                onClick={() => void loadData()}
-                disabled={isLoading}
-                style={{
-                  background: "#1e293b",
-                  color: "#94a3b8",
-                  border: "1px solid #475569",
-                  borderRadius: 6,
-                  padding: "6px 12px",
-                  fontSize: "0.82rem",
-                  cursor: "pointer"
-                }}
-              >
-                🔄 Aggiorna Metadati
-              </button>
-            </div>
           </div>
         </div>
 
         {storageInfo && (
-          <div style={{ marginTop: 12, fontSize: "0.78rem", color: "#64748b" }}>
-            📁 Percorso file di log: <code style={{ color: "#93c5fd" }}>{storageInfo.logDirectory}</code>
+          <div className="panel-note panel-note--path">
+            <p title={storageInfo.logDirectory} aria-label={`Percorso log: ${storageInfo.logDirectory}`}>
+              📁 Percorso: {storageInfo.logDirectory}
+            </p>
           </div>
         )}
+
+        <div className="settings-actions">
+          <button
+            type="button"
+            className="button-danger"
+            onClick={() => void handleClearLogs()}
+            disabled={isLoading || isSaving}
+          >
+            🗑️ Cancella / Azzera Log
+          </button>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => void loadData()}
+            disabled={isLoading}
+          >
+            🔄 Aggiorna Metadati
+          </button>
+        </div>
       </div>
 
       {showLogViewer && (

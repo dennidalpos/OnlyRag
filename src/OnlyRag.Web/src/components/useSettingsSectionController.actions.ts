@@ -305,10 +305,11 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
     }
   }
 
-  function applyOcrProfile(profile: string) {
+  function applyOcrProfile(profile: string, device?: string) {
     setOcrFormState((current: OcrSettings) => {
-      const preset = getOcrProfilePreset(profile, current.device);
-      return preset ?? { ...current, profile: "custom" };
+      const targetDevice = device ?? current.device;
+      const preset = getOcrProfilePreset(profile, targetDevice);
+      return preset ?? { ...current, profile: "custom", device: targetDevice };
     });
   }
 

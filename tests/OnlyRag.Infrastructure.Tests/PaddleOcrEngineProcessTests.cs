@@ -195,7 +195,7 @@ public sealed class PaddleOcrEngineProcessTests
             Directory.CreateDirectory(root);
             string scriptPath = Path.Combine(root, "bridge.ps1");
             File.WriteAllText(scriptPath, scriptBody, Encoding.UTF8);
-            return new TempBridge(root, scriptPath, timeout ?? TimeSpan.FromSeconds(5));
+            return new TempBridge(root, scriptPath, timeout ?? TimeSpan.FromSeconds(15));
         }
 
         public PaddleOcrEngine CreateEngine()

@@ -181,6 +181,12 @@ public sealed class OcrGpuCapabilityService
 
     private async Task<NvidiaHardwareProbe> DetectNvidiaHardwareAsync(CancellationToken cancellationToken)
     {
+        string? nvidiaSmiPath = OcrProvisionRuntimeResolver.ResolveExecutable("nvidia-smi");
+        if (nvidiaSmiPath is not null)
+        {
+            return new NvidiaHardwareProbe(true, true, null);
+        }
+
         string? shell = OcrProvisionRuntimeResolver.ResolveExecutable("pwsh")
             ?? OcrProvisionRuntimeResolver.ResolveExecutable("powershell");
         if (shell is null)

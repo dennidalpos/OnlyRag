@@ -24,7 +24,7 @@ internal sealed class OllamaSettingsService : IOllamaSettingsService
     private const string CodingNumCtxKey = "ollama.codingNumCtx";
     private const string TrustNonLocalEndpointKey = "ollama.trustNonLocalEndpoint";
     private const int MinNumCtx = 64;
-    private const int MaxNumCtx = 131072;
+    private const int MaxNumCtx = 262144;
 
     private readonly ISettingsRepository settingsRepository;
 

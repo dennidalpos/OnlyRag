@@ -87,12 +87,15 @@ internal sealed class AgentLoopEngine
 
         int maxIterations = (request.MaxIterations.HasValue && request.MaxIterations.Value > 0) ? request.MaxIterations.Value : DefaultMaxIterations;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var recentToolSignatures = new List<string>();
         int iteration = 0;
         int jsonRetryCount = 0;
         while (iteration < maxIterations)
         {
             iteration++;
             cancellationToken.ThrowIfCancellationRequested();
+
+            PruneMessageHistoryIfNeeded(messages, logger);
 
             OllamaSettings? settings = null;
             try
@@ -104,8 +107,8 @@ internal sealed class AgentLoopEngine
                 logger?.LogWarning("AgentEngine", $"Impossibile recuperare le impostazioni Ollama, uso context default: {ex.Message}");
             }
 
-            int? numCtx = settings?.CodingNumCtx ?? settings?.ChatNumCtx;
-            string numCtxLabel = numCtx.HasValue ? numCtx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "Auto (default modello LLM)";
+            int numCtx = settings?.CodingNumCtx ?? settings?.ChatNumCtx ?? DefaultNumCtx;
+            string numCtxLabel = $"{numCtx} tokens";
             string iterLabel = $"{iteration}/{maxIterations}";
             logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtxLabel}, Messages: {messages.Count})");
 
@@ -238,6 +241,23 @@ internal sealed class AgentLoopEngine
                     ? $"[SYSTEM CORRECTION WARNING] Il tool 'replace_file_content' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO perché TargetContent non è stato trovato nel file. NON ripetere la stessa stringa! Esegui prima read_file per verificare le righe esatte oppure usa write_file per riscrivere il file completo."
                     : $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. NON ripetere percorsi o comandi non esistenti!";
                 messages.Add(new("user", correctionPrompt));
+                continue;
+            }
+
+            // Cycle Guard: rileva ripetizioni cicliche o ripetitive di chiamate riuscite
+            recentToolSignatures.Add(callSignature);
+            if (recentToolSignatures.Count > 30)
+            {
+                recentToolSignatures.RemoveAt(0);
+            }
+
+            if (IsCyclicPatternDetected(recentToolSignatures))
+            {
+                logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive: {callSignature}");
+                yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive ({toolCall.ToolName}). Iniezione direttiva di conclusione...");
+                messages.Add(new("user",
+                    "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate di strumento per più volte senza avanzamenti significativi. " +
+                    "NON ripetere le stesse azioni! Se hai raccolto le informazioni o applicato le modifiche necessarie, rispondi ORA all'utente con il riepilogo finale in Markdown senza invocare altri tool."));
                 continue;
             }
 
@@ -768,5 +788,55 @@ REGOLE COMPORTAMENTALI (ANTIGRAVITY DIRECTIVES):
         sb.AppendLine("2. Se presenti, leggi prioritariamente AGENTS.md, PROJECT_STATUS.json o workspace_settings.json per rispettare le convenzioni del progetto, le responsabilita dei file e gli switch di configurazione.");
 
         return sb.ToString();
+    }
+
+    private static void PruneMessageHistoryIfNeeded(List<OllamaChatMessage> messages, ILoggingService? logger)
+    {
+        const int maxMessagesBeforePruning = 20;
+        const int keepRecentCount = 12;
+
+        if (messages.Count <= maxMessagesBeforePruning) return;
+
+        int removeCount = messages.Count - 2 - keepRecentCount;
+        if (removeCount <= 0) return;
+
+        logger?.LogInfo("AgentEngine", $"[CONTEXT SLIDING WINDOW] Contesto troppo ampio ({messages.Count} messaggi). Troncamento di {removeCount} messaggi intermedi per ottimizzazione memoria LLM.");
+
+        messages.RemoveRange(2, removeCount);
+        messages.Insert(2, new OllamaChatMessage("system", "[CONTESTO COMPRESSO SISTEMA] La cronologia intermedia delle iterazioni precedenti è stata sinteticamente compressa per mantenere la finestra di contesto fluida ed evitare amnesie o loop. Prosegui dall'ultimo stato utile."));
+    }
+
+    private static bool IsCyclicPatternDetected(List<string> history)
+    {
+        if (history.Count < 4) return false;
+
+        // 1. Stessa identica chiamata per 3 volte di seguito
+        int n = history.Count;
+        if (history[n - 1] == history[n - 2] && history[n - 2] == history[n - 3])
+        {
+            return true;
+        }
+
+        // 2. Pattern di 2 o 3 chiamate ripetuto 3 volte (es. A B A B A B oppure A B C A B C)
+        for (int period = 2; period <= 4; period++)
+        {
+            if (n >= period * 3)
+            {
+                bool match = true;
+                for (int i = 0; i < period; i++)
+                {
+                    string elem = history[n - 1 - i];
+                    if (history[n - 1 - i - period] != elem || history[n - 1 - i - (period * 2)] != elem)
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) return true;
+            }
+        }
+
+        return false;
     }
 }

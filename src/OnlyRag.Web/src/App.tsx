@@ -77,7 +77,7 @@ const offlineStatus: BackendStatus = {
 };
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<SectionId>("chat");
+  const [activeSection, setActiveSection] = useState<SectionId>("coding");
   const [backendStatus, setBackendStatus] = useState<BackendStatus>(offlineStatus);
   const [statusChecked, setStatusChecked] = useState(false);
   const [ollamaSettings, setOllamaSettings] = useState<OllamaSettings | null>(null);
