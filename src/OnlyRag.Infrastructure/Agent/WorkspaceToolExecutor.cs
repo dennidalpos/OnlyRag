@@ -14,6 +14,11 @@ namespace OnlyRag.Infrastructure.Agent;
 public sealed class WorkspaceToolExecutor
 {
     private static readonly JsonSerializerOptions s_indentedOptions = new() { WriteIndented = true };
+    private static readonly JsonDocumentOptions s_jsonDocOptions = new()
+    {
+        CommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
 
     private readonly BackgroundTaskManager taskManager;
     private readonly IHybridRetrievalService? retrievalService;
@@ -57,7 +62,7 @@ public sealed class WorkspaceToolExecutor
 
         try
         {
-            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson, s_jsonDocOptions);
             var root = doc.RootElement;
 
             AgentToolResult result = toolName.ToLowerInvariant() switch
@@ -532,7 +537,7 @@ public sealed class WorkspaceToolExecutor
             }
             catch { }
         }
-        return "powershell.exe"; // Legacy fallback
+        return "powershell.exe";
     }
 
     private AgentToolResult ManageTask(string callId, string toolName, JsonElement args)
