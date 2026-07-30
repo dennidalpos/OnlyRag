@@ -14,7 +14,25 @@ type SidebarProps = {
   diagnostics?: DiagnosticsResponse | null;
 };
 
-const sectionOrder: SectionId[] = ["coding", "chat", "documents", "images", "translation", "settings"];
+type NavGroup = {
+  title: string;
+  items: SectionId[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    title: "Intelligenza",
+    items: ["chat", "coding"]
+  },
+  {
+    title: "Media & RAG",
+    items: ["documents", "translation", "images"]
+  },
+  {
+    title: "Sistema",
+    items: ["settings"]
+  }
+];
 
 function SectionIcon({ section }: { section: SectionId }) {
   switch (section) {
@@ -70,6 +88,15 @@ function SectionIcon({ section }: { section: SectionId }) {
   }
 }
 
+const sectionShortcuts: Record<SectionId, string> = {
+  chat: "Ctrl+1",
+  coding: "Ctrl+2",
+  documents: "Ctrl+3",
+  translation: "Ctrl+4",
+  images: "Ctrl+5",
+  settings: "Ctrl+6"
+};
+
 export function Sidebar({
   activeSection,
   sections,
@@ -84,19 +111,26 @@ export function Sidebar({
         <p>OnlyRag</p>
       </div>
       <nav className="navigation" aria-label="Sezioni principali">
-        {sectionOrder.map((section) => (
-          <button
-            className={section === activeSection ? "nav-item nav-item--active" : "nav-item"}
-            key={section}
-            type="button"
-            aria-current={section === activeSection ? "page" : undefined}
-            onClick={() => onSectionChange(section)}
-          >
-            <span className="nav-item__content">
-              <SectionIcon section={section} />
-              <span className="nav-item__label">{sections[section]}</span>
-            </span>
-          </button>
+        {navGroups.map((group) => (
+          <div key={group.title} className="nav-group">
+            <span className="nav-group__title">{group.title}</span>
+            {group.items.map((section) => (
+              <button
+                className={section === activeSection ? "nav-item nav-item--active" : "nav-item"}
+                key={section}
+                type="button"
+                aria-current={section === activeSection ? "page" : undefined}
+                onClick={() => onSectionChange(section)}
+                title={`${sections[section]} (${sectionShortcuts[section]})`}
+              >
+                <span className="nav-item__content">
+                  <SectionIcon section={section} />
+                  <span className="nav-item__label">{sections[section]}</span>
+                </span>
+                <span className="nav-shortcut-badge" aria-hidden="true">{sectionShortcuts[section]}</span>
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
       <SidebarMetrics diagnostics={diagnostics} />

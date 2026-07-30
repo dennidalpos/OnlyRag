@@ -8,6 +8,7 @@ import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
 import { PdfExportPanel } from "./settings/PdfExportPanel";
 import { PerformanceSettingsPanel } from "./settings/PerformanceSettingsPanel";
 import { RerankerModelPanel } from "./settings/RerankerModelPanel";
+import { ThemeSelectorPanel } from "./SettingsSection.fields";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function SettingsSectionPanels() {
@@ -21,6 +22,13 @@ export function SettingsSectionPanels() {
       <div className="settings-panel" aria-label="Impostazioni principali">
         {infoMessage && <div className="feedback-banner feedback-banner--info settings-feedback" role="status">{infoMessage}</div>}
         {errorMessage && <div className="feedback-banner feedback-banner--error settings-feedback" role="alert">{errorMessage}</div>}
+
+        <section className="settings-section" aria-labelledby="settings-theme-title">
+          <h3 id="settings-theme-title">Personalizzazione Visiva</h3>
+          <div className="settings-card">
+            <ThemeSelectorPanel />
+          </div>
+        </section>
 
         <section className="settings-section" aria-labelledby="settings-connections-title">
           <h3 id="settings-connections-title">Connessione &amp; Modelli</h3>

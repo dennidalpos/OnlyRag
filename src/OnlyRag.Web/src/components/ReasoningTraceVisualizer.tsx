@@ -18,9 +18,14 @@ export function ReasoningTraceVisualizer({
 
   const thoughtEvents = events.filter((e) => e.type === "thought" || e.type === "thought_chunk");
   const toolEvents = events.filter((e) => e.type === "tool_proposed" || e.type === "tool_result");
+  const subagentEvents = events.filter((e) => Boolean(e.subagentRole));
 
   const fullThoughtText = thoughtEvents
-    .map((e) => e.content || (e.type === "thought_chunk" ? e.content : ""))
+    .map((e) => {
+      const prefix = e.subagentRole ? `\n🤖 [Subagent: ${e.subagentRole}]\n` : "";
+      const text = e.content || (e.type === "thought_chunk" ? e.content : "");
+      return prefix + text;
+    })
     .join("");
 
   return (
@@ -35,7 +40,7 @@ export function ReasoningTraceVisualizer({
             {isStreaming ? <Sparkles size={16} className="text-amber-400" /> : <Brain size={16} className="text-indigo-400" />}
           </span>
           <span className="reasoning-trace-visualizer__title">
-            Traccia di Ragionamento Agentico ({events.length} eventi)
+            Traccia di Ragionamento Agentico ({events.length} eventi{subagentEvents.length > 0 ? ` • ${subagentEvents.length} subagente` : ""})
           </span>
           {isStreaming && (
             <span className="reasoning-trace-visualizer__live-badge">
@@ -63,7 +68,7 @@ export function ReasoningTraceVisualizer({
               style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => setActiveTab("tools")}
             >
-              <Terminal size={13} /> Utensili Eseguiti ({toolEvents.length})
+              <Terminal size={13} /> Strumenti Eseguiti ({toolEvents.length})
             </button>
             <button
               type="button"
@@ -100,6 +105,11 @@ export function ReasoningTraceVisualizer({
                       <div className="reasoning-trace-visualizer__tool-proposed">
                         <span className="reasoning-trace-visualizer__tool-name" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <Terminal size={13} /> Proposal: <code>{evt.toolCall.toolName}</code>
+                          {evt.subagentRole && (
+                            <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: 6 }}>
+                              🤖 Subagent: {evt.subagentRole}
+                            </span>
+                          )}
                         </span>
                         {evt.toolCall.explanation && (
                           <p className="reasoning-trace-visualizer__tool-exp">
@@ -117,6 +127,11 @@ export function ReasoningTraceVisualizer({
                         <div className="reasoning-trace-visualizer__tool-result-header" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           {evt.toolResult.success ? <CheckCircle2 size={14} style={{ color: "#34d399" }} /> : <XCircle size={14} style={{ color: "#f87171" }} />}
                           <span><code>{evt.toolResult.toolName}</code></span>
+                          {evt.subagentRole && (
+                            <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: "auto" }}>
+                              🤖 Subagent: {evt.subagentRole}
+                            </span>
+                          )}
                         </div>
                         {evt.toolResult.output && (
                           <pre className="reasoning-trace-visualizer__tool-output">

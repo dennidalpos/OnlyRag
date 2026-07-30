@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { OllamaModelDetails } from "../api";
 import { formatOcrInteger } from "./SettingsSection.formatting";
 
@@ -317,6 +317,52 @@ export function UnifiedPresetBar({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+export function ThemeSelectorPanel() {
+  const currentTheme = (localStorage.getItem("onlyrag_theme") as "dark" | "light" | "cyber") || "dark";
+  const [activeTheme, setActiveTheme] = useState<"dark" | "light" | "cyber">(currentTheme);
+
+  function handleSelectTheme(newTheme: "dark" | "light" | "cyber") {
+    setActiveTheme(newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("onlyrag_theme", newTheme);
+  }
+
+  return (
+    <div className="unified-preset-bar">
+      <div className="unified-preset-bar__header">
+        <span className="unified-preset-bar__title">Tema Visivo dell'Interfaccia</span>
+        <span className="unified-preset-bar__subtitle">Personalizza lo stile visivo e i colori dell'applicazione</span>
+      </div>
+      <div className="unified-preset-bar__buttons" role="group" aria-label="Tema dell'Interfaccia">
+        <button
+          type="button"
+          className={`unified-preset-btn ${activeTheme === "dark" ? "unified-preset-btn--active" : ""}`}
+          onClick={() => handleSelectTheme("dark")}
+        >
+          <span>🌙</span>
+          <span>Scuro Midnight</span>
+        </button>
+        <button
+          type="button"
+          className={`unified-preset-btn ${activeTheme === "light" ? "unified-preset-btn--active" : ""}`}
+          onClick={() => handleSelectTheme("light")}
+        >
+          <span>☀️</span>
+          <span>Chiaro Crisp</span>
+        </button>
+        <button
+          type="button"
+          className={`unified-preset-btn ${activeTheme === "cyber" ? "unified-preset-btn--active" : ""}`}
+          onClick={() => handleSelectTheme("cyber")}
+        >
+          <span>⚡</span>
+          <span>Cyber Neon</span>
+        </button>
       </div>
     </div>
   );

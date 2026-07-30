@@ -19,6 +19,7 @@ public sealed class WorkspaceToolExecutor
     private readonly IHybridRetrievalService? retrievalService;
     private readonly IDocumentIngestionService? ingestionService;
     private readonly ImageGenerationService? imageGenerationService;
+    private readonly ISubagentRunner? subagentRunner;
     private readonly ILoggingService? logger;
 
     public WorkspaceToolExecutor(
@@ -26,12 +27,14 @@ public sealed class WorkspaceToolExecutor
         IHybridRetrievalService? retrievalService = null,
         IDocumentIngestionService? ingestionService = null,
         ImageGenerationService? imageGenerationService = null,
+        ISubagentRunner? subagentRunner = null,
         ILoggingService? logger = null)
     {
         this.taskManager = taskManager;
         this.retrievalService = retrievalService;
         this.ingestionService = ingestionService;
         this.imageGenerationService = imageGenerationService;
+        this.subagentRunner = subagentRunner;
         this.logger = logger;
     }
 
@@ -40,6 +43,7 @@ public sealed class WorkspaceToolExecutor
         string toolName,
         string argumentsJson,
         string workspaceRoot,
+        Action<AgentStepEvent>? onStep = null,
         CancellationToken cancellationToken = default)
     {
         logger?.LogTrace("AgentEngine", $"[TOOL EXEC START] Tool: '{toolName}', CallID: '{callId}', Args: {argumentsJson}");
@@ -74,7 +78,7 @@ public sealed class WorkspaceToolExecutor
                 "plan_task" or "create_plan" or "update_plan" => PlanTask(callId, toolName, root),
                 "reflect_step" or "reflect" or "self_reflection" => ReflectStep(callId, toolName, root),
                 "ast_structural_refactor" or "refactor_symbol" => await AstStructuralRefactorAsync(callId, toolName, root, workspaceRoot, cancellationToken),
-                "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
+                "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, onStep, cancellationToken),
                 _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool non riconosciuto: {toolName}")
             };
 
@@ -178,7 +182,7 @@ public sealed class WorkspaceToolExecutor
 
         if (allReadOnly && calls.Count > 1)
         {
-            var tasks = calls.Select(c => ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken));
+            var tasks = calls.Select(c => ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken: cancellationToken));
             var batchResults = await Task.WhenAll(tasks);
             return batchResults.ToList();
         }
@@ -186,7 +190,7 @@ public sealed class WorkspaceToolExecutor
         var seqResults = new List<AgentToolResult>();
         foreach (var c in calls)
         {
-            var res = await ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken);
+            var res = await ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken: cancellationToken);
             seqResults.Add(res);
         }
         return seqResults;
@@ -343,6 +347,80 @@ public sealed class WorkspaceToolExecutor
             targetDir = Path.GetDirectoryName(targetDir)!;
         }
 
+        // Prefer ripgrep (rg) for speed; fall back to linear scan if unavailable.
+        var rgResult = TryRipgrepSearch(callId, toolName, query, targetDir, rootPath);
+        if (rgResult is not null) return rgResult;
+
+        return LinearGrepSearch(callId, toolName, query, targetDir, rootPath);
+    }
+
+    private static AgentToolResult? TryRipgrepSearch(string callId, string toolName, string query, string targetDir, string rootPath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "rg",
+                // -n: line numbers, -i: case-insensitive, -m 50: max 50 matches, --no-heading, -l limited output
+                Arguments = $"--no-heading -n -i -m 50 --max-count 50 {EscapeShellArg(query)} {EscapeShellArg(targetDir)}",
+                WorkingDirectory = rootPath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc is null) return null;
+
+            string stdout = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(10_000);
+
+            // rg exits with 1 when no matches are found (not an error)
+            if (proc.ExitCode > 1) return null;
+
+            if (string.IsNullOrWhiteSpace(stdout))
+            {
+                return new AgentToolResult(callId, toolName, true, $"No results found for '{query}'.");
+            }
+
+            // Relativize paths in ripgrep output
+            var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line =>
+                {
+                    // rg output format: /abs/path/file:linenum:content
+                    int firstColon = line.IndexOf(':');
+                    if (firstColon > 0)
+                    {
+                        string absFile = line[..firstColon];
+                        if (File.Exists(absFile))
+                        {
+                            string rel = Path.GetRelativePath(rootPath, absFile).Replace('\\', '/');
+                            return rel + line[firstColon..];
+                        }
+                    }
+                    return line;
+                })
+                .Take(50)
+                .ToList();
+
+            return new AgentToolResult(callId, toolName, true, string.Join("\n", lines));
+        }
+        catch
+        {
+            // ripgrep not available on this system
+            return null;
+        }
+    }
+
+    private static string EscapeShellArg(string arg)
+    {
+        // Wrap in quotes; escape internal quotes
+        return $"\"{arg.Replace("\"", "\\\"")}\"";
+    }
+
+    private static AgentToolResult LinearGrepSearch(string callId, string toolName, string query, string targetDir, string rootPath)
+    {
         var results = new List<string>();
         var files = Directory.EnumerateFiles(targetDir, "*.*", SearchOption.AllDirectories)
             .Where(f => !f.Contains("\\.git\\") && !f.Contains("\\node_modules\\") && !f.Contains("\\bin\\") && !f.Contains("\\obj\\"))
@@ -365,7 +443,7 @@ public sealed class WorkspaceToolExecutor
             }
             catch
             {
-                // Ignora file non leggibili
+                // Skip unreadable files
             }
 
             if (results.Count >= 50) break;
@@ -373,7 +451,7 @@ public sealed class WorkspaceToolExecutor
 
         if (results.Count == 0)
         {
-            return new AgentToolResult(callId, toolName, true, $"Nessun risultato trovato per '{query}'.");
+            return new AgentToolResult(callId, toolName, true, $"No results found for '{query}'.");
         }
 
         return new AgentToolResult(callId, toolName, true, string.Join("\n", results));
@@ -390,12 +468,14 @@ public sealed class WorkspaceToolExecutor
         if (isAsync)
         {
             var taskInfo = taskManager.StartTask(commandLine, rootPath);
-            return new AgentToolResult(callId, toolName, true, $"Comando avviato in background con TaskID: {taskInfo.TaskId}\nUtilizzare manage_task per controllare lo stato ed i log.");
+            return new AgentToolResult(callId, toolName, true, $"Command started in background. TaskID: {taskInfo.TaskId}\nUse manage_task to poll status and logs.");
         }
 
+        // Use PowerShell 7 (pwsh) as mandated by AGENTS.md — falls back to powershell.exe if pwsh is unavailable.
+        string shellExe = ResolveShellExecutable();
         var psi = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
+            FileName = shellExe,
             Arguments = $"-NoProfile -NonInteractive -Command \"{commandLine.Replace("\"", "\\\"")}\"",
             WorkingDirectory = rootPath,
             UseShellExecute = false,
@@ -407,7 +487,7 @@ public sealed class WorkspaceToolExecutor
         using var process = Process.Start(psi);
         if (process is null)
         {
-            return new AgentToolResult(callId, toolName, false, string.Empty, "Impossibile avviare il processo di shell.");
+            return new AgentToolResult(callId, toolName, false, string.Empty, "Cannot start shell process.");
         }
 
         string stdout = process.StandardOutput.ReadToEnd();
@@ -423,7 +503,36 @@ public sealed class WorkspaceToolExecutor
             toolName,
             process.ExitCode == 0,
             combined,
-            process.ExitCode == 0 ? null : $"Processo terminato con exit code {process.ExitCode}");
+            process.ExitCode == 0 ? null : $"Process exited with code {process.ExitCode}");
+    }
+
+    /// <summary>Resolves the best available PowerShell executable on this machine.</summary>
+    private static string ResolveShellExecutable()
+    {
+        // Prefer PowerShell 7+ (pwsh) as mandated by AGENTS.md
+        foreach (string candidate in new[] { "pwsh", "pwsh.exe" })
+        {
+            try
+            {
+                using var probe = new Process();
+                probe.StartInfo = new ProcessStartInfo
+                {
+                    FileName = candidate,
+                    Arguments = "-NoProfile -Command exit 0",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                if (probe.Start())
+                {
+                    probe.WaitForExit(3000);
+                    if (probe.ExitCode == 0) return candidate;
+                }
+            }
+            catch { }
+        }
+        return "powershell.exe"; // Legacy fallback
     }
 
     private AgentToolResult ManageTask(string callId, string toolName, JsonElement args)
@@ -552,40 +661,26 @@ public sealed class WorkspaceToolExecutor
         return results;
     }
 
-    private Task<AgentToolResult> InvokeSubagentAsync(
+    private async Task<AgentToolResult> InvokeSubagentAsync(
         string callId,
         string toolName,
         JsonElement args,
         string rootPath,
+        Action<AgentStepEvent>? onStep,
         CancellationToken cancellationToken)
     {
-        string prompt = GetArgString(args, "prompt", "goal", "task", "description") ?? "";
-        string role = GetArgString(args, "role", "name", "type") ?? "Subagent Researcher";
-
-        if (string.IsNullOrWhiteSpace(prompt))
+        if (subagentRunner != null)
         {
-            return Task.FromResult(new AgentToolResult(
-                callId,
-                toolName,
-                false,
-                string.Empty,
-                "Il parametro 'prompt' o 'goal' è obbligatorio per invocare un subagente."));
+            return await subagentRunner.InvokeSubagentAsync(callId, toolName, args, rootPath, onStep, cancellationToken);
         }
 
-        string command = $"echo '[SUBAGENT {role}] Executing subtask: {prompt.Replace("\"", "\\\"")}'";
-        var taskInfo = taskManager.StartTask(command, rootPath);
-
-        logger?.LogInfo("AgentEngine", $"[SUBAGENT DISPATCH] Launched subagent '{role}' with TaskID {taskInfo.TaskId} for goal: '{prompt}'");
-
-        string resultMsg = $"Subagente '{role}' avviato con successo in background (TaskID: {taskInfo.TaskId}).\n" +
-                           $"Obiettivo delegato: '{prompt}'\n" +
-                           $"Utilizzare manage_task con action: 'status' e taskId: '{taskInfo.TaskId}' per verificare i risultati.";
-
-        return Task.FromResult(new AgentToolResult(
+        logger?.LogWarning("AgentEngine", "[INVOKE_SUBAGENT] SubagentRunner is not configured.");
+        return new AgentToolResult(
             callId,
             toolName,
-            true,
-            resultMsg));
+            false,
+            string.Empty,
+            "invoke_subagent is not available because ISubagentRunner is not configured.");
     }
 
     private static string? GetArgString(JsonElement root, params string[] propertyNames)

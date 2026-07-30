@@ -32,6 +32,7 @@ export type AgentStepEvent = {
   taskId?: string | null;
   batchToolCalls?: AgentToolCall[] | null;
   planMarkdown?: string | null;
+  subagentRole?: string | null;
 };
 
 export type ApproveToolCallRequest = {

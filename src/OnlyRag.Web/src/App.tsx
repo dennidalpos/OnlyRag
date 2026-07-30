@@ -301,6 +301,57 @@ export default function App() {
     };
   }, []);
 
+  const [theme] = useState<"dark" | "light" | "cyber">(() => {
+    return (localStorage.getItem("onlyrag_theme") as "dark" | "light" | "cyber") || "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("onlyrag_theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case "1":
+            event.preventDefault();
+            setActiveSection("chat");
+            setIsJobsDrawerOpen(false);
+            break;
+          case "2":
+            event.preventDefault();
+            setActiveSection("coding");
+            setIsJobsDrawerOpen(false);
+            break;
+          case "3":
+            event.preventDefault();
+            setActiveSection("documents");
+            setIsJobsDrawerOpen(false);
+            break;
+          case "4":
+            event.preventDefault();
+            setActiveSection("translation");
+            setIsJobsDrawerOpen(false);
+            break;
+          case "5":
+            event.preventDefault();
+            setActiveSection("images");
+            setIsJobsDrawerOpen(false);
+            break;
+          case "6":
+            event.preventDefault();
+            setActiveSection("settings");
+            setIsJobsDrawerOpen(false);
+            break;
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   const previousSectionRef = useRef<SectionId>(activeSection);
   useEffect(() => {
     if (previousSectionRef.current === "settings" && activeSection !== "settings") {
@@ -310,7 +361,7 @@ export default function App() {
   }, [activeSection]);
 
   return (
-    <div className="desktop-shell">
+    <div className="desktop-shell" data-theme={theme}>
       <a className="skip-link" href="#main-workspace">
         Salta al contenuto principale
       </a>
@@ -331,7 +382,7 @@ export default function App() {
           diagnostics={diagnostics}
           onOpenJobsDrawer={() => setIsJobsDrawerOpen(true)}
         />
-        <section className={`workspace-content workspace-content--${activeSection}`} aria-labelledby="workspace-title">
+        <section key={activeSection} className={`workspace-content workspace-content--${activeSection} workspace-section-animate`} aria-labelledby="workspace-title">
           {statusChecked && backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
               {shouldSurfaceRefreshFailure(backendStatus.refreshStatus)

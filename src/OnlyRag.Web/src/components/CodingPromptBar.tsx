@@ -4,7 +4,6 @@ import {
   FileCode,
   Paperclip,
   PenTool,
-  Send,
   Sparkles,
   Square,
   Trash2,

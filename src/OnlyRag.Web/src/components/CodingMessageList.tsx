@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowDown,
   Bot,
   CheckCircle2,
@@ -8,7 +7,6 @@ import {
   FileDiff,
   Loader2,
   Save,
-  Sparkles,
   Trash2,
   User
 } from "lucide-react";

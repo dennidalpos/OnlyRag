@@ -198,11 +198,33 @@ internal sealed class QdrantProcessSupervisor : IAsyncDisposable
         try
         {
             string? actualPath = process.MainModule?.FileName;
-            return !string.IsNullOrWhiteSpace(actualPath)
-                && string.Equals(
+            if (string.IsNullOrWhiteSpace(actualPath))
+            {
+                return false;
+            }
+
+            string actualName = Path.GetFileName(actualPath);
+            string expectedName = Path.GetFileName(expectedPath);
+            if (!string.Equals(actualName, expectedName, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (string.Equals(
                     Path.GetFullPath(actualPath),
                     Path.GetFullPath(expectedPath),
-                    StringComparison.OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException)
         {

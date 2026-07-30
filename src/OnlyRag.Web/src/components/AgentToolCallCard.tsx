@@ -6,14 +6,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Edit3,
-  FileText,
-  Folder,
-  Globe,
   Layers,
-  Search,
   Sparkles,
-  Terminal,
   X,
   XCircle
 } from "lucide-react";
@@ -34,10 +28,19 @@ const TOOL_BADGES: Record<string, string> = {
   write_file: "WRITE",
   write_to_file: "WRITE",
   replace_file_content: "EDIT",
+  multi_replace_file_content: "MULTI-EDIT",
   grep_search: "SEARCH",
+  git_diff_inspect: "GIT",
   run_command: "CMD",
   web_search: "WEB",
   search_web: "WEB",
+  query_retrieval_index: "RAG",
+  rag_hybrid_search: "RAG",
+  plan_task: "PLAN",
+  reflect_step: "REFLECT",
+  ingest_office_doc: "INGEST",
+  generate_image_onnx: "IMG-GEN",
+  ast_structural_refactor: "AST",
   invoke_subagent: "SUBAGENT",
   manage_task: "TASK"
 };
@@ -52,9 +55,23 @@ function formatArgsSummary(toolName: string, argsJson: string): string {
     }
     if (toolName === "write_file" || toolName === "write_to_file") return `${args.relativePath} (${(String(args.content ?? "")).length} car.)`;
     if (toolName === "replace_file_content") return `${args.relativePath}`;
+    if (toolName === "multi_replace_file_content") {
+      const chunks = Array.isArray(args.chunks) ? args.chunks.length : "?";
+      return `${args.relativePath} (${chunks} chunks)`;
+    }
     if (toolName === "grep_search") return `"${args.query}" in ${args.searchPath || "."}`;
+    if (toolName === "git_diff_inspect") return args.relativePath ? `${args.relativePath}` : "workspace";
     if (toolName === "run_command") return `${args.commandLine}`;
     if (toolName === "web_search" || toolName === "search_web") return `"${args.query}" ${args.domain ? `su ${args.domain}` : "(fonti ufficiali)"}`;
+    if (toolName === "query_retrieval_index" || toolName === "rag_hybrid_search") return `"${args.query}" (top${args.topK ?? 5})`;
+    if (toolName === "plan_task") {
+      const steps = Array.isArray(args.steps) ? args.steps.length : "?";
+      return `${steps} passi pianificati`;
+    }
+    if (toolName === "reflect_step") return `[${args.stepId ?? "-"}] ${args.status ?? ""}: ${String(args.learnings ?? "").slice(0, 60)}`;
+    if (toolName === "ingest_office_doc") return `${args.relativePath}${args.forceOcr ? " (force-OCR)" : ""}`;
+    if (toolName === "generate_image_onnx") return `"${String(args.prompt ?? "").slice(0, 60)}" (${args.aspectRatio ?? "1:1"})`;
+    if (toolName === "ast_structural_refactor") return `${args.operation}: ${args.targetSymbol} → ${args.newSymbolName ?? "?"}` ;
     if (toolName === "invoke_subagent") return `[${args.role || "Subagente"}] ${args.prompt || ""}`;
     if (toolName === "manage_task") return `Action: ${args.action || "list"} (Task: ${args.taskId || "all"})`;
     return JSON.stringify(args).slice(0, 120);
@@ -205,7 +222,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
     );
   }
 
-  if (event.type === "plan_updated" && event.planMarkdown) {
+  if (event.type === "plan_update" && event.planMarkdown) {
     return <PlanChecklistVisualizer planMarkdown={event.planMarkdown} />;
   }
 

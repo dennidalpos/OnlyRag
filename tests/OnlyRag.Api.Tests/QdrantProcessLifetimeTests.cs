@@ -68,7 +68,7 @@ public sealed class QdrantProcessLifetimeTests
         {
             exited = sleeper.HasExited || sleeper.WaitForExit(5000);
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
             // Process object was disposed following successful termination.
             exited = true;

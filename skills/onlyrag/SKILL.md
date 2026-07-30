@@ -29,8 +29,9 @@ OnlyRag is a local-first Windows desktop app combining:
 2. **React/Vite Web UI** ([`src/OnlyRag.Web`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Web)): Modern single-page app interface executing inside WebView2.
 3. **In-Process Backend API** ([`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api)): ASP.NET Core Minimal API hosted in-process inside the WPF app.
 4. **Core Contracts** ([`src/OnlyRag.Core`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Core)): Shared DTOs, interfaces, and settings models.
-5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v2), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation, CRAG confidence evaluation), ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
+5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v2), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
 6. **Worker Queue** ([`src/OnlyRag.Worker`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Worker)): In-process task queue for asynchronous background jobs.
+
 
 ## 3. Directory & Environment Standards
 

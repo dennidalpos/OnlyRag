@@ -114,6 +114,19 @@ internal sealed class AgentLoopEngine
         int iteration = 0;
         int jsonRetryCount = 0;
 
+        // Cache settings once before the hot loop — avoid I/O on every iteration
+        OllamaSettings? cachedSettings = null;
+        try
+        {
+            cachedSettings = await settingsService.GetAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning("AgentEngine", $"Could not load Ollama settings, using defaults: {ex.Message}");
+        }
+
+        int numCtx = cachedSettings?.CodingNumCtx ?? cachedSettings?.ChatNumCtx ?? DefaultNumCtx;
+
         while (iteration < maxIterations)
         {
             iteration++;
@@ -121,19 +134,8 @@ internal sealed class AgentLoopEngine
 
             memoryManager.PruneHistory(messages);
 
-            OllamaSettings? settings = null;
-            try
-            {
-                settings = await settingsService.GetAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogWarning("AgentEngine", $"Impossibile recuperare le impostazioni Ollama, uso context default: {ex.Message}");
-            }
-
-            int numCtx = settings?.CodingNumCtx ?? settings?.ChatNumCtx ?? DefaultNumCtx;
             string iterLabel = $"{iteration}/{maxIterations}";
-            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Invio richiesta a Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
+            logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Sending request to Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
 
             yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generazione risposta LLM ed analisi ragionamento...");
 
@@ -315,7 +317,7 @@ internal sealed class AgentLoopEngine
                         tc.ToolName,
                         tc.ArgumentsJson,
                         workspaceRoot,
-                        cancellationToken);
+                        cancellationToken: cancellationToken);
 
                     if (res.Success) executedReadOnlyCallSignatures.Add(callSig);
                     return res;
@@ -416,12 +418,30 @@ internal sealed class AgentLoopEngine
                         }
                     }
 
-                    var result = await toolExecutor.ExecuteToolAsync(
+                    var subagentChannel = System.Threading.Channels.Channel.CreateUnbounded<AgentStepEvent>();
+
+                    var toolTask = toolExecutor.ExecuteToolAsync(
                         toolCall.CallId,
                         toolCall.ToolName,
                         toolCall.ArgumentsJson,
                         workspaceRoot,
-                        cancellationToken);
+                        onStep: step => subagentChannel.Writer.TryWrite(step),
+                        cancellationToken: cancellationToken);
+
+                    while (!toolTask.IsCompleted || subagentChannel.Reader.TryRead(out _))
+                    {
+                        while (subagentChannel.Reader.TryRead(out var subagentStep))
+                        {
+                            yield return subagentStep;
+                        }
+
+                        if (!toolTask.IsCompleted)
+                        {
+                            await Task.WhenAny(toolTask, Task.Delay(50, cancellationToken));
+                        }
+                    }
+
+                    var result = await toolTask;
 
                     yield return new AgentStepEvent("tool_result", ToolResult: result);
                     resultsList.Add(result);
@@ -768,55 +788,87 @@ internal sealed class AgentLoopEngine
 
     private static string GetSystemPrompt(string? mode, bool autoApprove)
     {
-        string currentMode = mode ?? "write";
+        bool isWriteMode = string.Equals(mode, "write", StringComparison.OrdinalIgnoreCase)
+                        || string.IsNullOrWhiteSpace(mode);
+        string modeLabel = isWriteMode ? "WRITE" : "ASK";
+        string modeDescription = isWriteMode
+            ? "Full agentic mode: you can read files, write files, execute commands, search the web, and modify the codebase."
+            : "Read-only RAG mode: you can read files, search code, query the retrieval index, and inspect git state. Do NOT write or execute commands."
+        ;
+        string approvalNote = autoApprove
+            ? "Command auto-approval is ENABLED. run_command executes immediately without user confirmation."
+            : "Command auto-approval is DISABLED. run_command requires explicit user approval before execution.";
+
         return $$"""
-Sei Antigravity Autonomous Code Agent (SOTA Edition), un assistente agentico di sviluppo software di livello esperto compatibile con i principali LLM (Qwen, Llama, DeepSeek, Mistral, Phi, Gemma).
-Modalità operativa: {{currentMode}}
-Auto-Approvazione comandi: {{autoApprove}}
+            You are OnlyRag Autonomous Agent (SOTA Edition) — an expert software development agent optimized for local LLMs (Qwen, Llama, DeepSeek, Mistral, Phi, Gemma).
 
-Operi secondo un rigoroso ciclo ReAct SOTA (Plan -> Multi-Tool Execute -> Auto-Verify -> Reflect):
+            Operating mode: {{modeLabel}} — {{modeDescription}}
+            {{approvalNote}}
 
-STRUMENTI DISPONIBILI:
-1. list_dir({"relativePath": "string"}) [Elenco file e cartelle]
-2. read_file({"relativePath": "string", "startLine": 1, "endLine": 100}) [Alias: view_file - Lettura sicura file]
-3. write_file({"relativePath": "string", "content": "string"}) [Alias: write_to_file - Scrittura/creazione file]
-4. replace_file_content({"relativePath": "string", "targetContent": "string", "replacementContent": "string"}) [Sostituzione mirata di blocchi di codice]
-5. multi_replace_file_content({"relativePath": "string", "chunks": [{"targetContent": "string", "replacementContent": "string"}]}) [Sostituzione multipla non contigua]
-6. grep_search({"query": "string", "searchPath": "string"}) [Ricerca ripgrep nel codice]
-7. git_diff_inspect({"relativePath": "string"}) [Analisi dello stato Git e diff delle modifiche locale]
-8. run_command({"commandLine": "string", "isAsync": false}) [Esecuzione comandi di build, test e terminale]
-9. web_search({"query": "string", "domain": "string"}) [Ricerca online su documentazione e fonti ufficiali]
-10. ingest_office_doc({"relativePath": "string", "forceOcr": false}) [Ingestion RAG di file Office/PDF tramite LibreOffice & PaddleOCR GPU]
-11. generate_image_onnx({"prompt": "string", "aspectRatio": "1:1|16:9|9:16"}) [Generazione/editing immagini tramite ONNX DirectML GPU]
-12. query_retrieval_index({"query": "string", "topK": 5}) [Alias: rag_hybrid_search - Interrogazione diretta indici SQLite FTS5 e Qdrant vectors]
-13. plan_task({"steps": [{"description": "string"}]}) [Pianificazione dinamica e checklist del lavoro dell'agente]
-14. reflect_step({"stepId": "string", "status": "completed|failed", "learnings": "string"}) [Self-reflection post-azione e memorizzazione di fatto chiave]
-15. invoke_subagent({"prompt": "string", "role": "string"}) [Delega di sotto-task ad agenti autonomi secondari]
-16. manage_task({"action": "list|status|kill|send_input", "taskId": "string"}) [Gestione processi ed agenti in background]
-17. ast_structural_refactor({"operation": "rename_symbol|find_references|replace_symbol_body", "targetSymbol": "string", "newSymbolName": "string", "relativePath": "string"}) [Rifattorizzazione e ricerca simboli AST]
+            ## ReAct Reasoning Cycle
 
-FORMATO RISPOSTA MULTI-TOOL (JSON):
-Puoi restituire una o più chiamate di strumento nello stesso blocco JSON per eseguire letture ed ispezioni in parallelo:
-```json
-[
-  {
-    "tool": "read_file",
-    "arguments": { "relativePath": "src/OnlyRag.Api/AgentLoopEngine.cs" },
-    "explanation": "Lettura file di ragionamento"
-  },
-  {
-    "tool": "grep_search",
-    "arguments": { "query": "AgentStepEvent", "searchPath": "src/OnlyRag.Core" },
-    "explanation": "Ispezione contratti DTO"
-  }
-]
-```
+            Follow this strict cycle for every action:
+            1. THINK — Reason about the goal, current state, and what information you need.
+            2. ACT — Call one or more tools using the JSON format below.
+            3. OBSERVE — Read the tool results carefully.
+            4. REFLECT — Update your understanding; register key facts with reflect_step.
+            5. REPEAT or ANSWER — Continue until the goal is fully achieved, then produce a final Markdown summary.
 
-REGOLE COMPORTAMENTALI (SOTA DIRECTIVES):
-1. **PLANNING**: Prima di apportare modifiche in modalità 'write', definisci mentalmente la sequenza dei passi e verifica l'esistenza dei file con list_dir o grep_search.
-2. **ESECUZIONE E VERIFICA AUTOMATICA**: Dopo aver modificato file di codice, esegui SEMPRE `run_command` (`dotnet build`, `npm test`) per verificare che non vi siano errori di sintassi o compilazione prima di terminare.
-3. **RISPOSTA FINALE**: Soltanto dopo aver verificato le modifiche, fornisci il resoconto finale in Markdown pulito.
-""";
+            ## Available Tools
+
+            | Tool | Arguments | Description |
+            |---|---|---|
+            | list_dir | relativePath | List files and folders |
+            | read_file | relativePath, startLine?, endLine? | Read file content with optional line range |
+            | write_file | relativePath, content | Create or overwrite a file |
+            | replace_file_content | relativePath, targetContent, replacementContent | Replace an exact block in a file |
+            | multi_replace_file_content | relativePath, chunks[{targetContent, replacementContent}] | Multiple non-contiguous replacements |
+            | grep_search | query, searchPath | Fast code search (ripgrep) |
+            | git_diff_inspect | relativePath? | Git status and diff |
+            | run_command | commandLine, isAsync? | Execute PowerShell 7 command |
+            | web_search | query, domain? | DuckDuckGo web search |
+            | ingest_office_doc | relativePath, forceOcr? | RAG ingestion of Office/PDF documents |
+            | generate_image_onnx | prompt, aspectRatio? | ONNX DirectML image generation |
+            | query_retrieval_index | query, topK? | Hybrid FTS5+Qdrant RAG search |
+            | plan_task | steps[{description}] | Create or update a dynamic plan checklist |
+            | reflect_step | stepId, status, learnings | Record key facts after a completed action |
+            | manage_task | action, taskId? | List/status/kill background tasks |
+            | ast_structural_refactor | operation, targetSymbol, newSymbolName?, relativePath | AST-level symbol refactoring |
+            | invoke_subagent | role, prompt, subagents?[{role, prompt}] | Spawn specialized sub-agents to execute sub-tasks concurrently |
+
+            ## Tool Call Format
+
+            Always respond with a valid JSON block. You may batch multiple independent read-only tools in a single array for parallel execution:
+
+            **Single tool call:**
+            ```json
+            {
+              "tool": "read_file",
+              "arguments": { "relativePath": "src/Program.cs", "startLine": 1, "endLine": 50 },
+              "explanation": "Reading entry point to understand app structure"
+            }
+            ```
+
+            **Parallel tool calls (read-only tools only):**
+            ```json
+            [
+              { "tool": "list_dir", "arguments": { "relativePath": "src" }, "explanation": "Explore source structure" },
+              { "tool": "read_file", "arguments": { "relativePath": "README.md" }, "explanation": "Read project overview" },
+              { "tool": "grep_search", "arguments": { "query": "public interface", "searchPath": "src" }, "explanation": "Find interfaces" }
+            ]
+            ```
+
+            ## Behavioral Directives
+
+            1. **ALWAYS plan before writing.** In WRITE mode, call plan_task at the start with an explicit step list before modifying any files.
+            2. **ALWAYS verify after writing.** After changing code files, run `dotnet build` or `npm test` to catch errors before producing the final answer.
+            3. **NEVER repeat a failed tool call** with the same arguments. Change strategy or parameters.
+            4. **BATCH parallel reads.** Read multiple files simultaneously when they are independent.
+            5. **Use reflect_step** after completing each planned step to record what you learned.
+            6. **Final answer format.** When the goal is complete, respond with a clean Markdown summary: what changed, files affected, and verification results. Do NOT call any more tools after the final answer.
+            7. **Project context awareness.** If AGENTS.md or PROJECT_STATUS.json exist at the workspace root, read them first and follow their conventions.
+            8. **Workspace safety.** Never write outside the authorized workspace root. Never print secrets, keys, or credentials.
+            """;
     }
 
     private static string EnrichGoalWithWorkspaceContext(string goal, string workspaceRoot)
@@ -943,8 +995,10 @@ REGOLE COMPORTAMENTALI (SOTA DIRECTIVES):
 
     private static bool IsReadOnlyTool(AgentToolCall call)
     {
+        // Only tools that are truly stateless and idempotent qualify for parallel execution.
+        // plan_task and reflect_step are excluded: they mutate agent state (plan checklist, key-facts store).
         string t = call.ToolName.ToLowerInvariant();
-        return t is "read_file" or "list_dir" or "grep_search" or "git_diff_inspect" or "web_search" or "query_retrieval_index" or "plan_task" or "reflect_step";
+        return t is "read_file" or "list_dir" or "grep_search" or "git_diff_inspect" or "web_search" or "query_retrieval_index";
     }
 }
 

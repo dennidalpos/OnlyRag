@@ -117,6 +117,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<HeuristicReRankerService>();
         services.AddSingleton<RerankerModelManager>();
         services.AddSingleton<IReRankerService, OnnxCrossEncoderReRankerService>();
+        services.AddSingleton<ILlmQueryExpander, OllamaLlmQueryExpander>();
         services.AddSingleton<IQueryTransformationService, OllamaQueryTransformationService>();
         services.AddSingleton<ParentChildChunkResolver>();
         services.AddSingleton<CragEvaluator>();
@@ -128,8 +129,9 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();
+        services.AddSingleton<ISubagentRunner, SubagentRunner>();
         services.AddSingleton<WorkspaceToolExecutor>();
-        services.AddSingleton<AgentLoopEngine>();
+        services.AddTransient<AgentLoopEngine>();
         return services;
     }
 

@@ -208,5 +208,8 @@ The repository maintains project-specific skills under the `skills/` directory i
 3. **Official Sources Only**: All skill instructions and reference links must rely strictly on official documentation sources (Microsoft Learn, React, Vite, SQLite, Qdrant, Ollama, ONNX Runtime, NSIS, ESLint, Prettier, etc.).
 4. **Cross-Machine Synchronization**: Ensure all skills under `skills/` remain checked into the root repository so they are immediately available on any PC or development environment.
 5. **Code Quality & Maintenance Automation**: Use `pwsh .\scripts\Format-Code.ps1` for code formatting, `pwsh .\scripts\Lint-Code.ps1` for static linting/typechecking, `pwsh .\scripts\Test-Code.ps1` for automated unit tests, and `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` for canonical gate verification.
+6. **Continuous Documentation & Skill Synchronization**: Always update repository documentation (`docs/`) and skill files (`skills/`) whenever code structures, public APIs, dependencies, configuration, or operational commands are added, modified, or deprecated.
+7. **Zero Technical Debt Policy**: Promptly remove legacy scaffolding, obsolete planning files, unused/dead code, and temporary build or test artifacts to ensure a pristine, maintainable repository state.
+
 
 

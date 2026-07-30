@@ -28,12 +28,14 @@ Dual-Tier Chunking strategy:
 
 ## 3. Next-Gen 6-Stage Retrieval Pipeline
 
-1. **Query Transformation**: Multi-Query expansion, Sub-Query decomposition, or HyDE generation via `IQueryTransformationService`.
+1. **Query Transformation**: Multi-Query expansion, Sub-Query decomposition, or HyDE generation via `IQueryTransformationService` and Ollama LLM expander (`ILlmQueryExpander`).
 2. **Coarse 1st-Stage Search**: Parallel retrieval from SQLite FTS5 and Qdrant HNSW vector index.
 3. **Reciprocal Rank Fusion (RRF)**: Rank-based candidate fusion combining keyword and vector rankings.
 4. **2nd-Stage Re-ranking**: Cross-scoring `(Query, Chunk)` via `IReRankerService` (`HeuristicReRankerService`).
 5. **Parent-Child Resolution**: Resolving high-scoring child chunks to their rich parent chunk context using `ParentChildChunkResolver`.
 6. **CRAG Evaluation & Grounded Citation**: Faithfulness confidence check via `CragEvaluator` and interactive `[Pag. X, Chunk Y]` citation badge formatting.
+7. **Subagent Execution Engine**: Background research subagent execution managed via `ISubagentRunner`.
+
 
 ## 4. Retrieval Evaluation & Metrics
 

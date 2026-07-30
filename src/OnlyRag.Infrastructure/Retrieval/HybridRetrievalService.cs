@@ -79,14 +79,20 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             QueryTransformationStrategy.MultiQuery,
             cancellationToken);
 
-        // 2. Coarse Hybrid Retrieval (1st stage: FTS5 + Qdrant HNSW via RRF)
-        KeywordSearchResponse keywordResponse = await keywordSearch.SearchAsync(
+        // 2. Coarse Hybrid Retrieval (1st stage: FTS5 + Qdrant HNSW in parallel via RRF)
+        Task<KeywordSearchResponse> keywordTask = keywordSearch.SearchAsync(
             query,
             documentIds,
             options.KeywordTopK,
             cancellationToken);
 
-        QueryEmbeddingResult? queryEmbedding = await TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
+        Task<QueryEmbeddingResult?> embeddingTask = TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
+
+        await Task.WhenAll(keywordTask, embeddingTask);
+
+        KeywordSearchResponse keywordResponse = await keywordTask;
+        QueryEmbeddingResult? queryEmbedding = await embeddingTask;
+
         VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
             ? new VectorSearchAttempt([], "Qdrant unavailable")
             : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
@@ -143,7 +149,9 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             .ToList();
 
         // 5. Self-Corrective RAG (CRAG) Confidence Check
-        CragEvaluationResult cragResult = cragEvaluator.Evaluate(ranked, 0.30d);
+        // Note: RRF scores are raw values (typically 0.01-0.05 range). Threshold 0.08 catches
+        // genuinely low-confidence retrievals without false positives on normal results.
+        CragEvaluationResult cragResult = cragEvaluator.Evaluate(ranked, 0.08d);
         if (!cragResult.IsConfident)
         {
             notices.Add(new RetrievalNotice("crag_low_confidence", cragResult.SummaryNotice));

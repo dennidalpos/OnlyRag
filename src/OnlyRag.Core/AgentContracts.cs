@@ -30,7 +30,8 @@ public sealed record AgentStepEvent(
     AgentToolResult? ToolResult = null,
     string? TaskId = null,
     IReadOnlyList<AgentToolCall>? BatchToolCalls = null,
-    string? PlanMarkdown = null);
+    string? PlanMarkdown = null,
+    string? SubagentRole = null);
 
 public sealed record BackgroundTaskInfo(
     string TaskId,
