@@ -81,4 +81,75 @@ public sealed class AgentLoopEngineTests
             }
         }
     }
+
+    [Fact]
+    public void IsCyclicPatternDetected_DetectsMetaToolSpinningAndCyclicPatterns()
+    {
+        var method = typeof(AgentLoopEngine).GetMethod("IsCyclicPatternDetected", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var historyMetaSpins = new List<string>
+        {
+            "reflect_step:{\"stepId\":\"1\"}",
+            "plan_task:{\"steps\":[]}",
+            "reflect_step:{\"stepId\":\"2\"}"
+        };
+
+        bool isMetaSpinDetected = (bool)method.Invoke(null, [historyMetaSpins])!;
+        Assert.True(isMetaSpinDetected);
+
+        var historyToolNameCycle = new List<string>
+        {
+            "list_dir:{\"relativePath\":\"a\"}",
+            "read_file:{\"relativePath\":\"b\"}",
+            "list_dir:{\"relativePath\":\"c\"}",
+            "read_file:{\"relativePath\":\"d\"}",
+            "list_dir:{\"relativePath\":\"e\"}",
+            "read_file:{\"relativePath\":\"f\"}"
+        };
+
+        bool isToolNameCycleDetected = (bool)method.Invoke(null, [historyToolNameCycle])!;
+        Assert.True(isToolNameCycleDetected);
+    }
+
+    [Fact]
+    public void IsReadOnlyTool_Identifies_Independent_Tools()
+    {
+        var method = typeof(AgentLoopEngine).GetMethod("IsReadOnlyTool", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var callRead = new AgentToolCall("c1", "read_file", "{}");
+        var callList = new AgentToolCall("c2", "list_dir", "{}");
+        var callWrite = new AgentToolCall("c3", "write_file", "{}");
+        var callCmd = new AgentToolCall("c4", "run_command", "{}");
+
+        Assert.True((bool)method.Invoke(null, [callRead])!);
+        Assert.True((bool)method.Invoke(null, [callList])!);
+        Assert.False((bool)method.Invoke(null, [callWrite])!);
+        Assert.False((bool)method.Invoke(null, [callCmd])!);
+    }
+
+    [Fact]
+    public void AgentMemoryManager_CompressContext_SynthesizesHistory()
+    {
+        var memoryManager = new AgentMemoryManager();
+        var messages = new List<OllamaChatMessage>
+        {
+            new("system", "System prompt"),
+            new("user", "Goal")
+        };
+
+        for (int i = 0; i < 25; i++)
+        {
+            messages.Add(new("assistant", $"Thought step {i}"));
+            messages.Add(new("user", $"[TOOL RESULT (tool_{i})]\nSuccesso: True\nOutput:\nResult {i}"));
+        }
+
+        bool compressed = memoryManager.CompressContext(messages, maxMessagesThreshold: 20);
+
+        Assert.True(compressed);
+        Assert.True(messages.Count < 20);
+        Assert.Contains("[CONTESTO SINTETIZZATO DALL'AGENTE]", messages[2].Content);
+    }
 }
+

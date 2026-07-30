@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;

@@ -19,6 +19,7 @@ internal sealed class AgentLoopEngine
     private readonly IOllamaSettingsService settingsService;
     private readonly WorkspaceToolExecutor toolExecutor;
     private readonly BackgroundTaskManager taskManager;
+    private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService;
     private readonly ILoggingService? logger;
 
     private readonly ConcurrentDictionary<string, (AgentToolCall Call, TaskCompletionSource<bool> Tcs)> pendingApprovals = new();
@@ -28,12 +29,14 @@ internal sealed class AgentLoopEngine
         IOllamaSettingsService settingsService,
         WorkspaceToolExecutor toolExecutor,
         BackgroundTaskManager taskManager,
+        OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService = null,
         ILoggingService? logger = null)
     {
         this.ollamaClient = ollamaClient;
         this.settingsService = settingsService;
         this.toolExecutor = toolExecutor;
         this.taskManager = taskManager;
+        this.episodicMemoryService = episodicMemoryService;
         this.logger = logger;
     }
 
@@ -76,6 +79,24 @@ internal sealed class AgentLoopEngine
         }
 
         var memoryManager = new AgentMemoryManager(logger);
+
+        if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
+        {
+            try
+            {
+                var recalledMemories = await episodicMemoryService.SearchRelevantMemoriesAsync(request.Goal, topK: 3, cancellationToken);
+                if (recalledMemories.Count > 0)
+                {
+                    memoryManager.AddRecalledMemories(recalledMemories);
+                    logger?.LogInfo("AgentEngine", $"[EPISODIC MEMORY RECALL] Richiamate {recalledMemories.Count} memorie rilevanti da sessioni precedenti.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning("AgentEngine", $"Impossibile richiamare le memorie episodiche: {ex.Message}");
+            }
+        }
+
         string enrichedGoal = EnrichGoalWithWorkspaceContext(request.Goal, workspaceRoot);
 
         var messages = new List<OllamaChatMessage>
@@ -220,6 +241,23 @@ internal sealed class AgentLoopEngine
                 }
 
                 logger?.LogInfo("AgentEngine", $"[AGENT LOOP COMPLETE] Nessun tool chiamato. Risposta finale generata al passo {iteration}.");
+
+                if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
+                {
+                    try
+                    {
+                        string summary = responseText.Length > 300 ? $"{responseText[..300]}..." : responseText;
+                        var mem = new OnlyRag.Core.AgentEpisodicMemory(
+                            SessionId: $"session_{Guid.NewGuid():N}"[..12],
+                            Goal: request.Goal,
+                            Summary: summary,
+                            KeyFacts: memoryManager.GetKeyFacts().ToList(),
+                            Timestamp: DateTimeOffset.UtcNow);
+                        await episodicMemoryService.SaveMemoryAsync(mem, CancellationToken.None);
+                    }
+                    catch { }
+                }
+
                 yield return new AgentStepEvent("final_response", responseText);
                 yield break;
             }
@@ -233,6 +271,38 @@ internal sealed class AgentLoopEngine
             }
 
             var resultsList = new List<AgentToolResult>();
+
+            if (toolCalls.Count > 1 && toolCalls.All(IsReadOnlyTool))
+            {
+                logger?.LogInfo("AgentEngine", $"[PARALLEL TOOL EXECUTION] Esecuzione concorrente di {toolCalls.Count} tool in sola lettura.");
+                yield return new AgentStepEvent("thought", $"[Agent Parallel Engine] Esecuzione in parallelo di {toolCalls.Count} strumenti indipendenti...");
+
+                foreach (var tc in toolCalls)
+                {
+                    yield return new AgentStepEvent("tool_proposed", ToolCall: tc);
+                }
+
+                var parallelTasks = toolCalls.Select(tc => toolExecutor.ExecuteToolAsync(
+                    tc.CallId,
+                    tc.ToolName,
+                    tc.ArgumentsJson,
+                    workspaceRoot,
+                    cancellationToken)).ToList();
+
+                var parallelResults = await Task.WhenAll(parallelTasks);
+
+                foreach (var res in parallelResults)
+                {
+                    yield return new AgentStepEvent("tool_result", ToolResult: res);
+                    resultsList.Add(res);
+                    if (res.Success && res.ToolName == "reflect_step")
+                    {
+                        memoryManager.AddKeyFact(res.Output);
+                    }
+                }
+            }
+            else
+            {
 
             foreach (var toolCall in toolCalls)
             {
@@ -340,6 +410,7 @@ internal sealed class AgentLoopEngine
                 {
                     failedToolSignatures.Add(callSignature);
                 }
+            }
             }
 
             var batchMsgSb = new StringBuilder();
@@ -756,28 +827,63 @@ REGOLE COMPORTAMENTALI (SOTA DIRECTIVES):
 
     private static bool IsCyclicPatternDetected(List<string> history)
     {
-        if (history.Count < 4) return false;
+        if (history.Count < 3) return false;
         int n = history.Count;
-        if (history[n - 1] == history[n - 2] && history[n - 2] == history[n - 3]) return true;
 
-        for (int period = 2; period <= 4; period++)
+        string GetToolName(string sig)
         {
-            if (n >= period * 3)
+            int idx = sig.IndexOf(':');
+            return idx > 0 ? sig[..idx].Trim().ToLowerInvariant() : sig.Trim().ToLowerInvariant();
+        }
+
+        string t1 = GetToolName(history[n - 1]);
+        string t2 = GetToolName(history[n - 2]);
+        string t3 = GetToolName(history[n - 3]);
+
+        if (t1 is "reflect_step" or "plan_task" && t2 is "reflect_step" or "plan_task" && t3 is "reflect_step" or "plan_task")
+        {
+            return true;
+        }
+
+        if (history.Count >= 4)
+        {
+            if (history[n - 1] == history[n - 2] && history[n - 2] == history[n - 3]) return true;
+
+            for (int period = 2; period <= 4; period++)
             {
-                bool match = true;
-                for (int i = 0; i < period; i++)
+                if (n >= period * 3)
                 {
-                    string elem = history[n - 1 - i];
-                    if (history[n - 1 - i - period] != elem || history[n - 1 - i - (period * 2)] != elem)
+                    bool matchExact = true;
+                    bool matchToolName = true;
+
+                    for (int i = 0; i < period; i++)
                     {
-                        match = false;
-                        break;
+                        string elem = history[n - 1 - i];
+                        string name = GetToolName(elem);
+
+                        if (history[n - 1 - i - period] != elem || history[n - 1 - i - (period * 2)] != elem)
+                        {
+                            matchExact = false;
+                        }
+
+                        if (GetToolName(history[n - 1 - i - period]) != name || GetToolName(history[n - 1 - i - (period * 2)]) != name)
+                        {
+                            matchToolName = false;
+                        }
                     }
+
+                    if (matchExact || matchToolName) return true;
                 }
-                if (match) return true;
             }
         }
 
         return false;
     }
+
+    private static bool IsReadOnlyTool(AgentToolCall call)
+    {
+        string t = call.ToolName.ToLowerInvariant();
+        return t is "read_file" or "list_dir" or "grep_search" or "git_diff_inspect" or "web_search" or "query_retrieval_index" or "plan_task" or "reflect_step";
+    }
 }
+

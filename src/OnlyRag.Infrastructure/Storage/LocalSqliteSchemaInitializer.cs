@@ -5,7 +5,7 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteSchemaInitializer
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
     private const string FtsUnavailableNote = "SQLite FTS5 is unavailable in the active SQLite provider; keyword search is disabled.";
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -129,6 +129,12 @@ public sealed class LocalSqliteSchemaInitializer
             return new SchemaInspection("Current", null);
         }
 
+        if (currentVersion == 2)
+        {
+            await MigrateFromV2ToV3Async(connection, cancellationToken);
+            return new SchemaInspection("Current", null);
+        }
+
         if (currentVersion > CurrentSchemaVersion)
         {
             return new SchemaInspection(
@@ -147,6 +153,69 @@ public sealed class LocalSqliteSchemaInitializer
         return new SchemaInspection(
             "ResetRequired",
             "Il database locale e vuoto o non contiene lo schema fresh corrente.");
+    }
+
+    private static async Task MigrateFromV2ToV3Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS document_graph_nodes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    node_uid TEXT NOT NULL UNIQUE,
+                    document_id INTEGER NULL,
+                    chunk_id INTEGER NULL,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'Concept',
+                    description TEXT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS document_graph_edges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    edge_uid TEXT NOT NULL UNIQUE,
+                    source_node_id INTEGER NOT NULL,
+                    target_node_id INTEGER NOT NULL,
+                    relation_type TEXT NOT NULL DEFAULT 'relates_to',
+                    weight REAL NOT NULL DEFAULT 1.0,
+                    chunk_id INTEGER NULL,
+                    created_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (source_node_id) REFERENCES document_graph_nodes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (target_node_id) REFERENCES document_graph_nodes(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS agent_episodic_memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    key_facts_json TEXT NOT NULL DEFAULT '[]',
+                    qdrant_point_id TEXT NULL,
+                    created_at_utc TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_graph_nodes_name ON document_graph_nodes(name);
+                CREATE INDEX IF NOT EXISTS idx_graph_nodes_document ON document_graph_nodes(document_id);
+                CREATE INDEX IF NOT EXISTS idx_graph_edges_source ON document_graph_edges(source_node_id);
+                CREATE INDEX IF NOT EXISTS idx_graph_edges_target ON document_graph_edges(target_node_id);
+                CREATE INDEX IF NOT EXISTS idx_episodic_memories_session ON agent_episodic_memories(session_id);
+                CREATE INDEX IF NOT EXISTS idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+                """;
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+            await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private sealed record SchemaInspection(string Status, string? TechnicalNote);
@@ -229,6 +298,8 @@ public sealed class LocalSqliteSchemaInitializer
             && await TableExistsAsync(connection, "documents", cancellationToken)
             && await TableExistsAsync(connection, "chunks", cancellationToken)
             && await TableExistsAsync(connection, "settings", cancellationToken)
+            && await TableExistsAsync(connection, "document_graph_nodes", cancellationToken)
+            && await TableExistsAsync(connection, "agent_episodic_memories", cancellationToken)
             && !await TableExistsAsync(connection, "schema_migrations", cancellationToken);
     }
 
@@ -255,6 +326,9 @@ public sealed class LocalSqliteSchemaInitializer
             command.CommandText = BuildFreshSchemaSql(textSearchBackend);
             await command.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+            await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
         }
         catch
         {
@@ -458,6 +532,41 @@ public sealed class LocalSqliteSchemaInitializer
                 updated_at_utc TEXT NOT NULL
             );
 
+            CREATE TABLE document_graph_nodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                node_uid TEXT NOT NULL UNIQUE,
+                document_id INTEGER NULL,
+                chunk_id INTEGER NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'Concept',
+                description TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE document_graph_edges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                edge_uid TEXT NOT NULL UNIQUE,
+                source_node_id INTEGER NOT NULL,
+                target_node_id INTEGER NOT NULL,
+                relation_type TEXT NOT NULL DEFAULT 'relates_to',
+                weight REAL NOT NULL DEFAULT 1.0,
+                chunk_id INTEGER NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (source_node_id) REFERENCES document_graph_nodes(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_node_id) REFERENCES document_graph_nodes(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE agent_episodic_memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                goal TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                key_facts_json TEXT NOT NULL DEFAULT '[]',
+                qdrant_point_id TEXT NULL,
+                created_at_utc TEXT NOT NULL
+            );
+
             CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
             CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
             CREATE INDEX idx_document_pages_document ON document_pages(document_id);
@@ -481,9 +590,15 @@ public sealed class LocalSqliteSchemaInitializer
             CREATE INDEX idx_generated_images_created_at ON generated_images(created_at_utc DESC, id DESC);
             CREATE INDEX idx_ocr_cache_lookup
             ON ocr_cache(page_hash, engine_name, engine_version, language, preprocess_version);
+            CREATE INDEX idx_graph_nodes_name ON document_graph_nodes(name);
+            CREATE INDEX idx_graph_nodes_document ON document_graph_nodes(document_id);
+            CREATE INDEX idx_graph_edges_source ON document_graph_edges(source_node_id);
+            CREATE INDEX idx_graph_edges_target ON document_graph_edges(target_node_id);
+            CREATE INDEX idx_episodic_memories_session ON agent_episodic_memories(session_id);
+            CREATE INDEX idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
             {{ftsSql}}
 
-            PRAGMA user_version = 2;
+            PRAGMA user_version = 3;
             """;
     }
 

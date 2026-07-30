@@ -198,6 +198,13 @@ public sealed partial class InProcessBackendTests
         AssertTypeScriptContractMatchesDto<ChatNotice>(apiSource, "ChatNotice");
         AssertTypeScriptContractMatchesDto<ChatResponse>(apiSource, "ChatResponse");
         AssertTypeScriptContractMatchesDto<TranslationSummaryResponse>(apiSource, "TranslationSummary");
+        AssertTypeScriptContractMatchesDto<AgentToolCall>(apiSource, "AgentToolCall");
+        AssertTypeScriptContractMatchesDto<AgentToolResult>(apiSource, "AgentToolResult");
+        AssertTypeScriptContractMatchesDto<AgentRunRequest>(apiSource, "AgentRunRequest");
+        AssertTypeScriptContractMatchesDto<AgentStepEvent>(apiSource, "AgentStepEvent");
+        AssertTypeScriptContractMatchesDto<ApproveToolCallRequest>(apiSource, "ApproveToolCallRequest");
+        AssertTypeScriptContractMatchesDto<BackgroundTaskInfo>(apiSource, "BackgroundTaskInfo");
+        AssertTypeScriptContractMatchesDto<ManageTaskRequest>(apiSource, "ManageTaskRequest");
         AssertTypeScriptContractMatchesDto<TranslationUnitResponse>(apiSource, "TranslationUnit");
         AssertTypeScriptContractMatchesDto<TranslationDetailResponse>(apiSource, "TranslationDetail");
         AssertTypeScriptContractMatchesDto<TranslationCompareResponse>(apiSource, "TranslationCompare");

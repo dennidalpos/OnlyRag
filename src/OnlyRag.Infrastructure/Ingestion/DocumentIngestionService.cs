@@ -23,6 +23,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
     private readonly OcrSettingsStore ocrSettingsStore;
     private readonly IngestionSettingsStore ingestionSettingsStore;
     private readonly LocalSqliteStoreDescriptor? descriptor;
+    private readonly Retrieval.Graph.IEntityGraphExtractor? graphExtractor;
+    private readonly Retrieval.Graph.IGraphRetrievalService? graphService;
 
     public DocumentIngestionService(
         IDocumentRepository documents,
@@ -34,7 +36,9 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         OcrRetryPolicy? ocrRetryPolicy = null,
         LocalSqliteStoreDescriptor? descriptor = null,
         OcrSettingsStore? ocrSettingsStore = null,
-        IngestionSettingsStore? ingestionSettingsStore = null)
+        IngestionSettingsStore? ingestionSettingsStore = null,
+        Retrieval.Graph.IEntityGraphExtractor? graphExtractor = null,
+        Retrieval.Graph.IGraphRetrievalService? graphService = null)
     {
         this.documents = documents;
         this.settings = settings;
@@ -46,6 +50,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         this.ocrSettingsStore = ocrSettingsStore ?? new OcrSettingsStore(settings);
         this.ingestionSettingsStore = ingestionSettingsStore ?? new IngestionSettingsStore(settings);
         this.descriptor = descriptor;
+        this.graphExtractor = graphExtractor;
+        this.graphService = graphService;
     }
 
     public Task<DocumentIngestionResult> IngestAsync(
@@ -166,6 +172,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 chunks,
                 blockNumber,
                 cancellationToken);
+            await ExtractAndSaveGraphAsync(document.Id, chunks, cancellationToken);
 
             nextChunkOrdinal += chunks.Count;
             chunkCount = nextChunkOrdinal;
@@ -642,4 +649,27 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             return null;
         }
     }
+
+    private async Task ExtractAndSaveGraphAsync(long documentId, IReadOnlyList<IngestedDocumentChunk> chunks, CancellationToken cancellationToken)
+    {
+        if (graphExtractor == null || graphService == null || chunks.Count == 0) return;
+        try
+        {
+            var allNodes = new List<OnlyRag.Core.EntityGraphNode>();
+            var allEdges = new List<OnlyRag.Core.EntityGraphEdge>();
+            long fakeChunkId = 1;
+            foreach (var chunk in chunks)
+            {
+                var (nodes, edges) = graphExtractor.ExtractGraph(documentId, fakeChunkId++, chunk.Text);
+                allNodes.AddRange(nodes);
+                allEdges.AddRange(edges);
+            }
+            if (allNodes.Count > 0 || allEdges.Count > 0)
+            {
+                await graphService.InsertGraphAsync(allNodes, allEdges, cancellationToken);
+            }
+        }
+        catch { }
+    }
 }
+

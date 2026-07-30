@@ -40,6 +40,7 @@ internal sealed class AgentMemoryManager
 {
     private readonly HashSet<string> modifiedFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> keyFacts = new();
+    private readonly List<AgentEpisodicMemory> recalledMemories = new();
     private readonly ILoggingService? logger;
 
     public AgentPlan CurrentPlan { get; private set; } = new();
@@ -65,6 +66,17 @@ internal sealed class AgentMemoryManager
         }
     }
 
+    public void AddRecalledMemories(IEnumerable<AgentEpisodicMemory> memories)
+    {
+        foreach (var mem in memories)
+        {
+            if (!recalledMemories.Any(m => m.SessionId.Equals(mem.SessionId, StringComparison.OrdinalIgnoreCase)))
+            {
+                recalledMemories.Add(mem);
+            }
+        }
+    }
+
     public void UpdatePlan(IEnumerable<AgentPlanStep> newSteps, string? activeStepId = null)
     {
         CurrentPlan.Steps = newSteps.ToList();
@@ -75,11 +87,22 @@ internal sealed class AgentMemoryManager
     }
 
     public IReadOnlyCollection<string> GetModifiedFiles() => modifiedFiles;
+    public IReadOnlyCollection<string> GetKeyFacts() => keyFacts;
 
     public string BuildContextSummary()
     {
         var sb = new StringBuilder();
         sb.AppendLine("=== AGENT WORKING MEMORY ===");
+
+        if (recalledMemories.Count > 0)
+        {
+            sb.AppendLine($"Memorie Episodiche Richiamate da Sessioni Precedenti ({recalledMemories.Count}):");
+            foreach (var mem in recalledMemories)
+            {
+                sb.AppendLine($"  * [Goal: {mem.Goal}] Summary: {mem.Summary}");
+            }
+        }
+
         if (modifiedFiles.Count > 0)
         {
             sb.AppendLine($"File Modificati nel Workspace ({modifiedFiles.Count}):");
@@ -105,6 +128,46 @@ internal sealed class AgentMemoryManager
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    public bool CompressContext(List<OllamaChatMessage> messages, int maxMessagesThreshold = 20)
+    {
+        if (messages.Count <= maxMessagesThreshold) return false;
+
+        int preserveRecentCount = 6;
+        int startIndex = 2; // Keep system prompt (0) and initial user goal (1)
+        int removeCount = messages.Count - startIndex - preserveRecentCount;
+
+        if (removeCount <= 0) return false;
+
+        var historyToCompress = messages.GetRange(startIndex, removeCount);
+        var summarySb = new StringBuilder();
+        summarySb.AppendLine("[CONTESTO SINTETIZZATO DALL'AGENTE]");
+        summarySb.AppendLine($"Sintesi automatica di {removeCount} passaggi intermedi di esecuzione:");
+
+        foreach (var msg in historyToCompress)
+        {
+            if (msg.Role == "assistant")
+            {
+                string snippet = msg.Content.Length > 150 ? $"{msg.Content[..150]}..." : msg.Content;
+                summarySb.AppendLine($"- LLM: {snippet.Replace('\n', ' ')}");
+            }
+            else if (msg.Role == "user" && msg.Content.StartsWith("[TOOL RESULT", StringComparison.OrdinalIgnoreCase))
+            {
+                int endHeader = msg.Content.IndexOf(']');
+                string header = endHeader > 0 ? msg.Content.Substring(0, endHeader + 1) : "[TOOL RESULT]";
+                summarySb.AppendLine($"  * {header}");
+            }
+        }
+
+        summarySb.AppendLine();
+        summarySb.AppendLine(BuildContextSummary());
+
+        messages.RemoveRange(startIndex, removeCount);
+        messages.Insert(startIndex, new OllamaChatMessage("system", summarySb.ToString().TrimEnd()));
+
+        logger?.LogInfo("AgentMemory", $"[COMPRESSIONE CONTESTO] Sintetizzati {removeCount} messaggi intermedi in 1 blocco di contesto strutturato.");
+        return true;
     }
 
     public void PruneHistory(List<OllamaChatMessage> messages, int maxMessagesHardLimit = 30)
@@ -145,14 +208,7 @@ internal sealed class AgentMemoryManager
 
         if (messages.Count > maxMessagesHardLimit)
         {
-            int removeCount = messages.Count - 2 - 8;
-            if (removeCount > 0)
-            {
-                logger?.LogInfo("AgentMemory", $"[HARD CONTEXT SLIDE] Sostituite {removeCount} interazioni intermedie con memoria sintetica aggiornata.");
-                messages.RemoveRange(2, removeCount);
-                messages.Insert(2, new OllamaChatMessage("system",
-                    $"[MEMORIA SINTETICA REACT]\n{BuildContextSummary()}"));
-            }
+            CompressContext(messages, maxMessagesHardLimit - 5);
         }
     }
 }

@@ -49,3 +49,34 @@ public sealed record ManageTaskRequest(
 public sealed record ApproveToolCallRequest(
     string CallId,
     bool Approved);
+
+public sealed record AgentEpisodicMemory(
+    string SessionId,
+    string Goal,
+    string Summary,
+    IReadOnlyList<string> KeyFacts,
+    DateTimeOffset Timestamp,
+    float[]? Embedding = null);
+
+public sealed record EntityGraphNode(
+    string NodeId,
+    string DocumentId,
+    string ChunkId,
+    string Name,
+    string Type,
+    string Description);
+
+public sealed record EntityGraphEdge(
+    string EdgeId,
+    string SourceNodeId,
+    string TargetNodeId,
+    string RelationType,
+    float Weight,
+    string ChunkId);
+
+public sealed record GraphRetrievalResult(
+    IReadOnlyList<EntityGraphNode> Nodes,
+    IReadOnlyList<EntityGraphEdge> Edges,
+    IReadOnlyList<string> RelatedChunkIds,
+    float RelevanceScore);
+
