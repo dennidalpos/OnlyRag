@@ -89,6 +89,16 @@ internal sealed class AgentMemoryManager
     public IReadOnlyCollection<string> GetModifiedFiles() => modifiedFiles;
     public IReadOnlyCollection<string> GetKeyFacts() => keyFacts;
 
+    private readonly HashSet<string> exploredPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    public void RegisterExploredPath(string path)
+    {
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            exploredPaths.Add(path.Replace('\\', '/'));
+        }
+    }
+
     public string BuildContextSummary()
     {
         var sb = new StringBuilder();
@@ -100,6 +110,15 @@ internal sealed class AgentMemoryManager
             foreach (var mem in recalledMemories)
             {
                 sb.AppendLine($"  * [Goal: {mem.Goal}] Summary: {mem.Summary}");
+            }
+        }
+
+        if (exploredPaths.Count > 0)
+        {
+            sb.AppendLine($"Percorsi e File Già Ispezionati/Esplorati ({exploredPaths.Count}):");
+            foreach (var p in exploredPaths.Take(25))
+            {
+                sb.AppendLine($"  - {p}");
             }
         }
 

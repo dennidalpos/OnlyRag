@@ -1,3 +1,4 @@
+import { Bot, FileCode, FolderOpen, FolderSearch } from "lucide-react";
 import type { OllamaModel } from "../api";
 import type { WorkspaceConfig } from "../apiTypes";
 
@@ -27,7 +28,7 @@ export function CodingToolbar({
       <div className="coding-hub-toolbar__main">
         <div className="coding-hub-toolbar__title">
           <h2>
-            <span>🤖</span> Coding &amp; Vibe Hub
+            <Bot size={20} style={{ color: "#818cf8" }} /> Coding &amp; Vibe Hub
           </h2>
           <span className="coding-hub-toolbar__subtitle">
             Agent Workbench autonomo per esplorazione, scrittura codice, refactoring e test.
@@ -37,7 +38,7 @@ export function CodingToolbar({
         <div className="coding-hub-toolbar__actions">
           {workspaceConfig?.isAuthorized ? (
             <div className="workspace-badge-chip" title={workspaceConfig.rootPath ?? ""}>
-              <span>📂</span>
+              <FolderOpen size={16} style={{ color: "#38bdf8", flexShrink: 0 }} />
               <span className="workspace-badge-chip__path">{workspaceConfig.rootPath}</span>
               <span className="workspace-badge-chip__count">
                 ({workspaceConfig.fileCount} file)
@@ -45,10 +46,10 @@ export function CodingToolbar({
               <button
                 type="button"
                 className="button button--secondary button--small"
-                style={{ fontSize: "0.75rem", padding: "2px 6px" }}
+                style={{ fontSize: "0.75rem", padding: "2px 8px", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                 onClick={onOpenFilePicker}
               >
-                📄 File ({workspaceFilesCount})
+                <FileCode size={14} /> File ({workspaceFilesCount})
               </button>
             </div>
           ) : null}
@@ -56,9 +57,10 @@ export function CodingToolbar({
           <button
             type="button"
             className="button button--primary button--small"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={onPickFolder}
           >
-            📂 Sfoglia Cartella
+            <FolderSearch size={16} /> Sfoglia Cartella
           </button>
 
           <div className="coding-model-group">

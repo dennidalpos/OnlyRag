@@ -1,3 +1,4 @@
+import { Brain, CheckCircle2, ChevronDown, ChevronUp, FileCode, Sparkles, Terminal, XCircle } from "lucide-react";
 import { useState } from "react";
 import type { AgentStepEvent } from "../api";
 
@@ -31,7 +32,7 @@ export function ReasoningTraceVisualizer({
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <span className="reasoning-trace-visualizer__icon">
-            {isStreaming ? "⚡" : "🧠"}
+            {isStreaming ? <Sparkles size={16} className="text-amber-400" /> : <Brain size={16} className="text-indigo-400" />}
           </span>
           <span className="reasoning-trace-visualizer__title">
             Traccia di Ragionamento Agentico ({events.length} eventi)
@@ -42,7 +43,7 @@ export function ReasoningTraceVisualizer({
             </span>
           )}
           <span className="reasoning-trace-visualizer__chevron">
-            {isExpanded ? "▼" : "▶"}
+            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </span>
         </button>
 
@@ -51,23 +52,26 @@ export function ReasoningTraceVisualizer({
             <button
               type="button"
               className={`reasoning-trace-visualizer__tab ${activeTab === "trace" ? "reasoning-trace-visualizer__tab--active" : ""}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => setActiveTab("trace")}
             >
-              💭 Flusso Pensiero ({thoughtEvents.length})
+              <Brain size={13} /> Flusso Pensiero ({thoughtEvents.length})
             </button>
             <button
               type="button"
               className={`reasoning-trace-visualizer__tab ${activeTab === "tools" ? "reasoning-trace-visualizer__tab--active" : ""}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => setActiveTab("tools")}
             >
-              🛠️ Utensili Eseguiti ({toolEvents.length})
+              <Terminal size={13} /> Utensili Eseguiti ({toolEvents.length})
             </button>
             <button
               type="button"
               className={`reasoning-trace-visualizer__tab ${activeTab === "raw" ? "reasoning-trace-visualizer__tab--active" : ""}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => setActiveTab("raw")}
             >
-              📄 Log Grezzo
+              <FileCode size={13} /> Log Grezzo
             </button>
           </div>
         )}
@@ -94,8 +98,8 @@ export function ReasoningTraceVisualizer({
                   <div key={`tool_evt_${idx}`} className="reasoning-trace-visualizer__tool-item">
                     {evt.type === "tool_proposed" && evt.toolCall && (
                       <div className="reasoning-trace-visualizer__tool-proposed">
-                        <span className="reasoning-trace-visualizer__tool-name">
-                          ⚡ Proposal: <code>{evt.toolCall.toolName}</code>
+                        <span className="reasoning-trace-visualizer__tool-name" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Terminal size={13} /> Proposal: <code>{evt.toolCall.toolName}</code>
                         </span>
                         {evt.toolCall.explanation && (
                           <p className="reasoning-trace-visualizer__tool-exp">
@@ -110,10 +114,9 @@ export function ReasoningTraceVisualizer({
 
                     {evt.type === "tool_result" && evt.toolResult && (
                       <div className={`reasoning-trace-visualizer__tool-result ${evt.toolResult.success ? "reasoning-trace-visualizer__tool-result--success" : "reasoning-trace-visualizer__tool-result--error"}`}>
-                        <div className="reasoning-trace-visualizer__tool-result-header">
-                          <span>
-                            {evt.toolResult.success ? "✅ Successo:" : "❌ Errore:"} <code>{evt.toolResult.toolName}</code>
-                          </span>
+                        <div className="reasoning-trace-visualizer__tool-result-header" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {evt.toolResult.success ? <CheckCircle2 size={14} style={{ color: "#34d399" }} /> : <XCircle size={14} style={{ color: "#f87171" }} />}
+                          <span><code>{evt.toolResult.toolName}</code></span>
                         </div>
                         {evt.toolResult.output && (
                           <pre className="reasoning-trace-visualizer__tool-output">

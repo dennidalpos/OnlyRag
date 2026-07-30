@@ -58,6 +58,9 @@ export function CodingSection({
         messages={ctrl.messages}
         selectedModel={ctrl.selectedModel}
         chatContainerRef={ctrl.chatContainerRef}
+        isUserScrolledUp={ctrl.isUserScrolledUp}
+        onScroll={ctrl.handleScrollContainer}
+        onScrollToBottom={ctrl.scrollToBottom}
         onApproveAgentToolCall={(callId, approved) =>
           void ctrl.handleApproveAgentToolCall(callId, approved)
         }

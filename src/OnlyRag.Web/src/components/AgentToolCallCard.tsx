@@ -1,3 +1,22 @@
+import {
+  AlertTriangle,
+  Bot,
+  Brain,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  FileText,
+  Folder,
+  Globe,
+  Layers,
+  Search,
+  Sparkles,
+  Terminal,
+  X,
+  XCircle
+} from "lucide-react";
 import { useState } from "react";
 import type { AgentStepEvent } from "../api";
 import { PlanChecklistVisualizer } from "./PlanChecklistVisualizer";
@@ -8,7 +27,7 @@ type AgentToolCallCardProps = {
   onApprove?: (callId: string, approved: boolean) => void;
 };
 
-const TOOL_ICONS: Record<string, string> = {
+const TOOL_BADGES: Record<string, string> = {
   list_dir: "DIR",
   read_file: "FILE",
   view_file: "FILE",
@@ -55,7 +74,8 @@ function cleanThoughtContent(text?: string | null): string {
 }
 
 export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [isOutputVisible, setIsOutputVisible] = useState<boolean | null>(null);
 
   if (event.type === "thought" || event.type === "thought_chunk") {
     const isStepThought = event.content?.includes("[Agent Step") || event.content?.includes("Elaborazione");
@@ -71,14 +91,11 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word",
         boxShadow: isStepThought ? "0 0 12px rgba(99,102,241,0.15)" : "none"
       }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 16 14" />
-        </svg>
+        <Brain size={18} style={{ color: "#818cf8", flexShrink: 0, marginTop: 2 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           {isStepThought && (
-            <div style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#818cf8", marginBottom: 2 }}>
-              Pensiero & Inizializzazione LLM
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#818cf8", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={13} /> Pensiero &amp; Inizializzazione LLM
             </div>
           )}
           <span style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{cleanedText}</span>
@@ -89,7 +106,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
 
   if (event.type === "tool_proposed" && event.toolCall) {
     const tc = event.toolCall;
-    const badgeText = TOOL_ICONS[tc.toolName] || "TOOL";
+    const badgeText = TOOL_BADGES[tc.toolName] || "TOOL";
     const summary = formatArgsSummary(tc.toolName, tc.argumentsJson);
 
     return (
@@ -115,27 +132,27 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
                 <button
                   type="button"
                   className="button button--small"
-                  style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5", fontSize: "0.78rem", padding: "4px 10px", borderRadius: 6 }}
+                  style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5", fontSize: "0.78rem", padding: "4px 10px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 4 }}
                   onClick={() => onApprove(tc.callId, true)}
                 >
-                  Approva
+                  <Check size={14} /> Approva
                 </button>
                 <button
                   type="button"
                   className="button button--small"
-                  style={{ background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5", fontSize: "0.78rem", padding: "4px 10px", borderRadius: 6 }}
+                  style={{ background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5", fontSize: "0.78rem", padding: "4px 10px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 4 }}
                   onClick={() => onApprove(tc.callId, false)}
                 >
-                  Rifiuta
+                  <X size={14} /> Rifiuta
                 </button>
               </>
             )}
             <button
               type="button"
-              style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem" }}
-              onClick={() => setExpanded(!expanded)}
+              style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: 4 }}
+              onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
             >
-              {expanded ? "Nascondi" : "Dettagli"}
+              {isDetailsExpanded ? <><ChevronUp size={14} /> Nascondi</> : <><ChevronDown size={14} /> Dettagli</>}
             </button>
           </div>
         </div>
@@ -169,7 +186,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
           })()
         )}
 
-        {expanded && (
+        {isDetailsExpanded && (
           <pre style={{
             marginTop: 4, padding: 10, background: "#090d16", borderRadius: 6,
             border: "1px solid #1e293b", fontSize: "0.78rem", color: "#cbd5e1",
@@ -198,8 +215,8 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         padding: "10px 14px", background: "#0f172a", borderRadius: 8,
         border: "1px solid #38bdf8", boxShadow: "0 0 12px rgba(56, 189, 248, 0.15)"
       }}>
-        <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", marginBottom: 6 }}>
-          Chiamata Parallela Multi-Tool ({event.batchToolCalls.length} strumenti)
+        <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+          <Layers size={16} /> Chiamata Parallela Multi-Tool ({event.batchToolCalls.length} strumenti)
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {event.batchToolCalls.map((tc, idx) => (
@@ -215,7 +232,8 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
   if (event.type === "tool_result" && event.toolResult) {
     const tr = event.toolResult;
     const previewLen = 300;
-    const outputPreview = tr.output.length > previewLen ? tr.output.slice(0, previewLen) + "..." : tr.output;
+    const isOutputLong = tr.output.length > previewLen;
+    const isVisible = isOutputVisible !== null ? isOutputVisible : !isOutputLong;
 
     return (
       <div className="agent-step agent-step--result" style={{
@@ -224,30 +242,34 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0, flex: 1 }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: tr.success ? "#4ade80" : "#f87171", flexShrink: 0 }}>
-              {tr.success ? "OK" : "ERR"}
-            </span>
+            {tr.success ? (
+              <CheckCircle2 size={16} style={{ color: "#4ade80", flexShrink: 0 }} />
+            ) : (
+              <XCircle size={16} style={{ color: "#f87171", flexShrink: 0 }} />
+            )}
             <span style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.85rem", flexShrink: 0 }}>{tr.toolName}</span>
             {tr.error && <span style={{ color: "#fca5a5", fontSize: "0.82rem", overflowWrap: "anywhere", wordBreak: "break-word" }}>— {tr.error}</span>}
           </div>
-          <button
-            type="button"
-            style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem", flexShrink: 0 }}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? "Nascondi" : "Output"}
-          </button>
+          {tr.output && (
+            <button
+              type="button"
+              style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem", flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
+              onClick={() => setIsOutputVisible(!isVisible)}
+            >
+              {isVisible ? <><ChevronUp size={14} /> Nascondi</> : <><ChevronDown size={14} /> Output</>}
+            </button>
+          )}
         </div>
 
         {tr.diffPatch && <UnifiedDiffViewer patch={tr.diffPatch} />}
 
-        {(expanded || tr.output.length <= previewLen) && tr.output && (
+        {isVisible && tr.output && (
           <pre style={{
             marginTop: 6, padding: 8, background: "#090d16", borderRadius: 6,
             border: "1px solid #1e293b", fontSize: "0.78rem", color: "#cbd5e1",
             overflowX: "auto", maxHeight: 300, whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word"
           }}>
-            {expanded ? tr.output : outputPreview}
+            {tr.output}
           </pre>
         )}
       </div>
@@ -261,11 +283,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         border: "1px solid #f59e0b", boxShadow: "0 0 16px rgba(245,158,11,0.2)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
+          <AlertTriangle size={18} style={{ color: "#f59e0b", flexShrink: 0 }} />
           <span style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.92rem" }}>
             Approvazione richiesta per esecuzione comando
           </span>
@@ -288,18 +306,18 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
             <button
               type="button"
               className="button button--primary"
-              style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5" }}
+              style={{ background: "#065f46", borderColor: "#10b981", color: "#ecfdf5", display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={() => onApprove(event.toolCall!.callId, true)}
             >
-              Esegui Comando su Windows
+              <Check size={16} /> Esegui Comando su Windows
             </button>
             <button
               type="button"
               className="button button--secondary"
-              style={{ background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5" }}
+              style={{ background: "#7f1d1d", borderColor: "#ef4444", color: "#fca5a5", display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={() => onApprove(event.toolCall!.callId, false)}
             >
-              Rifiuta Esecuzione
+              <X size={16} /> Rifiuta Esecuzione
             </button>
           </div>
         )}
@@ -314,13 +332,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         border: "1px solid #334155", boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <rect x="3" y="11" width="18" height="10" rx="2" />
-            <circle cx="12" cy="5" r="2" />
-            <path d="M12 7v4" />
-            <line x1="8" y1="16" x2="8" y2="16" />
-            <line x1="16" y1="16" x2="16" y2="16" />
-          </svg>
+          <Bot size={18} style={{ color: "#6366f1", flexShrink: 0 }} />
           <span style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.88rem" }}>Risposta Agente</span>
         </div>
         <div style={{
@@ -341,11 +353,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         border: "1px solid #f59e0b", fontSize: "0.86rem", color: "#fcd34d",
         boxShadow: "0 0 12px rgba(245,158,11,0.15)", overflowWrap: "anywhere", wordBreak: "break-word"
       }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
-          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
+        <AlertTriangle size={18} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 2 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#f59e0b", marginBottom: 2 }}>
             Correzione Formato JSON
@@ -364,7 +372,7 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         boxShadow: "0 0 12px rgba(239,68,68,0.2)", overflowWrap: "anywhere", wordBreak: "break-word"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>⚠️</span>
+          <AlertTriangle size={18} style={{ color: "#f87171", flexShrink: 0 }} />
           <strong style={{ color: "#f87171", fontSize: "0.9rem" }}>Errore durante l'esecuzione della Modalità Agente</strong>
         </div>
         <div style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "0.84rem", color: "#fecaca", overflowWrap: "anywhere", wordBreak: "break-word" }}>

@@ -1,3 +1,16 @@
+import {
+  BookOpen,
+  Edit3,
+  FileCode,
+  Paperclip,
+  PenTool,
+  Send,
+  Sparkles,
+  Square,
+  Trash2,
+  X
+} from "lucide-react";
+
 type CodingPromptBarProps = {
   selectedWorkspaceFile: string | null;
   attachedFileContent: string | null;
@@ -43,7 +56,8 @@ export function CodingPromptBar({
       {selectedWorkspaceFile && (
         <div className="attached-file-chip-bar">
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span className="attached-file-chip-title">📄 Allegato attivo: {selectedWorkspaceFile}</span>
+            <FileCode size={16} style={{ color: "#38bdf8" }} />
+            <span className="attached-file-chip-title">Allegato attivo: {selectedWorkspaceFile}</span>
             {attachedFileContent && (
               <span className="attached-file-chip-size">
                 ({attachedFileContent.length} char)
@@ -54,19 +68,19 @@ export function CodingPromptBar({
             <button
               type="button"
               className="button button--secondary button--small"
-              style={{ fontSize: "0.78rem" }}
+              style={{ fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={onOpenAttachedFileEditor}
               title="Apri editor per modificare il contenuto"
             >
-              ✏️ Modifica File
+              <Edit3 size={13} /> Modifica File
             </button>
             <button
               type="button"
               className="button button--secondary button--small"
-              style={{ fontSize: "0.78rem" }}
+              style={{ fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={onOpenWorkspaceFilePicker}
             >
-              📄 Cambia File
+              <FileCode size={13} /> Cambia File
             </button>
             <button
               type="button"
@@ -74,7 +88,7 @@ export function CodingPromptBar({
               onClick={onRemoveAttachedFile}
               title="Rimuovi allegato"
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -109,18 +123,20 @@ export function CodingPromptBar({
             <button
               type="button"
               className={`segmented-mode-button ${operatingMode === "plan" ? "segmented-mode-button--plan-active" : ""}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={() => onSelectOperatingMode("plan")}
               title="Modalità Piano/Lettura: analizza e pianifica senza modificare direttamente i file"
             >
-              📖 Lettura / Piano
+              <BookOpen size={14} /> Lettura / Piano
             </button>
             <button
               type="button"
               className={`segmented-mode-button ${operatingMode === "write" ? "segmented-mode-button--write-active" : ""}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={() => onSelectOperatingMode("write")}
               title="Modalità Scrittura: esplora il progetto, crea/modifica file nel workspace ed esegui comandi in loop"
             >
-              ✍️ Agente Scrittura
+              <PenTool size={14} /> Agente Scrittura
             </button>
           </div>
 
@@ -137,10 +153,10 @@ export function CodingPromptBar({
             <button
               type="button"
               className="button button--secondary button--small"
-              style={{ fontSize: "0.8rem" }}
+              style={{ fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={onOpenWorkspaceFilePicker}
             >
-              📎 Allega File Progetto
+              <Paperclip size={14} /> Allega File Progetto
             </button>
           )}
         </div>
@@ -150,29 +166,31 @@ export function CodingPromptBar({
             <button
               type="button"
               className="button button--secondary button--small"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={onClearMessages}
               title="Svuota la chat ed interrompe eventuali generazioni in corso"
             >
-              Pulisci Chat
+              <Trash2 size={14} /> Pulisci Chat
             </button>
           )}
           {isGenerating ? (
             <button
               type="button"
               className="button button--danger button--small"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               onClick={onCancelGeneration}
             >
-              ⛔ Interrompi Risposta
+              <Square size={14} /> Interrompi Risposta
             </button>
           ) : (
             <button
               type="button"
               className="button button--primary"
-              style={{ minWidth: 140 }}
+              style={{ minWidth: 140, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
               disabled={!promptInput.trim()}
               onClick={onSendMessage}
             >
-              ⚡ Invia (Ctrl+Enter)
+              <Sparkles size={16} /> Invia (Ctrl+Enter)
             </button>
           )}
         </div>

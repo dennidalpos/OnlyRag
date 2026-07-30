@@ -112,10 +112,10 @@
   padding: 5px 12px;
   border-radius: var(--radius-sm, 6px);
   font-size: 0.82rem;
-  max-width: 400px;
+  max-width: 480px;
+  min-width: 0;
+  flex-shrink: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .workspace-badge-chip__path {
@@ -123,11 +123,15 @@
   color: var(--text-main, #f8fafc);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .workspace-badge-chip__count {
   color: var(--text-light, #94a3b8);
   font-size: 0.78rem;
+  flex-shrink: 0;
 }
 
 
@@ -690,5 +694,35 @@
   color: #64748b;
   text-align: center;
   padding: 12px;
+}
+
+/* FLOATING ANTIGRAVITY SCROLL TO BOTTOM BUTTON */
+.vibe-chat-scroll-bottom-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-focus, #818cf8);
+  color: #c7d2fe;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: animate-fade-in 0.2s ease-out;
+}
+
+.vibe-chat-scroll-bottom-btn:hover {
+  background: rgba(30, 27, 75, 0.95);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
 }
 

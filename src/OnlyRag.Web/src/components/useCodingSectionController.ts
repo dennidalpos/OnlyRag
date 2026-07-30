@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiAgentStreamRequest,
   apiRequest,
@@ -78,15 +78,34 @@ export function useCodingSectionController({
     }
   }, [defaultModel, models]);
 
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState<boolean>(false);
+
+  const handleScrollContainer = useCallback(() => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setIsUserScrolledUp(distanceFromBottom > 80);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+      setIsUserScrolledUp(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshWorkspaceConfig();
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
+    if (!isUserScrolledUp && chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [messages, isGenerating]);
+  }, [messages, isGenerating, isUserScrolledUp]);
 
   // Auto-dismiss workspace status messages after 5 seconds
   useEffect(() => {
@@ -646,6 +665,9 @@ export function useCodingSectionController({
     diffModalModifiedContent,
     diffModalFileApplied,
     chatContainerRef,
+    isUserScrolledUp,
+    handleScrollContainer,
+    scrollToBottom,
     handlePickWindowsFolder,
     handleAttachWorkspaceFile,
     handleSaveAttachedFileContent,

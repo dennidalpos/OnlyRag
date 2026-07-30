@@ -109,6 +109,7 @@ internal sealed class AgentLoopEngine
 
         int maxIterations = (request.MaxIterations.HasValue && request.MaxIterations.Value > 0) ? request.MaxIterations.Value : DefaultMaxIterations;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var executedReadOnlyCallSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var recentToolSignatures = new List<string>();
         int iteration = 0;
         int jsonRetryCount = 0;
@@ -279,15 +280,46 @@ internal sealed class AgentLoopEngine
 
                 foreach (var tc in toolCalls)
                 {
+                    string parallelCallSig = $"{tc.ToolName}:{tc.ArgumentsJson.Trim()}";
+                    recentToolSignatures.Add(parallelCallSig);
+                    if (recentToolSignatures.Count > 30) recentToolSignatures.RemoveAt(0);
+
                     yield return new AgentStepEvent("tool_proposed", ToolCall: tc);
                 }
 
-                var parallelTasks = toolCalls.Select(tc => toolExecutor.ExecuteToolAsync(
-                    tc.CallId,
-                    tc.ToolName,
-                    tc.ArgumentsJson,
-                    workspaceRoot,
-                    cancellationToken)).ToList();
+                if (IsCyclicPatternDetected(recentToolSignatures))
+                {
+                    logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive in esecuzione parallela.");
+                    yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive. Iniezione direttiva di conclusione...");
+                    messages.Add(new("user",
+                        "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate per più volte senza avanzamenti. " +
+                        "Rispondi ORA all'utente con il resoconto finale in Markdown senza invocare altri tool."));
+                    continue;
+                }
+
+                var parallelTasks = toolCalls.Select(async tc =>
+                {
+                    string callSig = $"{tc.ToolName}:{tc.ArgumentsJson.Trim()}";
+                    if (executedReadOnlyCallSignatures.Contains(callSig))
+                    {
+                        logger?.LogWarning("AgentEngine", $"[DUPLICATE GUARD] Tool in sola lettura già eseguito in precedenza: {callSig}");
+                        return new AgentToolResult(
+                            tc.CallId,
+                            tc.ToolName,
+                            true,
+                            $"[AVVISO SISTEMA] Il tool '{tc.ToolName}' con argomenti '{tc.ArgumentsJson}' è già stato eseguito ed è già disponibile nella memoria di lavoro. Non ripetere la stessa chiamata. Procedi ad elaborare i dati o la risposta finale.");
+                    }
+
+                    var res = await toolExecutor.ExecuteToolAsync(
+                        tc.CallId,
+                        tc.ToolName,
+                        tc.ArgumentsJson,
+                        workspaceRoot,
+                        cancellationToken);
+
+                    if (res.Success) executedReadOnlyCallSignatures.Add(callSig);
+                    return res;
+                }).ToList();
 
                 var parallelResults = await Task.WhenAll(parallelTasks);
 
@@ -303,114 +335,143 @@ internal sealed class AgentLoopEngine
             }
             else
             {
-
-            foreach (var toolCall in toolCalls)
-            {
-                string callSignature = $"{toolCall.ToolName}:{toolCall.ArgumentsJson.Trim()}";
-                if (failedToolSignatures.Contains(callSignature))
+                foreach (var toolCall in toolCalls)
                 {
-                    logger?.LogWarning("AgentEngine", $"[LOOP GUARD TRIGGERED] Chiamata ripetuta già fallita bloccata: {callSignature}");
-                    failedToolSignatures.Remove(callSignature);
-                    yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Rilevato tentativo di rieseguire una chiamata di strumento già fallita ({toolCall.ToolName}). Invio istruzione di correzione...");
-                    messages.Add(new("user", $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. NON ripetere le stesse azioni senza modificare i parametri!"));
-                    continue;
-                }
+                    string callSignature = $"{toolCall.ToolName}:{toolCall.ArgumentsJson.Trim()}";
 
-                recentToolSignatures.Add(callSignature);
-                if (recentToolSignatures.Count > 30) recentToolSignatures.RemoveAt(0);
-
-                if (IsCyclicPatternDetected(recentToolSignatures))
-                {
-                    logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive: {callSignature}");
-                    yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive ({toolCall.ToolName}). Iniezione direttiva di conclusione...");
-                    messages.Add(new("user",
-                        "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate per più volte senza avanzamenti. " +
-                        "Rispondi ORA all'utente con il resoconto finale in Markdown senza invocare altri tool."));
-                    continue;
-                }
-
-                bool needsApproval = toolCall.ToolName.Equals("run_command", StringComparison.OrdinalIgnoreCase) && !request.AutoApproveCommands;
-                var callWithApproval = toolCall with { RequiresApproval = needsApproval };
-
-                yield return new AgentStepEvent("tool_proposed", ToolCall: callWithApproval);
-
-                if (needsApproval)
-                {
-                    var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    pendingApprovals[toolCall.CallId] = (callWithApproval, tcs);
-
-                    yield return new AgentStepEvent("approval_required", ToolCall: callWithApproval);
-
-                    bool approved = false;
-                    try
+                    if (IsReadOnlyTool(toolCall) && executedReadOnlyCallSignatures.Contains(callSignature))
                     {
-                        approved = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-                    }
-                    catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
-                    {
-                        approved = false;
-                        logger?.LogWarning("AgentEngine", $"Timeout o cancellazione durante l'attesa di approvazione per {toolCall.CallId}");
-                    }
-                    finally
-                    {
-                        pendingApprovals.TryRemove(toolCall.CallId, out _);
-                    }
-
-                    if (!approved)
-                    {
-                        var deniedResult = new AgentToolResult(
+                        logger?.LogWarning("AgentEngine", $"[DUPLICATE GUARD TRIGGERED] Evitata chiamata ripetuta a tool in sola lettura: {callSignature}");
+                        var cachedNotice = new AgentToolResult(
                             toolCall.CallId,
                             toolCall.ToolName,
-                            false,
-                            string.Empty,
-                            "Esecuzione del comando RIFIUTATA dall'utente o andata in timeout.");
-
-                        yield return new AgentStepEvent("tool_result", ToolResult: deniedResult);
-                        messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccesso: False\nErrore: Esecuzione rifiutata dall'utente."));
+                            true,
+                            $"[AVVISO SISTEMA] Il tool '{toolCall.ToolName}' con argomenti '{toolCall.ArgumentsJson}' è già stato eseguito ed ha avuto successo. Le informazioni sono già disponibili nella memoria di lavoro. NON ripetere la chiamata e procedi con il passo successivo.");
+                        yield return new AgentStepEvent("tool_result", ToolResult: cachedNotice);
+                        resultsList.Add(cachedNotice);
                         continue;
                     }
-                }
 
-                var result = await toolExecutor.ExecuteToolAsync(
-                    toolCall.CallId,
-                    toolCall.ToolName,
-                    toolCall.ArgumentsJson,
-                    workspaceRoot,
-                    cancellationToken);
-
-                yield return new AgentStepEvent("tool_result", ToolResult: result);
-                resultsList.Add(result);
-
-                if (result.Success)
-                {
-                    if (toolCall.ToolName == "plan_task")
+                    if (failedToolSignatures.Contains(callSignature))
                     {
-                        yield return new AgentStepEvent("plan_update", PlanMarkdown: result.Output);
+                        logger?.LogWarning("AgentEngine", $"[LOOP GUARD TRIGGERED] Chiamata ripetuta già fallita bloccata: {callSignature}");
+                        failedToolSignatures.Remove(callSignature);
+                        yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Rilevato tentativo di rieseguire una chiamata di strumento già fallita ({toolCall.ToolName}). Invio istruzione di correzione...");
+                        messages.Add(new("user", $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. NON ripetere le stesse azioni senza modificare i parametri!"));
+                        continue;
                     }
-                    else if (toolCall.ToolName == "reflect_step")
+
+                    recentToolSignatures.Add(callSignature);
+                    if (recentToolSignatures.Count > 30) recentToolSignatures.RemoveAt(0);
+
+                    if (IsCyclicPatternDetected(recentToolSignatures))
                     {
-                        memoryManager.AddKeyFact(result.Output);
+                        logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive: {callSignature}");
+                        yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive ({toolCall.ToolName}). Iniezione direttiva di conclusione...");
+                        messages.Add(new("user",
+                            "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate per più volte senza avanzamenti. " +
+                            "Rispondi ORA all'utente con il resoconto finale in Markdown senza invocare altri tool."));
+                        continue;
                     }
-                    else if (toolCall.ToolName.Contains("write") || toolCall.ToolName.Contains("replace"))
+
+                    bool needsApproval = toolCall.ToolName.Equals("run_command", StringComparison.OrdinalIgnoreCase) && !request.AutoApproveCommands;
+                    var callWithApproval = toolCall with { RequiresApproval = needsApproval };
+
+                    yield return new AgentStepEvent("tool_proposed", ToolCall: callWithApproval);
+
+                    if (needsApproval)
                     {
-                        failedToolSignatures.Clear();
+                        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        pendingApprovals[toolCall.CallId] = (callWithApproval, tcs);
+
+                        yield return new AgentStepEvent("approval_required", ToolCall: callWithApproval);
+
+                        bool approved = false;
                         try
                         {
-                            using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
-                            if (doc.RootElement.TryGetProperty("relativePath", out var rp) || doc.RootElement.TryGetProperty("path", out rp))
-                            {
-                                string? pathStr = rp.GetString();
-                                if (!string.IsNullOrEmpty(pathStr)) memoryManager.RegisterModifiedFile(pathStr);
-                            }
+                            approved = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
                         }
-                        catch { }
+                        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+                        {
+                            approved = false;
+                            logger?.LogWarning("AgentEngine", $"Timeout o cancellazione durante l'attesa di approvazione per {toolCall.CallId}");
+                        }
+                        finally
+                        {
+                            pendingApprovals.TryRemove(toolCall.CallId, out _);
+                        }
+
+                        if (!approved)
+                        {
+                            var deniedResult = new AgentToolResult(
+                                toolCall.CallId,
+                                toolCall.ToolName,
+                                false,
+                                string.Empty,
+                                "Esecuzione del comando RIFIUTATA dall'utente o andata in timeout.");
+
+                            yield return new AgentStepEvent("tool_result", ToolResult: deniedResult);
+                            messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccesso: False\nErrore: Esecuzione rifiutata dall'utente."));
+                            continue;
+                        }
+                    }
+
+                    var result = await toolExecutor.ExecuteToolAsync(
+                        toolCall.CallId,
+                        toolCall.ToolName,
+                        toolCall.ArgumentsJson,
+                        workspaceRoot,
+                        cancellationToken);
+
+                    yield return new AgentStepEvent("tool_result", ToolResult: result);
+                    resultsList.Add(result);
+
+                    if (result.Success)
+                    {
+                        if (IsReadOnlyTool(toolCall))
+                        {
+                            executedReadOnlyCallSignatures.Add(callSignature);
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
+                                if (doc.RootElement.TryGetProperty("relativePath", out var rp) || doc.RootElement.TryGetProperty("path", out rp))
+                                {
+                                    string? pathStr = rp.GetString();
+                                    if (!string.IsNullOrEmpty(pathStr)) memoryManager.RegisterExploredPath(pathStr);
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (toolCall.ToolName == "plan_task")
+                        {
+                            yield return new AgentStepEvent("plan_update", PlanMarkdown: result.Output);
+                        }
+                        else if (toolCall.ToolName == "reflect_step")
+                        {
+                            memoryManager.AddKeyFact(result.Output);
+                        }
+                        else if (toolCall.ToolName.Contains("write") || toolCall.ToolName.Contains("replace"))
+                        {
+                            failedToolSignatures.Clear();
+                            executedReadOnlyCallSignatures.Clear();
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
+                                if (doc.RootElement.TryGetProperty("relativePath", out var rp) || doc.RootElement.TryGetProperty("path", out rp))
+                                {
+                                    string? pathStr = rp.GetString();
+                                    if (!string.IsNullOrEmpty(pathStr)) memoryManager.RegisterModifiedFile(pathStr);
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(result.Error))
+                    {
+                        failedToolSignatures.Add(callSignature);
                     }
                 }
-                else if (!string.IsNullOrEmpty(result.Error))
-                {
-                    failedToolSignatures.Add(callSignature);
-                }
-            }
             }
 
             var batchMsgSb = new StringBuilder();
@@ -819,7 +880,7 @@ REGOLE COMPORTAMENTALI (SOTA DIRECTIVES):
         catch { }
 
         sb.AppendLine("\nISTRUZIONI PER L'AGENTE:");
-        sb.AppendLine("1. Esegui sempre list_dir con relativePath: \".\" al primo passo per esplorare l'albero dei file.");
+        sb.AppendLine("1. Esplora i file e la struttura del progetto solo se strettamente necessario. Se la struttura è già nota o fornita nel contesto, non rieseguire list_dir e procedi direttamente con il task.");
         sb.AppendLine("2. Se presenti, leggi e rispetta prioritariamente AGENTS.md e PROJECT_STATUS.json.");
 
         return sb.ToString();

@@ -40,7 +40,7 @@ export function formatWorkspaceTreeSummary(rootPath: string | null, files: { rel
 }
 
 export type DiffLine = {
-  type: "add" | "delete" | "normal";
+  type: "add" | "delete" | "normal" | "hunk_separator";
   oldLineNumber?: number;
   newLineNumber?: number;
   content: string;
@@ -109,6 +109,58 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
         }
       }
     }
+  }
+
+  return result;
+}
+
+export function computeCompactDiff(oldText: string, newText: string, contextWindow = 3): DiffLine[] {
+  const fullDiff = computeLineDiff(oldText, newText);
+  if (fullDiff.length === 0) return [];
+
+  const modifiedIndices = new Set<number>();
+  fullDiff.forEach((line, idx) => {
+    if (line.type === "add" || line.type === "delete") {
+      for (let offset = -contextWindow; offset <= contextWindow; offset++) {
+        const targetIdx = idx + offset;
+        if (targetIdx >= 0 && targetIdx < fullDiff.length) {
+          modifiedIndices.add(targetIdx);
+        }
+      }
+    }
+  });
+
+  // If there are no modified lines at all, return full text if small, else empty
+  if (modifiedIndices.size === 0) {
+    return fullDiff.slice(0, 10);
+  }
+
+  const result: DiffLine[] = [];
+  let inSkippedBlock = false;
+  let skippedCount = 0;
+
+  for (let idx = 0; idx < fullDiff.length; idx++) {
+    if (modifiedIndices.has(idx)) {
+      if (inSkippedBlock) {
+        result.push({
+          type: "hunk_separator",
+          content: `@@ ... ${skippedCount} righe non modificate omesse ... @@`
+        });
+        inSkippedBlock = false;
+        skippedCount = 0;
+      }
+      result.push(fullDiff[idx]);
+    } else {
+      inSkippedBlock = true;
+      skippedCount++;
+    }
+  }
+
+  if (inSkippedBlock && skippedCount > 0) {
+    result.push({
+      type: "hunk_separator",
+      content: `@@ ... ${skippedCount} righe non modificate omesse ... @@`
+    });
   }
 
   return result;
