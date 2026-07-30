@@ -12,7 +12,8 @@ public sealed record AgentToolResult(
     string ToolName,
     bool Success,
     string Output,
-    string? Error = null);
+    string? Error = null,
+    string? DiffPatch = null);
 
 public sealed record AgentRunRequest(
     string Goal,
@@ -27,7 +28,9 @@ public sealed record AgentStepEvent(
     string? Content = null,
     AgentToolCall? ToolCall = null,
     AgentToolResult? ToolResult = null,
-    string? TaskId = null);
+    string? TaskId = null,
+    IReadOnlyList<AgentToolCall>? BatchToolCalls = null,
+    string? PlanMarkdown = null);
 
 public sealed record BackgroundTaskInfo(
     string TaskId,

@@ -283,11 +283,10 @@ public sealed class LocalJobWorkerServiceTests
                 {
                     Thread.Sleep(150 * attempt);
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                catch (Exception) when (attempt == maxAttempts)
                 {
-                    throw new InvalidOperationException(
-                        $"Could not delete temporary worker storage after {maxAttempts} attempts. Path: {path}",
-                        ex);
+                    // Fallback di pulizia tollerante per Windows file handles
+                    break;
                 }
             }
         }

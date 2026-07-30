@@ -250,7 +250,7 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
             unit);
 
         string translatedText = StripDelimiters(
-            await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken));
+            await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken: cancellationToken));
         TranslationValidationResult validation = TranslationOutputValidator.Validate(unit.SourceText, translatedText);
 
         if (validation.IsValid)

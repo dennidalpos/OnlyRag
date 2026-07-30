@@ -1,3 +1,8 @@
 {
-  "todos": []
+  "todos": [
+    "Implement graph-based entity retrieval (GraphRAG) for multi-hop document reasoning",
+    "Implement long-term vector episodic memory persistence across agent sessions",
+    "Implement parallel tool execution for independent non-blocking workspace tool calls",
+    "Implement automatic context compression and summarization for long-running agent loops"
+  ]
 }

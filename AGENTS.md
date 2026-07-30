@@ -92,7 +92,10 @@ Then run relevant project-native checks: format, lint, typecheck, tests, build, 
 
 `PROJECT_STATUS.json` is optional unless already present or explicitly requested.
 
-When it exists, it must contain **only current incomplete todo tasks**.
+When present, `PROJECT_STATUS.json` serves as the authoritative backlog for pending implementation tasks:
+1. **Register Remaining Scope**: Any feature, optimization, or implementation task requested by the user that is not yet fully completed MUST be registered as an actionable task in `PROJECT_STATUS.json`.
+2. **Persistent Task Execution**: At the start of every implementation task and in subsequent prompts, the agent MUST inspect `PROJECT_STATUS.json` using `view_file` and prioritize implementing any remaining todo items.
+3. **Iterative Cleanup**: Remove completed, obsolete, or invalidated items immediately as work is verified, leaving `PROJECT_STATUS.json` with `"todos": []` when all tasks are complete.
 
 Allowed schema:
 

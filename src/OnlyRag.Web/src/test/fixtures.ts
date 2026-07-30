@@ -12,6 +12,7 @@ import type {
   OllamaStatusResponse,
   PerformanceSettings,
   QdrantStatusResponse,
+  RerankerModelInfo,
   VectorBackendHealth
 } from "../api";
 
@@ -275,3 +276,21 @@ export function createOllamaInstallStatus(overrides: Partial<OllamaInstallStatus
     ...overrides
   };
 }
+
+export function createRerankerModelInfo(overrides: Partial<RerankerModelInfo> = {}): RerankerModelInfo {
+  return {
+    id: "bge-reranker-base",
+    name: "BGE Re-Ranker Base (ONNX)",
+    description: "Neural 2nd-stage Cross-Encoder re-ranker model.",
+    modelFileName: "bge-reranker-base.onnx",
+    downloadUrl: "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/onnx/model.onnx",
+    fileSizeBytes: 560000000,
+    sha256Hash: "",
+    isDownloaded: false,
+    downloadProgress: 0.0,
+    isDownloading: false,
+    downloadError: null,
+    ...overrides
+  };
+}
+

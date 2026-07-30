@@ -7,6 +7,7 @@ import { OllamaConnectionPanel } from "./settings/OllamaConnectionPanel";
 import { OcrEngineSettingsPanel } from "./settings/OcrEngineSettingsPanel";
 import { PdfExportPanel } from "./settings/PdfExportPanel";
 import { PerformanceSettingsPanel } from "./settings/PerformanceSettingsPanel";
+import { RerankerModelPanel } from "./settings/RerankerModelPanel";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function SettingsSectionPanels() {
@@ -35,6 +36,7 @@ export function SettingsSectionPanels() {
           <div className="settings-section__grid">
             <PerformanceSettingsPanel />
             <IngestionSettingsPanel />
+            <RerankerModelPanel />
           </div>
         </section>
 

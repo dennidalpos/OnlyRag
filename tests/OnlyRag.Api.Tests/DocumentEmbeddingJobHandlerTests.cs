@@ -403,6 +403,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
+            object? format = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
@@ -476,6 +477,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
+            object? format = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

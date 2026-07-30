@@ -226,3 +226,18 @@ export type OcrLanguage = {
   scriptGroup: string;
   isDefault: boolean;
 };
+
+export type RerankerModelInfo = {
+  id: string;
+  name: string;
+  description: string;
+  modelFileName: string;
+  downloadUrl: string;
+  fileSizeBytes: number;
+  sha256Hash: string;
+  isDownloaded: boolean;
+  downloadProgress: number;
+  isDownloading: boolean;
+  downloadError: string | null;
+};
+

@@ -12,6 +12,7 @@ export type AgentToolResult = {
   success: boolean;
   output: string;
   error?: string | null;
+  diffPatch?: string | null;
 };
 
 export type AgentRunRequest = {
@@ -24,11 +25,13 @@ export type AgentRunRequest = {
 };
 
 export type AgentStepEvent = {
-  type: "thought" | "thought_chunk" | "tool_proposed" | "approval_required" | "tool_result" | "final_response" | "json_parse_warning" | "error";
+  type: "thought" | "thought_chunk" | "tool_proposed" | "batch_tools_proposed" | "plan_update" | "plan_updated" | "approval_required" | "tool_result" | "final_response" | "json_parse_warning" | "error";
   content?: string | null;
   toolCall?: AgentToolCall | null;
   toolResult?: AgentToolResult | null;
   taskId?: string | null;
+  batchToolCalls?: AgentToolCall[] | null;
+  planMarkdown?: string | null;
 };
 
 export type ApproveToolCallRequest = {

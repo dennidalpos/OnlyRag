@@ -232,7 +232,7 @@ public static partial class InProcessBackend
                     new OllamaChatMessage("user", prompt)
                 ];
 
-                string translated = await ollamaClient.GenerateChatAsync(modelName, messages, numCtx: 2048, cancellationToken);
+                string translated = await ollamaClient.GenerateChatAsync(modelName, messages, numCtx: 2048, cancellationToken: cancellationToken);
                 string cleaned = translated.Trim().Trim('"').Trim('\'');
                 if (string.IsNullOrWhiteSpace(cleaned))
                 {

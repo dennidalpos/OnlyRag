@@ -112,13 +112,14 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
         services.AddSingleton<IRetrievalChunkRepository, SqliteRetrievalChunkRepository>();
         services.AddSingleton<IQueryEmbeddingGenerator, OllamaQueryEmbeddingGenerator>();
-        services.AddSingleton<IReRankerService, HeuristicReRankerService>();
+        services.AddSingleton<HeuristicReRankerService>();
+        services.AddSingleton<RerankerModelManager>();
+        services.AddSingleton<IReRankerService, OnnxCrossEncoderReRankerService>();
         services.AddSingleton<IQueryTransformationService, OllamaQueryTransformationService>();
         services.AddSingleton<ParentChildChunkResolver>();
         services.AddSingleton<CragEvaluator>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<ChatService>();
-        services.AddSingleton<CodingService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();
         services.AddSingleton<WorkspaceToolExecutor>();

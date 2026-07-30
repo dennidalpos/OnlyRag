@@ -95,7 +95,7 @@ internal sealed class ChatService
 
         int? configuredChatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
         int chatNumCtx = configuredChatNumCtx ?? DefaultChatNumCtx;
-        string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, chatNumCtx, cancellationToken);
+        string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, chatNumCtx, cancellationToken: cancellationToken);
         await PersistTurnAsync(conversationId, model, message, answer, sources, cancellationToken);
 
         return new ChatResponse(conversationId, model, answer, useDocuments, sources, notices);

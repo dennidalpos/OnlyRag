@@ -378,7 +378,7 @@ export default function App() {
               loadError={ollamaLoadError}
             />
           )}
-          <div hidden={activeSection !== "coding"}>
+          <div hidden={activeSection !== "coding"} className="coding-section-wrapper">
             <CodingSection
               models={ollamaModels}
               defaultModel={ollamaSettings?.defaultCodingModel ?? ollamaSettings?.defaultChatModel ?? null}

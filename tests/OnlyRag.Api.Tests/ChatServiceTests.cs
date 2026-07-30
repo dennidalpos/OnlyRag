@@ -220,6 +220,7 @@ public sealed class ChatServiceTests
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
+            object? format = null,
             CancellationToken cancellationToken = default)
         {
             LastMessages = messages;

@@ -14,7 +14,8 @@ import {
   type OllamaModel,
   type OllamaSettings,
   type OllamaStatusResponse,
-  type PerformanceSettings
+  type PerformanceSettings,
+  type RerankerModelInfo
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import {
@@ -76,11 +77,74 @@ export function useSettingsSectionController({
   );
   const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ocrProvisionStatus, setOcrProvisionStatus] = useState<OcrProvisionStatus | null>(null);
+  const [rerankerModelInfo, setRerankerModelInfo] = useState<RerankerModelInfo | null>(null);
   const [modelToInstall, setModelToInstall] = useState("");
   const [modelPullJobs, setModelPullJobs] = useState<LocalJob[]>([]);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+
+  async function refreshRerankerModelInfo() {
+    try {
+      const info = await apiRequest<RerankerModelInfo>("/api/rag/reranker/model");
+      setRerankerModelInfo(info);
+      return info;
+    } catch {
+      setRerankerModelInfo(null);
+      return null;
+    }
+  }
+
+  async function downloadRerankerModel() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+    try {
+      await apiRequest<{ success: boolean }>("/api/rag/reranker/download", {
+        method: "POST"
+      });
+      setInfoMessage("Download del modello ONNX Re-Ranker avviato.");
+      await refreshRerankerModelInfo();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile avviare il download del modello ONNX Re-Ranker.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function cancelRerankerDownload() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+    try {
+      await apiRequest<{ success: boolean }>("/api/rag/reranker/download", {
+        method: "DELETE"
+      });
+      setInfoMessage("Download del modello ONNX Re-Ranker annullato.");
+      await refreshRerankerModelInfo();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile annullare il download del modello.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function deleteRerankerModel() {
+    setIsBusy(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+    try {
+      await apiRequest<{ deleted: boolean }>("/api/rag/reranker/model", {
+        method: "DELETE"
+      });
+      setInfoMessage("Modello ONNX Re-Ranker eliminato.");
+      await refreshRerankerModelInfo();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossibile eliminare il modello ONNX Re-Ranker.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
   const { details: embeddingModelDetails, isLoading: embeddingModelDetailsLoading } = useSettingsModelDetails(
     formState.defaultEmbeddingModel
   );
@@ -128,7 +192,20 @@ export function useSettingsSectionController({
     void actions.refreshOcrLanguages();
     void actions.refreshDiagnostics();
     void actions.refreshDependencyStatus();
+    void refreshRerankerModelInfo();
   }, []);
+
+  useEffect(() => {
+    if (!rerankerModelInfo?.isDownloading) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshRerankerModelInfo();
+    }, 2000);
+
+    return () => window.clearInterval(interval);
+  }, [rerankerModelInfo?.isDownloading]);
 
   const installedModelNames = useMemo(() => models.map((model) => model.name), [models]);
   const usesNonLocalOllamaEndpoint = useMemo(() => isNonLocalUrl(formState.ollamaBaseUrl), [formState.ollamaBaseUrl]);
@@ -333,6 +410,7 @@ export function useSettingsSectionController({
     diagnosticsStatus,
     ollamaInstallStatus,
     ocrProvisionStatus,
+    rerankerModelInfo,
     ocrLanguages,
     embeddingModelDetails,
     chatModelDetails,
@@ -372,6 +450,10 @@ export function useSettingsSectionController({
     refreshOcrLanguages: actions.refreshOcrLanguages,
     refreshDiagnostics: actions.refreshDiagnostics,
     refreshDependencyStatus: actions.refreshDependencyStatus,
+    refreshRerankerModelInfo,
+    downloadRerankerModel,
+    cancelRerankerDownload,
+    deleteRerankerModel,
     installOllama: actions.installOllama,
     openLibreOfficeDownload: actions.openLibreOfficeDownload,
     configureOcrRuntime: actions.configureOcrRuntime,

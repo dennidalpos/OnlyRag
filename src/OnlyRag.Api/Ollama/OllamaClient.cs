@@ -141,6 +141,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         string modelName,
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
+        object? format = null,
         CancellationToken cancellationToken = default)
     {
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
@@ -159,34 +160,24 @@ internal sealed partial class OllamaClient : IOllamaClient
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
-        object requestBody = numCtx.HasValue
-            ? new
+        var payload = new Dictionary<string, object>
+        {
+            ["model"] = normalizedModelName,
+            ["stream"] = false,
+            ["messages"] = messages.Select(message => new
             {
-                model = normalizedModelName,
-                stream = false,
-                messages = messages.Select(message => new
-                {
-                    role = message.Role,
-                    content = message.Content
-                }),
-                options = new { num_ctx = numCtx.Value }
-            }
-            : (object)new
-            {
-                model = normalizedModelName,
-                stream = false,
-                messages = messages.Select(message => new
-                {
-                    role = message.Role,
-                    content = message.Content
-                })
-            };
+                role = message.Role,
+                content = message.Content
+            })
+        };
+        if (numCtx.HasValue) payload["options"] = new { num_ctx = numCtx.Value };
+        if (format is not null) payload["format"] = format;
         OllamaChatResponse response = await generationCoordinator.RunAsync(
             ct => SendAsync<OllamaChatResponse>(
                 HttpMethod.Post,
                 context,
                 "api/chat",
-                requestBody,
+                payload,
                 ct),
             cancellationToken);
 
@@ -205,6 +196,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         string modelName,
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
+        object? format = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
@@ -216,32 +208,22 @@ internal sealed partial class OllamaClient : IOllamaClient
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
-        object requestBody = numCtx.HasValue
-            ? new
+        var payload = new Dictionary<string, object>
+        {
+            ["model"] = normalizedModelName,
+            ["stream"] = true,
+            ["messages"] = messages.Select(message => new
             {
-                model = normalizedModelName,
-                stream = true,
-                messages = messages.Select(message => new
-                {
-                    role = message.Role,
-                    content = message.Content
-                }),
-                options = new { num_ctx = numCtx.Value }
-            }
-            : (object)new
-            {
-                model = normalizedModelName,
-                stream = true,
-                messages = messages.Select(message => new
-                {
-                    role = message.Role,
-                    content = message.Content
-                })
-            };
+                role = message.Role,
+                content = message.Content
+            })
+        };
+        if (numCtx.HasValue) payload["options"] = new { num_ctx = numCtx.Value };
+        if (format is not null) payload["format"] = format;
 
         using HttpRequestMessage request = new(HttpMethod.Post, new Uri(context.BaseUri, "api/chat"))
         {
-            Content = JsonContent.Create(requestBody)
+            Content = JsonContent.Create(payload)
         };
 
         using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);

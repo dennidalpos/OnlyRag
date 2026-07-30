@@ -312,6 +312,7 @@ public sealed class ChatServiceQdrantIntegrationTests
             string modelName,
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
+            object? format = null,
             CancellationToken cancellationToken = default)
         {
             LastMessages = messages;

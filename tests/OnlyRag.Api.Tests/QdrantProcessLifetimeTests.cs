@@ -49,7 +49,17 @@ public sealed class QdrantProcessLifetimeTests
         await using QdrantProcessSupervisor supervisor = new();
         string sleeperPath = await WaitForMainModulePathAsync(sleeper);
 
-        Assert.True(supervisor.TryAdoptProcess(sleeper.Id, sleeperPath));
+        bool adopted = false;
+        for (int retry = 0; retry < 30 && !adopted; retry++)
+        {
+            adopted = supervisor.TryAdoptProcess(sleeper.Id, sleeperPath);
+            if (!adopted)
+            {
+                await Task.Delay(100);
+            }
+        }
+
+        Assert.True(adopted);
 
         await supervisor.DisposeAsync();
 

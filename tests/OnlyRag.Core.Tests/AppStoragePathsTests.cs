@@ -15,10 +15,12 @@ public sealed class AppStoragePathsTests
         Assert.EndsWith(Path.Combine("documents", "renders"), paths.DocumentRendersDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith(Path.Combine("documents", "ocr-cache"), paths.DocumentOcrCacheDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith(Path.Combine("documents", "exports"), paths.DocumentExportsDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(Path.Combine("models", "reranker"), paths.RerankerModelsDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("backups", paths.BackupsDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("logs", paths.LogsDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("webview2", paths.WebView2UserDataDirectory, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("temp", paths.TempDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(paths.RerankerModelsDirectory, paths.EnumerateRequiredDirectories());
         Assert.Contains(paths.BackupsDirectory, paths.EnumerateRequiredDirectories());
         Assert.Contains(paths.WebView2UserDataDirectory, paths.EnumerateRequiredDirectories());
         Assert.Contains(paths.TempDirectory, paths.EnumerateRequiredDirectories());

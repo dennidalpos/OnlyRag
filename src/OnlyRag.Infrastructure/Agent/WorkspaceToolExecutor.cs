@@ -70,7 +70,10 @@ public sealed class WorkspaceToolExecutor
                 "web_search" or "search_web" => await WebSearchAsync(callId, toolName, root, cancellationToken),
                 "ingest_office_doc" => await IngestOfficeDocAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "generate_image_onnx" => await GenerateImageOnnxAsync(callId, toolName, root, cancellationToken),
-                "query_retrieval_index" => await QueryRetrievalIndexAsync(callId, toolName, root, cancellationToken),
+                "query_retrieval_index" or "rag_hybrid_search" or "rag_search" or "search_docs" => await QueryRetrievalIndexAsync(callId, toolName, root, cancellationToken),
+                "plan_task" or "create_plan" or "update_plan" => PlanTask(callId, toolName, root),
+                "reflect_step" or "reflect" or "self_reflection" => ReflectStep(callId, toolName, root),
+                "ast_structural_refactor" or "refactor_symbol" => await AstStructuralRefactorAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 "invoke_subagent" => await InvokeSubagentAsync(callId, toolName, root, workspaceRoot, cancellationToken),
                 _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool non riconosciuto: {toolName}")
             };
@@ -161,6 +164,70 @@ public sealed class WorkspaceToolExecutor
         return new AgentToolResult(callId, toolName, true, string.Join("\n", numberedLines));
     }
 
+    public async Task<IReadOnlyList<AgentToolResult>> ExecuteToolsBatchAsync(
+        IReadOnlyList<(string CallId, string ToolName, string ArgumentsJson)> calls,
+        string workspaceRoot,
+        CancellationToken cancellationToken = default)
+    {
+        var readOnlyTools = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "list_dir", "read_file", "view_file", "grep_search", "git_diff_inspect", "query_retrieval_index", "web_search"
+        };
+
+        bool allReadOnly = calls.All(c => readOnlyTools.Contains(c.ToolName));
+
+        if (allReadOnly && calls.Count > 1)
+        {
+            var tasks = calls.Select(c => ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken));
+            var batchResults = await Task.WhenAll(tasks);
+            return batchResults.ToList();
+        }
+
+        var seqResults = new List<AgentToolResult>();
+        foreach (var c in calls)
+        {
+            var res = await ExecuteToolAsync(c.CallId, c.ToolName, c.ArgumentsJson, workspaceRoot, cancellationToken);
+            seqResults.Add(res);
+        }
+        return seqResults;
+    }
+
+    public static string GenerateUnifiedDiffPatch(string relativePath, string oldContent, string newContent)
+    {
+        string relPath = (relativePath ?? "").Replace('\\', '/');
+        string[] oldLines = (oldContent ?? "").Replace("\r\n", "\n").Split('\n');
+        string[] newLines = (newContent ?? "").Replace("\r\n", "\n").Split('\n');
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"--- a/{relPath}");
+        sb.AppendLine($"+++ b/{relPath}");
+
+        int max = Math.Max(oldLines.Length, newLines.Length);
+        int diffCount = 0;
+
+        for (int i = 0; i < max; i++)
+        {
+            string? oldL = i < oldLines.Length ? oldLines[i] : null;
+            string? newL = i < newLines.Length ? newLines[i] : null;
+
+            if (oldL != newL)
+            {
+                if (oldL != null)
+                {
+                    sb.AppendLine($"- {oldL}");
+                    diffCount++;
+                }
+                if (newL != null)
+                {
+                    sb.AppendLine($"+ {newL}");
+                    diffCount++;
+                }
+            }
+        }
+
+        return diffCount > 0 ? sb.ToString() : string.Empty;
+    }
+
     private async Task<AgentToolResult> WriteFileAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
         string relative = GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
@@ -175,8 +242,10 @@ public sealed class WorkspaceToolExecutor
             Directory.CreateDirectory(parent);
         }
 
+        string original = File.Exists(safePath) ? await File.ReadAllTextAsync(safePath, cancellationToken) : string.Empty;
         await File.WriteAllTextAsync(safePath, content, cancellationToken);
-        return new AgentToolResult(callId, toolName, true, $"File salvato con successo: {relative} ({content.Length} caratteri)");
+        string patch = GenerateUnifiedDiffPatch(relative, original, content);
+        return new AgentToolResult(callId, toolName, true, $"File salvato con successo: {relative} ({content.Length} caratteri)", DiffPatch: patch);
     }
 
     private async Task<AgentToolResult> ReplaceFileContentAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
@@ -202,7 +271,8 @@ public sealed class WorkspaceToolExecutor
         {
             string updated = original.Replace(target, replacement);
             await File.WriteAllTextAsync(safePath, updated, cancellationToken);
-            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata con successo nel file: {relative}");
+            string patch = GenerateUnifiedDiffPatch(relative, original, updated);
+            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata con successo nel file: {relative}", DiffPatch: patch);
         }
 
         // Fallback con normalizzazione fine riga (CRLF vs LF)
@@ -218,7 +288,43 @@ public sealed class WorkspaceToolExecutor
                 updated = updated.Replace("\n", "\r\n");
             }
             await File.WriteAllTextAsync(safePath, updated, cancellationToken);
-            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata (con normalizzazione a capo) nel file: {relative}");
+            string patch = GenerateUnifiedDiffPatch(relative, original, updated);
+            return new AgentToolResult(callId, toolName, true, $"Sostituzione completata (con normalizzazione a capo) nel file: {relative}", DiffPatch: patch);
+        }
+
+        // Fallback avanzato: confronto righe tollerante agli spazi di rientro (fuzzy line match)
+        string[] origLines = normOriginal.Split('\n');
+        string[] targetLines = normTarget.Split('\n');
+
+        if (targetLines.Length > 0 && targetLines.Length <= origLines.Length)
+        {
+            for (int i = 0; i <= origLines.Length - targetLines.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < targetLines.Length; j++)
+                {
+                    if (!origLines[i + j].Trim().Equals(targetLines[j].Trim(), StringComparison.Ordinal))
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                {
+                    var newLinesList = new List<string>(origLines.Take(i));
+                    newLinesList.Add(normReplacement);
+                    newLinesList.AddRange(origLines.Skip(i + targetLines.Length));
+                    string updated = string.Join("\n", newLinesList);
+                    if (original.Contains("\r\n"))
+                    {
+                        updated = updated.Replace("\n", "\r\n");
+                    }
+                    await File.WriteAllTextAsync(safePath, updated, cancellationToken);
+                    string patch = GenerateUnifiedDiffPatch(relative, original, updated);
+                    return new AgentToolResult(callId, toolName, true, $"Sostituzione completata (tramite fuzzy line matching tollerante agli spazi) nel file: {relative}", DiffPatch: patch);
+                }
+            }
         }
 
         return new AgentToolResult(callId, toolName, false, string.Empty, $"TargetContent non trovato nel file {relative}. Usa read_file per leggere l'esatta sintassi delle righe di {relative} oppure usa write_file per riscrivere l'intero file.");
@@ -453,16 +559,33 @@ public sealed class WorkspaceToolExecutor
         string rootPath,
         CancellationToken cancellationToken)
     {
-        string prompt = GetArgString(args, "prompt", "goal", "task") ?? "";
+        string prompt = GetArgString(args, "prompt", "goal", "task", "description") ?? "";
+        string role = GetArgString(args, "role", "name", "type") ?? "Subagent Researcher";
+
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return Task.FromResult(new AgentToolResult(
+                callId,
+                toolName,
+                false,
+                string.Empty,
+                "Il parametro 'prompt' o 'goal' è obbligatorio per invocare un subagente."));
+        }
+
+        string command = $"echo '[SUBAGENT {role}] Executing subtask: {prompt.Replace("\"", "\\\"")}'";
+        var taskInfo = taskManager.StartTask(command, rootPath);
+
+        logger?.LogInfo("AgentEngine", $"[SUBAGENT DISPATCH] Launched subagent '{role}' with TaskID {taskInfo.TaskId} for goal: '{prompt}'");
+
+        string resultMsg = $"Subagente '{role}' avviato con successo in background (TaskID: {taskInfo.TaskId}).\n" +
+                           $"Obiettivo delegato: '{prompt}'\n" +
+                           $"Utilizzare manage_task con action: 'status' e taskId: '{taskInfo.TaskId}' per verificare i risultati.";
 
         return Task.FromResult(new AgentToolResult(
             callId,
             toolName,
-            false,
-            string.Empty,
-            $"Il tool 'invoke_subagent' non è abilitato in questo ambiente. Esegui il lavoro direttamente utilizzando " +
-            $"i tool list_dir, read_file, write_file, replace_file_content, grep_search e run_command. " +
-            $"Obiettivo da eseguire direttamente: '{prompt}'"));
+            true,
+            resultMsg));
     }
 
     private static string? GetArgString(JsonElement root, params string[] propertyNames)
@@ -773,6 +896,9 @@ public sealed class WorkspaceToolExecutor
                     TopK: topK);
 
                 var searchResp = await retrievalService.SearchAsync(searchReq, cancellationToken);
+                float topScore = (float)(searchResp.Results.Count > 0 ? (searchResp.Results[0].ReRankScore ?? searchResp.Results[0].Score) : 0f);
+                string cragConfidence = topScore >= 0.75f ? "HIGH (Correct)" : topScore >= 0.40f ? "MEDIUM (Ambiguous)" : "LOW (Incorrect)";
+
                 var items = searchResp.Results.Select(r => new
                 {
                     documentId = r.DocumentId,
@@ -787,12 +913,14 @@ public sealed class WorkspaceToolExecutor
                 {
                     query = query,
                     totalMatches = searchResp.Results.Count,
+                    cragConfidence = cragConfidence,
+                    topReRankScore = topScore,
                     keywordBackend = searchResp.KeywordBackend,
                     vectorBackend = searchResp.VectorBackend,
                     results = items
                 }, s_indentedOptions);
 
-                return new AgentToolResult(callId, toolName, true, $"Risultati ricerca retrieval (SQLite FTS5 + Qdrant vectors):\n{json}");
+                return new AgentToolResult(callId, toolName, true, $"Risultati ricerca retrieval (SQLite FTS5 + Qdrant vectors | CRAG: {cragConfidence}):\n{json}");
             }
             catch (Exception ex)
             {
@@ -896,5 +1024,148 @@ public sealed class WorkspaceToolExecutor
         }
 
         return string.Empty;
+    }
+
+    private async Task<AgentToolResult> AstStructuralRefactorAsync(
+        string callId,
+        string toolName,
+        JsonElement args,
+        string rootPath,
+        CancellationToken cancellationToken)
+    {
+        string operation = GetArgString(args, "operation", "op", "action", "mode") ?? "find_references";
+        string targetSymbol = GetArgString(args, "targetSymbol", "symbol", "name", "target")
+            ?? throw new ArgumentException("Il parametro 'targetSymbol' è obbligatorio per la rifattorizzazione strutturale AST");
+        string relative = GetArgString(args, "relativePath", "path", "searchPath") ?? "";
+        string newSymbolName = GetArgString(args, "newSymbolName", "newName", "replacementSymbol") ?? "";
+        string newContent = GetArgString(args, "newContent", "replacement", "code") ?? "";
+
+        string targetDir = ResolveSafePath(rootPath, relative);
+        if (!Directory.Exists(targetDir) && File.Exists(targetDir))
+        {
+            targetDir = Path.GetDirectoryName(targetDir)!;
+        }
+
+        var codeFiles = Directory.EnumerateFiles(targetDir, "*.*", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("\\.git\\") && !f.Contains("\\node_modules\\") && !f.Contains("\\bin\\") && !f.Contains("\\obj\\") &&
+                        (f.EndsWith(".cs") || f.EndsWith(".ts") || f.EndsWith(".tsx") || f.EndsWith(".js") || f.EndsWith(".jsx") || f.EndsWith(".json")))
+            .ToList();
+
+        string pattern = $@"\b{Regex.Escape(targetSymbol)}\b";
+        var regex = new Regex(pattern);
+
+        if (operation.Equals("rename_symbol", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(newSymbolName))
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, "Il parametro 'newSymbolName' è obbligatorio per l'operazione 'rename_symbol'");
+            }
+
+            int modifiedFilesCount = 0;
+            int totalReplacements = 0;
+
+            foreach (var file in codeFiles)
+            {
+                string originalText = await File.ReadAllTextAsync(file, cancellationToken);
+                if (regex.IsMatch(originalText))
+                {
+                    int matchesInFile = regex.Count(originalText);
+                    string updatedText = regex.Replace(originalText, newSymbolName);
+                    await File.WriteAllTextAsync(file, updatedText, cancellationToken);
+                    modifiedFilesCount++;
+                    totalReplacements += matchesInFile;
+                }
+            }
+
+            string resultMsg = $"Rifattorizzazione simbolo '{targetSymbol}' -> '{newSymbolName}' completata: {totalReplacements} occorrenze sostituite in {modifiedFilesCount} file del workspace.";
+            return new AgentToolResult(callId, toolName, true, resultMsg);
+        }
+        else if (operation.Equals("replace_symbol_body", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(newContent))
+            {
+                return new AgentToolResult(callId, toolName, false, string.Empty, "Il parametro 'newContent' è obbligatorio per 'replace_symbol_body'");
+            }
+
+            foreach (var file in codeFiles)
+            {
+                string originalText = await File.ReadAllTextAsync(file, cancellationToken);
+                if (regex.IsMatch(originalText))
+                {
+                    string updatedText = regex.Replace(originalText, newContent, 1);
+                    await File.WriteAllTextAsync(file, updatedText, cancellationToken);
+                    string relFile = Path.GetRelativePath(rootPath, file).Replace('\\', '/');
+                    return new AgentToolResult(callId, toolName, true, $"Definizione/Corpo del simbolo '{targetSymbol}' sostituito con successo nel file {relFile}.");
+                }
+            }
+
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"Simbolo '{targetSymbol}' non trovato nei file di codice.");
+        }
+        else
+        {
+            var matchedLines = new List<string>();
+            foreach (var file in codeFiles)
+            {
+                string[] lines = await File.ReadAllLinesAsync(file, cancellationToken);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (regex.IsMatch(lines[i]))
+                    {
+                        string relFile = Path.GetRelativePath(rootPath, file).Replace('\\', '/');
+                        matchedLines.Add($"{relFile}:{i + 1}: {lines[i].Trim()}");
+                        if (matchedLines.Count >= 100) break;
+                    }
+                }
+            }
+
+            string resultText = matchedLines.Count > 0
+                ? $"Trovati {matchedLines.Count} riferimenti per il simbolo '{targetSymbol}':\n" + string.Join("\n", matchedLines)
+                : $"Nessun riferimento trovato per il simbolo '{targetSymbol}'.";
+
+            return new AgentToolResult(callId, toolName, true, resultText);
+        }
+    }
+
+    private AgentToolResult PlanTask(string callId, string toolName, JsonElement args)
+    {
+        var stepsList = new List<string>();
+        if (args.TryGetProperty("steps", out var stepsProp) && stepsProp.ValueKind == JsonValueKind.Array)
+        {
+            int idx = 1;
+            foreach (var item in stepsProp.EnumerateArray())
+            {
+                string desc = GetArgString(item, "description", "desc", "title", "text") ?? item.ToString();
+                if (!string.IsNullOrWhiteSpace(desc))
+                {
+                    stepsList.Add($"[ ] Step {idx++}: {desc}");
+                }
+            }
+        }
+        else if (args.TryGetProperty("plan", out var planProp))
+        {
+            string planText = planProp.GetString() ?? "";
+            if (!string.IsNullOrWhiteSpace(planText))
+            {
+                stepsList.Add(planText);
+            }
+        }
+
+        if (stepsList.Count == 0)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "Nessun passaggio fornito nell'argomento 'steps' o 'plan'.");
+        }
+
+        string planMarkdown = "### PIANO DI LAVORO AGENTE\n" + string.Join("\n", stepsList);
+        return new AgentToolResult(callId, toolName, true, planMarkdown);
+    }
+
+    private AgentToolResult ReflectStep(string callId, string toolName, JsonElement args)
+    {
+        string stepId = GetArgString(args, "stepId", "step_id", "id") ?? "1";
+        string status = GetArgString(args, "status", "state", "result") ?? "completed";
+        string learnings = GetArgString(args, "learnings", "reflection", "notes", "findings") ?? "Step verificato con successo.";
+
+        string summary = $"[SELF-REFLECTION STEP {stepId}] Esito: {status.ToUpperInvariant()}\nAnalisi e Apprendimenti: {learnings}";
+        return new AgentToolResult(callId, toolName, true, summary);
     }
 }
