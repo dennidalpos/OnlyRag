@@ -426,5 +426,10 @@ public sealed class HybridRetrievalServiceTests
 
             return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm));
         }
+
+        public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

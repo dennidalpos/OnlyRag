@@ -76,8 +76,8 @@ public static partial class InProcessBackend
                     if (!capability.IsUsable)
                     {
                         return CreateBadRequestProblem(
-                            "OCR GPU non disponibile",
-                            capability.BlockReason ?? "Il runtime OCR GPU non e utilizzabile.",
+                            "GPU OCR unavailable",
+                            capability.BlockReason ?? "The GPU OCR runtime is not usable.",
                             "ocr_gpu_unavailable");
                     }
                 }
@@ -130,7 +130,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateBadRequestProblem(
-                    "Impostazioni Qdrant non valide",
+                    "Invalid Qdrant settings",
                     ex.Message,
                     "qdrant_settings_invalid");
             }
@@ -157,8 +157,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'avvio del server locale Qdrant richiede conferma esplicita.",
+                    "Request confirmation",
+                    "Starting the local Qdrant server requires explicit confirmation.",
                     "confirmation_required");
             }
 
@@ -169,7 +169,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateBadRequestProblem(
-                    "Qdrant non avviato",
+                    "Qdrant not started",
                     ex.Message,
                     "qdrant_start_failed");
             }
@@ -183,13 +183,13 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'arresto del server locale Qdrant richiede conferma esplicita.",
+                    "Request confirmation",
+                    "Stopping the local Qdrant server requires explicit confirmation.",
                     "confirmation_required");
             }
 
             await runtime.StopAsync(cancellationToken);
-            return Results.Ok(new OperationMessageResponse("Qdrant locale arrestato."));
+            return Results.Ok(new OperationMessageResponse("Local Qdrant stopped."));
         });
 
         app.MapPut("/api/settings/ollama", async (
@@ -246,8 +246,8 @@ public static partial class InProcessBackend
                 if (!capability.IsUsable)
                 {
                     return CreateBadRequestProblem(
-                        "OCR GPU non disponibile",
-                        capability.BlockReason ?? "Il runtime OCR GPU non e utilizzabile.",
+                        "GPU OCR unavailable",
+                        capability.BlockReason ?? "The GPU OCR runtime is not usable.",
                         "ocr_gpu_unavailable");
                 }
             }
@@ -267,7 +267,7 @@ public static partial class InProcessBackend
             {
                 return Results.Ok(new OcrAutoGpuEnableResponse(
                     false,
-                    capability.BlockReason ?? "Supporto OCR GPU non disponibile.",
+                    capability.BlockReason ?? "GPU OCR support unavailable.",
                     currentSettings));
             }
 
@@ -333,10 +333,10 @@ public static partial class InProcessBackend
                     currentSettings.OllamaBaseUrl,
                     models.Count,
                     models.Count == 0
-                        ? "Connessione riuscita. Ollama e disponibile ma non ci sono modelli installati."
+                        ? "Connection successful. Ollama is available but no models are installed."
                         : BuildOllamaOnlineMessage(models.Count, version, runningModels.Count),
                     models.Count == 0
-                        ? "Apri Impostazioni e installa almeno un modello prima di usare Chat o Traduzione."
+                        ? "Open Settings and install at least one model before using Chat or Translation."
                         : BuildOllamaStatusSuggestion(runningModels),
                     version,
                     runningModels));
@@ -378,7 +378,7 @@ public static partial class InProcessBackend
                         string.Empty,
                         modelName,
                         "Installed",
-                        $"Il modello {modelName} e gia installato."));
+                        $"Model {modelName} is already installed."));
                 }
 
                 LocalJob? existing = await FindActiveModelPullJobAsync(jobs, modelName, cancellationToken);
@@ -388,7 +388,7 @@ public static partial class InProcessBackend
                         existing.Id,
                         modelName,
                         existing.Status.ToString(),
-                        $"Installazione modello {modelName} gia in corso."));
+                        $"Model {modelName} installation is already in progress."));
                 }
 
                 LocalJob created = await jobs.CreateAsync(
@@ -401,7 +401,7 @@ public static partial class InProcessBackend
                     created.Id,
                     modelName,
                     created.Status.ToString(),
-                    $"Installazione modello {modelName} avviata."));
+                    $"Model {modelName} installation started."));
             }
             catch (OllamaApiException ex)
             {
@@ -473,7 +473,7 @@ public static partial class InProcessBackend
             string modelName = OllamaSettingsService.NormalizeRequiredModelName(name);
             await ollamaClient.DeleteModelAsync(modelName, cancellationToken);
             await settings.ClearMissingDefaultModelAsync(modelName, cancellationToken);
-            return Results.Ok(new OperationMessageResponse($"Modello {modelName} rimosso."));
+            return Results.Ok(new OperationMessageResponse($"Model {modelName} removed."));
         }
         catch (OllamaApiException ex)
         {
@@ -578,21 +578,21 @@ public static partial class InProcessBackend
     {
         string versionText = string.IsNullOrWhiteSpace(version) ? string.Empty : $" Versione: {version}.";
         string psText = runningModelCount == 0
-            ? " Nessun modello risulta caricato in memoria."
-            : $" Modelli caricati in memoria: {runningModelCount}.";
-        return $"Connessione riuscita. Modelli disponibili: {modelCount}.{versionText}{psText}";
+            ? " No models loaded in memory."
+            : $" Models loaded in memory: {runningModelCount}.";
+        return $"Connection successful. Available models: {modelCount}.{versionText}{psText}";
     }
 
     private static string? BuildOllamaStatusSuggestion(IReadOnlyList<OllamaRunningModelResponse> runningModels)
     {
         if (runningModels.Count == 0)
         {
-            return "Se una richiesta sembra lenta, usa 'ollama ps' per verificare caricamento, contesto e offload dei modelli.";
+            return "If a request seems slow, use 'ollama ps' to check model loading, context, and offload.";
         }
 
         if (runningModels.Any(model => model.SizeVram is > 0 || model.ContextLength is > 0))
         {
-            return "Per problemi di contesto, VRAM o offload confronta questi dati con 'ollama ps' e riduci num_ctx o batch se necessario.";
+            return "For context, VRAM, or offload issues, compare these data with 'ollama ps' and reduce num_ctx or batch if necessary.";
         }
 
         return null;

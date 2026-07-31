@@ -146,6 +146,23 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         await client.DeleteAsync(collection, filter, cancellationToken: cancellationToken);
     }
 
+    public async Task OptimizeCollectionAsync(
+        string model,
+        int dimensions,
+        CancellationToken cancellationToken = default)
+    {
+        string collection = BuildCollectionName(model, dimensions);
+        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
+        if (!await client.CollectionExistsAsync(collection, cancellationToken))
+        {
+            return;
+        }
+
+        await client.UpdateCollectionAsync(
+            collection,
+            cancellationToken: cancellationToken);
+    }
+
     private async Task<QdrantClient> GetOrCreateClientAsync(CancellationToken cancellationToken)
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);

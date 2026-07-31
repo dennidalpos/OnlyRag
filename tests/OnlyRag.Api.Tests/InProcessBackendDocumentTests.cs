@@ -580,6 +580,11 @@ public sealed partial class InProcessBackendTests
             DeletedDocuments.Add(new DeletedVectorDocument(model, dimensions, documentId));
             return Task.CompletedTask;
         }
+
+        public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed record DeletedVectorDocument(

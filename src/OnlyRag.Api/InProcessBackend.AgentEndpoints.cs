@@ -19,7 +19,7 @@ public static partial class InProcessBackend
         {
             if (string.IsNullOrWhiteSpace(request.Goal))
             {
-                return CreateBadRequestProblem("Goal richiesto", "Il parametro goal non puo essere vuoto.", "agent_goal_required");
+                return CreateBadRequestProblem("Goal required", "The goal parameter cannot be empty.", "agent_goal_required");
             }
 
             httpContext.Response.ContentType = "text/event-stream";
@@ -59,7 +59,7 @@ public static partial class InProcessBackend
         {
             if (request == null || string.IsNullOrWhiteSpace(request.CallId))
             {
-                return CreateBadRequestProblem("CallId non valido", "Il parametro callId e obbligatorio.", "agent_call_id_required");
+                return CreateBadRequestProblem("Invalid CallId", "The callId parameter is required.", "agent_call_id_required");
             }
 
             bool success = agentEngine.ApproveToolCall(request.CallId, request.Approved);

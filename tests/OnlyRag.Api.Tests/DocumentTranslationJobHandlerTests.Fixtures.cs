@@ -101,6 +101,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             IncrementCallCount();
@@ -193,6 +194,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
@@ -248,6 +250,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             IncrementCallCount();
@@ -266,6 +269,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             IncrementCallCount();
@@ -286,6 +290,7 @@ public sealed partial class DocumentTranslationJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             IncrementCallCount();

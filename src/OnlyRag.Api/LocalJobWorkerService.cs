@@ -45,7 +45,12 @@ internal sealed class LocalJobWorkerService : BackgroundService
 
             if (!didWork)
             {
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                // Wait for signal or cancellation — true zero-CPU idle
+                await queue.EnqueueSignal.WaitAsync(stoppingToken);
+            }
+            else
+            {
+                await Task.Delay(50, stoppingToken); // Brief pause for batch opportunity
             }
         }
     }
@@ -65,13 +70,13 @@ internal sealed class LocalJobWorkerService : BackgroundService
 
         if (!handlers.TryGetValue(job.Type, out ILocalJobHandler? handler))
         {
-            string noHandlerError = $"Nessun handler registrato per il job '{job.Type}'.";
+            string noHandlerError = $"No handler registered for job type '{job.Type}'.";
             BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: {noHandlerError}");
             await queue.FailAsync(job.Id, noHandlerError, retryable: false, stoppingToken);
             return true;
         }
 
-        BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: avviato.");
+        BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: started.");
 
         CancellationTokenSource jobCancellation = cancellationRegistry.Register(job.Id, stoppingToken);
         try
@@ -82,7 +87,7 @@ internal sealed class LocalJobWorkerService : BackgroundService
                 if (latestBeforeExecute?.Status is JobStatus.Pausing)
                 {
                     await queue.CompletePauseAsync(job.Id, stoppingToken);
-                    BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: in pausa.");
+                    BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: paused.");
                 }
 
                 return true;
@@ -93,12 +98,12 @@ internal sealed class LocalJobWorkerService : BackgroundService
             if (latest?.Status is JobStatus.Running)
             {
                 await queue.CompleteAsync(job.Id, stoppingToken);
-                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: completato.");
+                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: completed.");
             }
             else if (latest?.Status is JobStatus.Pausing)
             {
                 await queue.CompletePauseAsync(job.Id, stoppingToken);
-                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: in pausa.");
+                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: paused.");
             }
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
@@ -107,19 +112,19 @@ internal sealed class LocalJobWorkerService : BackgroundService
             if (latest?.Status is JobStatus.Pausing)
             {
                 await queue.CompletePauseAsync(job.Id, CancellationToken.None);
-                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: in pausa.");
+                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: paused.");
             }
             else if (latest?.Status is not (JobStatus.Cancelled or JobStatus.Paused))
             {
                 await queue.CancelAsync(job.Id, CancellationToken.None);
-                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: annullato.");
+                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: cancelled.");
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Il checkpoint più recente è già in DB grazie ai salvataggi periodici dell'handler.
-            // Non sovrascrivere con i valori iniziali del job — lasciare il DB invariato.
-            BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: interrotto per shutdown, verrà ripreso al prossimo avvio.");
+            // Latest checkpoint is already in DB thanks to periodic handler saves.
+            // Do not overwrite with initial job values — leave DB unchanged.
+            BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: interrupted by shutdown, will resume on next startup.");
         }
         catch (Exception ex)
         {
@@ -127,15 +132,15 @@ internal sealed class LocalJobWorkerService : BackgroundService
             if (latest?.Status is JobStatus.Pausing)
             {
                 await queue.CompletePauseAsync(job.Id, CancellationToken.None);
-                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: in pausa.");
+                BackendLog.Write(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: paused.");
             }
             else
             {
                 string message = UserFacingErrorText.FromExternalDetail(
                     ex.Message,
-                    "Job locale non completato. Dettagli tecnici disponibili nei log locali.");
+                    "Local job failed to complete. Technical details available in local logs.");
                 await queue.FailAsync(job.Id, message, retryable: true, CancellationToken.None);
-                BackendLog.WriteException(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: fallito.", ex);
+                BackendLog.WriteException(backendDescriptor.StoragePaths, job.Id, $"Job {job.Type}: failed.", ex);
             }
         }
         finally

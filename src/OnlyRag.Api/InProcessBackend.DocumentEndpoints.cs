@@ -27,7 +27,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
-            return document is null ? CreateNotFoundProblem("Documento") : Results.Ok(document);
+            return document is null ? CreateNotFoundProblem("Document") : Results.Ok(document);
         });
 
         app.MapDelete("/api/documents/{id:long}", async (
@@ -44,7 +44,7 @@ public static partial class InProcessBackend
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
@@ -60,15 +60,15 @@ public static partial class InProcessBackend
                     $"Document vector cleanup failed for document {id}.",
                     ex);
                 return CreateProblem(
-                    "Pulizia vettori non completata",
-                    "Il documento non e stato eliminato per evitare dati vettoriali orfani. Riprovare dopo aver verificato Qdrant.",
+                    "Vector cleanup failed",
+                    "Document was not deleted to prevent orphaned vector data. Please try again after verifying Qdrant.",
                     StatusCodes.Status502BadGateway,
                     "document_vector_cleanup_failed",
                     httpContext.TraceIdentifier);
             }
 
             ImportedDocument? deleted = await documents.DeleteAsync(id, cancellationToken);
-            return deleted is null ? CreateNotFoundProblem("Documento") : Results.Ok(deleted);
+            return deleted is null ? CreateNotFoundProblem("Document") : Results.Ok(deleted);
         });
 
         app.MapPost("/api/documents/{id:long}/reindex", async (
@@ -83,7 +83,7 @@ public static partial class InProcessBackend
             ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
@@ -92,7 +92,7 @@ public static partial class InProcessBackend
                 ocrSettings,
                 cancellationToken);
             ImportedDocument? queued = await documents.QueueForIndexingAsync(id, resolvedOcrLanguage, cancellationToken);
-            return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
+            return queued is null ? CreateNotFoundProblem("Document") : Results.Ok(queued);
         });
 
         app.MapGet("/api/documents/{id:long}/ocr-status", async (
@@ -105,7 +105,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             LocalJob? currentJob = await GetActiveDocumentJobAsync(document, jobs, cancellationToken);
@@ -129,7 +129,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             await CancelDocumentJobIfNeededAsync(document, jobs, cancellationRegistry, cancellationToken);
@@ -151,7 +151,7 @@ public static partial class InProcessBackend
                     Priority: 30),
                 cancellationToken);
             ImportedDocument? queued = await documents.SetStatusAsync(id, DocumentStatus.Queued, job.Id, lastError: null, cancellationToken);
-            return queued is null ? CreateNotFoundProblem("Documento") : Results.Ok(queued);
+            return queued is null ? CreateNotFoundProblem("Document") : Results.Ok(queued);
         });
 
         app.MapPost("/api/documents/{id:long}/embed", async (
@@ -167,7 +167,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             LocalJob? activeJob = await GetActiveDocumentJobAsync(document, jobs, cancellationToken);
@@ -207,8 +207,8 @@ public static partial class InProcessBackend
                 if (!modelInstalled)
                 {
                     return CreateProblem(
-                        "Modello embedding assente",
-                        $"Il modello embedding '{model}' non e installato in Ollama.",
+                        "Embedding model missing",
+                        $"The embedding model '{model}' is not installed in Ollama.",
                         StatusCodes.Status404NotFound,
                         "ollama_embedding_model_not_found");
                 }
@@ -250,7 +250,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
@@ -314,7 +314,7 @@ public static partial class InProcessBackend
         ImportedDocument? document = await documents.GetAsync(documentId, cancellationToken);
         if (document is null)
         {
-            throw new InvalidOperationException("Documento non trovato.");
+            throw new InvalidOperationException("Document not found.");
         }
 
         DocumentEmbeddingStatusSnapshot snapshot = await embeddings.GetDocumentEmbeddingStatusAsync(

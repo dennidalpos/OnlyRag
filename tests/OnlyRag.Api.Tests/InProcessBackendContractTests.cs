@@ -28,7 +28,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.Unauthorized,
-            "Non autorizzato",
+            "Unauthorized",
             "unauthorized");
     }
 
@@ -44,7 +44,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.NotFound,
-            "Documento non trovato",
+            "Document not found",
             "not_found");
     }
 
@@ -62,7 +62,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.BadRequest,
-            "Query non valida",
+            "Invalid query",
             "search_query_required");
     }
 
@@ -87,7 +87,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.Conflict,
-            "Documento non indicizzato",
+            "Document not indexed",
             "document_not_indexed");
     }
 
@@ -154,7 +154,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             chatResponse,
             HttpStatusCode.BadRequest,
-            "Messaggio non valido",
+            "Invalid message",
             "chat_validation_failed");
     }
 

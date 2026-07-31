@@ -56,8 +56,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "Il reset totale dei dati locali richiede conferma esplicita dalla UI.",
+                    "Confirmation required",
+                    "A full data reset requires explicit UI confirmation.",
                     "confirmation_required");
             }
 
@@ -192,8 +192,8 @@ public static partial class InProcessBackend
         if (!request.Confirmed)
         {
             return CreateBadRequestProblem(
-                "Conferma richiesta",
-                "L'apertura di processi locali richiede una conferma esplicita dalla UI.",
+                "Confirmation required",
+                "Opening local processes requires explicit UI confirmation.",
                 "confirmation_required");
         }
 

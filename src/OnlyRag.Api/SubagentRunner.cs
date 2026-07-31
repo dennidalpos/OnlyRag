@@ -41,12 +41,12 @@ public sealed class SubagentRunner : ISubagentRunner
         var subagentRequests = ParseSubagentSpecs(args);
         if (subagentRequests.Count == 0)
         {
-            string parseErr = "Nessun prompt o specifica di subagente valida fornita nei parametri. Specificare 'prompt' (stringa) o 'subagents' (array).";
+            string parseErr = "No valid prompt or subagent specification provided in parameters. Specify 'prompt' (string) or 'subagents' (array).";
             logger?.LogWarning("SubagentRunner", parseErr);
             return new AgentToolResult(callId, toolName, false, string.Empty, parseErr);
         }
 
-        logger?.LogInfo("SubagentRunner", $"[SUBAGENT ORCHESTRATOR] Avvio di {subagentRequests.Count} subagente/i a livello di profondità {currentDepth + 1}.");
+        logger?.LogInfo("SubagentRunner", $"[SUBAGENT ORCHESTRATOR] Launching {subagentRequests.Count} subagent(s) at nesting depth {currentDepth + 1}.");
 
         var tasks = subagentRequests.Select(async spec =>
         {
@@ -90,13 +90,23 @@ public sealed class SubagentRunner : ISubagentRunner
             using var scope = serviceProvider.CreateScope();
             var engine = scope.ServiceProvider.GetRequiredService<AgentLoopEngine>();
 
+            bool isReadOnlyRole = spec.Role.Contains("research", StringComparison.OrdinalIgnoreCase) ||
+                                  spec.Role.Contains("explore", StringComparison.OrdinalIgnoreCase) ||
+                                  spec.Role.Contains("inspect", StringComparison.OrdinalIgnoreCase) ||
+                                  spec.Role.Contains("audit", StringComparison.OrdinalIgnoreCase);
+
+            string mode = isReadOnlyRole ? "ask" : "write";
+            string roleInstruction = isReadOnlyRole
+                ? "[SUBAGENT ROLE DIRECTIVE - RESEARCHER & EXPLORER]\nYou are a specialized read-only research and exploration subagent. Focus on inspection, ripgrep, and web search. Do NOT modify files."
+                : $"[SUBAGENT ROLE DIRECTIVE - {spec.Role.ToUpperInvariant()}]\nYou are an autonomous subagent focused on this specific sub-goal. Execute the necessary actions and produce a clear report of results.";
+
             var runRequest = new AgentRunRequest(
-                Goal: $"[SUBAGENT ROLE: {spec.Role}]\n\n{spec.Prompt}",
+                Goal: $"{roleInstruction}\n\n[ASSIGNED OBJECTIVE]\n{spec.Prompt}",
                 WorkspaceRoot: workspaceRoot,
                 AutoApproveCommands: true,
                 MaxIterations: Math.Min(spec.MaxIterations, 30),
                 Model: spec.Model,
-                Mode: "write");
+                Mode: mode);
 
             var outputSb = new StringBuilder();
             string? finalResponse = null;
@@ -122,15 +132,15 @@ public sealed class SubagentRunner : ISubagentRunner
             }
 
             string agentOutput = finalResponse
-                ?? (recentThoughts.Length > 0 ? recentThoughts.ToString() : "Subagente completato senza testo esplicito.");
+                ?? (recentThoughts.Length > 0 ? recentThoughts.ToString() : "Subagent completed without explicit output text.");
 
             string formattedResult = $"### [SUBAGENT OUTPUT: {spec.Role}]\n\n{agentOutput}";
-            logger?.LogInfo("SubagentRunner", $"[SUBAGENT COMPLETE] Role: '{spec.Role}' ha completato l'esecuzione.");
+            logger?.LogInfo("SubagentRunner", $"[SUBAGENT COMPLETE] Role: '{spec.Role}' finished execution.");
             return (true, formattedResult, string.Empty);
         }
         catch (Exception ex)
         {
-            string err = $"Errore nell'esecuzione del subagente '{spec.Role}': {ex.Message}";
+            string err = $"Error executing subagent '{spec.Role}': {ex.Message}";
             logger?.LogError("SubagentRunner", err, ex);
             return (false, $"### [SUBAGENT FAILED: {spec.Role}]\n\n{err}", err);
         }

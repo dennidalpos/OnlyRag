@@ -11,8 +11,8 @@ public sealed class UserFacingErrorTextTests
             sensitive,
             "Errore tecnico.");
 
-        Assert.Contains("[percorso locale]", message, StringComparison.Ordinal);
-        Assert.Contains("[endpoint esterno]", message, StringComparison.Ordinal);
+        Assert.Contains("[local path]", message, StringComparison.Ordinal);
+        Assert.Contains("[external endpoint]", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Alice", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("192.168.1.20", message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret.txt", message, StringComparison.OrdinalIgnoreCase);
@@ -25,16 +25,16 @@ public sealed class UserFacingErrorTextTests
 
         string message = UserFacingErrorText.FromExternalDetail(
             sensitive,
-            "Errore tecnico.");
+            "Technical error.");
 
-        Assert.Contains("password=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Authorization=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Bearer [segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("api_key=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("apiToken=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("sessionToken=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("access_token=[segreto]", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("clientSecret=[segreto]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("password=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Authorization=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Bearer [redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("api_key=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("apiToken=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sessionToken=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("access_token=[redacted]", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("clientSecret=[redacted]", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-value", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-token", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dummy-key", message, StringComparison.OrdinalIgnoreCase);
@@ -51,7 +51,7 @@ public sealed class UserFacingErrorTextTests
 
         string message = UserFacingErrorText.StartupFailure(exception);
 
-        Assert.StartsWith("Il backend locale non e stato avviato.", message, StringComparison.Ordinal);
+        Assert.StartsWith("The local backend failed to start.", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Alice", message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("qdrant.exe failed from C:", message, StringComparison.OrdinalIgnoreCase);
     }

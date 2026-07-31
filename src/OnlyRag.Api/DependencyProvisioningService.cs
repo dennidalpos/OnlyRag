@@ -9,7 +9,7 @@ public sealed class DependencyProvisioningService
     public const string OllamaDownloadUrl = "https://ollama.com/download";
     public const string OllamaInstallCommand = OllamaDownloadUrl;
     public const string OllamaNetworkAccessHint =
-        "Installa Ollama manualmente dalla pagina ufficiale. Se sei offline o una policy aziendale blocca download o browser esterni, scarica il programma da una rete approvata o chiedi al reparto IT. Per usare un endpoint Ollama da altri PC della LAN, configura OLLAMA_HOST nelle impostazioni/variabili ambiente di Ollama e riavvia Ollama.";
+        "Install Ollama manually from the official page. If you are offline or a corporate policy blocks external downloads or browsers, download the program from an approved network or ask the IT department. To use an Ollama endpoint from other LAN PCs, configure OLLAMA_HOST in Ollama's settings/environment variables and restart Ollama.";
 
     private const string LibreOfficeDownloadUrl = "https://www.libreoffice.org/download/download-libreoffice/";
     private static readonly TimeSpan DefaultOcrProvisionTimeout = TimeSpan.FromMinutes(45);
@@ -26,7 +26,7 @@ public sealed class DependencyProvisioningService
     private OcrProvisionStatus lastOcrProvisionStatus = new(
         false,
         false,
-        "OCR da installare. Usa Installa OCR per preparare automaticamente le dipendenze locali.",
+        "OCR to install. Use Install OCR to prepare local dependencies automatically.",
         null);
     private Task? ocrProvisionTask;
     private CancellationTokenSource? ocrProvisionCancellation;
@@ -74,13 +74,13 @@ public sealed class DependencyProvisioningService
         if (!processLauncher.TryStart(startInfo, out _))
         {
             throw new InvalidOperationException(
-                "Download Ollama non aperto. Apri manualmente https://ollama.com/download. " +
-                "Se sei offline o una policy aziendale blocca browser o download esterni, usa una rete approvata o chiedi al reparto IT.");
+                "Ollama download not opened. Manually open https://ollama.com/download. " +
+                "If you are offline or a corporate policy blocks external browsers or downloads, use an approved network or ask the IT department.");
         }
 
         return new DependencyActionResponse(
             true,
-            "Pagina download Ollama aperta. Installa manualmente Ollama, avvialo, poi torna in OnlyRag e usa Verifica ora.");
+            "Ollama download page opened. Manually install Ollama, start it, then return to OnlyRag and use Verify now.");
     }
 
     public DependencyActionResponse OpenLibreOfficeDownload()
@@ -93,10 +93,10 @@ public sealed class DependencyProvisioningService
 
         if (!processLauncher.TryStart(startInfo, out string? errorMessage))
         {
-            throw new InvalidOperationException(errorMessage ?? "Impossibile aprire la pagina di download LibreOffice.");
+            throw new InvalidOperationException(errorMessage ?? "Unable to open the LibreOffice download page.");
         }
 
-        return new DependencyActionResponse(true, "Pagina download LibreOffice per export PDF aperta.");
+        return new DependencyActionResponse(true, "LibreOffice download page for PDF export opened.");
     }
 
     public async Task<OcrProvisionStatus> GetOcrStatusAsync(
@@ -135,7 +135,7 @@ public sealed class DependencyProvisioningService
                 recentStatus.StartedAtUtc,
                 DateTimeOffset.UtcNow,
                 "available",
-                "OCR disponibile",
+                "OCR available",
                 OcrProvisionStepCount,
                 OcrProvisionStepCount,
                 100,
@@ -155,7 +155,7 @@ public sealed class DependencyProvisioningService
 
         string message = string.IsNullOrWhiteSpace(availability.Message)
             || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
-            ? "OCR da installare. Usa Installa OCR per preparare automaticamente le dipendenze locali."
+            ? "OCR to install. Use Install OCR to prepare local dependencies automatically."
             : availability.Message;
 
         return new OcrProvisionStatus(
@@ -165,7 +165,7 @@ public sealed class DependencyProvisioningService
             null,
             UpdatedAtUtc: DateTimeOffset.UtcNow,
             StepKey: "not-configured",
-            StepLabel: "OCR da installare",
+            StepLabel: "OCR to install",
             StepIndex: 0,
             StepCount: OcrProvisionStepCount,
             ProgressPercent: 0,
@@ -180,7 +180,7 @@ public sealed class DependencyProvisioningService
         {
             if (ocrProvisionTask is { IsCompleted: false })
             {
-                return new DependencyActionResponse(false, "Configurazione OCR già in corso.");
+                return new DependencyActionResponse(false, "OCR configuration already in progress.");
             }
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -188,15 +188,15 @@ public sealed class DependencyProvisioningService
             lastOcrProvisionStatus = new OcrProvisionStatus(
                 false,
                 true,
-                $"Configurazione OCR avviata. La preparazione può richiedere diversi minuti e viene fermata automaticamente dopo {FormatTimeout(ocrProvisionTimeout)}.",
+                $"OCR configuration started. Preparation may take several minutes and is automatically stopped after {FormatTimeout(ocrProvisionTimeout)}.",
                 null,
                 normalizedTarget,
                 "resolving",
-                "Preparazione avviata: OnlyRag sta scegliendo il runtime OCR compatibile.",
+                "Preparation started: OnlyRag is choosing the compatible OCR runtime.",
                 now,
                 now,
                 "resolve-runtime",
-                "Selezione runtime OCR",
+                "OCR runtime selection",
                 1,
                 OcrProvisionStepCount,
                 CalculateProgressPercent(1),
@@ -211,7 +211,7 @@ public sealed class DependencyProvisioningService
             ocrProvisionTask = Task.Run(() => ProvisionOcrAsync(normalizedTarget, token));
         }
 
-        return new DependencyActionResponse(true, "Configurazione OCR avviata.");
+        return new DependencyActionResponse(true, "OCR configuration started.");
     }
 
     public DependencyActionResponse CancelOcrProvision()
@@ -220,21 +220,21 @@ public sealed class DependencyProvisioningService
         {
             if (ocrProvisionTask is not { IsCompleted: false } || ocrProvisionCancellation is null)
             {
-                return new DependencyActionResponse(false, "Nessuna configurazione OCR in corso.");
+                return new DependencyActionResponse(false, "No OCR configuration in progress.");
             }
 
             ocrProvisionCancelRequested = true;
             lastOcrProvisionStatus = lastOcrProvisionStatus with
             {
                 IsRunning = true,
-                Message = "Annullamento configurazione OCR richiesto. Arresto dei processi in corso...",
+                Message = "OCR configuration cancellation requested. Stopping running processes...",
                 LastError = null,
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             };
             ocrProvisionCancellation.Cancel();
         }
 
-        return new DependencyActionResponse(true, "Annullamento configurazione OCR richiesto.");
+        return new DependencyActionResponse(true, "OCR configuration cancellation requested.");
     }
 
     private async Task ProvisionOcrAsync(string runtimeTarget, CancellationToken cancellationToken)
@@ -243,14 +243,14 @@ public sealed class DependencyProvisioningService
         {
             if (!OperatingSystem.IsWindows())
             {
-                throw new InvalidOperationException("La configurazione automatica OCR è disponibile solo su Windows.");
+                throw new InvalidOperationException("Automatic OCR configuration is only available on Windows.");
             }
 
             string scriptsRoot = ResolveOcrScriptsRoot();
             string bridgePath = Path.Combine(scriptsRoot, "paddle_ocr_bridge.py");
             if (!File.Exists(bridgePath))
             {
-                throw new InvalidOperationException("Runtime OCR incompleto: bridge non trovato.");
+                throw new InvalidOperationException("Incomplete OCR runtime: bridge not found.");
             }
 
             OcrProvisionRuntime runtime = await ocrRuntimeResolver.ResolveAsync(runtimeTarget, cancellationToken);
@@ -258,25 +258,25 @@ public sealed class DependencyProvisioningService
             if (!File.Exists(requirementsPath))
             {
                 throw new InvalidOperationException(
-                    $"Runtime OCR incompleto: {runtime.RequirementsFileName} non trovato.");
+                    $"Incomplete OCR runtime: {runtime.RequirementsFileName} not found.");
             }
 
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Runtime OCR selezionato.",
+                "OCR runtime selected.",
                 runtime.Detail,
                 "resolve-runtime",
-                "Selezione runtime OCR",
+                "OCR runtime selection",
                 1));
 
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Verifica interprete Python compatibile in corso.",
-                "OnlyRag cerca Python 3.10, 3.11, 3.12 o 3.13.",
+                "Compatible Python interpreter verification in progress.",
+                "OnlyRag is looking for Python 3.10, 3.11, 3.12, or 3.13.",
                 "python",
-                "Verifica Python",
+                "Python verification",
                 2));
             OcrPythonCommand python = await ResolveOcrPythonCommandAsync(cancellationToken);
 
@@ -307,10 +307,10 @@ public sealed class DependencyProvisioningService
                 SetLastOcrStatus(CreateRunningOcrStatus(
                     runtimeTarget,
                     runtime.ResolvedRuntime,
-                    "Creazione ambiente Python OCR in corso.",
-                    $"Cartella runtime: {installRoot}",
+                    "OCR Python environment creation in progress.",
+                    $"Runtime folder: {installRoot}",
                     "venv",
-                    "Creazione ambiente",
+                    "Environment creation",
                     3));
                 await RunProcessAsync(
                     python.FileName,
@@ -322,52 +322,52 @@ public sealed class DependencyProvisioningService
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Aggiornamento pip OCR in corso.",
-                "Fase breve prima dell'installazione dei pacchetti PaddleOCR.",
+                "OCR pip upgrade in progress.",
+                "Short phase before installing PaddleOCR packages.",
                 "pip-upgrade",
-                "Aggiornamento pip",
+                "pip upgrade",
                 4));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"], null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Pulizia vecchi pacchetti Paddle in corso.",
-                "OnlyRag rimuove runtime Paddle incompatibili prima di reinstallare quello corretto.",
+                "Cleaning up old Paddle packages in progress.",
+                "OnlyRag removes incompatible Paddle runtimes before reinstalling the correct one.",
                 "paddle-clean",
-                "Pulizia Paddle",
+                "Paddle cleanup",
                 5));
             await RunPaddlePackageCleanupAsync(venvPython, null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Installazione pacchetti PaddleOCR in corso.",
-                "Questa fase può durare diversi minuti e dipende da rete, pip e wheel disponibili.",
+                "Installing PaddleOCR packages in progress.",
+                "This phase may take several minutes and depends on network, pip, and available wheels.",
                 "paddle-install",
-                "Installazione PaddleOCR",
+                "PaddleOCR installation",
                 6));
             await RunProcessAsync(venvPython, ["-m", "pip", "install", "--upgrade", "-r", requirementsPath, "--disable-pip-version-check"], null, cancellationToken);
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
                 runtime.ResolvedRuntime,
-                "Verifica runtime OCR appena installato in corso.",
+                "Verifying newly installed OCR runtime in progress.",
                 runtime.IsNvidia
-                    ? "OnlyRag controlla che PaddleOCR veda CUDA e la GPU."
-                    : "OnlyRag controlla che PaddleOCR CPU sia importabile e pronto.",
+                    ? "OnlyRag checks that PaddleOCR sees CUDA and the GPU."
+                    : "OnlyRag checks that CPU PaddleOCR is importable and ready.",
                 "bridge-check",
-                "Verifica runtime",
+                "Runtime verification",
                 7));
             await RunProcessAsync(venvPython, [bridgePath, "--mode", "check", "--device", runtime.IsNvidia ? "gpu" : "cpu"], null, cancellationToken);
 
             SetLastOcrStatus(new OcrProvisionStatus(
                 true,
                 false,
-                $"OCR configurato correttamente con runtime {runtime.ResolvedRuntime}. Puoi usare l'OCR da importazione documenti e azioni documento.",
+                $"OCR configured correctly with runtime {runtime.ResolvedRuntime}. You can use OCR from document import and document actions.",
                 null,
                 runtimeTarget,
                 runtime.ResolvedRuntime,
                 runtime.Detail,
                 StepKey: "complete",
-                StepLabel: "OCR configurato",
+                StepLabel: "OCR configured",
                 StepIndex: OcrProvisionStepCount,
                 StepCount: OcrProvisionStepCount,
                 ProgressPercent: 100,
@@ -381,14 +381,14 @@ public sealed class DependencyProvisioningService
                 false,
                 false,
                 WasOcrProvisionTimedOut()
-                    ? $"Configurazione OCR interrotta: tempo massimo di {FormatTimeout(ocrProvisionTimeout)} raggiunto."
-                    : "Configurazione OCR annullata.",
+                    ? $"OCR configuration interrupted: maximum time of {FormatTimeout(ocrProvisionTimeout)} reached."
+                    : "OCR configuration cancelled.",
                 null,
                 runtimeTarget,
                 "cancelled",
-                "I processi di preparazione OCR in corso sono stati arrestati. Puoi ripetere Installa OCR quando vuoi.",
+                "Running OCR preparation processes have been stopped. You can repeat Install OCR whenever you want.",
                 StepKey: "cancelled",
-                StepLabel: "Configurazione annullata",
+                StepLabel: "Configuration cancelled",
                 StepIndex: 0,
                 StepCount: OcrProvisionStepCount,
                 ProgressPercent: 0,
@@ -400,17 +400,17 @@ public sealed class DependencyProvisioningService
         {
             string lastError = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
-                "Errore tecnico durante la configurazione OCR. Dettagli disponibili nei log locali.");
+                "Technical error during OCR configuration. Details available in local logs.");
             SetLastOcrStatus(new OcrProvisionStatus(
                 false,
                 false,
-                "Configurazione OCR non completata.",
+                "OCR configuration not completed.",
                 lastError,
                 runtimeTarget,
                 "unknown",
                 null,
                 StepKey: "failed",
-                StepLabel: "Configurazione non completata",
+                StepLabel: "Configuration not completed",
                 StepIndex: 0,
                 StepCount: OcrProvisionStepCount,
                 ProgressPercent: 0,
@@ -460,12 +460,12 @@ public sealed class DependencyProvisioningService
         }
 
         string detail = unsupported.Count == 0
-            ? "Python compatibile non trovato."
-            : $"Interpreti non compatibili trovati: {string.Join(", ", unsupported)}.";
+            ? "Compatible Python not found."
+            : $"Incompatible interpreters found: {string.Join(", ", unsupported)}.";
         throw new InvalidOperationException(
-            "OCR richiede Python 3.10, 3.11, 3.12 o 3.13. " +
-            "PaddlePaddle 3.3.1 non pubblica wheel Windows per Python 3.14. " +
-            $"{detail} Installa una versione compatibile di Python per Windows, poi ripeti Installa OCR.");
+            "OCR requires Python 3.10, 3.11, 3.12, or 3.13. " +
+            "PaddlePaddle 3.3.1 does not publish Windows wheels for Python 3.14. " +
+            $"{detail} Install a compatible Python version for Windows, then repeat Install OCR.");
     }
 
     private string ResolveOcrScriptsRoot()
@@ -506,7 +506,7 @@ public sealed class DependencyProvisioningService
         {
             string detail = string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput : result.StandardError;
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
-                ? $"{fileName} terminato con exit code {result.ExitCode}."
+                ? $"{fileName} exited with code {result.ExitCode}."
                 : detail.Trim());
         }
 
@@ -527,7 +527,7 @@ public sealed class DependencyProvisioningService
         }
 
         throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
-            ? $"{venvPython} terminato con exit code {result.ExitCode}."
+            ? $"{venvPython} exited with code {result.ExitCode}."
             : detail.Trim());
     }
 
@@ -546,8 +546,8 @@ public sealed class DependencyProvisioningService
     private static string FormatTimeout(TimeSpan timeout)
     {
         return timeout.TotalMinutes >= 1
-            ? $"{(int)Math.Ceiling(timeout.TotalMinutes)} minuti"
-            : $"{(int)Math.Ceiling(timeout.TotalSeconds)} secondi";
+            ? $"{(int)Math.Ceiling(timeout.TotalMinutes)} minutes"
+            : $"{(int)Math.Ceiling(timeout.TotalSeconds)} seconds";
     }
 
     private static int CalculateProgressPercent(int stepIndex)
@@ -609,7 +609,7 @@ public sealed class DependencyProvisioningService
         && (
             !string.IsNullOrWhiteSpace(status.LastError)
             || string.Equals(status.ResolvedRuntime, "cancelled", StringComparison.OrdinalIgnoreCase)
-            || status.Message.StartsWith("Configurazione OCR non completata", StringComparison.OrdinalIgnoreCase)
+            || status.Message.StartsWith("OCR configuration not completed", StringComparison.OrdinalIgnoreCase)
         );
 
     private bool WasOcrProvisionTimedOut()

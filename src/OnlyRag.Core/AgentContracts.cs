@@ -81,3 +81,11 @@ public sealed record GraphRetrievalResult(
     IReadOnlyList<string> RelatedChunkIds,
     float RelevanceScore);
 
+public sealed record AgentSkillRecord(
+    string SkillId,
+    string Name,
+    string Category,
+    string PatternDescription,
+    string SolutionTemplate,
+    DateTimeOffset CreatedAtUtc);
+

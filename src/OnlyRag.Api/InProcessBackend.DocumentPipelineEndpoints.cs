@@ -25,7 +25,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             OllamaSettings currentSettings = await settings.GetAsync(cancellationToken);
@@ -58,7 +58,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             int requestedPage = Math.Max(1, page ?? 1);

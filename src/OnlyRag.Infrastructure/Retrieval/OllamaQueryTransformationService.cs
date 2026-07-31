@@ -10,6 +10,8 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
     private readonly ILlmQueryExpander? llmExpander;
     private readonly ILoggingService? logger;
     private readonly ConcurrentDictionary<(string Query, QueryTransformationStrategy Strategy), List<string>> llmCache = new();
+    private readonly LinkedList<(string Query, QueryTransformationStrategy Strategy)> cacheOrder = new();
+    private readonly object cacheLock = new();
 
     public OllamaQueryTransformationService(
         ILlmQueryExpander? llmExpander = null,
@@ -30,22 +32,12 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
             return new QueryTransformationResult(trimmed, [trimmed], QueryTransformationStrategy.None);
         }
 
-        // For HyDE and SubQuery, use LLM when available; otherwise fall back to MultiQuery heuristics.
         QueryTransformationStrategy effectiveStrategy = strategy;
-        if (llmExpander is null && strategy is QueryTransformationStrategy.HyDE or QueryTransformationStrategy.SubQuery)
-        {
-            effectiveStrategy = QueryTransformationStrategy.MultiQuery;
-            logger?.LogInfo("OllamaQueryTransformationService",
-                $"Strategia '{strategy}' richiede LLM non disponibile, fallback a MultiQuery euristica.");
-        }
-
-        List<string> variants = effectiveStrategy switch
+        List<string> variants = strategy switch
         {
             QueryTransformationStrategy.MultiQuery => GenerateMultiQueryVariants(trimmed),
-            // SubQuery and HyDE with no LLM already fell back to MultiQuery above.
-            // SubQuery/HyDE with LLM start with the original query; LLM variants are appended below.
             QueryTransformationStrategy.SubQuery => [trimmed],
-            QueryTransformationStrategy.HyDE => [trimmed],
+            QueryTransformationStrategy.HyDE => GenerateZeroShotHydeVariants(trimmed),
             _ => [trimmed]
         };
 
@@ -58,13 +50,13 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
                 {
                     variants.AddRange(llmVariants);
                     logger?.LogInfo("OllamaQueryTransformationService",
-                        $"[LLM EXPANSION SUCCESS] Generate {llmVariants.Count} varianti tramite LLM per la strategia '{effectiveStrategy}'.");
+                        $"[LLM EXPANSION SUCCESS] Generated {llmVariants.Count} variants via LLM for strategy '{effectiveStrategy}'.");
                 }
             }
             catch (Exception ex)
             {
                 logger?.LogWarning("OllamaQueryTransformationService",
-                    $"Errore nell'espansione LLM, utilizzate solo euristiche: {ex.Message}");
+                    $"Error in LLM expansion, falling back to heuristics only: {ex.Message}");
             }
         }
 
@@ -78,21 +70,28 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         CancellationToken cancellationToken)
     {
         var cacheKey = (query.ToLowerInvariant(), strategy);
-        if (llmCache.TryGetValue(cacheKey, out var cached))
+
+        lock (cacheLock)
         {
-            logger?.LogInfo("OllamaQueryTransformationService",
-                $"[LLM EXPANSION CACHE HIT] Trovate {cached.Count} varianti in cache per query '{query}' ({strategy}).");
-            return cached;
+            if (llmCache.TryGetValue(cacheKey, out var cached))
+            {
+                cacheOrder.Remove(cacheKey);
+                cacheOrder.AddLast(cacheKey);
+
+                logger?.LogInfo("OllamaQueryTransformationService",
+                    $"[LLM EXPANSION CACHE HIT] Found {cached.Count} cached variants for query '{query}' ({strategy}).");
+                return cached;
+            }
         }
 
         string prompt = strategy switch
         {
             QueryTransformationStrategy.MultiQuery =>
-                $"Genera 3 riformulazioni alternative della seguente query di ricerca, una per riga, conservando il significato originale:\n\"{query}\"",
+                $"Generate 3 alternative reformulations of the following search query, one per line, preserving the original meaning:\n\"{query}\"",
             QueryTransformationStrategy.SubQuery =>
-                $"Scomponi la seguente query di ricerca in 2-3 sotto-query più semplici e focalizzate, una per riga. Mantieni intatti nomi propri ed entità composte:\n\"{query}\"",
+                $"Decompose the following search query into 2-3 simpler, focused sub-queries, one per line. Keep proper nouns and compound entities intact:\n\"{query}\"",
             QueryTransformationStrategy.HyDE =>
-                $"Scrivi un breve estratto (2-3 frasi) di un ipotetico documento che risponda alla domanda o argomento seguente:\n\"{query}\"",
+                $"Write a brief excerpt (2-3 sentences) of a hypothetical document that answers the following question or topic:\n\"{query}\"",
             _ => string.Empty
         };
 
@@ -121,35 +120,26 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
 
         if (list.Count > 0)
         {
-            EvictCacheIfNeeded();
-            llmCache[cacheKey] = list;
+            lock (cacheLock)
+            {
+                if (!llmCache.ContainsKey(cacheKey))
+                {
+                    if (llmCache.Count >= MaxCacheEntries)
+                    {
+                        var oldest = cacheOrder.First;
+                        if (oldest != null)
+                        {
+                            llmCache.TryRemove(oldest.Value, out _);
+                            cacheOrder.RemoveFirst();
+                        }
+                    }
+                    llmCache[cacheKey] = list;
+                    cacheOrder.AddLast(cacheKey);
+                }
+            }
         }
 
         return list;
-    }
-
-    private void EvictCacheIfNeeded()
-    {
-        if (llmCache.Count < MaxCacheEntries)
-        {
-            return;
-        }
-
-        // Remove roughly half the cache entries to avoid frequent evictions.
-        int toRemove = llmCache.Count / 2;
-        int removed = 0;
-        foreach (var key in llmCache.Keys)
-        {
-            if (removed >= toRemove)
-            {
-                break;
-            }
-
-            if (llmCache.TryRemove(key, out _))
-            {
-                removed++;
-            }
-        }
     }
 
     private static string CleanLine(string line)
@@ -209,6 +199,25 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         if (!string.Equals(expanded, query, StringComparison.OrdinalIgnoreCase))
         {
             list.Add(expanded);
+        }
+
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static List<string> GenerateZeroShotHydeVariants(string query)
+    {
+        var list = new List<string> { query };
+
+        string syntheticPassage = $"This document describes and provides specific details about: {query}. It contains technical explanations, key concepts, and related definitions.";
+        list.Add(syntheticPassage);
+
+        var multiQuery = GenerateMultiQueryVariants(query);
+        foreach (var mq in multiQuery)
+        {
+            if (!list.Contains(mq, StringComparer.OrdinalIgnoreCase))
+            {
+                list.Add(mq);
+            }
         }
 
         return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();

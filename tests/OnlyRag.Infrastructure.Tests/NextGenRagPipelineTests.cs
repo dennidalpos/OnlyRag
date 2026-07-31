@@ -62,18 +62,18 @@ public sealed class NextGenRagPipelineTests
     }
 
     [Fact]
-    public void CragEvaluator_DetectsLowConfidence()
+    public void CragDecisionEngine_DetectsLowConfidence()
     {
-        CragEvaluator evaluator = new();
+        CragDecisionEngine engine = new();
         List<DocumentSearchResult> lowScoreResults = new()
         {
-            new DocumentSearchResult(1, "doc.txt", 1, 1, 10, "testo irrilevante", 0.15d, 0.15d)
+            new DocumentSearchResult(1, "doc.txt", 1, 1, 10, "irrelevant text", 0.15d, 0.15d)
         };
 
-        CragEvaluationResult result = evaluator.Evaluate(lowScoreResults, threshold: 0.30d);
+        CragDecision result = engine.Evaluate(lowScoreResults, "test query", threshold: 0.30d);
 
-        Assert.False(result.IsConfident);
-        Assert.Contains("basso", result.SummaryNotice, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(CragAction.Reformulate, result.Action);
+        Assert.Contains("low", result.SummaryNotice, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class DummyChunkRepo : IRetrievalChunkRepository

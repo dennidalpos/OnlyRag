@@ -36,4 +36,7 @@ public interface ILocalJobQueue
     Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default);
 
     Task<int> PurgeCompletedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Signal released when a new job is enqueued. Workers await this instead of polling.</summary>
+    SemaphoreSlim EnqueueSignal { get; }
 }

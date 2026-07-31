@@ -36,6 +36,7 @@ internal interface IOllamaClient
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
         object? format = null,
+        object? tools = null,
         CancellationToken cancellationToken = default);
 
     async IAsyncEnumerable<string> GenerateChatStreamAsync(
@@ -43,9 +44,10 @@ internal interface IOllamaClient
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
         object? format = null,
+        object? tools = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        string response = await GenerateChatAsync(modelName, messages, numCtx, format, cancellationToken);
+        string response = await GenerateChatAsync(modelName, messages, numCtx, format, tools, cancellationToken);
         yield return response;
     }
 

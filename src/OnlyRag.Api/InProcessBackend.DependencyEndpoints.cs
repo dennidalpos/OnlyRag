@@ -36,8 +36,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'avvio dell'installazione Ollama richiede una conferma esplicita dalla UI.",
+                    "Confirmation required",
+                    "Starting Ollama installation requires explicit UI confirmation.",
                     "confirmation_required");
             }
 
@@ -48,7 +48,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateBadRequestProblem(
-                    "Installazione Ollama non avviata",
+                    "Ollama installation not started",
                     ex.Message,
                     "dependency_install_not_started");
             }
@@ -63,8 +63,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'apertura del download LibreOffice per export PDF richiede una conferma esplicita dalla UI.",
+                    "Confirmation required",
+                    "Opening LibreOffice download for PDF export requires explicit UI confirmation.",
                     "confirmation_required");
             }
 
@@ -75,7 +75,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Open LibreOffice PDF export download failed.", ex);
-                return CreateUnexpectedErrorProblem("Download LibreOffice non aperto", httpContext.TraceIdentifier);
+                return CreateUnexpectedErrorProblem("LibreOffice download not opened", httpContext.TraceIdentifier);
             }
         });
 
@@ -102,8 +102,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "La configurazione OCR richiede una conferma esplicita dalla UI.",
+                    "Confirmation required",
+                    "OCR configuration requires explicit UI confirmation.",
                     "confirmation_required");
             }
 
@@ -114,7 +114,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, "Start OCR provisioning failed.", ex);
-                return CreateUnexpectedErrorProblem("Configurazione OCR non avviata", httpContext.TraceIdentifier);
+                return CreateUnexpectedErrorProblem("OCR configuration not started", httpContext.TraceIdentifier);
             }
         });
 
@@ -125,8 +125,8 @@ public static partial class InProcessBackend
             if (!request.Confirmed)
             {
                 return CreateBadRequestProblem(
-                    "Conferma richiesta",
-                    "L'annullamento della configurazione OCR richiede una conferma esplicita dalla UI.",
+                    "Confirmation required",
+                    "Cancelling OCR configuration requires explicit UI confirmation.",
                     "confirmation_required");
             }
 

@@ -21,7 +21,7 @@ internal sealed class WindowsKillOnCloseProcessJob : IDisposable
         SafeFileHandle handle = CreateJobObjectW(IntPtr.Zero, null);
         if (handle.IsInvalid)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Impossibile creare il job Windows per Qdrant.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to create the Windows job for Qdrant.");
         }
 
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = new()
@@ -40,7 +40,7 @@ internal sealed class WindowsKillOnCloseProcessJob : IDisposable
         {
             int error = Marshal.GetLastWin32Error();
             handle.Dispose();
-            throw new Win32Exception(error, "Impossibile configurare il job Windows per Qdrant.");
+            throw new Win32Exception(error, "Unable to configure the Windows job for Qdrant.");
         }
 
         return new WindowsKillOnCloseProcessJob(handle);
@@ -50,7 +50,7 @@ internal sealed class WindowsKillOnCloseProcessJob : IDisposable
     {
         if (!AssignProcessToJobObject(handle, process.Handle))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Impossibile associare Qdrant al job Windows dell'app.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to assign Qdrant to the app's Windows job.");
         }
     }
 

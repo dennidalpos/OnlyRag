@@ -1,35 +1,78 @@
+using System.Collections.Generic;
+using System.Linq;
 using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
-public sealed record CragEvaluationResult(
-    bool IsConfident,
-    double HighestScore,
-    string SummaryNotice);
-
-public sealed class CragEvaluator
+public enum CragAction
 {
-    public CragEvaluationResult Evaluate(
+    Accept,
+    Reformulate,
+    Abstain
+}
+
+public sealed record CragDecision(
+    CragAction Action,
+    double HighestScore,
+    string SummaryNotice,
+    IReadOnlyList<string>? ReformulatedQueries);
+
+public sealed class CragDecisionEngine
+{
+    public CragDecision Evaluate(
         IReadOnlyList<DocumentSearchResult> results,
-        double threshold = 0.30)
+        string originalQuery,
+        double threshold = 0.30,
+        double lowThreshold = 0.15)
     {
         if (results.Count == 0)
         {
-            return new CragEvaluationResult(false, 0d, "Nessun candidato recuperato.");
+            return new CragDecision(CragAction.Abstain, 0d, "No candidates retrieved.", null);
         }
 
         double maxScore = results.Max(r => r.ReRankScore ?? r.Score);
-        if (maxScore < threshold)
+
+        if (maxScore >= threshold)
         {
-            return new CragEvaluationResult(
-                false,
+            return new CragDecision(
+                CragAction.Accept,
                 maxScore,
-                $"Punteggio di confidenza RAG basso ({maxScore:F2} < {threshold:F2}). Considera di riformulare la domanda.");
+                $"High RAG confidence ({maxScore:F2}).",
+                null);
         }
 
-        return new CragEvaluationResult(
-            true,
+        if (maxScore >= lowThreshold)
+        {
+            var reformulations = GenerateReformulations(originalQuery);
+            return new CragDecision(
+                CragAction.Reformulate,
+                maxScore,
+                $"Low RAG confidence ({maxScore:F2} < {threshold:F2}). Attempting query reformulation.",
+                reformulations);
+        }
+
+        return new CragDecision(
+            CragAction.Abstain,
             maxScore,
-            $"Confidenza RAG elevata ({maxScore:F2}).");
+            $"Insufficient RAG confidence ({maxScore:F2} < {lowThreshold:F2}).",
+            null);
+    }
+
+    private static readonly char[] QuerySplitChars = [' ', '?', '.', ','];
+
+    public IReadOnlyList<string> GenerateReformulations(string originalQuery)
+    {
+        var words = originalQuery.Split(QuerySplitChars, System.StringSplitOptions.RemoveEmptyEntries);
+        var keyTerms = words.Where(w => w.Length > 3).ToList();
+
+        if (keyTerms.Count == 0)
+        {
+            return [originalQuery + " explained", "What is " + originalQuery + "?"];
+        }
+
+        string rearranged = string.Join(" ", keyTerms.OrderByDescending(x => x.Length));
+        string withFraming = "What is known about " + string.Join(" ", keyTerms) + "?";
+
+        return [rearranged, withFraming];
     }
 }

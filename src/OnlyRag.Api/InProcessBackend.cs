@@ -72,9 +72,9 @@ public static partial class InProcessBackend
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             throw new InvalidOperationException(
-                "Impossibile preparare la directory runtime principale di OnlyRag. " +
-                $"Percorso: {dataRoot}. " +
-                "Verifica che il percorso non sia un file e che l'utente corrente abbia permessi di lettura e scrittura.",
+                "Unable to prepare the main OnlyRag runtime directory. " +
+                $"Path: {dataRoot}. " +
+                "Verify that the path is not a file and that the current user has read and write permissions.",
                 ex);
         }
     }

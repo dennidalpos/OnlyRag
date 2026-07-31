@@ -8,6 +8,13 @@ namespace OnlyRag.Infrastructure.Ingestion;
 public sealed class DocumentTextChunker
 {
     private static readonly Regex TokenRegex = new(@"\S+", RegexOptions.Compiled);
+    private static readonly Regex SentenceBoundaryRegex = new(@"(?<=[.!?;])\s+", RegexOptions.Compiled | RegexOptions.RightToLeft);
+
+    private static int FindLastSentenceBoundary(string text)
+    {
+        Match match = SentenceBoundaryRegex.Match(text);
+        return match.Success ? match.Index : -1;
+    }
 
     public IReadOnlyList<IngestedDocumentChunk> CreateChunks(
         string text,
@@ -131,7 +138,7 @@ public sealed class DocumentTextChunker
                     continue;
                 }
 
-                AddWordUnits(line, units);
+                AddSentenceUnits(line, units);
             }
         }
 
@@ -170,6 +177,47 @@ public sealed class DocumentTextChunker
         }
     }
 
+    private static void AddSentenceUnits(string text, List<TextUnit> units)
+    {
+        // Split at sentence boundaries first
+        string[] sentences = Regex.Split(text, @"(?<=[.!?])\s+(?=[A-Z\p{Lu}])");
+        StringBuilder builder = new();
+        int tokens = 0;
+
+        foreach (string sentence in sentences)
+        {
+            int sentenceTokens = EstimateTokenCount(sentence);
+            if (sentenceTokens == 0) continue;
+
+            if (sentenceTokens > DocumentIngestionOptions.MaximumChunkSizeTokens)
+            {
+                if (tokens > 0)
+                {
+                    units.Add(new TextUnit(builder.ToString().Trim(), tokens));
+                    builder.Clear();
+                    tokens = 0;
+                }
+                AddWordUnits(sentence, units);
+                continue;
+            }
+
+            // If adding this sentence would exceed min chunk, flush current
+            if (tokens > 0 && tokens + sentenceTokens > DocumentIngestionOptions.MinimumChunkSizeTokens)
+            {
+                units.Add(new TextUnit(builder.ToString().Trim(), tokens));
+                builder.Clear();
+                tokens = 0;
+            }
+
+            if (builder.Length > 0) builder.Append(' ');
+            builder.Append(sentence);
+            tokens += sentenceTokens;
+        }
+
+        if (tokens > 0)
+            units.Add(new TextUnit(builder.ToString().Trim(), tokens));
+    }
+
     private static List<TextUnit> BuildOverlap(IReadOnlyList<TextUnit> units, int overlapTokens)
     {
         if (overlapTokens <= 0)
@@ -184,6 +232,16 @@ public sealed class DocumentTextChunker
             TextUnit unit = units[index];
             if (overlap.Count > 0 && tokens + unit.TokenCount > overlapTokens)
             {
+                int boundary = FindLastSentenceBoundary(unit.Text);
+                if (boundary > 0)
+                {
+                    string partial = unit.Text[boundary..].TrimStart();
+                    int partialTokens = EstimateTokenCount(partial);
+                    if (partialTokens > 0 && tokens + partialTokens <= overlapTokens)
+                    {
+                        overlap.Insert(0, new TextUnit(partial, partialTokens));
+                    }
+                }
                 break;
             }
 

@@ -44,7 +44,7 @@ internal sealed class OcrProvisionRuntimeResolver
         if (target is CpuTarget)
         {
             return OcrProvisionRuntime.Cpu(
-                "CPU richiesta esplicitamente.",
+                "CPU requested explicitly.",
                 cpuTarget.RequirementsFile,
                 cpuTarget.ResolvedRuntime);
         }
@@ -53,9 +53,9 @@ internal sealed class OcrProvisionRuntimeResolver
         if (nvidiaSmiPath is null)
         {
             return target is NvidiaTarget
-                ? throw new InvalidOperationException("Runtime NVIDIA richiesto, ma nvidia-smi non e' stato trovato.")
+                ? throw new InvalidOperationException("NVIDIA runtime requested, but nvidia-smi was not found.")
                 : OcrProvisionRuntime.Cpu(
-                    "NVIDIA non rilevata: nvidia-smi non trovato.",
+                    "NVIDIA not detected: nvidia-smi not found.",
                     cpuTarget.RequirementsFile,
                     cpuTarget.ResolvedRuntime);
         }
@@ -75,16 +75,16 @@ internal sealed class OcrProvisionRuntimeResolver
             return OcrProvisionRuntime.Cpu(
                 UserFacingErrorText.FromExternalDetail(
                     ex.Message,
-                    "NVIDIA rilevata, ma nvidia-smi non ha completato la verifica. OCR CPU selezionato."),
+                    "NVIDIA detected, but nvidia-smi did not complete verification. CPU OCR selected."),
                 cpuTarget.RequirementsFile,
                 cpuTarget.ResolvedRuntime);
         }
         if (info.DriverVersion is null)
         {
             return target is NvidiaTarget
-                ? throw new InvalidOperationException("Runtime NVIDIA richiesto, ma la versione driver non e' stata rilevata.")
+                ? throw new InvalidOperationException("NVIDIA runtime requested, but the driver version was not detected.")
                 : OcrProvisionRuntime.Cpu(
-                    "NVIDIA rilevata, ma versione driver non leggibile.",
+                    "NVIDIA detected, but driver version is unreadable.",
                     cpuTarget.RequirementsFile,
                     cpuTarget.ResolvedRuntime);
         }
@@ -92,7 +92,7 @@ internal sealed class OcrProvisionRuntimeResolver
         if (IsNvidiaSeries50(info.DisplayName))
         {
             string message =
-                $"NVIDIA {info.DisplayName} rilevata, ma il supporto PaddlePaddle Windows per RTX serie 50 e' ancora marcato sperimentale/speciale. OnlyRag usera' OCR CPU finche' non c'e' una wheel stabile verificata.";
+                $"NVIDIA {info.DisplayName} detected, but PaddlePaddle Windows support for RTX 50 series is still marked experimental/special. OnlyRag will use CPU OCR until there is a verified stable wheel.";
             return target is NvidiaTarget
                 ? throw new InvalidOperationException(message)
                 : OcrProvisionRuntime.Cpu(message, cpuTarget.RequirementsFile, cpuTarget.ResolvedRuntime);
@@ -119,19 +119,19 @@ internal sealed class OcrProvisionRuntimeResolver
             }
 
             string computeDetail = info.ComputeCapability is null
-                ? "compute capability non letta da nvidia-smi"
+                ? "compute capability not read by nvidia-smi"
                 : $"compute capability {info.ComputeCapability}";
             return OcrProvisionRuntime.Nvidia(
                 runtime.ResolvedRuntime,
                 runtime.RequirementsFile,
-                $"NVIDIA {info.DisplayName} con driver {info.DriverVersion} e {computeDetail} compatibile con {runtime.ResolvedRuntime}.",
+                $"NVIDIA {info.DisplayName} with driver {info.DriverVersion} and {computeDetail} compatible with {runtime.ResolvedRuntime}.",
                 info.DisplayName,
                 info.DriverVersion.ToString(),
                 info.ComputeCapability?.ToString());
         }
 
         string detail =
-            $"Driver NVIDIA {info.DriverVersion} o compute capability {info.ComputeCapability?.ToString() ?? "non rilevata"} sotto il minimo dei runtime PaddleOCR GPU Windows verificati.";
+            $"NVIDIA driver {info.DriverVersion} or compute capability {info.ComputeCapability?.ToString() ?? "not detected"} below the minimum of verified PaddleOCR GPU Windows runtimes.";
         return target is NvidiaTarget
             ? throw new InvalidOperationException(detail)
             : OcrProvisionRuntime.Cpu(detail, cpuTarget.RequirementsFile, cpuTarget.ResolvedRuntime);
@@ -225,7 +225,7 @@ internal sealed class OcrProvisionRuntimeResolver
             string detail = string.IsNullOrWhiteSpace(result.StandardError)
                 ? result.StandardOutput
                 : result.StandardError;
-            throw new InvalidOperationException($"Runtime NVIDIA richiesto, ma nvidia-smi non e' utilizzabile: {detail.Trim()}.");
+            throw new InvalidOperationException($"NVIDIA runtime requested, but nvidia-smi is not usable: {detail.Trim()}.");
         }
 
         return ParseNvidiaSmi(result.StandardOutput);

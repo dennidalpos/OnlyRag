@@ -278,6 +278,11 @@ public sealed class ChatServiceQdrantIntegrationTests
 
             return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm));
         }
+
+        public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed class FakeOllamaClient : IOllamaClient
@@ -313,6 +318,7 @@ public sealed class ChatServiceQdrantIntegrationTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             LastMessages = messages;

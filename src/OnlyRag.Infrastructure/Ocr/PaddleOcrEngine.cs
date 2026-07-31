@@ -255,12 +255,12 @@ public sealed class PaddleOcrEngine : IOcrEngine
             string detail = FormatBridgeErrorDetail(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr);
             throw new InvalidOperationException(
                 string.IsNullOrWhiteSpace(detail)
-                    ? "Risposta JSON OCR non valida."
-                    : $"Risposta JSON OCR non valida: {detail}",
+                    ? "Invalid OCR JSON response."
+                    : $"Invalid OCR JSON response: {detail}",
                 ex);
         }
 
-        return result ?? throw new InvalidOperationException("Risposta JSON OCR non valida.");
+        return result ?? throw new InvalidOperationException("Invalid OCR JSON response.");
     }
 
     private static void KillProcessTree(Process process)

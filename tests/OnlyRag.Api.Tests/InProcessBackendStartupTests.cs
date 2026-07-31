@@ -26,9 +26,9 @@ public sealed partial class InProcessBackendTests
             InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => InProcessBackend.StartAsync(descriptor));
 
-            Assert.Contains("directory runtime principale", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("main OnlyRag runtime directory", error.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Contains(fileRoot, error.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("permessi", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("permissions", error.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

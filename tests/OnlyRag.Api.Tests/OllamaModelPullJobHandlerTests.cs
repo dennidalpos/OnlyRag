@@ -59,6 +59,7 @@ public sealed class OllamaModelPullJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

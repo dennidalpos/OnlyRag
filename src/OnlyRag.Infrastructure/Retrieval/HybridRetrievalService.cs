@@ -15,7 +15,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
     private readonly IReRankerService reRanker;
     private readonly IQueryTransformationService queryTransformer;
     private readonly ParentChildChunkResolver parentChildResolver;
-    private readonly CragEvaluator cragEvaluator;
+    private readonly CragDecisionEngine cragEvaluator;
     private readonly HybridRetrievalOptions options;
     private readonly ISettingsRepository? settings;
 
@@ -29,7 +29,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         IReRankerService? reRanker = null,
         IQueryTransformationService? queryTransformer = null,
         ParentChildChunkResolver? parentChildResolver = null,
-        CragEvaluator? cragEvaluator = null,
+        CragDecisionEngine? cragEvaluator = null,
         HybridRetrievalOptions? options = null,
         ISettingsRepository? settings = null)
     {
@@ -42,13 +42,21 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         this.reRanker = reRanker ?? new HeuristicReRankerService();
         this.queryTransformer = queryTransformer ?? new OllamaQueryTransformationService();
         this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver(chunks);
-        this.cragEvaluator = cragEvaluator ?? new CragEvaluator();
+        this.cragEvaluator = cragEvaluator ?? new CragDecisionEngine();
         this.options = options ?? HybridRetrievalOptions.Default;
         this.settings = settings;
     }
 
+    public Task<DocumentSearchResponse> SearchAsync(
+        DocumentSearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SearchAsync(request, false, cancellationToken);
+    }
+
     public async Task<DocumentSearchResponse> SearchAsync(
         DocumentSearchRequest request,
+        bool isReformulation,
         CancellationToken cancellationToken = default)
     {
         string query = request.Query?.Trim() ?? string.Empty;
@@ -84,8 +92,72 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             ? transformation.ExpandedQueries
             : [query];
 
+        var pipelineResult = await ExecuteStages2To5Async(query, searchQueries, documentIds, finalLimit, notices, cancellationToken);
+        var finalResults = pipelineResult.Results;
+
+        // ── Stage 6: CRAG Confidence Check ─────────────────────────────────
+        double cragThreshold = await GetCragThresholdAsync(cancellationToken);
+        CragDecision cragResult = cragEvaluator.Evaluate(finalResults, query, cragThreshold);
+
+        if (cragResult.Action == CragAction.Abstain)
+        {
+            notices.Add(new RetrievalNotice("crag_insufficient_evidence", cragResult.SummaryNotice));
+        }
+        else if (cragResult.Action == CragAction.Reformulate)
+        {
+            if (isReformulation)
+            {
+                notices.Add(new RetrievalNotice("crag_insufficient_evidence", cragResult.SummaryNotice));
+            }
+            else
+            {
+                notices.Add(new RetrievalNotice("crag_reformulation", cragResult.SummaryNotice));
+
+                var reformQueries = cragResult.ReformulatedQueries ?? [];
+                string primaryReformQuery = reformQueries.Count > 0 ? reformQueries[0] : query;
+                var refPipelineResult = await ExecuteStages2To5Async(primaryReformQuery, reformQueries, documentIds, finalLimit, notices, cancellationToken);
+
+                var mergedResults = finalResults.Concat(refPipelineResult.Results)
+                    .DistinctBy(r => r.ChunkId)
+                    .ToList();
+
+                List<ReRankCandidate> mergedCandidates = mergedResults.Select(m => new ReRankCandidate(m.ChunkId, m.Snippet)).ToList();
+                var mergedReRankedScores = await reRanker.ReRankAsync(query, mergedCandidates, cancellationToken);
+                var mergedScoreMap = mergedReRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
+
+                finalResults = mergedResults.Select(m =>
+                {
+                    double rs = mergedScoreMap.TryGetValue(m.ChunkId, out var s) ? s : m.Score;
+                    return m with { Score = rs, ReRankScore = rs };
+                }).OrderByDescending(m => m.ReRankScore ?? m.Score).Take(finalLimit).ToList();
+            }
+        }
+
+        IReadOnlyList<DocumentSearchDocumentStatus> documentStatuses = await BuildDocumentStatusesAsync(
+            documentIds,
+            pipelineResult.QueryEmbedding?.Model,
+            cancellationToken);
+
+        return new DocumentSearchResponse(
+            finalResults,
+            documentStatuses,
+            pipelineResult.KeywordBackendName,
+            pipelineResult.VectorAttempt.BackendName,
+            options.MaxContextCharacters)
+        {
+            Notices = notices
+        };
+    }
+
+    private async Task<(IReadOnlyList<DocumentSearchResult> Results, VectorSearchAttempt VectorAttempt, string KeywordBackendName, QueryEmbeddingResult? QueryEmbedding)> ExecuteStages2To5Async(
+        string query,
+        IReadOnlyList<string> searchQueries,
+        long[] documentIds,
+        int finalLimit,
+        List<RetrievalNotice> notices,
+        CancellationToken cancellationToken)
+    {
         // ── Stage 2: Coarse Hybrid Retrieval (FTS5 + Qdrant in parallel) ───
-        // Run keyword + vector searches for ALL query variants, then merge via RRF.
         Task<QueryEmbeddingResult?> embeddingTask = TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
 
         List<Task<KeywordSearchResponse>> keywordTasks = [];
@@ -98,12 +170,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         QueryEmbeddingResult? queryEmbedding = await embeddingTask;
 
-        // Vector search uses the primary embedding (original query).
         VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
             ? new VectorSearchAttempt([], "Qdrant unavailable")
             : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
 
-        // Merge all keyword results into one list.
         List<KeywordSearchResult> allKeywordResults = [];
         string keywordBackendName = "none";
         foreach (Task<KeywordSearchResponse> task in keywordTasks)
@@ -125,7 +195,6 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             cancellationToken);
 
         // ── Stage 4: 2nd-Stage Re-ranking on child chunks ──────────────────
-        // Build re-rank candidates from the CHILD chunk content (not parent).
         List<ReRankCandidate> candidates = [];
         foreach (DocumentSearchResult coarse in coarseResults)
         {
@@ -135,7 +204,6 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         IReadOnlyList<ReRankResult> reRankedScores = await reRanker.ReRankAsync(query, candidates, cancellationToken);
         Dictionary<long, double> scoreMap = reRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
 
-        // Apply re-rank scores, sort, and take top-K.
         List<DocumentSearchResult> reRanked = [];
         foreach (DocumentSearchResult coarse in coarseResults)
         {
@@ -166,28 +234,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             });
         }
 
-        // ── Stage 6: CRAG Confidence Check ─────────────────────────────────
-        double cragThreshold = await GetCragThresholdAsync(cancellationToken);
-        CragEvaluationResult cragResult = cragEvaluator.Evaluate(finalResults, cragThreshold);
-        if (!cragResult.IsConfident)
-        {
-            notices.Add(new RetrievalNotice("crag_low_confidence", cragResult.SummaryNotice));
-        }
-
-        IReadOnlyList<DocumentSearchDocumentStatus> documentStatuses = await BuildDocumentStatusesAsync(
-            documentIds,
-            queryEmbedding?.Model,
-            cancellationToken);
-
-        return new DocumentSearchResponse(
-            finalResults,
-            documentStatuses,
-            keywordBackendName,
-            vectorSearchAttempt.BackendName,
-            options.MaxContextCharacters)
-        {
-            Notices = notices
-        };
+        return (finalResults, vectorSearchAttempt, keywordBackendName, queryEmbedding);
     }
 
     private int NormalizeTopK(int? requestedTopK)

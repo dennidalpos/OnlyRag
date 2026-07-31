@@ -64,7 +64,7 @@ public sealed class OcrProvisionRuntimeResolverTests
         OcrProvisionRuntime runtime = await resolver.ResolveAsync("auto", CancellationToken.None);
 
         Assert.Equal("cpu", runtime.Target);
-        Assert.Contains("serie 50", runtime.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RTX 5090", runtime.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class OcrProvisionRuntimeResolverTests
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             resolver.ResolveAsync("nvidia", CancellationToken.None));
 
-        Assert.Contains("serie 50", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RTX 5090", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class OcrProvisionRuntimeResolverTests
         OcrProvisionRuntime runtime = await resolver.ResolveAsync("auto", CancellationToken.None);
 
         Assert.Equal("cpu", runtime.Target);
-        Assert.Contains("sotto il minimo", runtime.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NVIDIA driver", runtime.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class FakeProcessLauncher : ILocalProcessLauncher

@@ -16,6 +16,9 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
     private readonly ISqliteConnectionFactory connectionFactory;
     private readonly LocalJobQueueDescriptor descriptor;
+    private readonly SemaphoreSlim _enqueueSignal = new(0);
+
+    public SemaphoreSlim EnqueueSignal => _enqueueSignal;
 
     public SqliteLocalJobQueue(
         ISqliteConnectionFactory connectionFactory,
@@ -79,6 +82,8 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         command.AddParameter("$maxRetries", request.MaxRetries ?? descriptor.MaxRetries);
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        _enqueueSignal.Release();
 
         return (await GetAsync(id, cancellationToken))!;
     }

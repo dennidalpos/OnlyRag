@@ -133,7 +133,7 @@ public sealed class PaddleOcrEngineProcessTests
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             engine.RecognizeAsync(new OcrRecognitionRequest("prepared.png", "it", OcrSettings.Default)));
 
-        Assert.Contains("Risposta JSON OCR non valida", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Invalid OCR JSON response", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("diagnostic", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 

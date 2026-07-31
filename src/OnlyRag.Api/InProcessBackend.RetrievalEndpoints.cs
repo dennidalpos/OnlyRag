@@ -18,16 +18,16 @@ public static partial class InProcessBackend
             if (string.IsNullOrWhiteSpace(request.Query))
             {
                 return CreateBadRequestProblem(
-                    "Query non valida",
-                    "Inserisci una query di ricerca.",
+                    "Invalid query",
+                    "Enter a search query.",
                     "search_query_required");
             }
 
             if (request.DocumentIds is null || request.DocumentIds.Count == 0)
             {
                 return CreateBadRequestProblem(
-                    "Documenti non selezionati",
-                    "Seleziona almeno un documento prima di cercare.",
+                    "No documents selected",
+                    "Select at least one document before searching.",
                     "documents_required");
             }
 
@@ -38,8 +38,8 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateProblem(
-                    "Retrieval Qdrant non disponibile",
-                    UserFacingErrorText.FromExternalDetail(ex.Message, "Ricostruisci gli embedding o verifica la connessione Qdrant."),
+                    "Qdrant retrieval unavailable",
+                    UserFacingErrorText.FromExternalDetail(ex.Message, "Rebuild embeddings or verify Qdrant connection."),
                     StatusCodes.Status503ServiceUnavailable,
                     "qdrant_retrieval_unavailable");
             }
@@ -61,8 +61,8 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateProblem(
-                    "Chat documentale non disponibile",
-                    UserFacingErrorText.FromExternalDetail(ex.Message, "Ricostruisci gli embedding o verifica la connessione Qdrant."),
+                    "Document chat unavailable",
+                    UserFacingErrorText.FromExternalDetail(ex.Message, "Rebuild embeddings or verify Qdrant connection."),
                     StatusCodes.Status503ServiceUnavailable,
                     "qdrant_retrieval_unavailable");
             }

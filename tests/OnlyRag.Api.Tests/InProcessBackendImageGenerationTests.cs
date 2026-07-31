@@ -57,7 +57,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.Conflict,
-            "Modello immagini non pronto",
+            "Image model not ready",
             "image_generation_model_not_ready");
     }
 
@@ -123,7 +123,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.Conflict,
-            "Modello immagini non pronto",
+            "Image model not ready",
             "image_generation_model_not_ready");
     }
 
@@ -142,7 +142,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.BadRequest,
-            "Richiesta immagini non valida",
+            "Invalid image request",
             "image_generation_invalid_request");
     }
 
@@ -313,7 +313,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.Conflict,
-            "Modello immagini non pronto",
+            "Image model not ready",
             "image_generation_model_not_ready");
     }
 
@@ -435,7 +435,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.Conflict,
-            "Modello immagini non pronto",
+            "Image model not ready",
             "image_generation_model_not_ready");
     }
 
@@ -463,7 +463,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.RequestTimeout,
-            "Timeout generazione immagini",
+            "Image generation timeout",
             "image_generation_timeout");
     }
 
@@ -491,7 +491,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.BadRequest,
-            "Configurazione immagini non valida",
+            "Invalid image configuration",
             "image_generation_invalid_configuration");
     }
 
@@ -519,7 +519,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             generateResponse,
             HttpStatusCode.BadGateway,
-            "Errore generazione immagini",
+            "Image generation error",
             "image_generation_unexpected_response");
     }
 
@@ -639,7 +639,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             response,
             HttpStatusCode.BadRequest,
-            "Configurazione immagini non valida",
+            "Invalid image configuration",
             "image_generation_invalid_configuration");
     }
 
@@ -706,7 +706,7 @@ public sealed partial class InProcessBackendTests
         await AssertProblemAsync(
             invalidResponse,
             HttpStatusCode.BadRequest,
-            "Richiesta immagini non valida",
+            "Invalid image request",
             "image_generation_invalid_request");
     }
 

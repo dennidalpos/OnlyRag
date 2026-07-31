@@ -24,20 +24,20 @@ public static partial class InProcessBackend
                 ImportedDocument? document = await documents.GetAsync(request.DocumentId, cancellationToken);
                 if (document is null)
                 {
-                    return CreateNotFoundProblem("Documento");
+                    return CreateNotFoundProblem("Document");
                 }
 
                 if (document.PageCount == 0)
                 {
                     return CreateConflictProblem(
-                        "Documento non indicizzato",
-                        "Esegui prima l'ingestion del documento: la traduzione usa le unita testuali indicizzate.",
+                        "Document not indexed",
+                        "Ingest the document first: translation relies on indexed text units.",
                         "document_not_indexed");
                 }
 
                 string model = OllamaSettingsService.NormalizeRequiredModelName(request.Model);
                 string targetLanguage = DocumentTranslationPromptBuilder.NormalizeLanguage(request.TargetLanguage);
-                await EnsureOllamaModelInstalledAsync(ollamaClient, model, "traduzione", cancellationToken);
+                await EnsureOllamaModelInstalledAsync(ollamaClient, model, "translation", cancellationToken);
 
                 IReadOnlyList<TranslationSourceUnit> units = await translations.BuildSourceUnitsAsync(
                     request.DocumentId,
@@ -76,7 +76,7 @@ public static partial class InProcessBackend
             catch (InvalidOperationException ex)
             {
                 return CreateConflictProblem(
-                    "Traduzione non avviata",
+                    "Translation not started",
                     ex.Message,
                     "translation_not_started");
             }
@@ -88,7 +88,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             TranslationDetailResponse? detail = await BuildTranslationDetailAsync(id, translations, cancellationToken);
-            return detail is null ? CreateNotFoundProblem("Traduzione") : Results.Ok(detail);
+            return detail is null ? CreateNotFoundProblem("Translation") : Results.Ok(detail);
         });
 
         app.MapGet("/api/translations/{id:long}/compare", async (
@@ -102,7 +102,7 @@ public static partial class InProcessBackend
                 page,
                 translations,
                 cancellationToken);
-            return compare is null ? CreateNotFoundProblem("Traduzione") : Results.Ok(compare);
+            return compare is null ? CreateNotFoundProblem("Translation") : Results.Ok(compare);
         });
 
         app.MapGet("/api/documents/{id:long}/translations", async (
@@ -114,7 +114,7 @@ public static partial class InProcessBackend
             ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
             if (document is null)
             {
-                return CreateNotFoundProblem("Documento");
+                return CreateNotFoundProblem("Document");
             }
 
             IReadOnlyList<StoredTranslation> items = await translations.ListByDocumentAsync(id, cancellationToken);
@@ -131,8 +131,8 @@ public static partial class InProcessBackend
             if (string.IsNullOrWhiteSpace(request.TranslatedText))
             {
                 return CreateBadRequestProblem(
-                    "Correzione non valida",
-                    "Il testo corretto non puo essere vuoto.",
+                    "Invalid correction",
+                    "The corrected text cannot be empty.",
                     "translation_unit_text_required");
             }
 
@@ -141,7 +141,7 @@ public static partial class InProcessBackend
                 unitId,
                 request.TranslatedText,
                 cancellationToken);
-            return unit is null ? CreateNotFoundProblem("Unita traduzione") : Results.Ok(unit.ToResponse());
+            return unit is null ? CreateNotFoundProblem("Translation unit") : Results.Ok(unit.ToResponse());
         });
 
         app.MapPost("/api/translations/{id:long}/export", async (
@@ -153,7 +153,7 @@ public static partial class InProcessBackend
             try
             {
                 TranslationExportResponse? response = await exporter.ExportAsync(id, request, cancellationToken);
-                return response is null ? CreateNotFoundProblem("Traduzione") : Results.Ok(response);
+                return response is null ? CreateNotFoundProblem("Translation") : Results.Ok(response);
             }
             catch (TranslationExportException ex)
             {

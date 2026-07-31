@@ -68,7 +68,7 @@ public sealed class AgentLoopEngineTests
             string result = (string)method.Invoke(null, new object[] { "Analizza il codice", tempDir })!;
 
             Assert.Contains("Analizza il codice", result);
-            Assert.Contains("[CONTESTO WORKSPACE ATTIVO]", result);
+            Assert.Contains("[ACTIVE WORKSPACE CONTEXT]", result);
             Assert.Contains("AGENTS.md", result);
             Assert.Contains("workspace_settings.json", result);
             Assert.Contains("{\"preset\": \"vibe\"}", result);
@@ -149,7 +149,7 @@ public sealed class AgentLoopEngineTests
 
         Assert.True(compressed);
         Assert.True(messages.Count < 20);
-        Assert.Contains("[CONTESTO SINTETIZZATO DALL'AGENTE]", messages[2].Content);
+        Assert.Contains("[AGENT SYNTHESIZED CONTEXT]", messages[2].Content);
     }
 }
 

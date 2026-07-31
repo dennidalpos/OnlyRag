@@ -83,7 +83,7 @@ internal sealed partial class OllamaClient
                 {
                     throw new OllamaApiException(
                         OllamaErrorKind.UnexpectedResponse,
-                        "Ollama ha restituito avanzamento installazione modello non valido.",
+                        "Ollama returned invalid model installation progress.",
                         innerException: ex);
                 }
 
@@ -91,7 +91,7 @@ internal sealed partial class OllamaClient
                 {
                     throw new OllamaApiException(
                         OllamaErrorKind.UnexpectedResponse,
-                        "Ollama ha restituito avanzamento installazione modello vuoto.");
+                        "Ollama returned empty model installation progress.");
                 }
 
                 int? percent = ComputePullProgressPercent(chunk);
@@ -109,21 +109,21 @@ internal sealed partial class OllamaClient
 
             if (!sawDone)
             {
-                await onProgress(new OllamaModelPullProgress("Installazione modello completata", null, null, 100), timeoutSource.Token);
+                await onProgress(new OllamaModelPullProgress("Model installation completed", null, null, 100), timeoutSource.Token);
             }
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             throw new OllamaApiException(
                 OllamaErrorKind.Timeout,
-                $"Ollama non ha risposto entro {context.Timeout.TotalSeconds:0} secondi.",
+                $"Ollama did not respond within {context.Timeout.TotalSeconds:0} seconds.",
                 innerException: ex);
         }
         catch (HttpRequestException ex)
         {
             throw new OllamaApiException(
                 OllamaErrorKind.Unreachable,
-                $"Non riesco a raggiungere Ollama su {context.BaseUri}. Controlla l'indirizzo e verifica che il servizio sia in esecuzione.",
+                $"Cannot reach Ollama at {context.BaseUri}. Check the address and ensure the service is running.",
                 innerException: ex);
         }
     }

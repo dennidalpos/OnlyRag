@@ -6,7 +6,24 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("rehype-highlight") || id.includes("highlight.js") || id.includes("lowlight")) {
+              return "vendor-highlight";
+            }
+            if (id.includes("lucide-react")) {
+              return "vendor-icons";
+            }
+            if (id.includes("react") || id.includes("react-dom") || id.includes("@tanstack") || id.includes("react-markdown") || id.includes("remark-gfm") || id.includes("unified") || id.includes("micromark")) {
+              return "vendor-react";
+            }
+          }
+        }
+      }
+    }
   },
   test: {
     environment: "jsdom",

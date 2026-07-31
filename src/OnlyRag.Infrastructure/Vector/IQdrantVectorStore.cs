@@ -37,4 +37,9 @@ public interface IQdrantVectorStore
         int dimensions,
         long documentId,
         CancellationToken cancellationToken = default);
+
+    Task OptimizeCollectionAsync(
+        string model,
+        int dimensions,
+        CancellationToken cancellationToken = default);
 }

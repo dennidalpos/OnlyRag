@@ -120,10 +120,14 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ILlmQueryExpander, OllamaLlmQueryExpander>();
         services.AddSingleton<IQueryTransformationService, OllamaQueryTransformationService>();
         services.AddSingleton<ParentChildChunkResolver>();
-        services.AddSingleton<CragEvaluator>();
+        services.AddSingleton<CragDecisionEngine>();
         services.AddSingleton<IEntityGraphExtractor, EntityGraphExtractor>();
         services.AddSingleton<IGraphRetrievalService, SqliteGraphRetrievalService>();
         services.AddSingleton<IAgentEpisodicMemoryService, SqliteQdrantEpisodicMemoryService>();
+        services.AddSingleton<IAgentSkillRepository, SqliteAgentSkillRepository>();
+        services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
+        services.AddSingleton<IWorkspaceVectorIndexerService, WorkspaceVectorIndexerService>();
+        services.AddSingleton<IAstDependencyGraphService, AstDependencyGraphService>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();

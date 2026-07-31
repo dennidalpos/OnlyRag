@@ -102,7 +102,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             return CreateUnavailableStatus(
                 settings,
                 endpoint,
-                "qdrant.exe non trovato nel payload applicativo. Eseguire il packaging Qdrant prima dell'avvio locale.");
+                "qdrant.exe not found in the application payload. Run Qdrant packaging before local startup.");
         }
 
         QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
@@ -151,7 +151,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         string? binary = ResolveBinaryPath();
         if (binary is null)
         {
-            throw new InvalidOperationException("qdrant.exe non trovato nel payload applicativo. Eseguire il packaging Qdrant prima dell'avvio locale.");
+            throw new InvalidOperationException("qdrant.exe not found in the application payload. Run Qdrant packaging before local startup.");
         }
 
         WriteConfig(settings);
@@ -175,7 +175,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         {
             if (!process.Start())
             {
-                throw new InvalidOperationException("Qdrant non ha accettato la richiesta di avvio.");
+                throw new InvalidOperationException("Qdrant did not accept the start request.");
             }
 
             processSupervisor.AttachStartedProcess(process);
@@ -236,7 +236,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
 
         return lastStatus.IsReachable
             ? lastStatus
-            : lastStatus with { Error = lastStatus.Error ?? "Qdrant locale avviato ma non ancora raggiungibile sulla porta gRPC configurata." };
+            : lastStatus with { Error = lastStatus.Error ?? "Local Qdrant started but not yet reachable on the configured gRPC port." };
     }
 
     private void TryAdoptPersistedProcess()
@@ -252,12 +252,12 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     {
         if (!QdrantSettingsStore.IsLoopback(endpoint) && endpoint.Scheme != Uri.UriSchemeHttps)
         {
-            return "Endpoint Qdrant remoto senza TLS: usare solo su rete esplicitamente attendibile.";
+            return "Remote Qdrant endpoint without TLS: use only on an explicitly trusted network.";
         }
 
         if (!QdrantSettingsStore.IsLoopback(endpoint) && string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            return "Endpoint Qdrant remoto senza API key configurata.";
+            return "Remote Qdrant endpoint without an API key configured.";
         }
 
         return null;

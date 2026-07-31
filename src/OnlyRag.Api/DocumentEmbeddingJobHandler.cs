@@ -41,7 +41,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         DocumentEmbeddingJobPayload? payload = JsonSerializer.Deserialize<DocumentEmbeddingJobPayload>(job.PayloadJson);
         if (payload is null || string.IsNullOrWhiteSpace(payload.Model))
         {
-            await queue.FailAsync(job.Id, "Payload job embedding non valido.", retryable: false, cancellationToken);
+            await queue.FailAsync(job.Id, "Invalid embedding job payload.", retryable: false, cancellationToken);
             return;
         }
 
@@ -67,7 +67,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         }
         catch (OllamaApiException ex) when (ex.Kind == OllamaErrorKind.ContextLengthExceeded)
         {
-            string message = "Chunk troppo lungo per la finestra di contesto del modello. Imposta un num_ctx più alto nelle impostazioni o riduci la dimensione dei chunk.";
+            string message = "Chunk too long for the model's context window. Set a higher num_ctx in settings or reduce chunk size.";
             await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
             await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
         }
@@ -86,7 +86,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         {
             string message = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
-                "Embedding non completato. Dettagli tecnici disponibili nei log locali.");
+                "Embedding not completed. Technical details available in local logs.");
             await documents.SetStatusAsync(document.Id, DocumentStatus.Failed, job.Id, message, cancellationToken);
             await queue.FailAsync(job.Id, message, retryable: false, cancellationToken);
         }
@@ -132,7 +132,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                     job.Id,
                     new LocalJobCheckpoint(
                         100,
-                        $"Embedding completati: {status.EmbeddedChunkCount}/{status.ChunkCount} chunk",
+                        $"Embeddings completed: {status.EmbeddedChunkCount}/{status.ChunkCount} chunks",
                         JsonSerializer.Serialize(new DocumentEmbeddingCheckpoint(
                             Version: 1,
                             document.Id,
@@ -156,7 +156,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                 IReadOnlyList<float> vector = vectors[index];
                 if (vector.Count == 0)
                 {
-                    throw new InvalidOperationException("Ollama ha restituito un embedding vuoto.");
+                    throw new InvalidOperationException("Ollama returned an empty embedding.");
                 }
 
                 await vectorStore.UpsertChunkAsync(
@@ -216,8 +216,8 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
         {
             throw new OllamaApiException(
                 OllamaErrorKind.ContextLengthExceeded,
-                $"Un chunk richiede almeno {needed} token di contesto, ma la finestra configurata è {configuredNumCtx.Value}. "
-                + "Aumenta num_ctx nelle impostazioni oppure imposta la modalità Automatica.");
+                $"A chunk requires at least {needed} context tokens, but the configured window is {configuredNumCtx.Value}. "
+                + "Increase num_ctx in settings or set Automatic mode.");
         }
 
         return configuredNumCtx.Value;

@@ -39,7 +39,7 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, httpResponse.StatusCode);
         Assert.NotNull(response);
         Assert.False(response.Started);
-        Assert.Contains("Nessuna", response.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No OCR", response.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -64,7 +64,7 @@ public static partial class InProcessBackend
 
                 await WriteProblemAsync(
                     context,
-                    "Errore interno del server.",
+                    "Internal server error.",
                     CreateUnexpectedErrorDetail(correlationId),
                     StatusCodes.Status500InternalServerError,
                     "unexpected_error",

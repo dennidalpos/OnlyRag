@@ -20,6 +20,8 @@ internal sealed class AgentLoopEngine
     private readonly WorkspaceToolExecutor toolExecutor;
     private readonly BackgroundTaskManager taskManager;
     private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService;
+    private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentSkillRepository? skillRepository;
+    private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentSkillAutoLearner? skillAutoLearner;
     private readonly ILoggingService? logger;
 
     private readonly ConcurrentDictionary<string, (AgentToolCall Call, TaskCompletionSource<bool> Tcs)> pendingApprovals = new();
@@ -30,6 +32,8 @@ internal sealed class AgentLoopEngine
         WorkspaceToolExecutor toolExecutor,
         BackgroundTaskManager taskManager,
         OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService = null,
+        OnlyRag.Infrastructure.Agent.Memory.IAgentSkillRepository? skillRepository = null,
+        OnlyRag.Infrastructure.Agent.Memory.IAgentSkillAutoLearner? skillAutoLearner = null,
         ILoggingService? logger = null)
     {
         this.ollamaClient = ollamaClient;
@@ -37,6 +41,8 @@ internal sealed class AgentLoopEngine
         this.toolExecutor = toolExecutor;
         this.taskManager = taskManager;
         this.episodicMemoryService = episodicMemoryService;
+        this.skillRepository = skillRepository;
+        this.skillAutoLearner = skillAutoLearner;
         this.logger = logger;
     }
 
@@ -45,11 +51,11 @@ internal sealed class AgentLoopEngine
         if (pendingApprovals.TryRemove(callId, out var pending))
         {
             pending.Tcs.TrySetResult(approved);
-            logger?.LogInfo("AgentEngine", $"Approvazione tool call {callId}: {approved}");
+            logger?.LogInfo("AgentEngine", $"Tool call {callId} approval: {approved}");
             return true;
         }
 
-        logger?.LogWarning("AgentEngine", $"Tentativo di approvazione per callId non trovata: {callId}");
+        logger?.LogWarning("AgentEngine", $"Approval attempt for unknown callId: {callId}");
         return false;
     }
 
@@ -68,7 +74,7 @@ internal sealed class AgentLoopEngine
         }
         catch (Exception ex)
         {
-            resolveError = $"Errore durante la risoluzione del modello LLM per l'agente: {ex.Message}";
+            resolveError = $"Error resolving LLM model for the agent: {ex.Message}";
             logger?.LogError("AgentEngine", resolveError, ex);
         }
 
@@ -88,16 +94,16 @@ internal sealed class AgentLoopEngine
                 if (recalledMemories.Count > 0)
                 {
                     memoryManager.AddRecalledMemories(recalledMemories);
-                    logger?.LogInfo("AgentEngine", $"[EPISODIC MEMORY RECALL] Richiamate {recalledMemories.Count} memorie rilevanti da sessioni precedenti.");
+                    logger?.LogInfo("AgentEngine", $"[EPISODIC MEMORY RECALL] Recalled {recalledMemories.Count} relevant memories from previous sessions.");
                 }
             }
             catch (Exception ex)
             {
-                logger?.LogWarning("AgentEngine", $"Impossibile richiamare le memorie episodiche: {ex.Message}");
+                logger?.LogWarning("AgentEngine", $"Could not recall episodic memories: {ex.Message}");
             }
         }
 
-        string enrichedGoal = EnrichGoalWithWorkspaceContext(request.Goal, workspaceRoot);
+        string enrichedGoal = AgentWorkspaceContextEnricher.EnrichGoalWithWorkspaceContext(request.Goal, workspaceRoot);
 
         var messages = new List<OllamaChatMessage>
         {
@@ -105,12 +111,35 @@ internal sealed class AgentLoopEngine
             new("user", enrichedGoal)
         };
 
-        yield return new AgentStepEvent("thought", $"[Agent Engine SOTA] Inizio elaborazione dell'obiettivo in modalità '{request.Mode}' con il modello '{model}'. Caricamento memoria ed esecuzione in corso...");
+        if (skillRepository != null && !string.IsNullOrWhiteSpace(request.Goal))
+        {
+            try
+            {
+                var recalledSkills = await skillRepository.SearchRelevantSkillsAsync(request.Goal, topK: 3, cancellationToken);
+                if (recalledSkills.Count > 0)
+                {
+                    var sb = new StringBuilder("### [SKILL REPOSITORY RECALL]\nSystem Skill Recipes:\n");
+                    foreach (var s in recalledSkills)
+                    {
+                        sb.AppendLine($"- **{s.Name}** [{s.Category}]: {s.PatternDescription} -> Solution: {s.SolutionTemplate}");
+                    }
+                    messages.Add(new("system", sb.ToString()));
+                    logger?.LogInfo("AgentEngine", $"[SKILL REPOSITORY RECALL] Recalled {recalledSkills.Count} relevant skills.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning("AgentEngine", $"Could not recall skills from repository: {ex.Message}");
+            }
+        }
+
+        yield return new AgentStepEvent("thought", $"[Agent Engine SOTA] Starting goal processing in '{request.Mode}' mode with model '{model}'. Loading memory and executing...");
 
         int maxIterations = (request.MaxIterations.HasValue && request.MaxIterations.Value > 0) ? request.MaxIterations.Value : DefaultMaxIterations;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var executedReadOnlyCallSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var recentToolSignatures = new List<string>();
+        var accumulatedToolResults = new List<AgentToolResult>();
         int iteration = 0;
         int jsonRetryCount = 0;
 
@@ -137,7 +166,7 @@ internal sealed class AgentLoopEngine
             string iterLabel = $"{iteration}/{maxIterations}";
             logger?.LogTrace("AgentEngine", $"[AGENT ITERATION {iterLabel}] Sending request to Ollama (Model: {model}, NumCtx: {numCtx}, Messages: {messages.Count})");
 
-            yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generazione risposta LLM ed analisi ragionamento...");
+            yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generating LLM response and analyzing reasoning...");
 
             var responseSb = new StringBuilder();
             IAsyncEnumerator<string>? enumerator = null;
@@ -153,7 +182,7 @@ internal sealed class AgentLoopEngine
             }
             catch (Exception ex)
             {
-                streamError = $"Errore nell'interrogazione di Ollama con il modello '{model}': {ex.Message}";
+                streamError = $"Error querying Ollama with model '{model}': {ex.Message}";
                 logger?.LogError("AgentEngine", streamError, ex);
             }
 
@@ -179,7 +208,7 @@ internal sealed class AgentLoopEngine
                         }
                         catch (Exception ex)
                         {
-                            streamError = $"Errore durante lo streaming da Ollama con il modello '{model}': {ex.Message}";
+                            streamError = $"Error during Ollama streaming with model '{model}': {ex.Message}";
                             logger?.LogError("AgentEngine", streamError, ex);
                             break;
                         }
@@ -218,7 +247,7 @@ internal sealed class AgentLoopEngine
             string responseText = responseSb.ToString();
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                string errEmpty = "Il modello LLM non ha restituito alcun contenuto nella risposta.";
+                string errEmpty = "The LLM model returned no content in the response.";
                 logger?.LogWarning("AgentEngine", errEmpty);
                 yield return new AgentStepEvent("error", errEmpty);
                 yield break;
@@ -226,24 +255,24 @@ internal sealed class AgentLoopEngine
 
             messages.Add(new("assistant", responseText));
 
-            var toolCalls = TryExtractToolCalls(responseText, logger);
+            var toolCalls = AgentToolCallParser.TryExtractToolCalls(responseText, logger);
             if (toolCalls.Count == 0)
             {
-                if (LooksLikeFailedToolCall(responseText) && jsonRetryCount < MaxJsonRetries)
+                if (AgentToolCallParser.LooksLikeFailedToolCall(responseText) && jsonRetryCount < MaxJsonRetries)
                 {
                     jsonRetryCount++;
-                    logger?.LogWarning("AgentEngine", $"[JSON PARSE RETRY {jsonRetryCount}/{MaxJsonRetries}] Rilevata tool call con JSON malformato, invio prompt correttivo.");
+                    logger?.LogWarning("AgentEngine", $"[JSON PARSE RETRY {jsonRetryCount}/{MaxJsonRetries}] Detected malformed JSON in tool call, sending corrective prompt.");
                     yield return new AgentStepEvent("json_parse_warning",
-                        $"⚠️ JSON malformato nella risposta LLM (tentativo di correzione {jsonRetryCount}/{MaxJsonRetries}). Richiesta ripetizione al modello...");
+                        $"⚠️ Malformed JSON in LLM response (correction attempt {jsonRetryCount}/{MaxJsonRetries}). Requesting model to retry...");
                     messages.Add(new("user",
-                        "[ERRORE DI FORMATO] La tua risposta precedente conteneva un tentativo di chiamata tool, " +
-                        "ma il JSON non era valido e non è stato possibile parsarlo. " +
-                        "Rispondi RIGOROSAMENTE con un unico blocco ```json { \"tool\": \"nome_tool\", \"arguments\": {...} } ``` " +
-                        "oppure un array ```json [ {\"tool\": \"...\", \"arguments\": {...}} ] ``` per chiamate multiple in parallelo."));
+                        "[FORMAT ERROR] Your previous response contained a tool call attempt, " +
+                        "but the JSON was invalid and could not be parsed. " +
+                        "Respond STRICTLY with a single ```json { \"tool\": \"tool_name\", \"arguments\": {...} } ``` block " +
+                        "or an array ```json [ {\"tool\": \"...\", \"arguments\": {...}} ] ``` for parallel calls."));
                     continue;
                 }
 
-                logger?.LogInfo("AgentEngine", $"[AGENT LOOP COMPLETE] Nessun tool chiamato. Risposta finale generata al passo {iteration}.");
+                logger?.LogInfo("AgentEngine", $"[AGENT LOOP COMPLETE] No tools called. Final response generated at step {iteration}.");
 
                 if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
                 {
@@ -266,7 +295,7 @@ internal sealed class AgentLoopEngine
             }
 
             jsonRetryCount = 0;
-            logger?.LogInfo("AgentEngine", $"[TOOLS PROPOSED] Estratte {toolCalls.Count} chiamate di strumento.");
+            logger?.LogInfo("AgentEngine", $"[TOOLS PROPOSED] Extracted {toolCalls.Count} tool calls.");
 
             if (toolCalls.Count > 1)
             {
@@ -275,10 +304,10 @@ internal sealed class AgentLoopEngine
 
             var resultsList = new List<AgentToolResult>();
 
-            if (toolCalls.Count > 1 && toolCalls.All(IsReadOnlyTool))
+            if (toolCalls.Count > 1 && toolCalls.All(AgentToolCallParser.IsReadOnlyTool))
             {
-                logger?.LogInfo("AgentEngine", $"[PARALLEL TOOL EXECUTION] Esecuzione concorrente di {toolCalls.Count} tool in sola lettura.");
-                yield return new AgentStepEvent("thought", $"[Agent Parallel Engine] Esecuzione in parallelo di {toolCalls.Count} strumenti indipendenti...");
+                logger?.LogInfo("AgentEngine", $"[PARALLEL TOOL EXECUTION] Concurrent execution of {toolCalls.Count} read-only tools.");
+                yield return new AgentStepEvent("thought", $"[Agent Parallel Engine] Executing {toolCalls.Count} independent tools in parallel...");
 
                 foreach (var tc in toolCalls)
                 {
@@ -289,13 +318,13 @@ internal sealed class AgentLoopEngine
                     yield return new AgentStepEvent("tool_proposed", ToolCall: tc);
                 }
 
-                if (IsCyclicPatternDetected(recentToolSignatures))
+                if (AgentCycleGuard.IsCyclicPatternDetected(recentToolSignatures))
                 {
-                    logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive in esecuzione parallela.");
-                    yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive. Iniezione direttiva di conclusione...");
+                    logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Detected repetitive call cycle in parallel execution.");
+                    yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Detected repetitive call cycle in parallel execution. Injecting conclusion directive...");
                     messages.Add(new("user",
-                        "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate per più volte senza avanzamenti. " +
-                        "Rispondi ORA all'utente con il resoconto finale in Markdown senza invocare altri tool."));
+                        "[SYSTEM DIRECTIVE - STOP CYCLE] You have repeated the same calls multiple times without progress. " +
+                        "Respond NOW to the user with the final summary in Markdown without invoking any more tools."));
                     continue;
                 }
 
@@ -309,7 +338,7 @@ internal sealed class AgentLoopEngine
                             tc.CallId,
                             tc.ToolName,
                             true,
-                            $"[AVVISO SISTEMA] Il tool '{tc.ToolName}' con argomenti '{tc.ArgumentsJson}' è già stato eseguito ed è già disponibile nella memoria di lavoro. Non ripetere la stessa chiamata. Procedi ad elaborare i dati o la risposta finale.");
+                            $"[SYSTEM NOTICE] Tool '{tc.ToolName}' with arguments '{tc.ArgumentsJson}' has already been executed and is available in working memory. Do not repeat the same call. Proceed to process the data or produce the final response.");
                     }
 
                     var res = await toolExecutor.ExecuteToolAsync(
@@ -341,14 +370,14 @@ internal sealed class AgentLoopEngine
                 {
                     string callSignature = $"{toolCall.ToolName}:{toolCall.ArgumentsJson.Trim()}";
 
-                    if (IsReadOnlyTool(toolCall) && executedReadOnlyCallSignatures.Contains(callSignature))
+                    if (AgentToolCallParser.IsReadOnlyTool(toolCall) && executedReadOnlyCallSignatures.Contains(callSignature))
                     {
                         logger?.LogWarning("AgentEngine", $"[DUPLICATE GUARD TRIGGERED] Evitata chiamata ripetuta a tool in sola lettura: {callSignature}");
                         var cachedNotice = new AgentToolResult(
                             toolCall.CallId,
                             toolCall.ToolName,
                             true,
-                            $"[AVVISO SISTEMA] Il tool '{toolCall.ToolName}' con argomenti '{toolCall.ArgumentsJson}' è già stato eseguito ed ha avuto successo. Le informazioni sono già disponibili nella memoria di lavoro. NON ripetere la chiamata e procedi con il passo successivo.");
+                            $"[SYSTEM NOTICE] Tool '{toolCall.ToolName}' with arguments '{toolCall.ArgumentsJson}' has already been executed successfully. The information is available in working memory. Do NOT repeat the call and proceed to the next step.");
                         yield return new AgentStepEvent("tool_result", ToolResult: cachedNotice);
                         resultsList.Add(cachedNotice);
                         continue;
@@ -358,21 +387,21 @@ internal sealed class AgentLoopEngine
                     {
                         logger?.LogWarning("AgentEngine", $"[LOOP GUARD TRIGGERED] Chiamata ripetuta già fallita bloccata: {callSignature}");
                         failedToolSignatures.Remove(callSignature);
-                        yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Rilevato tentativo di rieseguire una chiamata di strumento già fallita ({toolCall.ToolName}). Invio istruzione di correzione...");
-                        messages.Add(new("user", $"[SYSTEM CORRECTION WARNING] Il tool '{toolCall.ToolName}' con parametri '{toolCall.ArgumentsJson}' è GIÀ STATO ESEGUITO ed è FALLITO al passo precedente. NON ripetere le stesse azioni senza modificare i parametri!"));
+                        yield return new AgentStepEvent("thought", $"[Agent Loop Guard] Detected retry of a previously failed tool call ({toolCall.ToolName}). Sending correction instruction...");
+                        messages.Add(new("user", $"[SYSTEM CORRECTION WARNING] Tool '{toolCall.ToolName}' with parameters '{toolCall.ArgumentsJson}' has ALREADY been executed and FAILED in the previous step. Do NOT repeat the same actions without modifying the parameters!"));
                         continue;
                     }
 
                     recentToolSignatures.Add(callSignature);
                     if (recentToolSignatures.Count > 30) recentToolSignatures.RemoveAt(0);
 
-                    if (IsCyclicPatternDetected(recentToolSignatures))
+                    if (AgentCycleGuard.IsCyclicPatternDetected(recentToolSignatures))
                     {
-                        logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Rilevato ciclo di chiamate ripetitive: {callSignature}");
-                        yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Rilevato ciclo di azioni ripetitive ({toolCall.ToolName}). Iniezione direttiva di conclusione...");
+                        logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Detected repetitive call cycle: {callSignature}");
+                        yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Detected repetitive action cycle ({toolCall.ToolName}). Injecting conclusion directive...");
                         messages.Add(new("user",
-                            "[DIRETTIVA SISTEMA - STOP CICLO] Hai ripetuto le stesse chiamate per più volte senza avanzamenti. " +
-                            "Rispondi ORA all'utente con il resoconto finale in Markdown senza invocare altri tool."));
+                            "[SYSTEM DIRECTIVE - STOP CYCLE] You have repeated the same calls multiple times without progress. " +
+                            "Respond NOW to the user with the final summary in Markdown without invoking any more tools."));
                         continue;
                     }
 
@@ -396,7 +425,7 @@ internal sealed class AgentLoopEngine
                         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
                         {
                             approved = false;
-                            logger?.LogWarning("AgentEngine", $"Timeout o cancellazione durante l'attesa di approvazione per {toolCall.CallId}");
+                            logger?.LogWarning("AgentEngine", $"Timeout or cancellation while waiting for approval for {toolCall.CallId}");
                         }
                         finally
                         {
@@ -410,10 +439,10 @@ internal sealed class AgentLoopEngine
                                 toolCall.ToolName,
                                 false,
                                 string.Empty,
-                                "Esecuzione del comando RIFIUTATA dall'utente o andata in timeout.");
+                                "Command execution DENIED by user or timed out.");
 
                             yield return new AgentStepEvent("tool_result", ToolResult: deniedResult);
-                            messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccesso: False\nErrore: Esecuzione rifiutata dall'utente."));
+                            messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccess: False\nError: Execution denied by user."));
                             continue;
                         }
                     }
@@ -448,7 +477,7 @@ internal sealed class AgentLoopEngine
 
                     if (result.Success)
                     {
-                        if (IsReadOnlyTool(toolCall))
+                        if (AgentToolCallParser.IsReadOnlyTool(toolCall))
                         {
                             executedReadOnlyCallSignatures.Add(callSignature);
                             try
@@ -466,10 +495,25 @@ internal sealed class AgentLoopEngine
                         if (toolCall.ToolName == "plan_task")
                         {
                             yield return new AgentStepEvent("plan_update", PlanMarkdown: result.Output);
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
+                                memoryManager.UpdatePlanFromToolCall(doc.RootElement);
+                            }
+                            catch { }
                         }
                         else if (toolCall.ToolName == "reflect_step")
                         {
                             memoryManager.AddKeyFact(result.Output);
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
+                                string stepId = doc.RootElement.TryGetProperty("stepId", out var sid) ? sid.GetString() ?? "1" : "1";
+                                string status = doc.RootElement.TryGetProperty("status", out var st) ? st.GetString() ?? "completed" : "completed";
+                                string learnings = doc.RootElement.TryGetProperty("learnings", out var lr) ? lr.GetString() ?? "" : "";
+                                memoryManager.UpdateStepStatus(stepId, status, learnings);
+                            }
+                            catch { }
                         }
                         else if (toolCall.ToolName.Contains("write") || toolCall.ToolName.Contains("replace"))
                         {
@@ -498,14 +542,25 @@ internal sealed class AgentLoopEngine
             foreach (var res in resultsList)
             {
                 batchMsgSb.AppendLine($"[TOOL RESULT ({res.ToolName})]");
-                batchMsgSb.AppendLine($"Successo: {res.Success}");
+                batchMsgSb.AppendLine($"Success: {res.Success}");
                 batchMsgSb.AppendLine($"Output:\n{res.Output}");
+                if (!string.IsNullOrWhiteSpace(res.DiffPatch))
+                {
+                    batchMsgSb.AppendLine($"\n[UNIFIED DIFF ISPEZIONE MODIFICA]:\n{res.DiffPatch}");
+                }
                 if (!res.Success && !string.IsNullOrEmpty(res.Error))
                 {
-                    batchMsgSb.AppendLine($"Errore: {res.Error}");
+                    batchMsgSb.AppendLine($"Error: {res.Error}");
+                    batchMsgSb.AppendLine("\n[SYSTEM DIAGNOSTIC & SELF-CORRECTION GUIDANCE]");
+                    batchMsgSb.AppendLine($"The action '{res.ToolName}' encountered an error.");
+                    batchMsgSb.AppendLine("1. Identify the root cause of the error by analyzing the output above.");
+                    batchMsgSb.AppendLine("2. Inspect the relevant code files with read_file before making blind attempts.");
+                    batchMsgSb.AppendLine("3. If a modification caused the error, apply a targeted fix or change strategy.");
                 }
                 batchMsgSb.AppendLine();
             }
+
+            accumulatedToolResults.AddRange(resultsList);
 
             if (batchMsgSb.Length > 0)
             {
@@ -513,268 +568,38 @@ internal sealed class AgentLoopEngine
             }
         }
 
+        _ = skillAutoLearner?.ExtractAndSaveSkillAsync(request.Goal, accumulatedToolResults, cancellationToken);
+
         if (maxIterations > 0 && iteration >= maxIterations)
         {
-            logger?.LogWarning("AgentEngine", $"[AGENT LOOP END] Raggiunto limite massimo di {maxIterations} iterazioni.");
-            yield return new AgentStepEvent("final_response", $"Raggiunto il limite massimo di iterazioni dell'agente ({maxIterations} passi).");
+            logger?.LogWarning("AgentEngine", $"[AGENT LOOP END] Reached maximum iteration limit of {maxIterations}.");
+            yield return new AgentStepEvent("final_response", $"Reached the maximum agent iteration limit ({maxIterations} steps).");
         }
     }
 
     internal static AgentToolCall? TryExtractToolCall(string text, ILoggingService? logger = null)
     {
-        var calls = TryExtractToolCalls(text, logger);
-        return calls.Count > 0 ? calls[0] : null;
+        return AgentToolCallParser.TryExtractToolCall(text, logger);
     }
 
     internal static List<AgentToolCall> TryExtractToolCalls(string text, ILoggingService? logger = null)
     {
-        var list = new List<AgentToolCall>();
-        if (string.IsNullOrWhiteSpace(text)) return list;
-
-        // 1. Cerca tag XML (<tool_call>, <tool>, <function_call>)
-        var matchTagBlock = Regex.Match(text, @"<(?:tool_call|tool|function_call)>\s*([\s\S]*?)\s*</(?:tool_call|tool|function_call)>", RegexOptions.Singleline);
-        if (matchTagBlock.Success)
-        {
-            ParseAndAddCalls(matchTagBlock.Groups[1].Value, list, logger);
-            if (list.Count > 0) return list;
-        }
-
-        // 2. Cerca il blocco di codice markdown ```json ... ``` o ``` ... ```
-        var matchCodeBlock = Regex.Match(text, @"```(?:json|JSON)?\s*([\s\S]*?)\s*(?:```|$)", RegexOptions.Singleline);
-        if (matchCodeBlock.Success)
-        {
-            ParseAndAddCalls(matchCodeBlock.Groups[1].Value, list, logger);
-            if (list.Count > 0) return list;
-        }
-
-        // 3. Bilanciamento graffe/quadre per JSON non recintati
-        int firstBrace = text.IndexOf('{');
-        int firstBracket = text.IndexOf('[');
-
-        if (firstBracket != -1 && (firstBrace == -1 || firstBracket < firstBrace))
-        {
-            int lastBracket = text.LastIndexOf(']');
-            if (lastBracket > firstBracket)
-            {
-                string jsonCandidate = text.Substring(firstBracket, lastBracket - firstBracket + 1);
-                ParseAndAddCalls(jsonCandidate, list, logger);
-                if (list.Count > 0) return list;
-            }
-        }
-
-        if (firstBrace != -1)
-        {
-            int openCount = 0;
-            int lastBrace = -1;
-            for (int i = firstBrace; i < text.Length; i++)
-            {
-                if (text[i] == '{') openCount++;
-                else if (text[i] == '}')
-                {
-                    openCount--;
-                    if (openCount == 0)
-                    {
-                        lastBrace = i;
-                        break;
-                    }
-                }
-            }
-
-            if (lastBrace > firstBrace)
-            {
-                string jsonCandidate = text.Substring(firstBrace, lastBrace - firstBrace + 1);
-                ParseAndAddCalls(jsonCandidate, list, logger);
-                if (list.Count > 0) return list;
-            }
-        }
-
-        return list;
+        return AgentToolCallParser.TryExtractToolCalls(text, logger);
     }
 
-    private static void ParseAndAddCalls(string rawJson, List<AgentToolCall> targetList, ILoggingService? logger)
+    internal static string EnrichGoalWithWorkspaceContext(string baseGoal, string workspaceRoot)
     {
-        var options = new JsonDocumentOptions
-        {
-            AllowTrailingCommas = true,
-            CommentHandling = JsonCommentHandling.Skip
-        };
-
-        string sanitizedJson = FixUnescapedControlCharsInJsonStrings(rawJson);
-        JsonDocument? doc = null;
-        try
-        {
-            doc = JsonDocument.Parse(sanitizedJson, options);
-        }
-        catch
-        {
-            string repairedJson = RepairMalformedJson(sanitizedJson);
-            try { doc = JsonDocument.Parse(repairedJson, options); }
-            catch { }
-        }
-
-        if (doc == null) return;
-
-        using (doc)
-        {
-            var root = doc.RootElement;
-            if (root.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in root.EnumerateArray())
-                {
-                    var call = ExtractSingleCallFromElement(item);
-                    if (call != null) targetList.Add(call);
-                }
-            }
-            else if (root.ValueKind == JsonValueKind.Object)
-            {
-                var call = ExtractSingleCallFromElement(root);
-                if (call != null) targetList.Add(call);
-            }
-        }
+        return AgentWorkspaceContextEnricher.EnrichGoalWithWorkspaceContext(baseGoal, workspaceRoot);
     }
 
-    private static AgentToolCall? ExtractSingleCallFromElement(JsonElement root)
+    internal static bool IsCyclicPatternDetected(List<string> toolHistorySignature)
     {
-        JsonElement targetElement = root;
-        if (root.TryGetProperty("function", out var fnObj) && fnObj.ValueKind == JsonValueKind.Object)
-        {
-            targetElement = fnObj;
-        }
-
-        string? toolRaw = null;
-        if (targetElement.TryGetProperty("tool", out var toolProp)) toolRaw = toolProp.GetString();
-        else if (targetElement.TryGetProperty("tool_name", out var toolNameProp)) toolRaw = toolNameProp.GetString();
-        else if (targetElement.TryGetProperty("function", out var fnProp) && fnProp.ValueKind == JsonValueKind.String) toolRaw = fnProp.GetString();
-        else if (targetElement.TryGetProperty("action", out var actProp)) toolRaw = actProp.GetString();
-        else if (targetElement.TryGetProperty("name", out var nameProp)) toolRaw = nameProp.GetString();
-
-        if (string.IsNullOrWhiteSpace(toolRaw)) return null;
-
-        string normalizedTool = NormalizeToolName(toolRaw);
-        string argsJson = "{}";
-
-        JsonElement? argsElem = null;
-        if (targetElement.TryGetProperty("arguments", out var argsProp)) argsElem = argsProp;
-        else if (targetElement.TryGetProperty("args", out var aProp)) argsElem = aProp;
-        else if (targetElement.TryGetProperty("parameters", out var pProp)) argsElem = pProp;
-        else if (targetElement.TryGetProperty("inputs", out var iProp)) argsElem = iProp;
-        else if (root.TryGetProperty("arguments", out var rootArgsProp)) argsElem = rootArgsProp;
-
-        if (argsElem.HasValue)
-        {
-            if (argsElem.Value.ValueKind == JsonValueKind.String)
-            {
-                string strVal = argsElem.Value.GetString() ?? "{}";
-                argsJson = strVal.Trim().StartsWith('{') ? strVal : "{ \"input\": " + JsonSerializer.Serialize(strVal) + " }";
-            }
-            else
-            {
-                argsJson = argsElem.Value.GetRawText();
-            }
-        }
-
-        string? explanation = root.TryGetProperty("explanation", out var expProp) ? expProp.GetString() : null;
-        if (string.IsNullOrWhiteSpace(explanation) && targetElement.TryGetProperty("explanation", out var expProp2))
-        {
-            explanation = expProp2.GetString();
-        }
-
-        return new AgentToolCall(
-            CallId: $"call_{Guid.NewGuid():N}"[..10],
-            ToolName: normalizedTool,
-            ArgumentsJson: argsJson,
-            Explanation: explanation);
+        return AgentCycleGuard.IsCyclicPatternDetected(toolHistorySignature);
     }
 
-    private static string RepairMalformedJson(string rawJson)
+    internal static bool IsReadOnlyTool(AgentToolCall call)
     {
-        if (string.IsNullOrWhiteSpace(rawJson)) return rawJson;
-        string repaired = FixUnescapedControlCharsInJsonStrings(rawJson);
-        repaired = FixUnescapedStringLiterals(repaired);
-        repaired = Regex.Replace(repaired, @"\\(?![\\""/bfnrt]|u[0-9a-fA-F]{4})", @"\\");
-        repaired = Regex.Replace(repaired, @"'([^'\\]*(?:\\.[^'\\]*)*?)'", "\"$1\"");
-        repaired = Regex.Replace(repaired, @"(?<=[{\s,])([a-zA-Z_][a-zA-Z0-9_]*)\s*:", "\"$1\":");
-        repaired = Regex.Replace(repaired, @",\s*([}\]])", "$1");
-        repaired = Regex.Replace(repaired, @"(?<=:\s*)True(?=\s*[,}\]])", "true");
-        repaired = Regex.Replace(repaired, @"(?<=:\s*)False(?=\s*[,}\]])", "false");
-        repaired = Regex.Replace(repaired, @"(?<=:\s*)None(?=\s*[,}\]])", "null");
-        return repaired;
-    }
-
-    private static string FixUnescapedControlCharsInJsonStrings(string json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return json;
-        var sb = new StringBuilder(json.Length + 64);
-        bool inString = false;
-        bool isEscaped = false;
-
-        for (int i = 0; i < json.Length; i++)
-        {
-            char c = json[i];
-            if (inString)
-            {
-                if (isEscaped) { sb.Append(c); isEscaped = false; }
-                else if (c == '\\') { sb.Append(c); isEscaped = true; }
-                else if (c == '"') { sb.Append(c); inString = false; }
-                else if (c == '\t') sb.Append("\\t");
-                else if (c == '\r') sb.Append("\\r");
-                else if (c == '\n') sb.Append("\\n");
-                else sb.Append(c);
-            }
-            else
-            {
-                if (c == '"') inString = true;
-                sb.Append(c);
-            }
-        }
-        return sb.ToString();
-    }
-
-    private static string FixUnescapedStringLiterals(string text)
-    {
-        return Regex.Replace(text, @"(?<=""(?:content|replacementContent|targetContent|query|commandLine)"":\s*"")([\s\S]*?)(?=""\s*[,}])", m =>
-        {
-            return m.Value.Replace("\r\n", "\\n").Replace("\n", "\\n").Replace("\r", "\\n").Replace("\t", "\\t");
-        });
-    }
-
-    private static bool LooksLikeFailedToolCall(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        string lower = text.ToLowerInvariant();
-        bool hasToolKeyword = lower.Contains("\"tool\"") || lower.Contains("\"tool_name\"") ||
-                              lower.Contains("\"action\"") || lower.Contains("\"function\"") ||
-                              lower.Contains("<tool_call>") || lower.Contains("<tool>");
-        bool hasArgumentsKeyword = lower.Contains("\"arguments\"") || lower.Contains("\"args\"") ||
-                                   lower.Contains("\"parameters\"") || lower.Contains("\"inputs\"");
-        bool hasJsonBlock = text.Contains("```json") || text.Contains("<tool_call>") || (text.Contains('{') && text.Contains('}'));
-
-        return hasToolKeyword && (hasArgumentsKeyword || hasJsonBlock);
-    }
-
-    private static string NormalizeToolName(string toolName)
-    {
-        string t = toolName.Trim().ToLowerInvariant();
-        return t switch
-        {
-            "list" or "listdir" or "ls" or "dir" or "list_directory" or "list_files" => "list_dir",
-            "read" or "readfile" or "read_file_content" or "view_file" or "cat" => "read_file",
-            "write" or "writefile" or "create_file" or "create" or "write_to_file" => "write_file",
-            "replace" or "replacefile" or "replace_content" or "edit" or "edit_file" => "replace_file_content",
-            "multi_replace" or "multi_replace_file_content" or "batch_replace" => "multi_replace_file_content",
-            "grep" or "search" or "find" or "grep_search" or "find_in_files" => "grep_search",
-            "git_diff" or "git_status" or "git_diff_inspect" or "git" => "git_diff_inspect",
-            "run" or "exec" or "execute" or "command" or "terminal" or "run_command" or "cmd" or "powershell" => "run_command",
-            "web_search" or "search_web" or "internet_search" or "online_search" or "ddg" or "google" => "web_search",
-            "ingest_office" or "ingest_office_doc" or "office_ingest" or "ingest_document" => "ingest_office_doc",
-            "generate_image" or "generate_image_onnx" or "image_gen" or "create_image" => "generate_image_onnx",
-            "query_retrieval" or "query_retrieval_index" or "search_retrieval" or "vector_search" or "rag_hybrid_search" or "rag_search" => "query_retrieval_index",
-            "plan" or "plan_task" or "create_plan" or "update_plan" => "plan_task",
-            "reflect" or "reflect_step" or "self_reflection" => "reflect_step",
-            "subagent" or "invoke_subagent" or "sub_agent" => "invoke_subagent",
-            "task" or "manage_task" => "manage_task",
-            _ => t
-        };
+        return AgentToolCallParser.IsReadOnlyTool(call);
     }
 
     private async Task<string> ResolveModelAsync(string? requestedModel, CancellationToken cancellationToken)
@@ -793,8 +618,7 @@ internal sealed class AgentLoopEngine
         string modeLabel = isWriteMode ? "WRITE" : "ASK";
         string modeDescription = isWriteMode
             ? "Full agentic mode: you can read files, write files, execute commands, search the web, and modify the codebase."
-            : "Read-only RAG mode: you can read files, search code, query the retrieval index, and inspect git state. Do NOT write or execute commands."
-        ;
+            : "Read-only RAG mode: you can read files, search code, query the retrieval index, and inspect git state. Do NOT write or execute commands.";
         string approvalNote = autoApprove
             ? "Command auto-approval is ENABLED. run_command executes immediately without user confirmation."
             : "Command auto-approval is DISABLED. run_command requires explicit user approval before execution.";
@@ -869,136 +693,6 @@ internal sealed class AgentLoopEngine
             7. **Project context awareness.** If AGENTS.md or PROJECT_STATUS.json exist at the workspace root, read them first and follow their conventions.
             8. **Workspace safety.** Never write outside the authorized workspace root. Never print secrets, keys, or credentials.
             """;
-    }
-
-    private static string EnrichGoalWithWorkspaceContext(string goal, string workspaceRoot)
-    {
-        if (string.IsNullOrWhiteSpace(workspaceRoot)) return goal;
-
-        var sb = new StringBuilder();
-        sb.AppendLine(goal);
-        sb.AppendLine();
-        sb.AppendLine("[CONTESTO WORKSPACE ATTIVO]");
-        sb.AppendLine($"Cartella radice del progetto: {workspaceRoot}");
-
-        try
-        {
-            if (Directory.Exists(workspaceRoot))
-            {
-                var detectedItems = new List<string>();
-                if (File.Exists(Path.Combine(workspaceRoot, "AGENTS.md"))) detectedItems.Add("- AGENTS.md (Istruzioni e convenzioni generali del repository)");
-                if (File.Exists(Path.Combine(workspaceRoot, "PROJECT_STATUS.json"))) detectedItems.Add("- PROJECT_STATUS.json (Todo attivi e stato del progetto)");
-                if (File.Exists(Path.Combine(workspaceRoot, "workspace_settings.json"))) detectedItems.Add("- workspace_settings.json (Impostazioni e switch attivi del workspace)");
-                if (File.Exists(Path.Combine(workspaceRoot, "README.md"))) detectedItems.Add("- README.md (Panoramica e guida principale del repository)");
-                if (Directory.Exists(Path.Combine(workspaceRoot, "skills"))) detectedItems.Add("- skills/ (Directory skill e linee guida di dominio)");
-
-                if (detectedItems.Count > 0)
-                {
-                    sb.AppendLine("File di contesto e configurazione identificati nella radice:");
-                    foreach (var item in detectedItems) sb.AppendLine(item);
-                }
-
-                string statusPath = Path.Combine(workspaceRoot, "PROJECT_STATUS.json");
-                if (File.Exists(statusPath))
-                {
-                    try
-                    {
-                        string statusJson = File.ReadAllText(statusPath, Encoding.UTF8);
-                        if (!string.IsNullOrWhiteSpace(statusJson) && statusJson.Length < 3000)
-                        {
-                            sb.AppendLine("\nContenuto attuale di PROJECT_STATUS.json:");
-                            sb.AppendLine(statusJson.Trim());
-                        }
-                    }
-                    catch { }
-                }
-
-                string settingsPath = Path.Combine(workspaceRoot, "workspace_settings.json");
-                if (File.Exists(settingsPath))
-                {
-                    try
-                    {
-                        string settingsJson = File.ReadAllText(settingsPath, Encoding.UTF8);
-                        if (!string.IsNullOrWhiteSpace(settingsJson) && settingsJson.Length < 2000)
-                        {
-                            sb.AppendLine("\nContenuto switch/configurazione di workspace_settings.json:");
-                            sb.AppendLine(settingsJson.Trim());
-                        }
-                    }
-                    catch { }
-                }
-            }
-        }
-        catch { }
-
-        sb.AppendLine("\nISTRUZIONI PER L'AGENTE:");
-        sb.AppendLine("1. Esplora i file e la struttura del progetto solo se strettamente necessario. Se la struttura è già nota o fornita nel contesto, non rieseguire list_dir e procedi direttamente con il task.");
-        sb.AppendLine("2. Se presenti, leggi e rispetta prioritariamente AGENTS.md e PROJECT_STATUS.json.");
-
-        return sb.ToString();
-    }
-
-    private static bool IsCyclicPatternDetected(List<string> history)
-    {
-        if (history.Count < 3) return false;
-        int n = history.Count;
-
-        string GetToolName(string sig)
-        {
-            int idx = sig.IndexOf(':');
-            return idx > 0 ? sig[..idx].Trim().ToLowerInvariant() : sig.Trim().ToLowerInvariant();
-        }
-
-        string t1 = GetToolName(history[n - 1]);
-        string t2 = GetToolName(history[n - 2]);
-        string t3 = GetToolName(history[n - 3]);
-
-        if (t1 is "reflect_step" or "plan_task" && t2 is "reflect_step" or "plan_task" && t3 is "reflect_step" or "plan_task")
-        {
-            return true;
-        }
-
-        if (history.Count >= 4)
-        {
-            if (history[n - 1] == history[n - 2] && history[n - 2] == history[n - 3]) return true;
-
-            for (int period = 2; period <= 4; period++)
-            {
-                if (n >= period * 3)
-                {
-                    bool matchExact = true;
-                    bool matchToolName = true;
-
-                    for (int i = 0; i < period; i++)
-                    {
-                        string elem = history[n - 1 - i];
-                        string name = GetToolName(elem);
-
-                        if (history[n - 1 - i - period] != elem || history[n - 1 - i - (period * 2)] != elem)
-                        {
-                            matchExact = false;
-                        }
-
-                        if (GetToolName(history[n - 1 - i - period]) != name || GetToolName(history[n - 1 - i - (period * 2)]) != name)
-                        {
-                            matchToolName = false;
-                        }
-                    }
-
-                    if (matchExact || matchToolName) return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsReadOnlyTool(AgentToolCall call)
-    {
-        // Only tools that are truly stateless and idempotent qualify for parallel execution.
-        // plan_task and reflect_step are excluded: they mutate agent state (plan checklist, key-facts store).
-        string t = call.ToolName.ToLowerInvariant();
-        return t is "read_file" or "list_dir" or "grep_search" or "git_diff_inspect" or "web_search" or "query_retrieval_index";
     }
 }
 

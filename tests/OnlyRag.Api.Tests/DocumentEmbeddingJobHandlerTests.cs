@@ -310,6 +310,11 @@ public sealed class DocumentEmbeddingJobHandlerTests
         {
             return Task.CompletedTask;
         }
+
+        public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed class StubOllamaSettingsService : IOllamaSettingsService
@@ -404,6 +409,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
@@ -478,6 +484,7 @@ public sealed class DocumentEmbeddingJobHandlerTests
             IReadOnlyList<OllamaChatMessage> messages,
             int? numCtx = null,
             object? format = null,
+            object? tools = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

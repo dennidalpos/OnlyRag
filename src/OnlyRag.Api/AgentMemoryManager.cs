@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Logging;
@@ -19,7 +20,7 @@ public sealed class AgentPlan
 
     public string ToMarkdownSummary()
     {
-        if (Steps.Count == 0) return "Nessun piano attivo.";
+        if (Steps.Count == 0) return "No active plan.";
         var sb = new StringBuilder();
         foreach (var s in Steps)
         {
@@ -30,7 +31,7 @@ public sealed class AgentPlan
                 "failed" => "[!]",
                 _ => "[ ]"
             };
-            sb.AppendLine($"{mark} {s.Description}");
+            sb.AppendLine($"{mark} Step {s.Id}: {s.Description}");
         }
         return sb.ToString().TrimEnd();
     }
@@ -86,6 +87,64 @@ internal sealed class AgentMemoryManager
         }
     }
 
+    public void UpdatePlanFromToolCall(JsonElement root)
+    {
+        var stepsList = new List<AgentPlanStep>();
+        if (root.TryGetProperty("steps", out var stepsProp) && stepsProp.ValueKind == JsonValueKind.Array)
+        {
+            int idx = 1;
+            foreach (var item in stepsProp.EnumerateArray())
+            {
+                string desc = item.ValueKind == JsonValueKind.Object
+                    ? (item.TryGetProperty("description", out var d) ? d.GetString() ?? "" : item.ToString())
+                    : item.GetString() ?? "";
+
+                if (!string.IsNullOrWhiteSpace(desc))
+                {
+                    stepsList.Add(new AgentPlanStep
+                    {
+                        Id = idx.ToString(),
+                        Description = desc.Trim(),
+                        Status = idx == 1 ? "in_progress" : "pending"
+                    });
+                    idx++;
+                }
+            }
+        }
+
+        if (stepsList.Count > 0)
+        {
+            CurrentPlan.Steps = stepsList;
+            CurrentPlan.ActiveStepId = stepsList[0].Id;
+            logger?.LogInfo("AgentMemory", $"[PLAN SCRATCHPAD UPDATED] Caricato nuovo piano con {stepsList.Count} passaggi.");
+        }
+    }
+
+    public void UpdateStepStatus(string stepId, string status, string? learnings = null)
+    {
+        var step = CurrentPlan.Steps.FirstOrDefault(s => s.Id.Equals(stepId, StringComparison.OrdinalIgnoreCase));
+        if (step != null)
+        {
+            step.Status = status.ToLowerInvariant();
+            logger?.LogInfo("AgentMemory", $"[STEP STATUS UPDATED] Step {stepId} -> {status}");
+
+            if (status.Equals("completed", StringComparison.OrdinalIgnoreCase))
+            {
+                var nextStep = CurrentPlan.Steps.FirstOrDefault(s => s.Status == "pending");
+                if (nextStep != null)
+                {
+                    nextStep.Status = "in_progress";
+                    CurrentPlan.ActiveStepId = nextStep.Id;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(learnings))
+        {
+            AddKeyFact($"[Learning Step {stepId}] {learnings}");
+        }
+    }
+
     public IReadOnlyCollection<string> GetModifiedFiles() => modifiedFiles;
     public IReadOnlyCollection<string> GetKeyFacts() => keyFacts;
 
@@ -102,7 +161,14 @@ internal sealed class AgentMemoryManager
     public string BuildContextSummary()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("=== AGENT WORKING MEMORY ===");
+        sb.AppendLine("=== AGENT WORKING MEMORY & LIVE PLAN SCRATCHPAD ===");
+
+        if (CurrentPlan.Steps.Count > 0)
+        {
+            sb.AppendLine("LIVE PLAN SCRATCHPAD:");
+            sb.AppendLine(CurrentPlan.ToMarkdownSummary());
+            sb.AppendLine();
+        }
 
         if (recalledMemories.Count > 0)
         {
@@ -131,12 +197,6 @@ internal sealed class AgentMemoryManager
             }
         }
 
-        if (CurrentPlan.Steps.Count > 0)
-        {
-            sb.AppendLine("Piano Attivo:");
-            sb.AppendLine(CurrentPlan.ToMarkdownSummary());
-        }
-
         if (keyFacts.Count > 0)
         {
             sb.AppendLine("Fatti e Risultati Chiave:");
@@ -161,8 +221,8 @@ internal sealed class AgentMemoryManager
 
         var historyToCompress = messages.GetRange(startIndex, removeCount);
         var summarySb = new StringBuilder();
-        summarySb.AppendLine("[CONTESTO SINTETIZZATO DALL'AGENTE]");
-        summarySb.AppendLine($"Sintesi automatica di {removeCount} passaggi intermedi di esecuzione:");
+        summarySb.AppendLine("[AGENT SYNTHESIZED CONTEXT]");
+        summarySb.AppendLine($"Automatic summary of {removeCount} intermediate execution steps:");
 
         foreach (var msg in historyToCompress)
         {
@@ -185,7 +245,7 @@ internal sealed class AgentMemoryManager
         messages.RemoveRange(startIndex, removeCount);
         messages.Insert(startIndex, new OllamaChatMessage("system", summarySb.ToString().TrimEnd()));
 
-        logger?.LogInfo("AgentMemory", $"[COMPRESSIONE CONTESTO] Sintetizzati {removeCount} messaggi intermedi in 1 blocco di contesto strutturato.");
+        logger?.LogInfo("AgentMemory", $"[CONTEXT COMPRESSION] Synthesized {removeCount} intermediate messages into 1 structured context block.");
         return true;
     }
 
@@ -193,7 +253,7 @@ internal sealed class AgentMemoryManager
     {
         if (messages.Count <= 12) return;
 
-        const int maxObsLength = 600;
+        const int maxObsLength = 800;
         int preserveRecentIdx = Math.Max(2, messages.Count - 6);
         int truncatedCount = 0;
 
@@ -208,11 +268,30 @@ internal sealed class AgentMemoryManager
                 {
                     string header = originalText.Substring(0, outputIdx + 8);
                     string body = originalText.Substring(outputIdx + 8);
+
                     if (body.Length > maxObsLength)
                     {
-                        string headSnippet = body.Substring(0, 250);
+                        string headSnippet = body.Substring(0, 300);
                         string tailSnippet = body.Substring(body.Length - 250);
-                        string compressedBody = $"{headSnippet}\n... [Osservazione intermedia sintetizzata dalla memoria gerarchica ({body.Length} caratteri)] ...\n{tailSnippet}";
+
+                        // Preserve lines containing [STDERR], Error, Exception or fail if present in the body
+                        string errorLines = string.Empty;
+                        if (body.Contains("[STDERR]", StringComparison.OrdinalIgnoreCase) ||
+                            body.Contains("Exception", StringComparison.OrdinalIgnoreCase) ||
+                            body.Contains("Error", StringComparison.OrdinalIgnoreCase) ||
+                            body.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var errMatches = body.Split('\n')
+                                .Where(l => l.Contains("Exception", StringComparison.OrdinalIgnoreCase) ||
+                                           l.Contains("at ", StringComparison.OrdinalIgnoreCase) ||
+                                           l.Contains("[STDERR]", StringComparison.OrdinalIgnoreCase) ||
+                                           l.Contains("Error", StringComparison.OrdinalIgnoreCase) ||
+                                           l.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+                                .Take(10);
+                            errorLines = "\n[PRESERVED ERROR EXTRACT]:\n" + string.Join("\n", errMatches);
+                        }
+
+                        string compressedBody = $"{headSnippet}\n... [Intermediate observation synthesized by hierarchical memory ({body.Length} chars)] ...{errorLines}\n{tailSnippet}";
                         messages[i] = new OllamaChatMessage("user", header + compressedBody);
                         truncatedCount++;
                     }
@@ -222,7 +301,7 @@ internal sealed class AgentMemoryManager
 
         if (truncatedCount > 0)
         {
-            logger?.LogInfo("AgentMemory", $"[MEMORIA GERARCHICA] Sintetizzate {truncatedCount} osservazioni voluminose storiche.");
+            logger?.LogInfo("AgentMemory", $"[HIERARCHICAL MEMORY] Synthesized {truncatedCount} large historical observations, preserving error traces.");
         }
 
         if (messages.Count > maxMessagesHardLimit)

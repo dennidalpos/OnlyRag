@@ -133,7 +133,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.UnexpectedResponse,
-                "Ollama ha risposto alla chat di prova con un risultato incompleto.");
+                "Ollama replied to the test chat with an incomplete result.");
         }
     }
 
@@ -142,6 +142,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
         object? format = null,
+        object? tools = null,
         CancellationToken cancellationToken = default)
     {
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
@@ -149,14 +150,14 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                "La richiesta chat deve contenere almeno un messaggio.");
+                "The chat request must contain at least one message.");
         }
 
         if (messages.Any(message => string.IsNullOrWhiteSpace(message.Role) || string.IsNullOrWhiteSpace(message.Content)))
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                "I messaggi chat devono includere ruolo e contenuto.");
+                "Chat messages must include role and content.");
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
@@ -172,6 +173,8 @@ internal sealed partial class OllamaClient : IOllamaClient
         };
         if (numCtx.HasValue) payload["options"] = new { num_ctx = numCtx.Value };
         if (format is not null) payload["format"] = format;
+        if (tools is not null) payload["tools"] = tools;
+
         OllamaChatResponse response = await generationCoordinator.RunAsync(
             ct => SendAsync<OllamaChatResponse>(
                 HttpMethod.Post,
@@ -186,7 +189,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.UnexpectedResponse,
-                "Ollama non ha restituito testo per la risposta chat.");
+                "Ollama did not return text for the chat response.");
         }
 
         return content;
@@ -197,6 +200,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         IReadOnlyList<OllamaChatMessage> messages,
         int? numCtx = null,
         object? format = null,
+        object? tools = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         string normalizedModelName = OllamaSettingsService.NormalizeRequiredModelName(modelName);
@@ -204,7 +208,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                "La richiesta chat deve contenere almeno un messaggio.");
+                "The chat request must contain at least one message.");
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
@@ -220,6 +224,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         };
         if (numCtx.HasValue) payload["options"] = new { num_ctx = numCtx.Value };
         if (format is not null) payload["format"] = format;
+        if (tools is not null) payload["tools"] = tools;
 
         using HttpRequestMessage request = new(HttpMethod.Post, new Uri(context.BaseUri, "api/chat"))
         {
@@ -263,7 +268,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.UnexpectedResponse,
-                "Ollama non ha restituito embedding validi per il modello richiesto.");
+                "Ollama did not return valid embeddings for the requested model.");
         }
     }
 
@@ -308,14 +313,14 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                "La richiesta embedding deve contenere almeno un chunk.");
+                "The embedding request must contain at least one chunk.");
         }
 
         if (inputs.Any(string.IsNullOrWhiteSpace))
         {
             throw new OllamaApiException(
                 OllamaErrorKind.InvalidRequest,
-                "I chunk vuoti non possono essere inviati a Ollama per gli embedding.");
+                "Empty chunks cannot be sent to Ollama for embeddings.");
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
@@ -337,7 +342,7 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.UnexpectedResponse,
-                "Ollama ha restituito un numero di embedding diverso dal numero di chunk inviati.");
+                "Ollama returned a different number of embeddings than the number of chunks sent.");
         }
 
         return response.Embeddings;
@@ -378,7 +383,7 @@ internal sealed partial class OllamaClient : IOllamaClient
             {
                 throw new OllamaApiException(
                     OllamaErrorKind.UnexpectedResponse,
-                    "Ollama ha restituito una risposta vuota.");
+                    "Ollama returned an empty response.");
             }
 
             return payload;
@@ -387,14 +392,14 @@ internal sealed partial class OllamaClient : IOllamaClient
         {
             throw new OllamaApiException(
                 OllamaErrorKind.Timeout,
-                $"Ollama non ha risposto entro {context.Timeout.TotalSeconds:0} secondi.",
+                $"Ollama did not respond within {context.Timeout.TotalSeconds:0} seconds.",
                 innerException: ex);
         }
         catch (HttpRequestException ex)
         {
             throw new OllamaApiException(
                 OllamaErrorKind.Unreachable,
-                $"Non riesco a raggiungere Ollama su {context.BaseUri}. Controlla l'indirizzo e verifica che il servizio sia in esecuzione.",
+                $"Cannot reach Ollama at {context.BaseUri}. Check the address and ensure the service is running.",
                 innerException: ex);
         }
     }

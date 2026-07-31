@@ -240,8 +240,8 @@ public sealed class DiagnosticsTests
 
             string content = File.ReadAllText(Path.Combine(paths.LogsDirectory, "backend.log"));
             Assert.Contains("InvalidOperationException", content, StringComparison.Ordinal);
-            Assert.Contains("[percorso locale]", content, StringComparison.Ordinal);
-            Assert.Contains("[endpoint esterno]", content, StringComparison.Ordinal);
+            Assert.Contains("[local path]", content, StringComparison.Ordinal);
+            Assert.Contains("[external endpoint]", content, StringComparison.Ordinal);
             Assert.DoesNotContain("secret.txt", content, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("example.test", content, StringComparison.OrdinalIgnoreCase);
         }

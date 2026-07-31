@@ -23,7 +23,7 @@ public static partial class InProcessBackend
         {
             throw new OllamaApiException(
                 OllamaErrorKind.ModelNotFound,
-                $"Il modello {usage} '{model}' non e installato in Ollama.");
+                $"The {usage} model '{model}' is not installed in Ollama.");
         }
     }
 
@@ -44,38 +44,38 @@ public static partial class InProcessBackend
         return exception.Kind switch
         {
             OllamaErrorKind.InvalidUrl => CreateProblem(
-                "URL Ollama non valido",
-                "L'indirizzo configurato per Ollama non e valido. Correggilo nelle impostazioni.",
+                "Invalid Ollama URL",
+                "The configured Ollama address is invalid. Please correct it in Settings.",
                 StatusCodes.Status400BadRequest,
                 "ollama_invalid_url"),
             OllamaErrorKind.InvalidRequest => CreateProblem(
-                "Richiesta Ollama non valida",
-                "La richiesta inviata a Ollama non e valida. Controlla modello, parametri e impostazioni.",
+                "Invalid Ollama request",
+                "The request sent to Ollama is invalid. Check model, parameters, and settings.",
                 StatusCodes.Status400BadRequest,
                 "ollama_invalid_request"),
             OllamaErrorKind.ContextLengthExceeded => CreateProblem(
-                "Contesto Ollama troppo grande",
-                "La richiesta supera la finestra di contesto del modello. Riduci i documenti selezionati o aumenta num_ctx.",
+                "Ollama context too large",
+                "The request exceeds the model's context window. Reduce selected documents or increase num_ctx.",
                 StatusCodes.Status400BadRequest,
                 "ollama_context_length_exceeded"),
             OllamaErrorKind.ModelNotFound => CreateProblem(
-                "Modello assente",
+                "Model not found",
                 exception.Message,
                 StatusCodes.Status404NotFound,
                 "ollama_model_not_found"),
             OllamaErrorKind.Timeout => CreateProblem(
-                "Timeout Ollama",
-                "Ollama non ha risposto entro il tempo configurato. Controlla il servizio o aumenta il timeout.",
+                "Ollama timeout",
+                "Ollama did not respond within the configured timeout. Check the service or increase the timeout.",
                 StatusCodes.Status408RequestTimeout,
                 "ollama_timeout"),
             OllamaErrorKind.Unreachable => CreateProblem(
-                "Ollama non raggiungibile",
-                "Ollama non e raggiungibile dall'app. Controlla che il servizio sia attivo e che l'endpoint sia corretto.",
+                "Ollama unreachable",
+                "Ollama is not reachable from the app. Check that the service is running and the endpoint is correct.",
                 StatusCodes.Status503ServiceUnavailable,
                 "ollama_unreachable"),
             _ => CreateProblem(
-                "Errore Ollama",
-                "Ollama ha restituito una risposta inattesa. I dettagli tecnici sono nei log locali.",
+                "Ollama error",
+                "Ollama returned an unexpected response. Technical details are in the local logs.",
                 StatusCodes.Status502BadGateway,
                 "ollama_unexpected_response")
         };
@@ -98,38 +98,38 @@ public static partial class InProcessBackend
         return exception.Kind switch
         {
             ImageGenerationErrorKind.InvalidConfiguration => CreateProblem(
-                "Configurazione immagini non valida",
+                "Invalid image configuration",
                 exception.Message,
                 StatusCodes.Status400BadRequest,
                 "image_generation_invalid_configuration"),
             ImageGenerationErrorKind.InvalidRequest => CreateProblem(
-                "Richiesta immagini non valida",
+                "Invalid image request",
                 exception.Message,
                 StatusCodes.Status400BadRequest,
                 "image_generation_invalid_request"),
             ImageGenerationErrorKind.Timeout => CreateProblem(
-                "Timeout generazione immagini",
+                "Image generation timeout",
                 exception.Message,
                 StatusCodes.Status408RequestTimeout,
                 "image_generation_timeout"),
             ImageGenerationErrorKind.ModelNotReady => CreateProblem(
-                "Modello immagini non pronto",
+                "Image model not ready",
                 exception.Message,
                 StatusCodes.Status409Conflict,
                 "image_generation_model_not_ready"),
             ImageGenerationErrorKind.Unreachable => CreateProblem(
-                "Download modello immagini non raggiungibile",
+                "Image model download unreachable",
                 exception.Message,
                 StatusCodes.Status503ServiceUnavailable,
                 "image_generation_unreachable"),
             ImageGenerationErrorKind.NotFound => CreateProblem(
-                "Risorsa immagini non trovata",
+                "Image resource not found",
                 exception.Message,
                 StatusCodes.Status404NotFound,
                 "image_generation_not_found"),
             _ => CreateProblem(
-                "Errore generazione immagini",
-                "Il generatore immagini integrato ha restituito una risposta inattesa. I dettagli tecnici sono nei log locali.",
+                "Image generation error",
+                "The integrated image generator returned an unexpected response. Technical details are in the local logs.",
                 StatusCodes.Status502BadGateway,
                 "image_generation_unexpected_response")
         };
@@ -155,11 +155,11 @@ public static partial class InProcessBackend
         return CreateProblem(title, detail, StatusCodes.Status409Conflict, code);
     }
 
-    private static IResult CreateNotFoundProblem(string resourceName = "Risorsa")
+    private static IResult CreateNotFoundProblem(string resourceName = "Resource")
     {
         return CreateProblem(
-            $"{resourceName} non trovato",
-            "La risorsa richiesta non esiste o non e piu disponibile.",
+            $"{resourceName} not found",
+            "The requested resource does not exist or is no longer available.",
             StatusCodes.Status404NotFound,
             "not_found");
     }
@@ -201,8 +201,8 @@ public static partial class InProcessBackend
     private static string CreateUnexpectedErrorDetail(string? correlationId = null)
     {
         return string.IsNullOrWhiteSpace(correlationId)
-            ? "Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali."
-            : $"Si e verificato un errore imprevisto. I dettagli sono stati registrati nei log locali con riferimento {correlationId}.";
+            ? "An unexpected error occurred. Details have been recorded in the local logs."
+            : $"An unexpected error occurred. Details have been recorded in the local logs with reference {correlationId}.";
     }
 
     private static OllamaStatusResponse CreateStatusResponse(string baseUrl, OllamaApiException exception)
@@ -215,28 +215,28 @@ public static partial class InProcessBackend
                 baseUrl,
                 0,
                 exception.Message,
-                "Apri Impostazioni e correggi l'indirizzo Ollama."),
+                "Open Settings and correct the Ollama address."),
             OllamaErrorKind.Timeout => new OllamaStatusResponse(
                 "Offline",
                 false,
                 baseUrl,
                 0,
-                "Ollama non ha risposto in tempo.",
-                "Controlla che Ollama sia attivo e aumenta il timeout se la macchina e lenta."),
+                "Ollama did not respond in time.",
+                "Check that Ollama is running and increase the timeout if the machine is slow."),
             OllamaErrorKind.Unreachable => new OllamaStatusResponse(
                 "Offline",
                 false,
                 baseUrl,
                 0,
-                "Ollama non e raggiungibile.",
-                "Verifica che Ollama sia aperto oppure che l'host LAN sia corretto e accessibile."),
+                "Ollama is unreachable.",
+                "Verify that Ollama is open or that the LAN host is correct and accessible."),
             _ => new OllamaStatusResponse(
                 "Offline",
                 false,
                 baseUrl,
                 0,
                 exception.Message,
-                "Controlla configurazione e modelli in Impostazioni.")
+                "Check configuration and models in Settings.")
         };
     }
 }

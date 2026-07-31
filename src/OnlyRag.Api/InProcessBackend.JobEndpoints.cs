@@ -64,8 +64,8 @@ public static partial class InProcessBackend
             if (current.Status is JobStatus.Pausing || cancellationRegistry.IsRunning(id))
             {
                 return CreateConflictProblem(
-                    "Job in pausa",
-                    "Il job sta ancora completando la pausa. Riprovare tra poco.",
+                    "Job paused",
+                    "The job is still completing the pause. Please try again shortly.",
                     "job_pause_in_progress");
             }
 
@@ -84,8 +84,8 @@ public static partial class InProcessBackend
             if (job.Status is JobStatus.Running or JobStatus.Pausing or JobStatus.Pending)
             {
                 return CreateConflictProblem(
-                    "Job attivo",
-                    "Impossibile eliminare un job in esecuzione o in attesa.",
+                    "Active job",
+                    "Cannot delete a running or pending job.",
                     "job_active");
             }
 

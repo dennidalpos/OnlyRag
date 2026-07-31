@@ -32,7 +32,7 @@ public sealed class WorkspaceToolExecutorTests
             var result = await executor.ExecuteToolAsync("call_1", "multi_replace_file_content", argsJson, tempDir);
 
             Assert.True(result.Success);
-            Assert.Contains("Applicati 2 chunk", result.Output);
+            Assert.Contains("Applied 2 replacement chunks", result.Output);
 
             string updatedText = await File.ReadAllTextAsync(testFile);
             Assert.Contains("ALPHA_NEW", updatedText);
@@ -58,7 +58,7 @@ public sealed class WorkspaceToolExecutorTests
         var result = await executor.ExecuteToolAsync("call_2", "git_diff_inspect", "{}", rootPath);
 
         Assert.True(result.Success);
-        Assert.Contains("[STATO GIT LOCAL WORKSPACE:", result.Output);
+        Assert.Contains("[GIT LOCAL WORKSPACE STATUS:", result.Output);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class WorkspaceToolExecutorTests
             var result = await executor.ExecuteToolAsync("call_3", "ingest_office_doc", argsJson, tempDir);
 
             Assert.False(result.Success);
-            Assert.Contains("Documento non trovato", result.Error);
+            Assert.Contains("Document not found", result.Error);
         }
         finally
         {

@@ -163,7 +163,7 @@ public static partial class InProcessBackend
         {
             (GeneratedImage Image, string AbsolutePath)? file = await imageGeneration.GetFileAsync(id, cancellationToken);
             return file is null
-                ? CreateNotFoundProblem("Immagine")
+                ? CreateNotFoundProblem("Image")
                 : Results.File(file.Value.AbsolutePath, file.Value.Image.MimeType, file.Value.Image.FileName);
         });
 
@@ -173,7 +173,7 @@ public static partial class InProcessBackend
             CancellationToken cancellationToken) =>
         {
             GeneratedImage? deleted = await imageGeneration.DeleteAsync(id, cancellationToken);
-            return deleted is null ? CreateNotFoundProblem("Immagine") : Results.Ok(deleted);
+            return deleted is null ? CreateNotFoundProblem("Image") : Results.Ok(deleted);
         });
 
         app.MapPost("/api/images/{id:long}/edit", async (

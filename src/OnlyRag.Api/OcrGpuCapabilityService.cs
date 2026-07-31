@@ -20,7 +20,7 @@ public sealed class OcrGpuCapabilityService
 
         if (!OperatingSystem.IsWindows())
         {
-            return Blocked("non_windows", "Non disponibile", "OCR GPU e supportato solo su Windows.");
+            return Blocked("non_windows", "Unavailable", "GPU OCR is supported only on Windows.");
         }
 
         NvidiaHardwareProbe hardwareProbe = await DetectNvidiaHardwareAsync(cancellationToken);
@@ -30,7 +30,7 @@ public sealed class OcrGpuCapabilityService
                 false,
                 "CPU",
                 null,
-                "Nessuna GPU NVIDIA rilevata. OCR CPU disponibile.",
+                "No NVIDIA GPU detected. CPU OCR available.",
                 null,
                 null,
                 null,
@@ -46,8 +46,8 @@ public sealed class OcrGpuCapabilityService
         {
             return new OcrGpuCapabilityResponse(
                 false,
-                "Driver NVIDIA da riparare",
-                "GPU NVIDIA rilevata, ma nvidia-smi non e disponibile. Installa o ripara il driver NVIDIA ufficiale, riavvia Windows e riprova.",
+                "NVIDIA driver to repair",
+                "NVIDIA GPU detected, but nvidia-smi is unavailable. Install or repair the official NVIDIA driver, restart Windows and try again.",
                 null,
                 null,
                 hardwareProbe.DisplayName,
@@ -69,12 +69,12 @@ public sealed class OcrGpuCapabilityService
         {
             return new OcrGpuCapabilityResponse(
                 false,
-                "NVIDIA non disponibile",
+                "NVIDIA unavailable",
                 UserFacingErrorText.FromExternalDetail(
                     ex.Message,
                     hardwareProbe.HasNvidiaHardware
-                        ? "GPU NVIDIA rilevata, ma il driver o nvidia-smi non completano la verifica. Ripara il driver NVIDIA e riavvia Windows."
-                        : "Rilevazione NVIDIA non completata. Dettagli tecnici disponibili nei log locali."),
+                        ? "NVIDIA GPU detected, but the driver or nvidia-smi did not complete verification. Repair the NVIDIA driver and restart Windows."
+                        : "NVIDIA detection not completed. Technical details available in local logs."),
                 null,
                 null,
                 hardwareProbe.DisplayName,
@@ -92,10 +92,10 @@ public sealed class OcrGpuCapabilityService
 
         if (!availability.IsConfigured)
         {
-            string blockReason = availability.Message ?? "Il runtime OCR GPU non e utilizzabile.";
+            string blockReason = availability.Message ?? "The GPU OCR runtime is not usable.";
             return new OcrGpuCapabilityResponse(
                 false,
-                IsRepairableOcrRuntimeIssue(blockReason) ? "Runtime OCR da riparare" : "Runtime CUDA non utilizzabile",
+                IsRepairableOcrRuntimeIssue(blockReason) ? "OCR runtime to repair" : "CUDA runtime unusable",
                 blockReason,
                 runtime.Detail,
                 availability.EngineVersion,
@@ -112,8 +112,8 @@ public sealed class OcrGpuCapabilityService
         {
             return new OcrGpuCapabilityResponse(
                 false,
-                "Runtime PaddlePaddle senza CUDA",
-                "Il runtime OCR installato non supporta CUDA. Apri Impostazioni > Diagnostica e premi Installa OCR GPU per installare il runtime NVIDIA GPU, oppure usa OCR CPU.",
+                "PaddlePaddle runtime without CUDA",
+                "The installed OCR runtime does not support CUDA. Open Settings > Diagnostics and press Install GPU OCR to install the NVIDIA GPU runtime, or use CPU OCR.",
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -129,8 +129,8 @@ public sealed class OcrGpuCapabilityService
         {
             return new OcrGpuCapabilityResponse(
                 false,
-                "CUDA non vede GPU",
-                "PaddlePaddle non rileva dispositivi CUDA.",
+                "CUDA sees no GPUs",
+                "PaddlePaddle does not detect CUDA devices.",
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -144,7 +144,7 @@ public sealed class OcrGpuCapabilityService
 
         return new OcrGpuCapabilityResponse(
             true,
-            "GPU OCR utilizzabile",
+            "GPU OCR usable",
             null,
             runtime.Detail,
             availability.EngineVersion,
@@ -176,7 +176,7 @@ public sealed class OcrGpuCapabilityService
 
     private static bool IsRepairableOcrRuntimeIssue(string message)
     {
-        return message.StartsWith("Runtime OCR locale incompleto o danneggiato.", StringComparison.OrdinalIgnoreCase);
+        return message.StartsWith("Local OCR runtime incomplete or damaged.", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<NvidiaHardwareProbe> DetectNvidiaHardwareAsync(CancellationToken cancellationToken)

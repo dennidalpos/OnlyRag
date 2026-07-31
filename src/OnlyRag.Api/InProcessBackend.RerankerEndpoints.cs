@@ -28,11 +28,11 @@ public static partial class InProcessBackend
             }
             catch (InvalidOperationException ex)
             {
-                return CreateBadRequestProblem("Download già in corso", ex.Message, "reranker_download_in_progress");
+                return CreateBadRequestProblem("Download already in progress", ex.Message, "reranker_download_in_progress");
             }
             catch (Exception ex)
             {
-                return CreateBadRequestProblem("Errore download modello ONNX", ex.Message, "reranker_download_error");
+                return CreateBadRequestProblem("ONNX model download error", ex.Message, "reranker_download_error");
             }
         });
 

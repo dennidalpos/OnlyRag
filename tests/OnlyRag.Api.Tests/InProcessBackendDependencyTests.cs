@@ -23,7 +23,7 @@ public sealed partial class InProcessBackendTests
         Assert.DoesNotContain("irm", status.InstallCommand, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iex", status.InstallCommand, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("OLLAMA_HOST", status.NetworkAccessHint);
-        Assert.Contains("policy aziendale", status.NetworkAccessHint);
+        Assert.Contains("corporate policy", status.NetworkAccessHint);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed partial class InProcessBackendTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("offline", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("policy aziendale", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("corporate policy", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("internal details", body, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -274,7 +274,7 @@ public sealed partial class InProcessBackendTests
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.DoesNotContain(sensitivePath, body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("riferimento", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reference", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

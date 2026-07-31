@@ -204,12 +204,24 @@ public sealed class LocalSqliteSchemaInitializer
                     created_at_utc TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS agent_skills (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    skill_id TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    pattern_description TEXT NOT NULL,
+                    solution_template TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_graph_nodes_name ON document_graph_nodes(name);
                 CREATE INDEX IF NOT EXISTS idx_graph_nodes_document ON document_graph_nodes(document_id);
                 CREATE INDEX IF NOT EXISTS idx_graph_edges_source ON document_graph_edges(source_node_id);
                 CREATE INDEX IF NOT EXISTS idx_graph_edges_target ON document_graph_edges(target_node_id);
                 CREATE INDEX IF NOT EXISTS idx_episodic_memories_session ON agent_episodic_memories(session_id);
                 CREATE INDEX IF NOT EXISTS idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+                CREATE INDEX IF NOT EXISTS idx_agent_skills_category ON agent_skills(category);
+                CREATE INDEX IF NOT EXISTS idx_agent_skills_created ON agent_skills(created_at_utc DESC);
                 """;
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

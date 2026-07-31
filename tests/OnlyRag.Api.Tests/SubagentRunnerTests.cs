@@ -102,7 +102,7 @@ public sealed class SubagentRunnerTests
         public Task ChatSmokeAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task EmbeddingsSmokeAsync(string modelName, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task<string> GenerateChatAsync(string modelName, IReadOnlyList<OllamaChatMessage> messages, int? numCtx = null, object? format = null, CancellationToken cancellationToken = default)
+        public Task<string> GenerateChatAsync(string modelName, IReadOnlyList<OllamaChatMessage> messages, int? numCtx = null, object? format = null, object? tools = null, CancellationToken cancellationToken = default)
         {
             return Task.FromResult("Subagent completed task successfully.");
         }

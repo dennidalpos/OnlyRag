@@ -26,12 +26,12 @@ public static class UserFacingErrorText
             return fallback;
         }
 
-        normalized = FileUriPattern.Replace(normalized, "[percorso locale]");
-        normalized = WindowsPathPattern.Replace(normalized, "[percorso locale]");
-        normalized = UncPathPattern.Replace(normalized, "[percorso locale]");
-        normalized = UrlPattern.Replace(normalized, "[endpoint esterno]");
-        normalized = CredentialPattern.Replace(normalized, "$1=[segreto]");
-        normalized = BearerTokenPattern.Replace(normalized, "Bearer [segreto]");
+        normalized = FileUriPattern.Replace(normalized, "[local path]");
+        normalized = WindowsPathPattern.Replace(normalized, "[local path]");
+        normalized = UncPathPattern.Replace(normalized, "[local path]");
+        normalized = UrlPattern.Replace(normalized, "[external endpoint]");
+        normalized = CredentialPattern.Replace(normalized, "$1=[redacted]");
+        normalized = BearerTokenPattern.Replace(normalized, "Bearer [redacted]");
         normalized = IpEndpointPattern.Replace(normalized, "[host]");
         normalized = CollapseWhitespace(normalized);
 
@@ -48,8 +48,8 @@ public static class UserFacingErrorText
         ArgumentNullException.ThrowIfNull(exception);
         string detail = FromExternalDetail(
             exception.Message,
-            "Il backend locale non e stato avviato. Controlla i log locali per i dettagli tecnici.");
-        return $"Il backend locale non e stato avviato. Dettaglio: {detail}";
+            "The local backend failed to start. Check local logs for technical details.");
+        return $"The local backend failed to start. Detail: {detail}";
     }
 
     private static string Normalize(string? detail)

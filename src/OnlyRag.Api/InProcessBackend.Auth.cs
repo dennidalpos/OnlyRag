@@ -36,8 +36,8 @@ public static partial class InProcessBackend
 
             await WriteProblemAsync(
                 context,
-                "Non autorizzato",
-                "Token di sessione API mancante o non valido.",
+                "Unauthorized",
+                "API session token missing or invalid.",
                 StatusCodes.Status401Unauthorized,
                 "unauthorized");
         });

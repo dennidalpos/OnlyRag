@@ -15,7 +15,7 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
         try
         {
             bool started = process.Start();
-            errorMessage = started ? null : "Il processo non ha accettato la richiesta di avvio.";
+            errorMessage = started ? null : "The process did not accept the start request.";
             return started;
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
@@ -54,12 +54,12 @@ public sealed class LocalProcessLauncher : ILocalProcessLauncher
         {
             if (!process.Start())
             {
-                throw new InvalidOperationException($"Impossibile avviare {fileName}.");
+                throw new InvalidOperationException($"Unable to start {fileName}.");
             }
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            throw new InvalidOperationException($"Impossibile avviare {fileName}: {ex.Message}", ex);
+            throw new InvalidOperationException($"Unable to start {fileName}: {ex.Message}", ex);
         }
 
         Task<string> stdoutTask = ReadToEndBoundedAsync(process.StandardOutput, cancellationToken);

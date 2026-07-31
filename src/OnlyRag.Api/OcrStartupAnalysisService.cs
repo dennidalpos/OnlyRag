@@ -25,24 +25,24 @@ public sealed class OcrStartupAnalysisService
         bool isWindowsSupported = OperatingSystem.IsWindows();
         if (!isWindowsSupported)
         {
-            findings.Add("La configurazione automatica OCR e disponibile solo su Windows.");
+            findings.Add("Automatic OCR configuration is only available on Windows.");
         }
 
         long availableDiskBytes = GetProvisioningDriveAvailableBytes();
         bool hasMinimumDiskSpace = availableDiskBytes >= MinimumOcrProvisionDiskBytes;
         findings.Add(hasMinimumDiskSpace
-            ? "Spazio disco sufficiente per il runtime OCR locale."
-            : "Spazio disco insufficiente per preparare il runtime OCR locale.");
+            ? "Sufficient disk space for the local OCR runtime."
+            : "Insufficient disk space to prepare the local OCR runtime.");
 
         bool hasCompatiblePython = await HasCompatiblePythonAsync(cancellationToken);
         findings.Add(hasCompatiblePython
-            ? "Python 3.10-3.13 compatibile rilevato."
-            : "Python 3.10-3.13 non rilevato.");
+            ? "Compatible Python 3.10-3.13 detected."
+            : "Python 3.10-3.13 not detected.");
 
         OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
         findings.Add(availability.IsConfigured
-            ? $"Runtime OCR configurato: {availability.EngineName} {availability.EngineVersion}."
-            : "Runtime OCR Paddle non ancora configurato.");
+            ? $"OCR runtime configured: {availability.EngineName} {availability.EngineVersion}."
+            : "Paddle OCR runtime not yet configured.");
 
         OcrProvisionRuntime runtime = await ResolveRecommendedRuntimeAsync(cancellationToken);
         bool isNvidiaRuntimeAvailable = runtime.IsNvidia;
@@ -50,8 +50,8 @@ public sealed class OcrStartupAnalysisService
 
         OcrGpuCapabilityResponse gpu = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
         findings.Add(gpu.IsUsable
-            ? "PaddleOCR GPU utilizzabile."
-            : gpu.BlockReason ?? "PaddleOCR GPU non utilizzabile.");
+            ? "GPU PaddleOCR usable."
+            : gpu.BlockReason ?? "GPU PaddleOCR unusable.");
 
         bool canProvision = isWindowsSupported && hasMinimumDiskSpace && hasCompatiblePython;
         bool hasRepairableOcrRuntimeIssue = IsRepairableOcrRuntimeIssue(availability.Message);
@@ -61,20 +61,20 @@ public sealed class OcrStartupAnalysisService
             : OcrProvisionRuntimeResolver.CpuTarget;
         string title = shouldPrompt
             ? hasRepairableOcrRuntimeIssue
-                ? "Runtime OCR da riparare"
+                ? "OCR runtime to repair"
                 : runtime.IsNvidia
-                    ? "OCR GPU da installare"
-                    : "OCR CPU da installare"
+                    ? "GPU OCR to install"
+                    : "CPU OCR to install"
             : availability.IsConfigured
-                ? "OCR già configurato"
-                : "Configurazione OCR manuale richiesta";
+                ? "OCR already configured"
+                : "Manual OCR configuration required";
         string message = shouldPrompt
             ? hasRepairableOcrRuntimeIssue && !string.IsNullOrWhiteSpace(availability.Message)
                 ? availability.Message
-                : "OnlyRag non vede ancora un runtime PaddleOCR installato. Premi Installa OCR per prepararlo automaticamente, oppure Verifica ora dopo una configurazione manuale."
+                : "OnlyRag does not yet see a PaddleOCR runtime installed. Press Install OCR to prepare it automatically, or Verify now after manual configuration."
             : availability.IsConfigured
-                ? "Il runtime OCR locale è già disponibile."
-                : "Completa i prerequisiti indicati, poi configura OCR dalle Impostazioni.";
+                ? "The local OCR runtime is already available."
+                : "Complete the indicated prerequisites, then configure OCR from Settings.";
 
         return new OcrStartupAnalysisResponse(
             shouldPrompt,
@@ -126,7 +126,7 @@ public sealed class OcrStartupAnalysisService
         {
             return OcrProvisionRuntime.Cpu(UserFacingErrorText.FromExternalDetail(
                 ex.Message,
-                "Runtime NVIDIA non rilevato. Verrà usato il runtime CPU."));
+                "NVIDIA runtime not detected. CPU runtime will be used."));
         }
     }
 
@@ -154,7 +154,7 @@ public sealed class OcrStartupAnalysisService
     private static bool IsRepairableOcrRuntimeIssue(string? message)
     {
         return message?.StartsWith(
-            "Runtime OCR locale incompleto o danneggiato.",
+            "Local OCR runtime incomplete or damaged.",
             StringComparison.OrdinalIgnoreCase) == true;
     }
 

@@ -20,16 +20,16 @@ public static partial class InProcessBackend
             if (!request.HasFormContentType)
             {
                 return CreateBadRequestProblem(
-                    "Richiesta import non valida",
-                    "Usa multipart/form-data con uno o piu file.",
+                    "Invalid import request",
+                    "Use multipart/form-data with one or more files.",
                     "document_import_invalid_content_type");
             }
 
             if (request.ContentLength > storageGuard.Limits.MaxRequestBodySizeBytes)
             {
                 return CreateProblem(
-                    "Import troppo grande",
-                    $"La richiesta supera il limite di {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
+                    "Import too large",
+                    $"The request exceeds the limit of {LocalDocumentLibraryLimits.FormatBytes(storageGuard.Limits.MaxRequestBodySizeBytes)}.",
                     StatusCodes.Status413PayloadTooLarge,
                     "document_import_request_too_large");
             }
@@ -51,8 +51,8 @@ public static partial class InProcessBackend
             if (form.Files.Count == 0)
             {
                 return CreateBadRequestProblem(
-                    "Nessun file selezionato",
-                    "Seleziona almeno un file da importare.",
+                    "No file selected",
+                    "Select at least one file to import.",
                     "document_import_files_required");
             }
 
@@ -63,7 +63,7 @@ public static partial class InProcessBackend
             catch (ArgumentException ex)
             {
                 return CreateBadRequestProblem(
-                    "Import non valido",
+                    "Invalid import",
                     ex.Message,
                     "document_import_invalid");
             }
@@ -132,8 +132,8 @@ public static partial class InProcessBackend
     private static IResult CreateRequestTooLargeProblem()
     {
         return CreateProblem(
-            "Import troppo grande",
-            "La richiesta multipart supera i limiti configurati.",
+            "Import too large",
+            "The multipart request exceeds the configured limits.",
             StatusCodes.Status413PayloadTooLarge,
             "document_import_request_too_large");
     }
@@ -150,7 +150,7 @@ public static partial class InProcessBackend
         {
             return DocumentImportFileResult.Failed(
                 resultFileName,
-                "Il file e vuoto.",
+                "The file is empty.",
                 "document_import_empty_file");
         }
 
@@ -177,7 +177,7 @@ public static partial class InProcessBackend
         {
             return DocumentImportFileResult.Failed(
                 resultFileName,
-                "Il file non puo essere salvato nella libreria locale.",
+                "The file cannot be saved in the local library.",
                 "document_import_invalid_path");
         }
     }
