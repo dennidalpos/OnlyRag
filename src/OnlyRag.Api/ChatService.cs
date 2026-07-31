@@ -101,6 +101,86 @@ internal sealed class ChatService
         return new ChatResponse(conversationId, model, answer, useDocuments, sources, notices);
     }
 
+    public async IAsyncEnumerable<ChatStreamChunkEvent> SendStreamAsync(
+        ChatRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string message = NormalizeMessage(request.Message);
+        string model = OllamaSettingsService.NormalizeRequiredModelName(request.Model);
+        string conversationId = NormalizeConversationId(request.ConversationId);
+        bool useDocuments = request.UseDocuments;
+        long[] selectedDocumentIds = (request.SelectedDocumentIds ?? [])
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        if (useDocuments && selectedDocumentIds.Length == 0)
+        {
+            throw new ChatValidationException("Documenti non selezionati", "Seleziona almeno un documento prima di usare la chat documentale.");
+        }
+
+        await EnsureModelIsInstalledAsync(model, cancellationToken);
+
+        IReadOnlyList<ChatHistoryRecord> history = await chatHistory.ListRecentMessagesAsync(
+            conversationId,
+            MaxHistoryMessages,
+            cancellationToken);
+
+        DocumentSearchResponse? searchResponse = null;
+        List<ChatNotice> notices = [];
+        List<ChatSource> sources = [];
+        bool isChatter = IsConversationalChatter(message);
+
+        if (useDocuments && !isChatter)
+        {
+            searchResponse = await retrieval.SearchAsync(
+                new DocumentSearchRequest(message, selectedDocumentIds, RetrievalTopK),
+                cancellationToken);
+
+            sources.AddRange(searchResponse.Results.Select(result => new ChatSource(
+                result.DocumentId,
+                result.DocumentName,
+                result.PageStart,
+                result.PageEnd,
+                result.ChunkId,
+                result.Snippet,
+                result.Score)));
+
+            notices.AddRange(BuildDocumentNotices(searchResponse));
+            if (sources.Count == 0)
+            {
+                string noContextAnswer = "Non ho trovato risultati nei documenti selezionati. Indicizza i documenti, genera gli embedding se necessari o prova una domanda piu specifica.";
+                await PersistTurnAsync(conversationId, model, message, noContextAnswer, sources, cancellationToken);
+                yield return new ChatStreamChunkEvent("meta", conversationId, model, null, sources, notices);
+                yield return new ChatStreamChunkEvent("chunk", conversationId, model, noContextAnswer);
+                yield return new ChatStreamChunkEvent("done", conversationId, model);
+                yield break;
+            }
+        }
+
+        yield return new ChatStreamChunkEvent("meta", conversationId, model, null, sources, notices);
+
+        IReadOnlyList<OllamaChatMessage> promptMessages = BuildPromptMessages(
+            message,
+            useDocuments,
+            searchResponse,
+            history);
+
+        int? configuredChatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
+        int chatNumCtx = configuredChatNumCtx ?? DefaultChatNumCtx;
+
+        StringBuilder fullAnswer = new();
+        await foreach (string chunk in ollamaClient.GenerateChatStreamAsync(model, promptMessages, chatNumCtx, cancellationToken: cancellationToken))
+        {
+            fullAnswer.Append(chunk);
+            yield return new ChatStreamChunkEvent("chunk", conversationId, model, chunk);
+        }
+
+        string answerText = fullAnswer.ToString();
+        await PersistTurnAsync(conversationId, model, message, answerText, sources, cancellationToken);
+        yield return new ChatStreamChunkEvent("done", conversationId, model);
+    }
+
     private static string NormalizeMessage(string? message)
     {
         if (string.IsNullOrWhiteSpace(message))

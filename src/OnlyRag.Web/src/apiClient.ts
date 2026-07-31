@@ -135,10 +135,10 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
   throw new Error("Richiesta fallita dopo diversi tentativi.");
 }
 
-export async function apiStreamRequest(
+export async function apiStreamRequest<T>(
   path: string,
   body: unknown,
-  onChunk: (chunk: string) => void,
+  onEvent: (event: T) => void,
   signal?: AbortSignal,
   options?: ApiRequestOptions
 ): Promise<void> {
@@ -220,13 +220,8 @@ export async function apiStreamRequest(
       const dataStr = trimmed.slice(6);
       if (dataStr === "[DONE]") break;
       try {
-        const parsed = JSON.parse(dataStr) as { chunk?: string; error?: string };
-        if (parsed.error) {
-          throw new Error(parsed.error);
-        }
-        if (parsed.chunk) {
-          onChunk(parsed.chunk);
-        }
+        const parsed = JSON.parse(dataStr) as T;
+        onEvent(parsed);
       } catch (e) {
         if (e instanceof Error && !e.message.includes("JSON")) throw e;
       }

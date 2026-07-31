@@ -4,6 +4,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Ingestion;
+using OnlyRag.Infrastructure.Logging;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
@@ -14,8 +15,103 @@ public static partial class InProcessBackend
 {
     internal static void MapSettingsEndpoints(this WebApplication app)
     {
+        app.MapGet("/api/settings", async (
+            IOllamaSettingsService ollamaSettings,
+            QdrantSettingsStore qdrantSettings,
+            IPerformanceSettingsService performanceSettings,
+            IngestionSettingsStore ingestionSettings,
+            OcrSettingsStore ocrSettings,
+            PdfExportSettingsStore pdfExportSettings,
+            ILoggingService loggingService,
+            CancellationToken cancellationToken) =>
+        {
+            var ollama = await ollamaSettings.GetAsync(cancellationToken);
+            var qdrant = ToQdrantSettingsResponse(await qdrantSettings.GetAsync(cancellationToken));
+            var perf = await performanceSettings.GetAsync(cancellationToken);
+            var ing = await ingestionSettings.GetAsync(cancellationToken);
+            var ocr = await ocrSettings.GetAsync(cancellationToken);
+            var ocrProc = await ocrSettings.GetProcessingAsync(cancellationToken);
+            var pdfExp = await pdfExportSettings.GetAsync(cancellationToken);
+            var log = await loggingService.GetSettingsAsync(cancellationToken);
+
+            return Results.Ok(new UnifiedSettingsResponse(
+                ollama, qdrant, perf, ing, ocr, ocrProc, pdfExp, log));
+        });
+
+        app.MapPut("/api/settings", async (
+            UnifiedSettingsUpdateRequest request,
+            IOllamaSettingsService ollamaSettings,
+            QdrantSettingsStore qdrantSettings,
+            IPerformanceSettingsService performanceSettings,
+            IngestionSettingsStore ingestionSettings,
+            OcrSettingsStore ocrSettings,
+            PdfExportSettingsStore pdfExportSettings,
+            ILoggingService loggingService,
+            IOcrEngine ocrEngine,
+            OcrGpuCapabilityService gpuCapability,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.Ollama is not null)
+            {
+                await ollamaSettings.UpdateAsync(request.Ollama, cancellationToken);
+            }
+            if (request.Qdrant is not null)
+            {
+                await qdrantSettings.UpdateAsync(request.Qdrant, cancellationToken);
+            }
+            if (request.Performance is not null)
+            {
+                await performanceSettings.UpdateAsync(request.Performance, cancellationToken);
+            }
+            if (request.Ingestion is not null)
+            {
+                await ingestionSettings.UpdateAsync(request.Ingestion, cancellationToken);
+            }
+            if (request.Ocr is not null)
+            {
+                OcrSettings normalizedOcr = OcrSettings.Normalize(request.Ocr);
+                if (normalizedOcr.Device == "gpu")
+                {
+                    OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+                    if (!capability.IsUsable)
+                    {
+                        return CreateBadRequestProblem(
+                            "OCR GPU non disponibile",
+                            capability.BlockReason ?? "Il runtime OCR GPU non e utilizzabile.",
+                            "ocr_gpu_unavailable");
+                    }
+                }
+                await ocrSettings.UpdateAsync(normalizedOcr, cancellationToken);
+            }
+            if (request.OcrProcessing is not null)
+            {
+                await ocrSettings.UpdateProcessingAsync(request.OcrProcessing, cancellationToken);
+            }
+            if (request.PdfExport is not null)
+            {
+                await pdfExportSettings.UpdateAsync(request.PdfExport, cancellationToken);
+            }
+            if (request.Logging is not null)
+            {
+                await loggingService.UpdateSettingsAsync(request.Logging, cancellationToken);
+            }
+
+            var ollama = await ollamaSettings.GetAsync(cancellationToken);
+            var qdrant = ToQdrantSettingsResponse(await qdrantSettings.GetAsync(cancellationToken));
+            var perf = await performanceSettings.GetAsync(cancellationToken);
+            var ing = await ingestionSettings.GetAsync(cancellationToken);
+            var ocr = await ocrSettings.GetAsync(cancellationToken);
+            var ocrProc = await ocrSettings.GetProcessingAsync(cancellationToken);
+            var pdfExp = await pdfExportSettings.GetAsync(cancellationToken);
+            var log = await loggingService.GetSettingsAsync(cancellationToken);
+
+            return Results.Ok(new UnifiedSettingsResponse(
+                ollama, qdrant, perf, ing, ocr, ocrProc, pdfExp, log));
+        });
+
         app.MapGet("/api/settings/ollama", async (IOllamaSettingsService settings, CancellationToken cancellationToken) =>
             Results.Ok(await settings.GetAsync(cancellationToken)));
+
 
         app.MapGet("/api/settings/qdrant", async (
             QdrantSettingsStore settings,

@@ -12,6 +12,11 @@ import {
   createPipelineStatus,
   createVectorHealth
 } from "../test/fixtures";
+import { createQueryClient, QueryProvider } from "../context/QueryProvider";
+
+function renderWithQuery(ui: React.ReactElement) {
+  return render(<QueryProvider>{ui}</QueryProvider>);
+}
 
 describe("DocumentsSection", () => {
   it("imports OCR candidates through the policy dialog and opens the preview modal", async () => {
@@ -90,7 +95,7 @@ describe("DocumentsSection", () => {
       }
     ]);
 
-    const { container } = render(<DocumentsSection />);
+    const { container } = renderWithQuery(<DocumentsSection />);
     expect(await screen.findByText("Nessun documento presente. Importa un file per iniziare.")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Nessun documento presente.");
 
@@ -140,7 +145,7 @@ describe("DocumentsSection", () => {
       { path: "/api/documents", response: [] }
     ]);
 
-    const { container } = render(<DocumentsSection />);
+    const { container } = renderWithQuery(<DocumentsSection />);
     await screen.findByText("Nessun documento presente. Importa un file per iniziare.");
 
     const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
@@ -167,7 +172,7 @@ describe("DocumentsSection", () => {
       }
     ]);
 
-    const { container } = render(<DocumentsSection />);
+    const { container } = renderWithQuery(<DocumentsSection />);
     await screen.findByText("Nessun documento presente. Importa un file per iniziare.");
 
     const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
@@ -221,7 +226,7 @@ describe("DocumentsSection", () => {
       }
     ]);
 
-    const { container } = render(<DocumentsSection />);
+    const { container } = renderWithQuery(<DocumentsSection />);
     await screen.findByText("Nessun documento presente. Importa un file per iniziare.");
 
     const fileInput = container.querySelector<HTMLInputElement>("input[type='file']");
@@ -235,80 +240,77 @@ describe("DocumentsSection", () => {
   });
 
   it("surfaces repeated polling failures while keeping the last successful document state", async () => {
-    vi.useFakeTimers();
     let documentReads = 0;
-    try {
-      mockApi([
-        { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
-        { path: "/api/ocr/languages", response: [createOcrLanguage()] },
-        {
-          path: "/api/documents",
-          handler: async () => {
-            documentReads += 1;
-            if (documentReads > 1) {
-              throw new TypeError("offline");
-            }
-
-            return { body: [createDocument()] };
+    const queryClient = createQueryClient();
+    mockApi([
+      { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      {
+        path: "/api/documents",
+        handler: async () => {
+          documentReads += 1;
+          if (documentReads > 1) {
+            throw new TypeError("offline");
           }
-        },
-        { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
-        { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
-        { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
-      ]);
 
-      render(<DocumentsSection />);
+          return { body: [createDocument()] };
+        }
+      },
+      { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
+      { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
+      { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
+    ]);
 
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+    render(
+      <QueryProvider client={queryClient}>
+        <DocumentsSection />
+      </QueryProvider>
+    );
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(10_000);
-      });
+    expect((await screen.findAllByText("manuale.pdf")).length).toBeGreaterThan(0);
 
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ["documentsList"] });
+      await queryClient.refetchQueries({ queryKey: ["documentsList"] });
+    });
+
+    await waitFor(() => {
       expect(screen.getAllByRole("alert").some((alert) => alert.textContent?.includes("Stato non aggiornato"))).toBe(true);
-      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
-    } finally {
-      vi.useRealTimers();
-    }
+    });
+    expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
   });
 
   it("does not keep a stale selected detail when polling no longer returns the document", async () => {
-    vi.useFakeTimers();
     let documents = [createDocument()];
-    try {
-      mockApi([
-        { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
-        { path: "/api/ocr/languages", response: [createOcrLanguage()] },
-        {
-          path: "/api/documents",
-          handler: () => ({ body: documents })
-        },
-        { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
-        { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
-        { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
-      ]);
+    const queryClient = createQueryClient();
+    mockApi([
+      { path: "/api/diagnostics/vector-health", response: createVectorHealth() },
+      { path: "/api/ocr/languages", response: [createOcrLanguage()] },
+      {
+        path: "/api/documents",
+        handler: () => ({ body: documents })
+      },
+      { path: "/api/documents/1/embedding-status", response: createEmbeddingStatus() },
+      { path: "/api/documents/1/ocr-status", response: createOcrStatus() },
+      { path: "/api/documents/1/pipeline-status", response: createPipelineStatus() }
+    ]);
 
-      render(<DocumentsSection />);
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(screen.getAllByText("manuale.pdf").length).toBeGreaterThan(0);
+    render(
+      <QueryProvider client={queryClient}>
+        <DocumentsSection />
+      </QueryProvider>
+    );
+    expect((await screen.findAllByText("manuale.pdf")).length).toBeGreaterThan(0);
 
-      documents = [];
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000);
-      });
+    documents = [];
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ["documentsList"] });
+    });
 
+    await waitFor(() => {
       expect(screen.getByText("Nessun documento presente. Importa un file per iniziare.")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Elimina" })).not.toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
+    });
+    expect(screen.queryByRole("button", { name: "Elimina" })).not.toBeInTheDocument();
   });
 
   it("connects document action tooltips to the action accessible description", () => {

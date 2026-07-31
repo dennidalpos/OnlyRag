@@ -71,5 +71,46 @@ public static partial class InProcessBackend
                 return MapOllamaException(ex, app.Services, "/api/chat");
             }
         });
+
+        app.MapPost("/api/chat/stream", async (
+            HttpContext httpContext,
+            ChatRequest request,
+            ChatService chatService) =>
+        {
+            httpContext.Response.ContentType = "text/event-stream";
+            httpContext.Response.Headers.CacheControl = "no-cache";
+            httpContext.Response.Headers.Connection = "keep-alive";
+
+            try
+            {
+                await foreach (ChatStreamChunkEvent evt in chatService.SendStreamAsync(request, httpContext.RequestAborted))
+                {
+                    string json = System.Text.Json.JsonSerializer.Serialize(evt, AgentJsonOptions);
+                    await httpContext.Response.WriteAsync($"data: {json}\n\n", httpContext.RequestAborted);
+                    await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+                }
+
+                await httpContext.Response.WriteAsync("data: [DONE]\n\n", httpContext.RequestAborted);
+                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+            }
+            catch (OperationCanceledException)
+            {
+                // Client cancelled or disconnected
+            }
+            catch (ChatValidationException ex)
+            {
+                var errorEvt = new ChatStreamChunkEvent("error", Content: ex.Message);
+                string json = System.Text.Json.JsonSerializer.Serialize(errorEvt, AgentJsonOptions);
+                await httpContext.Response.WriteAsync($"data: {json}\n\n", httpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                var errorEvt = new ChatStreamChunkEvent("error", Content: ex.Message);
+                string json = System.Text.Json.JsonSerializer.Serialize(errorEvt, AgentJsonOptions);
+                await httpContext.Response.WriteAsync($"data: {json}\n\n", httpContext.RequestAborted);
+            }
+
+            return Results.Empty;
+        });
     }
 }

@@ -1,17 +1,21 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { BackendStatus } from "../App";
+import { ThemeProvider } from "../context/ThemeContext";
 import { createDiagnostics } from "../test/fixtures";
 import { AppHeader } from "./AppHeader";
 
 describe("AppHeader", () => {
   it("keeps the updating clock outside the application status live region", () => {
     const { container } = render(
-      <AppHeader
-        currentSection="Chat"
-        backendStatus={createBackendStatus()}
-        diagnostics={createDiagnostics()}
-      />
+      <ThemeProvider>
+        <AppHeader
+          currentSection="Chat"
+          backendStatus={createBackendStatus()}
+          diagnostics={createDiagnostics()}
+        />
+      </ThemeProvider>
     );
 
     const status = screen.getByRole("status", { name: "Stato applicazione" });
@@ -23,6 +27,28 @@ describe("AppHeader", () => {
     expect(status).not.toHaveTextContent("Ora");
     expect(screen.getByTitle(/Ora corrente/)).toBeInTheDocument();
     expect(container.querySelector(".status-row__operations")).toHaveTextContent(/Operazioni.*Ora/);
+  });
+
+  it("opens theme switcher menu and changes active theme", async () => {
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <AppHeader
+          currentSection="Chat"
+          backendStatus={createBackendStatus()}
+          diagnostics={createDiagnostics()}
+        />
+      </ThemeProvider>
+    );
+
+    const themeButton = screen.getByRole("button", { name: "Cambia tema visivo" });
+    await user.click(themeButton);
+
+    expect(screen.getByText("Seleziona Tema Visivo")).toBeInTheDocument();
+    const cyberOption = screen.getByRole("button", { name: /Cyberpunk Neon/ });
+    await user.click(cyberOption);
+
+    expect(document.documentElement.getAttribute("data-theme")).toBe("cyber");
   });
 });
 

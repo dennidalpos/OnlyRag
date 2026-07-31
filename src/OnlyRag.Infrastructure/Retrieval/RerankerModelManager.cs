@@ -43,6 +43,8 @@ public sealed class RerankerModelManager
 
     public string GetDefaultModelPath() => Path.Combine(GetModelDirectory(), DefaultModelFileName);
 
+    public string GetVocabPath() => Path.Combine(GetModelDirectory(), "vocab.txt");
+
     public Task<RerankerModelInfo> GetModelStatusAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

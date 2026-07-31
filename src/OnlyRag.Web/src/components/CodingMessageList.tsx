@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { RefObject } from "react";
 import { AgentToolCallCard } from "./AgentToolCallCard";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ReasoningTraceVisualizer } from "./ReasoningTraceVisualizer";
 import type { CodingMessage } from "./useCodingSectionController";
 
@@ -143,7 +144,7 @@ export function CodingMessageList({
                 </div>
               ) : (
                 <div className="vibe-message-content">
-                  {msg.content}
+                  <MarkdownRenderer content={msg.content} />
                 </div>
               )}
 

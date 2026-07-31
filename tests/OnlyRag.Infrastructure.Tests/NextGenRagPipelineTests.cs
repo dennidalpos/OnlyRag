@@ -37,9 +37,10 @@ public sealed class NextGenRagPipelineTests
     }
 
     [Fact]
-    public void ParentChildResolver_ResolvesParentContext()
+    public async Task ParentChildResolver_ResolvesParentContext()
     {
-        ParentChildChunkResolver resolver = new();
+        DummyChunkRepo repo = new();
+        ParentChildChunkResolver resolver = new(repo);
         SearchChunk childChunk = new(
             ChunkId: 10,
             DocumentId: 1,
@@ -53,7 +54,9 @@ public sealed class NextGenRagPipelineTests
             SectionHeading: "Sezione 1",
             ParentContent: "Paragrafo esteso parent con tutto il contesto del documento.");
 
-        SearchChunk resolved = resolver.Resolve(childChunk);
+        Dictionary<long, SearchChunk> map = new() { [10] = childChunk };
+        IReadOnlyDictionary<long, SearchChunk> resolvedMap = await resolver.ResolveAllAsync(map);
+        SearchChunk resolved = resolvedMap[10];
 
         Assert.Equal("Paragrafo esteso parent con tutto il contesto del documento.", resolved.ParentContent);
     }
@@ -71,5 +74,14 @@ public sealed class NextGenRagPipelineTests
 
         Assert.False(result.IsConfident);
         Assert.Contains("basso", result.SummaryNotice, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class DummyChunkRepo : IRetrievalChunkRepository
+    {
+        public Task<IReadOnlyDictionary<long, SearchChunk>> GetChunksAsync(IReadOnlyCollection<long> chunkIds, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyDictionary<long, SearchChunk> dict = new Dictionary<long, SearchChunk>();
+            return Task.FromResult(dict);
+        }
     }
 }

@@ -5,7 +5,7 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteSchemaInitializer
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     private const string FtsUnavailableNote = "SQLite FTS5 is unavailable in the active SQLite provider; keyword search is disabled.";
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -132,6 +132,12 @@ public sealed class LocalSqliteSchemaInitializer
         if (currentVersion == 2)
         {
             await MigrateFromV2ToV3Async(connection, cancellationToken);
+            currentVersion = 3;
+        }
+
+        if (currentVersion == 3)
+        {
+            await MigrateFromV3ToV4Async(connection, cancellationToken);
             return new SchemaInspection("Current", null);
         }
 
@@ -204,6 +210,29 @@ public sealed class LocalSqliteSchemaInitializer
                 CREATE INDEX IF NOT EXISTS idx_graph_edges_target ON document_graph_edges(target_node_id);
                 CREATE INDEX IF NOT EXISTS idx_episodic_memories_session ON agent_episodic_memories(session_id);
                 CREATE INDEX IF NOT EXISTS idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+                """;
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+            await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateFromV3ToV4Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                CREATE INDEX IF NOT EXISTS idx_documents_original_path ON documents(original_path);
                 """;
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -596,9 +625,10 @@ public sealed class LocalSqliteSchemaInitializer
             CREATE INDEX idx_graph_edges_target ON document_graph_edges(target_node_id);
             CREATE INDEX idx_episodic_memories_session ON agent_episodic_memories(session_id);
             CREATE INDEX idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+            CREATE INDEX idx_documents_original_path ON documents(original_path);
             {{ftsSql}}
 
-            PRAGMA user_version = 3;
+            PRAGMA user_version = 4;
             """;
     }
 

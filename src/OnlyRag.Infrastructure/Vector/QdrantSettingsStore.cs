@@ -15,6 +15,8 @@ public sealed class QdrantSettingsStore
 
     private readonly ISettingsRepository settings;
 
+    public event Action? SettingsChanged;
+
     public QdrantSettingsStore(ISettingsRepository settings)
     {
         this.settings = settings;
@@ -43,6 +45,7 @@ public sealed class QdrantSettingsStore
         await settings.UpsertAsync(UseLocalKey, normalized.UseLocalBundledServer.ToString(), cancellationToken);
         await settings.UpsertAsync(LocalPortKey, normalized.LocalGrpcPort.ToString(), cancellationToken);
         await settings.UpsertAsync(TimeoutKey, normalized.RequestTimeoutSeconds.ToString(), cancellationToken);
+        SettingsChanged?.Invoke();
         return normalized;
     }
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import {
   apiRequest,
+  apiStreamRequest,
   type ChatSource,
-  type ChatResponse,
+  type ChatStreamChunkEvent,
   type ImportedDocument,
   type OllamaModel,
   type OllamaStatusResponse
@@ -217,14 +218,21 @@ export function ChatSection({
       return;
     }
 
-
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: message,
       sources: []
     };
-    setMessages((current) => [...current, userMessage]);
+    const assistantMessageId = crypto.randomUUID();
+    const assistantPlaceholder: ChatMessage = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      sources: []
+    };
+
+    setMessages((current) => [...current, userMessage, assistantPlaceholder]);
     setInput("");
     setFeedback(null);
     setNotices([]);
@@ -234,29 +242,42 @@ export function ChatSection({
     abortControllerRef.current = abortController;
 
     try {
-      const response = await apiRequest<ChatResponse>("/api/chat", {
-        method: "POST",
-        signal: abortController.signal,
-        body: JSON.stringify({
+      await apiStreamRequest<ChatStreamChunkEvent>(
+        "/api/chat/stream",
+        {
           message,
           model: selectedModel,
           useDocuments: selectedDocumentIds.length > 0,
           selectedDocumentIds,
           conversationId
-        })
-      });
-
-      setConversationId(response.conversationId);
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: response.answer,
-          sources: response.sources
-        }
-      ]);
-      setNotices(response.notices.map((notice) => notice.message));
+        },
+        (evt) => {
+          if (evt.eventType === "meta") {
+            if (evt.conversationId) setConversationId(evt.conversationId);
+            if (evt.sources) {
+              setMessages((current) =>
+                current.map((msg) =>
+                  msg.id === assistantMessageId ? { ...msg, sources: evt.sources! } : msg
+                )
+              );
+            }
+            if (evt.notices) {
+              setNotices(evt.notices.map((n) => n.message));
+            }
+          } else if (evt.eventType === "chunk" && evt.content) {
+            setMessages((current) =>
+              current.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: msg.content + evt.content }
+                  : msg
+              )
+            );
+          } else if (evt.eventType === "error" && evt.content) {
+            setFeedback(evt.content);
+          }
+        },
+        abortController.signal
+      );
       clearChatDraft();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {

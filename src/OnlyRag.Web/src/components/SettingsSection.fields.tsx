@@ -1,6 +1,7 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import type { OllamaModelDetails } from "../api";
 import { formatOcrInteger } from "./SettingsSection.formatting";
+import { useTheme } from "../context/ThemeContext";
 
 type OcrRangeFieldProps = {
   id: string;
@@ -323,14 +324,7 @@ export function UnifiedPresetBar({
 }
 
 export function ThemeSelectorPanel() {
-  const currentTheme = (localStorage.getItem("onlyrag_theme") as "dark" | "light" | "cyber") || "dark";
-  const [activeTheme, setActiveTheme] = useState<"dark" | "light" | "cyber">(currentTheme);
-
-  function handleSelectTheme(newTheme: "dark" | "light" | "cyber") {
-    setActiveTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("onlyrag_theme", newTheme);
-  }
+  const { theme, setTheme, themes } = useTheme();
 
   return (
     <div className="unified-preset-bar">
@@ -339,30 +333,18 @@ export function ThemeSelectorPanel() {
         <span className="unified-preset-bar__subtitle">Personalizza lo stile visivo e i colori dell'applicazione</span>
       </div>
       <div className="unified-preset-bar__buttons" role="group" aria-label="Tema dell'Interfaccia">
-        <button
-          type="button"
-          className={`unified-preset-btn ${activeTheme === "dark" ? "unified-preset-btn--active" : ""}`}
-          onClick={() => handleSelectTheme("dark")}
-        >
-          <span>🌙</span>
-          <span>Scuro Midnight</span>
-        </button>
-        <button
-          type="button"
-          className={`unified-preset-btn ${activeTheme === "light" ? "unified-preset-btn--active" : ""}`}
-          onClick={() => handleSelectTheme("light")}
-        >
-          <span>☀️</span>
-          <span>Chiaro Crisp</span>
-        </button>
-        <button
-          type="button"
-          className={`unified-preset-btn ${activeTheme === "cyber" ? "unified-preset-btn--active" : ""}`}
-          onClick={() => handleSelectTheme("cyber")}
-        >
-          <span>⚡</span>
-          <span>Cyber Neon</span>
-        </button>
+        {themes.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`unified-preset-btn ${theme === t.id ? "unified-preset-btn--active" : ""}`}
+            onClick={() => setTheme(t.id)}
+            title={t.description}
+          >
+            <span>{t.icon}</span>
+            <span>{t.name}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

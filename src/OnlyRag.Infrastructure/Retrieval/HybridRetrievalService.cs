@@ -41,7 +41,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         this.queryEmbeddingGenerator = queryEmbeddingGenerator;
         this.reRanker = reRanker ?? new HeuristicReRankerService();
         this.queryTransformer = queryTransformer ?? new OllamaQueryTransformationService();
-        this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver();
+        this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver(chunks);
         this.cragEvaluator = cragEvaluator ?? new CragEvaluator();
         this.options = options ?? HybridRetrievalOptions.Default;
         this.settings = settings;
@@ -73,85 +73,102 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         List<RetrievalNotice> notices = [];
 
-        // 1. Query Transformation
+        // ── Stage 1: Query Transformation ──────────────────────────────────
+        QueryTransformationStrategy configuredStrategy = await GetTransformationStrategyAsync(cancellationToken);
         QueryTransformationResult transformation = await queryTransformer.TransformAsync(
             query,
-            QueryTransformationStrategy.MultiQuery,
+            configuredStrategy,
             cancellationToken);
 
-        // 2. Coarse Hybrid Retrieval (1st stage: FTS5 + Qdrant HNSW in parallel via RRF)
-        Task<KeywordSearchResponse> keywordTask = keywordSearch.SearchAsync(
-            query,
-            documentIds,
-            options.KeywordTopK,
-            cancellationToken);
+        IReadOnlyList<string> searchQueries = transformation.ExpandedQueries.Count > 0
+            ? transformation.ExpandedQueries
+            : [query];
 
+        // ── Stage 2: Coarse Hybrid Retrieval (FTS5 + Qdrant in parallel) ───
+        // Run keyword + vector searches for ALL query variants, then merge via RRF.
         Task<QueryEmbeddingResult?> embeddingTask = TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
 
-        await Task.WhenAll(keywordTask, embeddingTask);
+        List<Task<KeywordSearchResponse>> keywordTasks = [];
+        foreach (string q in searchQueries)
+        {
+            keywordTasks.Add(keywordSearch.SearchAsync(q, documentIds, options.KeywordTopK, cancellationToken));
+        }
 
-        KeywordSearchResponse keywordResponse = await keywordTask;
+        await Task.WhenAll([.. keywordTasks, embeddingTask]);
+
         QueryEmbeddingResult? queryEmbedding = await embeddingTask;
 
+        // Vector search uses the primary embedding (original query).
         VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
             ? new VectorSearchAttempt([], "Qdrant unavailable")
             : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
 
-        // 3. Merging via Reciprocal Rank Fusion (RRF)
+        // Merge all keyword results into one list.
+        List<KeywordSearchResult> allKeywordResults = [];
+        string keywordBackendName = "none";
+        foreach (Task<KeywordSearchResponse> task in keywordTasks)
+        {
+            KeywordSearchResponse response = await task;
+            allKeywordResults.AddRange(response.Results);
+            if (keywordBackendName == "none" || keywordBackendName == "SQLite FTS5")
+            {
+                keywordBackendName = response.BackendName;
+            }
+        }
+
+        // ── Stage 3: Reciprocal Rank Fusion (RRF) ──────────────────────────
         IReadOnlyList<DocumentSearchResult> coarseResults = await RrfMergeResultsAsync(
             query,
-            keywordResponse.Results,
+            allKeywordResults,
             vectorSearchAttempt.Results,
             options.VectorTopK,
             cancellationToken);
 
-        // 4. Bulk fetch chunks & Parent-Child resolution BEFORE 2nd-Stage Re-ranking
-        long[] coarseChunkIds = coarseResults.Select(r => r.ChunkId).ToArray();
-        IReadOnlyDictionary<long, SearchChunk> rawChunkMap = await chunks.GetChunksAsync(coarseChunkIds, cancellationToken);
-
-        Dictionary<long, SearchChunk> resolvedChunkMap = new();
-        List<ReRankCandidate> candidates = new();
-
+        // ── Stage 4: 2nd-Stage Re-ranking on child chunks ──────────────────
+        // Build re-rank candidates from the CHILD chunk content (not parent).
+        List<ReRankCandidate> candidates = [];
         foreach (DocumentSearchResult coarse in coarseResults)
         {
-            SearchChunk? rawChunk = rawChunkMap.TryGetValue(coarse.ChunkId, out SearchChunk? c) ? c : null;
-            SearchChunk? resolved = rawChunk is not null ? parentChildResolver.Resolve(rawChunk) : null;
-            if (resolved is not null)
-            {
-                resolvedChunkMap[coarse.ChunkId] = resolved;
-            }
-            string textToRank = resolved?.ParentContent ?? coarse.Snippet;
-            candidates.Add(new ReRankCandidate(coarse.ChunkId, textToRank));
+            candidates.Add(new ReRankCandidate(coarse.ChunkId, coarse.Snippet));
         }
 
         IReadOnlyList<ReRankResult> reRankedScores = await reRanker.ReRankAsync(query, candidates, cancellationToken);
         Dictionary<long, double> scoreMap = reRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
 
-        List<DocumentSearchResult> finalResults = [];
+        // Apply re-rank scores, sort, and take top-K.
+        List<DocumentSearchResult> reRanked = [];
         foreach (DocumentSearchResult coarse in coarseResults)
         {
             double reRankScore = scoreMap.TryGetValue(coarse.ChunkId, out double score) ? score : coarse.Score;
-            SearchChunk? resolved = resolvedChunkMap.TryGetValue(coarse.ChunkId, out SearchChunk? r) ? r : null;
+            reRanked.Add(coarse with { Score = reRankScore, ReRankScore = reRankScore });
+        }
 
-            finalResults.Add(coarse with
+        IReadOnlyList<DocumentSearchResult> topK = reRanked
+            .OrderByDescending(r => r.ReRankScore ?? r.Score)
+            .Take(finalLimit)
+            .ToList();
+
+        // ── Stage 5: Parent-Child Resolution (only on top-K) ───────────────
+        long[] topKChunkIds = topK.Select(r => r.ChunkId).ToArray();
+        IReadOnlyDictionary<long, SearchChunk> rawChunkMap = await chunks.GetChunksAsync(topKChunkIds, cancellationToken);
+        IReadOnlyDictionary<long, SearchChunk> resolvedChunkMap =
+            await parentChildResolver.ResolveAllAsync(rawChunkMap, cancellationToken);
+
+        List<DocumentSearchResult> finalResults = [];
+        foreach (DocumentSearchResult result in topK)
+        {
+            SearchChunk? resolved = resolvedChunkMap.TryGetValue(result.ChunkId, out SearchChunk? r) ? r : null;
+            finalResults.Add(result with
             {
-                Score = reRankScore,
-                ReRankScore = reRankScore,
-                ParentContent = resolved?.ParentContent ?? coarse.Snippet,
+                ParentContent = resolved?.ParentContent ?? result.Snippet,
                 SectionHeading = resolved?.SectionHeading,
                 ChunkLevel = resolved?.ChunkLevel ?? "Child"
             });
         }
 
-        IReadOnlyList<DocumentSearchResult> ranked = finalResults
-            .OrderByDescending(r => r.ReRankScore ?? r.Score)
-            .Take(finalLimit)
-            .ToList();
-
-        // 5. Self-Corrective RAG (CRAG) Confidence Check
-        // Note: RRF scores are raw values (typically 0.01-0.05 range). Threshold 0.08 catches
-        // genuinely low-confidence retrievals without false positives on normal results.
-        CragEvaluationResult cragResult = cragEvaluator.Evaluate(ranked, 0.08d);
+        // ── Stage 6: CRAG Confidence Check ─────────────────────────────────
+        double cragThreshold = await GetCragThresholdAsync(cancellationToken);
+        CragEvaluationResult cragResult = cragEvaluator.Evaluate(finalResults, cragThreshold);
         if (!cragResult.IsConfident)
         {
             notices.Add(new RetrievalNotice("crag_low_confidence", cragResult.SummaryNotice));
@@ -163,9 +180,9 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             cancellationToken);
 
         return new DocumentSearchResponse(
-            ranked,
+            finalResults,
             documentStatuses,
-            keywordResponse.BackendName,
+            keywordBackendName,
             vectorSearchAttempt.BackendName,
             options.MaxContextCharacters)
         {
@@ -190,6 +207,32 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         return int.TryParse(value, out int parsed)
             ? Math.Clamp(parsed, 1, options.MaxTopK)
             : options.DefaultTopK;
+    }
+
+    private async Task<QueryTransformationStrategy> GetTransformationStrategyAsync(CancellationToken cancellationToken)
+    {
+        if (settings is null)
+        {
+            return QueryTransformationStrategy.MultiQuery;
+        }
+
+        string? value = await settings.GetValueAsync("retrieval.transformationStrategy", cancellationToken);
+        return Enum.TryParse<QueryTransformationStrategy>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : QueryTransformationStrategy.MultiQuery;
+    }
+
+    private async Task<double> GetCragThresholdAsync(CancellationToken cancellationToken)
+    {
+        if (settings is null)
+        {
+            return options.CragConfidenceThreshold;
+        }
+
+        string? value = await settings.GetValueAsync("retrieval.cragConfidenceThreshold", cancellationToken);
+        return double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out double parsed)
+            ? Math.Clamp(parsed, 0.01, 0.99)
+            : options.CragConfidenceThreshold;
     }
 
     private async Task<QueryEmbeddingResult?> TryGenerateQueryEmbeddingAsync(
@@ -263,6 +306,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (1d / (k + rank + 1));
         }
 
+        // Normalize RRF scores to [0, 1] range.
+        double maxRrfScore = rrfScores.Count > 0 ? rrfScores.Values.Max() : 1d;
+        if (maxRrfScore <= 0d) maxRrfScore = 1d;
+
         long[] chunkIds = rrfScores.Keys.ToArray();
         IReadOnlyDictionary<long, SearchChunk> chunkMap = await chunks.GetChunksAsync(chunkIds, cancellationToken);
 
@@ -274,6 +321,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
                 continue;
             }
 
+            double normalizedScore = Math.Round(kvp.Value / maxRrfScore, 4);
             results.Add(new DocumentSearchResult(
                 chunk.DocumentId,
                 chunk.DocumentName,
@@ -281,7 +329,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
                 chunk.PageEnd,
                 chunk.ChunkId,
                 chunk.Content,
-                Math.Round(kvp.Value * 30d, 4))); // Normalized RRF score for UI
+                normalizedScore));
         }
 
         return results;

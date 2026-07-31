@@ -38,8 +38,8 @@ public sealed class OllamaQueryTransformationServiceTests
         var result = await service.TransformAsync("Database vector storage", QueryTransformationStrategy.HyDE);
 
         Assert.Equal(QueryTransformationStrategy.HyDE, result.Strategy);
-        Assert.True(result.ExpandedQueries.Count >= 2);
-        Assert.Contains("Documento su: Database vector storage", result.ExpandedQueries);
+        Assert.Single(result.ExpandedQueries);
+        Assert.Contains("Database vector storage", result.ExpandedQueries);
     }
 
     [Fact]

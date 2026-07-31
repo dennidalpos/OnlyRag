@@ -8,7 +8,8 @@ public sealed record HybridRetrievalOptions(
     int SnippetMaxCharacters = 360,
     int MaxContextCharacters = 8000,
     double KeywordWeight = 0.45,
-    double VectorWeight = 0.55)
+    double VectorWeight = 0.55,
+    double CragConfidenceThreshold = 0.30)
 {
     public static HybridRetrievalOptions Default { get; } = new();
 }

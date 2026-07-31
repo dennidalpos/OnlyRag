@@ -4,16 +4,15 @@ import {
   type DocumentEmbeddingStatus,
   type DocumentImportResponse,
   type ImportedDocument,
-  type OcrLanguage,
   type OcrPolicy,
-  type OcrProcessingSettings,
-  type VectorBackendHealth
+  type OcrProcessingSettings
 } from "../api";
 import { clearExitContributor, setExitContributor } from "../appLifecycle";
 import {
   initialRefreshStatus,
   markRefreshFailure,
-  markRefreshSuccess
+  markRefreshSuccess,
+  type RefreshStatus
 } from "../pollingStatus";
 import {
   DEFAULT_OCR_LANGUAGE,
@@ -28,26 +27,54 @@ import { isOcrCandidate } from "./DocumentsSection.helpers";
 import { useDocumentStatusPolling } from "./useDocumentStatusPolling";
 import { useDocumentPreviewController } from "./useDocumentPreviewController";
 
+import {
+  useDocumentListQuery,
+  useInvalidateDocuments,
+  useOcrLanguagesQuery,
+  useOcrSettingsQuery,
+  useVectorHealthQuery
+} from "../hooks/useDocumentQueries";
+
 type UseDocumentsSectionControllerOptions = {
   onLibraryChanged?: () => void;
 };
 
 export function useDocumentsSectionController({ onLibraryChanged }: UseDocumentsSectionControllerOptions = {}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [documents, setDocuments] = useState<ImportedDocument[]>([]);
+  const invalidateDocuments = useInvalidateDocuments();
+
+  const { data: documentsData, isLoading, error: docsError } = useDocumentListQuery();
+  const { data: vectorHealthData } = useVectorHealthQuery();
+  const { data: ocrLanguagesData } = useOcrLanguagesQuery();
+  const { data: ocrSettingsData } = useOcrSettingsQuery();
+
+  const [overrideOcrLanguage, setOverrideOcrLanguage] = useState<string | null>(null);
+  const [overrideOcrSettings, setOverrideOcrSettings] = useState<OcrProcessingSettings | null>(null);
+
+  const documents = documentsData ?? [];
+  const vectorHealth = vectorHealthData ?? null;
+  const ocrLanguages = ocrLanguagesData ?? fallbackOcrLanguages;
+  const ocrProcessingSettings = overrideOcrSettings || ocrSettingsData || null;
+  const ocrDefaultLanguage = overrideOcrLanguage || ocrSettingsData?.language || DEFAULT_OCR_LANGUAGE;
+
   const [selectedDocument, setSelectedDocument] = useState<ImportedDocument | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [vectorHealth, setVectorHealth] = useState<VectorBackendHealth | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [pendingOcrAction, setPendingOcrAction] = useState<PendingOcrAction | null>(null);
-  const [ocrLanguages, setOcrLanguages] = useState<OcrLanguage[]>(fallbackOcrLanguages);
-  const [ocrDefaultLanguage, setOcrDefaultLanguage] = useState(DEFAULT_OCR_LANGUAGE);
-  const [ocrProcessingSettings, setOcrProcessingSettings] = useState<OcrProcessingSettings | null>(null);
-  const [documentRefreshStatus, setDocumentRefreshStatus] = useState(initialRefreshStatus);
+
+  const [documentRefreshStatus, setDocumentRefreshStatus] = useState<RefreshStatus>(initialRefreshStatus);
+
+  useEffect(() => {
+    if (docsError) {
+      setDocumentRefreshStatus((prev) => markRefreshFailure(prev, docsError.message));
+    } else if (documentsData) {
+      setDocumentRefreshStatus(markRefreshSuccess());
+    }
+  }, [documentsData, docsError]);
+
   const {
     detailRefreshStatus,
     embeddingStatus,
@@ -59,6 +86,14 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
   const preview = useDocumentPreviewController();
 
   useEffect(() => {
+    if (documents.length > 0) {
+      setSelectedDocument((current) =>
+        current ? (documents.find((d) => d.id === current.id) ?? documents[0] ?? null) : (documents[0] ?? null)
+      );
+    }
+  }, [documents]);
+
+  useEffect(() => {
     setExitContributor("documents", {
       label: "Documenti",
       hasPendingChanges: false,
@@ -67,72 +102,9 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
     return () => clearExitContributor("documents");
   }, [busyDocumentId, isUploading]);
 
-  useEffect(() => {
-    apiRequest<VectorBackendHealth>("/api/diagnostics/vector-health")
-      .then((health) => setVectorHealth(health))
-      .catch(() => {});
-    apiRequest<OcrLanguage[]>("/api/ocr/languages")
-      .then((languages) => setOcrLanguages(languages.length > 0 ? languages : fallbackOcrLanguages))
-      .catch(() => setOcrLanguages(fallbackOcrLanguages));
-    apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing")
-      .then((settings) => {
-        setOcrProcessingSettings(settings);
-        setOcrDefaultLanguage(settings.language || DEFAULT_OCR_LANGUAGE);
-      })
-      .catch(() => setOcrDefaultLanguage(DEFAULT_OCR_LANGUAGE));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiRequest<ImportedDocument[]>("/api/documents")
-      .then((docs) => {
-        if (cancelled) return;
-        setDocuments(docs);
-        setSelectedDocument(docs[0] ?? null);
-        setDocumentRefreshStatus(markRefreshSuccess());
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Impossibile leggere i documenti.";
-          setFeedback({ tone: "error", message });
-          setDocumentRefreshStatus((current) => markRefreshFailure(current, message));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const interval = window.setInterval(async () => {
-      try {
-        const docs = await apiRequest<ImportedDocument[]>("/api/documents");
-        if (cancelled) return;
-        setDocuments(docs);
-        setSelectedDocument((current) =>
-          current ? (docs.find((d) => d.id === current.id) ?? docs[0] ?? null) : (docs[0] ?? null)
-        );
-        setDocumentRefreshStatus(markRefreshSuccess());
-      } catch (error) {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : "Impossibile aggiornare i documenti.";
-        setDocumentRefreshStatus((current) => markRefreshFailure(current, message));
-      }
-    }, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
-
   async function refreshDocuments(preferredId?: number | null) {
+    invalidateDocuments();
     const docs = await apiRequest<ImportedDocument[]>("/api/documents");
-    setDocuments(docs);
-    setDocumentRefreshStatus(markRefreshSuccess());
     const nextId = preferredId ?? selectedDocument?.id ?? null;
     if (nextId === null) {
       setSelectedDocument(docs[0] ?? null);
@@ -329,7 +301,7 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
       return;
     }
 
-    setOcrDefaultLanguage(normalizedLanguage);
+    setOverrideOcrLanguage(normalizedLanguage);
 
     const currentSettings = ocrProcessingSettings ?? {
       language: DEFAULT_OCR_LANGUAGE,
@@ -338,7 +310,7 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
       lowConfidenceThreshold: 0.55
     };
     const nextSettings = { ...currentSettings, language: normalizedLanguage };
-    setOcrProcessingSettings(nextSettings);
+    setOverrideOcrSettings(nextSettings);
 
     try {
       await apiRequest<OcrProcessingSettings>("/api/settings/ocr-processing", {

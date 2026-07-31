@@ -125,7 +125,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IGraphRetrievalService, SqliteGraphRetrievalService>();
         services.AddSingleton<IAgentEpisodicMemoryService, SqliteQdrantEpisodicMemoryService>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
-        services.AddSingleton<HybridRetrievalService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();

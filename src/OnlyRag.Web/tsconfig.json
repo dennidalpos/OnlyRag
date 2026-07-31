@@ -17,6 +17,6 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"]
   },
-  "include": ["src", "e2e", "playwright.config.ts"],
+  "include": ["src", "tests", "e2e", "playwright.config.ts"],
   "references": []
 }

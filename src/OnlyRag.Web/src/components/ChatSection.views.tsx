@@ -2,6 +2,7 @@ import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import type { ChatSource, ImportedDocument, OllamaModel, OllamaStatusResponse } from "../api";
 import { formatPageRange } from "./ChatSection.helpers";
 import type { ChatMessage } from "./ChatSection.storage";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 export function ChatDocumentsPanel({
   documentsError,
@@ -219,7 +220,7 @@ export function ChatMainPanel({
           messages.map((message) => (
             <article className={`chat-message chat-message--${message.role}`} key={message.id}>
               <div className="chat-message__bubble">
-                <p>{message.content}</p>
+                <MarkdownRenderer content={message.content} />
                 {message.sources.length > 0 && (
                   <div className="chat-sources">
                     <strong>Fonti RAG</strong>

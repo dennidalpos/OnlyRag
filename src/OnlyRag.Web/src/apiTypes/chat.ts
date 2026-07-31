@@ -29,3 +29,12 @@ export type ChatResponse = {
   sources: ChatSource[];
   notices: ChatNotice[];
 };
+
+export type ChatStreamChunkEvent = {
+  eventType: "meta" | "chunk" | "done" | "error";
+  conversationId?: string | null;
+  model?: string | null;
+  content?: string | null;
+  sources?: ChatSource[] | null;
+  notices?: ChatNotice[] | null;
+};

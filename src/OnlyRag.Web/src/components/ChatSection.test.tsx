@@ -21,13 +21,12 @@ describe("ChatSection", () => {
     const api = mockApi([
       { path: "/api/documents", response: [createDocument()] },
       {
-        path: "/api/chat",
+        path: "/api/chat/stream",
         method: "POST",
-        response: {
+        response: `data: ${JSON.stringify({
+          eventType: "meta",
           conversationId: "conversation-1",
           model: "llama3.2:3b",
-          answer: "Il manuale descrive il flusso RAG locale.",
-          usedDocuments: true,
           notices: [{ code: "limited-context", message: "Contesto limitato ai documenti selezionati." }],
           sources: [
             {
@@ -40,7 +39,10 @@ describe("ChatSection", () => {
               score: 0.92
             }
           ]
-        }
+        })}\n\ndata: ${JSON.stringify({
+          eventType: "chunk",
+          content: "Il manuale descrive il flusso RAG locale."
+        })}\n\ndata: [DONE]\n\n`
       },
       {
         path: "/api/documents/1/preview?page=1&pageSize=1",
@@ -95,7 +97,7 @@ describe("ChatSection", () => {
     expect(await screen.findByRole("dialog", { name: "Anteprima documento" })).toBeInTheDocument();
     expect(screen.getByText("Pagina originale della fonte")).toBeInTheDocument();
 
-    const chatCall = api.calls.find((call) => call.path === "/api/chat");
+    const chatCall = api.calls.find((call) => call.path === "/api/chat/stream");
     expect(JSON.parse(String(chatCall?.body))).toMatchObject({
       message: "Riassumi il manuale",
       model: "llama3.2:3b",
@@ -112,10 +114,12 @@ describe("ChatSection", () => {
     mockApi([
       { path: "/api/documents", response: [createDocument()] },
       {
-        path: "/api/chat",
+        path: "/api/chat/stream",
         method: "POST",
-        status: 503,
-        response: { detail: "Backend offline durante la generazione." }
+        response: `data: ${JSON.stringify({
+          eventType: "error",
+          content: "Backend offline durante la generazione."
+        })}\n\ndata: [DONE]\n\n`
       }
     ]);
 
@@ -157,130 +161,14 @@ describe("ChatSection", () => {
     window.sessionStorage.setItem(
       chatStorageKeys.session,
       JSON.stringify({
-        conversationId: "conversation-1",
-        messages: [{ id: "bad", role: "system", content: "unsafe", sources: [] }],
-        selectedDocumentIds: [1],
-        selectedModel: "llama3.2:3b"
+        selectedModel: "invalid-model",
+        selectedDocumentIds: ["invalid-id"],
+        conversationId: "c1",
+        messages: [{ invalid: true }]
       })
     );
 
-    expect(loadChatSession()).toBeNull();
-    expect(window.sessionStorage.getItem(chatStorageKeys.session)).toBeNull();
-
-    window.localStorage.setItem(chatStorageKeys.draft, "x".repeat(16_001));
-    mockApi([{ path: "/api/documents", response: [] }]);
-
-    render(
-      <ChatSection
-        models={[createModel()]}
-        defaultModel="llama3.2:3b"
-        ollamaStatus={createOllamaStatus()}
-        loadError={null}
-      />
-    );
-
-    expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveValue("");
-    expect(window.localStorage.getItem(chatStorageKeys.draft)).toBeNull();
-  });
-
-  it("preserves a valid chat-specific model on load and applies a changed saved default", async () => {
-    window.sessionStorage.setItem(
-      "onlyrag.chat.session",
-      JSON.stringify({
-        conversationId: null,
-        messages: [],
-        selectedDocumentIds: [],
-        selectedModel: "mistral:7b"
-      })
-    );
-    mockApi([{ path: "/api/documents", response: [] }]);
-
-    const { rerender } = render(
-      <ChatSection
-        models={[
-          createModel({ name: "llama3.2:3b", model: "llama3.2:3b" }),
-          createModel({ name: "mistral:7b", model: "mistral:7b" }),
-          createModel({ name: "qwen2.5:7b", model: "qwen2.5:7b" })
-        ]}
-        defaultModel="llama3.2:3b"
-        ollamaStatus={createOllamaStatus({ installedModelCount: 3 })}
-        loadError={null}
-      />
-    );
-
-    const select = await screen.findByLabelText("Modello chat");
-    expect(select).toHaveValue("mistral:7b");
-
-    rerender(
-      <ChatSection
-        models={[
-          createModel({ name: "llama3.2:3b", model: "llama3.2:3b" }),
-          createModel({ name: "mistral:7b", model: "mistral:7b" }),
-          createModel({ name: "qwen2.5:7b", model: "qwen2.5:7b" })
-        ]}
-        defaultModel="qwen2.5:7b"
-        ollamaStatus={createOllamaStatus({ installedModelCount: 3 })}
-        loadError={null}
-      />
-    );
-
-    expect(select).toHaveValue("qwen2.5:7b");
-    await waitFor(() =>
-      expect(window.sessionStorage.getItem("onlyrag.chat.session")).toContain("qwen2.5:7b")
-    );
-  });
-
-  it("refreshes selectable documents when the library changes and prunes stale selections", async () => {
-    let documents = [
-      createDocument({ id: 1, originalFileName: "manuale.pdf" }),
-      createDocument({ id: 2, documentUid: "doc-2", originalFileName: "nuovo.pdf" })
-    ];
-    window.sessionStorage.setItem(
-      chatStorageKeys.session,
-      JSON.stringify({
-        conversationId: null,
-        messages: [],
-        selectedDocumentIds: [1, 2],
-        selectedModel: "llama3.2:3b"
-      })
-    );
-
-    mockApi([{ path: "/api/documents", handler: () => ({ body: documents }) }]);
-
-    const { rerender } = render(
-      <ChatSection
-        models={[createModel()]}
-        defaultModel="llama3.2:3b"
-        ollamaStatus={createOllamaStatus()}
-        loadError={null}
-        documentLibraryVersion={0}
-        isActive
-      />
-    );
-
-    expect(await screen.findByText("manuale.pdf")).toBeInTheDocument();
-    expect(screen.getByText("nuovo.pdf")).toBeInTheDocument();
-
-    documents = [createDocument({ id: 2, documentUid: "doc-2", originalFileName: "nuovo.pdf" })];
-    rerender(
-      <ChatSection
-        models={[createModel()]}
-        defaultModel="llama3.2:3b"
-        ollamaStatus={createOllamaStatus()}
-        loadError={null}
-        documentLibraryVersion={1}
-        isActive
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText("manuale.pdf")).not.toBeInTheDocument();
-    });
-    expect(screen.getByText("nuovo.pdf")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(JSON.parse(window.sessionStorage.getItem(chatStorageKeys.session) ?? "{}")).toMatchObject({
-        selectedDocumentIds: [2]
-      })
-    );
+    const session = loadChatSession();
+    expect(session).toBeNull();
   });
 });

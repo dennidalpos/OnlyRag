@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BackendStatus } from "../App";
 import type { DiagnosticsResponse } from "../api";
 import { formatTime } from "../pollingStatus";
+import { useTheme } from "../context/ThemeContext";
 
 type StatusBadge = {
   label: string;
@@ -17,9 +18,15 @@ type AppHeaderProps = {
 };
 
 export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJobsDrawer }: AppHeaderProps) {
+  const { theme, setTheme, themes } = useTheme();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
+  const themeMenuRef = useRef<HTMLDivElement | null>(null);
   const activeJobs = parseInt(backendStatus.jobsValue, 10);
+
+  const currentThemeObj = themes.find((t) => t.id === theme) || themes[0];
+
   const jobsBadge: StatusBadge = {
     label: "Operazioni",
     value: formatJobsValue(backendStatus.jobsValue, activeJobs),
@@ -42,12 +49,15 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
       if (statusMenuRef.current && !statusMenuRef.current.contains(event.target as Node)) {
         setShowStatusMenu(false);
       }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
+        setShowThemeMenu(false);
+      }
     }
-    if (showStatusMenu) {
+    if (showStatusMenu || showThemeMenu) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [showStatusMenu]);
+  }, [showStatusMenu, showThemeMenu]);
 
   return (
     <header className="app-header">
@@ -89,6 +99,44 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
           <span className="sr-only">{jobsBadge.label} {jobsBadge.value}</span>
         </div>
         <div className="status-row__operations">
+          <div className="theme-switcher-container" ref={themeMenuRef}>
+            <button
+              type="button"
+              className="status-badge status-badge--neutral status-badge--theme-switcher"
+              onClick={() => setShowThemeMenu((prev) => !prev)}
+              title={`Tema visivo attuale: ${currentThemeObj.name}. Clicca per cambiare tema`}
+              aria-label="Cambia tema visivo"
+              aria-expanded={showThemeMenu}
+            >
+              <span>{currentThemeObj.icon}</span>
+              <strong>{currentThemeObj.name}</strong>
+            </button>
+            {showThemeMenu && (
+              <div className="theme-menu-popover">
+                <div className="theme-menu-popover__header">
+                  <span className="theme-menu-popover__title">Seleziona Tema Visivo</span>
+                  <button type="button" className="button-secondary" onClick={() => setShowThemeMenu(false)} style={{ padding: "2px 6px" }}>✕</button>
+                </div>
+                {themes.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`theme-menu-item ${t.id === theme ? "theme-menu-item--active" : ""}`}
+                    onClick={() => {
+                      setTheme(t.id);
+                      setShowThemeMenu(false);
+                    }}
+                  >
+                    <span className="theme-menu-item__icon">{t.icon}</span>
+                    <div className="theme-menu-item__info">
+                      <span className="theme-menu-item__name">{t.name}</span>
+                      <span className="theme-menu-item__desc">{t.description}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className={`status-badge status-badge--${jobsBadge.tone}`}

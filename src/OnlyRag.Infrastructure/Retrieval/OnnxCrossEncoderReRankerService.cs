@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
@@ -6,12 +5,12 @@ namespace OnlyRag.Infrastructure.Retrieval;
 
 public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposable
 {
-    private static readonly Regex WordSplitter = new(@"\w+", RegexOptions.Compiled);
     private readonly RerankerModelManager modelManager;
     private readonly IReRankerService fallbackReRanker;
     private readonly object sessionLock = new();
 
     private InferenceSession? session;
+    private BertVocab? vocab;
     private bool isInitialized;
     private bool sessionFailed;
 
@@ -33,8 +32,8 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
             return [];
         }
 
-        InferenceSession? currentSession = GetOrInitializeSession();
-        if (currentSession is null)
+        (InferenceSession? currentSession, BertVocab? currentVocab) = GetOrInitialize();
+        if (currentSession is null || currentVocab is null)
         {
             return await fallbackReRanker.ReRankAsync(query, candidates, cancellationToken);
         }
@@ -45,7 +44,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
             foreach (ReRankCandidate candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                double score = ComputeOnnxCrossScore(currentSession, query, candidate.Content);
+                double score = ComputeCrossScore(currentSession, currentVocab, query, candidate.Content);
                 results.Add(new ReRankResult(candidate.ChunkId, Math.Round(score, 4)));
             }
 
@@ -55,33 +54,36 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         }
         catch (Exception)
         {
-            // Graceful fallback on ONNX runtime error
+            // Graceful fallback on ONNX runtime error.
             return await fallbackReRanker.ReRankAsync(query, candidates, cancellationToken);
         }
     }
 
-    private InferenceSession? GetOrInitializeSession()
+    private (InferenceSession?, BertVocab?) GetOrInitialize()
     {
         lock (sessionLock)
         {
             if (sessionFailed)
             {
-                return null;
+                return (null, null);
             }
 
             if (isInitialized)
             {
-                return session;
+                return (session, vocab);
             }
 
             string modelPath = modelManager.GetDefaultModelPath();
-            if (!File.Exists(modelPath))
+            string vocabPath = modelManager.GetVocabPath();
+            if (!File.Exists(modelPath) || !File.Exists(vocabPath))
             {
-                return null;
+                return (null, null);
             }
 
             try
             {
+                vocab = BertVocab.Load(vocabPath);
+
                 SessionOptions options = new();
                 try
                 {
@@ -94,34 +96,79 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
                 session = new InferenceSession(modelPath, options);
                 isInitialized = true;
-                return session;
+                return (session, vocab);
             }
             catch
             {
                 sessionFailed = true;
                 session?.Dispose();
                 session = null;
-                return null;
+                vocab = null;
+                return (null, null);
             }
         }
     }
 
-    private static double ComputeOnnxCrossScore(InferenceSession currentSession, string query, string content)
+    private static double ComputeCrossScore(
+        InferenceSession currentSession,
+        BertVocab currentVocab,
+        string query,
+        string content)
     {
-        int maxSeqLength = 512;
-        long[] inputIds = TokenizePair(query, content, maxSeqLength, out long[] attentionMask, out long[] tokenTypeIds);
+        const int maxSeqLength = 512;
+
+        // Tokenize via real WordPiece using the loaded vocab.
+        List<int> queryTokenIds = currentVocab.Tokenize(query, maxSeqLength / 2 - 2);
+        int remaining = maxSeqLength - queryTokenIds.Count - 3; // [CLS] + [SEP] + [SEP]
+        List<int> contentTokenIds = currentVocab.Tokenize(content, Math.Max(1, remaining));
+
+        // Build BERT dual-segment input: [CLS] query [SEP] content [SEP] [PAD...]
+        long[] inputIds = new long[maxSeqLength];
+        long[] attentionMask = new long[maxSeqLength];
+        long[] tokenTypeIds = new long[maxSeqLength];
+
+        int pos = 0;
+        inputIds[pos] = currentVocab.ClsId;
+        attentionMask[pos] = 1;
+        pos++;
+
+        foreach (int id in queryTokenIds)
+        {
+            inputIds[pos] = id;
+            attentionMask[pos] = 1;
+            pos++;
+        }
+
+        inputIds[pos] = currentVocab.SepId;
+        attentionMask[pos] = 1;
+        pos++;
+
+        foreach (int id in contentTokenIds)
+        {
+            inputIds[pos] = id;
+            attentionMask[pos] = 1;
+            tokenTypeIds[pos] = 1; // Segment B
+            pos++;
+        }
+
+        inputIds[pos] = currentVocab.SepId;
+        attentionMask[pos] = 1;
+        tokenTypeIds[pos] = 1;
+        pos++;
+
+        // Remaining positions stay 0 (PAD, no attention, segment A).
 
         int[] shape = [1, maxSeqLength];
         DenseTensor<long> inputIdsTensor = new(inputIds, shape);
         DenseTensor<long> attentionMaskTensor = new(attentionMask, shape);
         DenseTensor<long> tokenTypeIdsTensor = new(tokenTypeIds, shape);
 
-        List<NamedOnnxValue> container = new()
-        {
+        List<NamedOnnxValue> container =
+        [
             NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
             NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor),
             NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIdsTensor)
-        };
+        ];
 
         using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results = currentSession.Run(container);
         DisposableNamedOnnxValue? outputValue = results.Count > 0 ? results[0] : null;
@@ -135,74 +182,6 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         return Sigmoid(rawScore);
     }
 
-    private static long[] TokenizePair(
-        string textA,
-        string textB,
-        int maxLen,
-        out long[] attentionMask,
-        out long[] tokenTypeIds)
-    {
-        long clsToken = 101;
-        long sepToken = 102;
-        long padToken = 0;
-
-        List<long> tokensA = SimpleWordPieceTokenize(textA);
-        List<long> tokensB = SimpleWordPieceTokenize(textB);
-
-        int maxTokensA = Math.Min(tokensA.Count, maxLen / 2 - 2);
-        int maxTokensB = Math.Min(tokensB.Count, maxLen - maxTokensA - 3);
-
-        List<long> fullTokens = new() { clsToken };
-        fullTokens.AddRange(tokensA.Take(maxTokensA));
-        fullTokens.Add(sepToken);
-
-        int sepIndexA = fullTokens.Count;
-
-        fullTokens.AddRange(tokensB.Take(maxTokensB));
-        fullTokens.Add(sepToken);
-
-        long[] ids = new long[maxLen];
-        attentionMask = new long[maxLen];
-        tokenTypeIds = new long[maxLen];
-
-        for (int i = 0; i < maxLen; i++)
-        {
-            if (i < fullTokens.Count)
-            {
-                ids[i] = fullTokens[i];
-                attentionMask[i] = 1;
-                tokenTypeIds[i] = i >= sepIndexA ? 1 : 0;
-            }
-            else
-            {
-                ids[i] = padToken;
-                attentionMask[i] = 0;
-                tokenTypeIds[i] = 0;
-            }
-        }
-
-        return ids;
-    }
-
-    private static List<long> SimpleWordPieceTokenize(string text)
-    {
-        List<long> tokens = new();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return tokens;
-        }
-
-        MatchCollection matches = WordSplitter.Matches(text.ToLowerInvariant());
-        foreach (Match match in matches)
-        {
-            string word = match.Value;
-            long tokenHash = Math.Abs(word.GetHashCode(StringComparison.Ordinal)) % 29000 + 1000;
-            tokens.Add(tokenHash);
-        }
-
-        return tokens;
-    }
-
     private static double Sigmoid(float x) => 1.0d / (1.0d + Math.Exp(-x));
 
     public void Dispose()
@@ -211,7 +190,139 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         {
             session?.Dispose();
             session = null;
+            vocab = null;
             isInitialized = false;
+        }
+    }
+
+    /// <summary>
+    /// Self-contained BERT WordPiece vocabulary and tokenizer.
+    /// Loads vocab.txt (one token per line, line number = token ID) and performs
+    /// standard WordPiece sub-word tokenization matching the HuggingFace BERT convention.
+    /// </summary>
+    private sealed class BertVocab
+    {
+        private readonly Dictionary<string, int> tokenToId;
+        public int ClsId { get; }
+        public int SepId { get; }
+        public int PadId { get; }
+        public int UnkId { get; }
+
+        private BertVocab(Dictionary<string, int> tokenToId)
+        {
+            this.tokenToId = tokenToId;
+            ClsId = tokenToId.GetValueOrDefault("[CLS]", 101);
+            SepId = tokenToId.GetValueOrDefault("[SEP]", 102);
+            PadId = tokenToId.GetValueOrDefault("[PAD]", 0);
+            UnkId = tokenToId.GetValueOrDefault("[UNK]", 100);
+        }
+
+        public static BertVocab Load(string vocabPath)
+        {
+            Dictionary<string, int> dict = new(60_000, StringComparer.Ordinal);
+            string[] lines = File.ReadAllLines(vocabPath);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string token = lines[i].TrimEnd();
+                if (token.Length > 0)
+                {
+                    dict[token] = i;
+                }
+            }
+            return new BertVocab(dict);
+        }
+
+        /// <summary>
+        /// Performs BERT WordPiece tokenization: lowercase, split on whitespace and
+        /// punctuation, then greedily match longest subword pieces from the vocabulary.
+        /// </summary>
+        public List<int> Tokenize(string text, int maxTokens)
+        {
+            List<int> result = [];
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return result;
+            }
+
+            string normalized = text.ToLowerInvariant();
+            List<string> words = SplitOnWhitespaceAndPunctuation(normalized);
+
+            foreach (string word in words)
+            {
+                if (result.Count >= maxTokens)
+                {
+                    break;
+                }
+
+                WordPieceTokenizeWord(word, result, maxTokens);
+            }
+
+            return result;
+        }
+
+        private void WordPieceTokenizeWord(string word, List<int> output, int maxTokens)
+        {
+            int start = 0;
+            while (start < word.Length && output.Count < maxTokens)
+            {
+                int end = word.Length;
+                bool found = false;
+
+                while (start < end)
+                {
+                    string subword = start == 0
+                        ? word[start..end]
+                        : $"##{word[start..end]}";
+
+                    if (tokenToId.TryGetValue(subword, out int id))
+                    {
+                        output.Add(id);
+                        start = end;
+                        found = true;
+                        break;
+                    }
+
+                    end--;
+                }
+
+                if (!found)
+                {
+                    // Character not in vocab — emit [UNK] and skip entire word.
+                    output.Add(UnkId);
+                    break;
+                }
+            }
+        }
+
+        private static List<string> SplitOnWhitespaceAndPunctuation(string text)
+        {
+            List<string> tokens = [];
+            int i = 0;
+            while (i < text.Length)
+            {
+                if (char.IsWhiteSpace(text[i]))
+                {
+                    i++;
+                    continue;
+                }
+
+                if (char.IsPunctuation(text[i]) || char.IsSymbol(text[i]))
+                {
+                    tokens.Add(text[i].ToString());
+                    i++;
+                    continue;
+                }
+
+                int start = i;
+                while (i < text.Length && !char.IsWhiteSpace(text[i])
+                       && !char.IsPunctuation(text[i]) && !char.IsSymbol(text[i]))
+                {
+                    i++;
+                }
+                tokens.Add(text[start..i]);
+            }
+
+            return tokens;
         }
     }
 }

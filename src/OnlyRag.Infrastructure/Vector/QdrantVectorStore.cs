@@ -7,9 +7,12 @@ using static Qdrant.Client.Grpc.Conditions;
 
 namespace OnlyRag.Infrastructure.Vector;
 
-public sealed class QdrantVectorStore : IQdrantVectorStore
+public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
 {
     private readonly QdrantSettingsStore settingsStore;
+    private QdrantClient? _cachedClient;
+    private QdrantSettings? _cachedSettings;
+    private readonly SemaphoreSlim _clientLock = new(1, 1);
 
     public QdrantVectorStore(QdrantSettingsStore settingsStore)
     {
@@ -47,7 +50,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore
 
     public async Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default)
     {
-        using QdrantClient client = await CreateClientAsync(cancellationToken);
+        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
         await client.HealthAsync(cancellationToken);
     }
 
@@ -68,7 +71,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore
         }
 
         string collection = BuildCollectionName(model, vector.Count);
-        using QdrantClient client = await CreateClientAsync(cancellationToken);
+        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
         await EnsureCollectionAsync(client, collection, vector.Count, cancellationToken);
 
         ulong pointId = checked((ulong)chunkId);
@@ -100,7 +103,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore
         }
 
         string collection = BuildCollectionName(model, queryVector.Count);
-        using QdrantClient client = await CreateClientAsync(cancellationToken);
+        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
         if (!await client.CollectionExistsAsync(collection, cancellationToken))
         {
             throw new InvalidOperationException($"Collection Qdrant mancante: {collection}. Ricostruire gli embedding.");
@@ -133,7 +136,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore
         CancellationToken cancellationToken = default)
     {
         string collection = BuildCollectionName(model, dimensions);
-        using QdrantClient client = await CreateClientAsync(cancellationToken);
+        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
         if (!await client.CollectionExistsAsync(collection, cancellationToken))
         {
             return;
@@ -143,11 +146,54 @@ public sealed class QdrantVectorStore : IQdrantVectorStore
         await client.DeleteAsync(collection, filter, cancellationToken: cancellationToken);
     }
 
-    private async Task<QdrantClient> CreateClientAsync(CancellationToken cancellationToken)
+    private async Task<QdrantClient> GetOrCreateClientAsync(CancellationToken cancellationToken)
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
-        Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
-        return new QdrantClient(endpoint, settings.ApiKey, TimeSpan.FromSeconds(settings.RequestTimeoutSeconds));
+
+        await _clientLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_cachedClient != null && _cachedSettings != null &&
+                _cachedSettings.GrpcEndpoint == settings.GrpcEndpoint &&
+                _cachedSettings.ApiKey == settings.ApiKey &&
+                _cachedSettings.RequestTimeoutSeconds == settings.RequestTimeoutSeconds)
+            {
+                return _cachedClient;
+            }
+
+            if (_cachedClient != null)
+            {
+                _cachedClient.Dispose();
+            }
+
+            Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
+            _cachedClient = new QdrantClient(endpoint, settings.ApiKey, TimeSpan.FromSeconds(settings.RequestTimeoutSeconds));
+            _cachedSettings = settings;
+
+            return _cachedClient;
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _clientLock.WaitAsync();
+        try
+        {
+            if (_cachedClient != null)
+            {
+                _cachedClient.Dispose();
+                _cachedClient = null;
+            }
+        }
+        finally
+        {
+            _clientLock.Release();
+            _clientLock.Dispose();
+        }
     }
 
     private static async Task EnsureCollectionAsync(

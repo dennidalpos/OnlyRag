@@ -1,30 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import {
   apiRequest,
-  markBackendOffline,
-  markBackendOnline,
   resolveBackendErrorMessage,
   type DependencyActionResponse,
-  type DiagnosticsResponse,
   type OcrAutoGpuEnableResponse,
-  type OllamaInstallStatus,
-  type OllamaModel,
-  type OllamaModelsResponse,
-  type OllamaSettings,
   type OllamaStatusResponse
 } from "./api";
 import { initializeAppLifecycleBridge } from "./appLifecycle";
 import { AppHeader } from "./components/AppHeader";
 import { ChatSection } from "./components/ChatSection";
+import { CodingSection } from "./components/CodingSection";
 import { DocumentsSection } from "./components/DocumentsSection";
-import { SetupBanner } from "./components/SetupBanner";
 import { ImagesSection } from "./components/ImagesSection";
 import { JobsDrawer } from "./components/JobsDrawer";
 import { SectionId, Sidebar } from "./components/Sidebar";
-import { CodingSection } from "./components/CodingSection";
 import { SettingsSection } from "./components/SettingsSection";
+import { SetupBanner } from "./components/SetupBanner";
 import { TranslationSection } from "./components/TranslationSection";
 import { useOcrStartupPrompt } from "./components/useOcrStartupPrompt";
+import { QueryProvider } from "./context/QueryProvider";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { useBackendStatusQuery } from "./hooks/useBackendStatusQuery";
+import { useDiagnosticsQuery } from "./hooks/useDiagnosticsQuery";
+import { useOllamaStatusQuery } from "./hooks/useOllamaStatusQuery";
 import {
   formatLastRefresh,
   initialRefreshStatus,
@@ -33,15 +31,6 @@ import {
   shouldSurfaceRefreshFailure,
   type RefreshStatus
 } from "./pollingStatus";
-
-type AppStatusResponse = {
-  backend: string;
-  database: string;
-  jobQueue: string;
-  ollama: string;
-  startedAtUtc: string;
-  lowResourceMode: boolean;
-};
 
 type StatusTone = "online" | "offline" | "warning";
 
@@ -76,99 +65,48 @@ const offlineStatus: BackendStatus = {
   refreshStatus: initialRefreshStatus
 };
 
-export default function App() {
+export function AppContent() {
+  const { theme } = useTheme();
   const [activeSection, setActiveSection] = useState<SectionId>("coding");
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>(offlineStatus);
-  const [statusChecked, setStatusChecked] = useState(false);
-  const [ollamaSettings, setOllamaSettings] = useState<OllamaSettings | null>(null);
-  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusResponse | null>(null);
-  const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
-  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
   const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
-  const [ollamaLoadError, setOllamaLoadError] = useState<string | null>(null);
   const [isRecheckingOllama, setIsRecheckingOllama] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
-  const [ollamaSettingsChecked, setOllamaSettingsChecked] = useState(false);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const initialSetupCheckInProgressRef = useRef(false);
   const ocrStartupPrompt = useOcrStartupPrompt();
 
-  async function refreshBackendStatus() {
-    try {
-      const status = await apiRequest<AppStatusResponse>("/api/app/status");
-      markBackendOnline();
-      setBackendStatus((current) => ({
-        ...current,
-        backendValue: status.backend,
+  const backendQuery = useBackendStatusQuery();
+  const ollamaQuery = useOllamaStatusQuery();
+  const diagnosticsQuery = useDiagnosticsQuery();
+
+  const backendStatus: BackendStatus = backendQuery.data
+    ? {
+        backendValue: backendQuery.data.backend,
         backendTone: "online",
-        jobsValue: status.jobQueue,
+        ollamaValue: ollamaQuery.data?.status ? formatOllamaBadge(ollamaQuery.data.status) : "Offline",
+        ollamaTone: ollamaQuery.data?.status ? getOllamaTone(ollamaQuery.data.status) : "offline",
+        jobsValue: backendQuery.data.jobQueue,
         jobsTone: "online",
-        lowResourceMode: status.lowResourceMode,
+        lowResourceMode: backendQuery.data.lowResourceMode,
         refreshStatus: markRefreshSuccess()
-      }));
-    } catch {
-      markBackendOffline();
-      setBackendStatus((current) => ({
+      }
+    : {
         ...offlineStatus,
         refreshStatus: markRefreshFailure(
-          current.refreshStatus,
+          initialRefreshStatus,
           resolveBackendErrorMessage() ??
             "Il backend locale non è raggiungibile. Le operazioni non sono disponibili. Riavviare l'applicazione."
         )
-      }));
-    } finally {
-      setStatusChecked(true);
-    }
-  }
+      };
 
-  async function refreshOllamaData() {
-    try {
-      const [settings, status] = await Promise.all([
-        apiRequest<OllamaSettings>("/api/settings/ollama"),
-        apiRequest<OllamaStatusResponse>("/api/ollama/status")
-      ]);
-      const dependencyStatus = await apiRequest<OllamaInstallStatus>("/api/dependencies/ollama")
-        .catch(() => null);
-
-      setOllamaSettings(settings);
-      setOllamaSettingsChecked(true);
-      setOllamaStatus(status);
-      setOllamaInstallStatus(dependencyStatus);
-      setBackendStatus((current) => ({
-        ...current,
-        ollamaValue: formatOllamaBadge(status),
-        ollamaTone: getOllamaTone(status)
-      }));
-
-      if (status.isReachable) {
-        const modelsResponse = await apiRequest<OllamaModelsResponse>("/api/ollama/models");
-        setOllamaModels(modelsResponse.models);
-        setOllamaLoadError(null);
-      } else {
-        setOllamaModels([]);
-        setOllamaLoadError(status.suggestion ?? status.message);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Impossibile leggere lo stato di Ollama.";
-      setOllamaSettingsChecked(true);
-      setOllamaStatus(null);
-      setOllamaInstallStatus(null);
-      setOllamaModels([]);
-      setOllamaLoadError(message);
-      setBackendStatus((current) => ({
-        ...current,
-        ollamaValue: "Errore",
-        ollamaTone: "offline"
-      }));
-    }
-  }
-
-  async function refreshDiagnostics() {
-    const data = await apiRequest<DiagnosticsResponse>("/api/diagnostics");
-    setDiagnostics(data);
-    return data;
-  }
+  const statusChecked = !backendQuery.isLoading;
+  const ollamaSettings = ollamaQuery.data?.settings ?? null;
+  const ollamaStatus = ollamaQuery.data?.status ?? null;
+  const ollamaInstallStatus = ollamaQuery.data?.installStatus ?? null;
+  const ollamaModels = ollamaQuery.data?.models ?? [];
+  const ollamaLoadError = ollamaQuery.data?.loadError ?? null;
+  const ollamaSettingsChecked = Boolean(ollamaQuery.data?.settings || ollamaQuery.data?.status || ollamaQuery.isFetched);
+  const diagnostics = diagnosticsQuery.data ?? null;
 
   async function autoEnableOcrGpu() {
     await apiRequest<OcrAutoGpuEnableResponse>("/api/settings/ocr/auto-enable-gpu", {
@@ -183,7 +121,7 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({ confirmed: true })
       });
-      await refreshOllamaData();
+      await ollamaQuery.refetch();
     } finally {
       setIsRecheckingOllama(false);
     }
@@ -201,9 +139,9 @@ export default function App() {
 
     try {
       await Promise.all([
-        refreshBackendStatus(),
-        refreshOllamaData(),
-        refreshDiagnostics().catch(() => {}),
+        backendQuery.refetch(),
+        ollamaQuery.refetch(),
+        diagnosticsQuery.refetch(),
         ocrStartupPrompt.refresh()
       ]);
     } finally {
@@ -232,18 +170,14 @@ export default function App() {
     async function load() {
       initialSetupCheckInProgressRef.current = true;
       try {
-        await refreshBackendStatus();
-        if (isCancelled) {
-          return;
-        }
+        await backendQuery.refetch();
+        if (isCancelled) return;
 
-        await refreshOllamaData();
-        if (isCancelled) {
-          return;
-        }
+        await ollamaQuery.refetch();
+        if (isCancelled) return;
 
         const [diagnosticsResult] = await Promise.all([
-          refreshDiagnostics().catch(() => null),
+          diagnosticsQuery.refetch().then((res) => res.data ?? null).catch(() => null),
           ocrStartupPrompt.refresh()
         ]);
         if (!isCancelled && diagnosticsResult?.ocrGpuCapability.isUsable) {
@@ -262,20 +196,6 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    const handle = setInterval(() => {
-      void refreshBackendStatus();
-    }, 3_000);
-    return () => clearInterval(handle);
-  }, []);
-
-  useEffect(() => {
-    const handle = setInterval(() => {
-      void refreshDiagnostics().catch(() => {});
-    }, 3_000);
-    return () => clearInterval(handle);
   }, []);
 
   useEffect(() => {
@@ -300,15 +220,6 @@ export default function App() {
       document.removeEventListener("visibilitychange", recheckWhenVisible);
     };
   }, []);
-
-  const [theme] = useState<"dark" | "light" | "cyber">(() => {
-    return (localStorage.getItem("onlyrag_theme") as "dark" | "light" | "cyber") || "dark";
-  });
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("onlyrag_theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -445,9 +356,9 @@ export default function App() {
               initialDiagnostics={diagnostics}
               loadError={ollamaLoadError}
               onDataChanged={async () => {
-                await refreshBackendStatus();
-                await refreshOllamaData();
-                await refreshDiagnostics().catch(() => {});
+                await backendQuery.refetch();
+                await ollamaQuery.refetch();
+                await diagnosticsQuery.refetch().catch(() => {});
               }}
             />
           )}
@@ -456,9 +367,19 @@ export default function App() {
       <JobsDrawer
         isOpen={isJobsDrawerOpen}
         onClose={() => setIsJobsDrawerOpen(false)}
-        onJobsChanged={() => void refreshBackendStatus()}
+        onJobsChanged={() => void backendQuery.refetch()}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </QueryProvider>
   );
 }
 

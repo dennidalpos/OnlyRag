@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
@@ -165,15 +166,9 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
             """
             SELECT d.id, d.document_uid, d.original_file_name, d.original_path, d.sha256, d.mime_type,
                    d.file_extension, d.file_size_bytes, d.status, d.page_count,
-                   COALESCE(c.chunk_count, 0) AS chunk_count,
+                   (SELECT COUNT(*) FROM chunks WHERE document_id = d.id) AS chunk_count,
                    d.current_job_id, d.last_error, d.created_at_utc, d.updated_at_utc
-            FROM documents
-            AS d
-            LEFT JOIN (
-                SELECT document_id, COUNT(*) AS chunk_count
-                FROM chunks
-                GROUP BY document_id
-            ) AS c ON c.document_id = d.id
+            FROM documents AS d
             ORDER BY d.created_at_utc DESC, d.id DESC;
             """;
 
@@ -195,15 +190,9 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
             """
             SELECT d.id, d.document_uid, d.original_file_name, d.original_path, d.sha256, d.mime_type,
                    d.file_extension, d.file_size_bytes, d.status, d.page_count,
-                   COALESCE(c.chunk_count, 0) AS chunk_count,
+                   (SELECT COUNT(*) FROM chunks WHERE document_id = d.id) AS chunk_count,
                    d.current_job_id, d.last_error, d.created_at_utc, d.updated_at_utc
-            FROM documents
-            AS d
-            LEFT JOIN (
-                SELECT document_id, COUNT(*) AS chunk_count
-                FROM chunks
-                GROUP BY document_id
-            ) AS c ON c.document_id = d.id
+            FROM documents AS d
             WHERE d.id = $id;
             """;
         command.AddParameter("$id", id);
@@ -221,15 +210,9 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
             """
             SELECT d.id, d.document_uid, d.original_file_name, d.original_path, d.sha256, d.mime_type,
                    d.file_extension, d.file_size_bytes, d.status, d.page_count,
-                   COALESCE(c.chunk_count, 0) AS chunk_count,
+                   (SELECT COUNT(*) FROM chunks WHERE document_id = d.id) AS chunk_count,
                    d.current_job_id, d.last_error, d.created_at_utc, d.updated_at_utc
-            FROM documents
-            AS d
-            LEFT JOIN (
-                SELECT document_id, COUNT(*) AS chunk_count
-                FROM chunks
-                GROUP BY document_id
-            ) AS c ON c.document_id = d.id
+            FROM documents AS d
             WHERE d.sha256 = $sha256
             ORDER BY d.created_at_utc ASC
             LIMIT 1;
@@ -365,11 +348,13 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
             pageId = Convert.ToInt64(await upsertPage.ExecuteScalarAsync(cancellationToken));
         }
 
-        foreach (IngestedDocumentChunk chunk in chunks)
+        if (chunks.Count > 0)
         {
             await using SqliteCommand insertChunk = connection.CreateCommand();
             insertChunk.Transaction = transaction;
-            insertChunk.CommandText =
+
+            var sb = new StringBuilder();
+            sb.AppendLine(
                 """
                 INSERT INTO chunks (
                     document_id,
@@ -387,22 +372,50 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
                     created_at_utc,
                     updated_at_utc
                 )
-                VALUES (
-                    $documentId,
-                    $pageId,
-                    $ordinal,
-                    $text,
-                    $tokenCount,
-                    $pageStart,
-                    $pageEnd,
-                    $contentHash,
-                    $metadataJson,
-                    $parentChunkId,
-                    $chunkLevel,
-                    $sectionHeading,
-                    $now,
-                    $now
-                )
+                VALUES
+                """);
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.AppendLine(",");
+                }
+
+                sb.Append($"    ($documentId_{i}, $pageId_{i}, $ordinal_{i}, $text_{i}, $tokenCount_{i}, $pageStart_{i}, $pageEnd_{i}, $contentHash_{i}, $metadataJson_{i}, $parentChunkId_{i}, $chunkLevel_{i}, $sectionHeading_{i}, $now_{i}, $now_{i})");
+
+                IngestedDocumentChunk chunk = chunks[i];
+                insertChunk.AddParameter($"$documentId_{i}", documentId);
+                insertChunk.AddParameter($"$pageId_{i}", pageId);
+                insertChunk.AddParameter($"$ordinal_{i}", chunk.Ordinal);
+                insertChunk.AddParameter($"$text_{i}", chunk.Text);
+                insertChunk.AddParameter($"$tokenCount_{i}", chunk.ApproximateTokenCount);
+                insertChunk.AddParameter($"$pageStart_{i}", chunk.PageStart);
+                insertChunk.AddParameter($"$pageEnd_{i}", chunk.PageEnd);
+                insertChunk.AddParameter($"$contentHash_{i}", chunk.ContentHash);
+                insertChunk.AddParameter($"$parentChunkId_{i}", (object?)chunk.ParentChunkId ?? DBNull.Value);
+                insertChunk.AddParameter($"$chunkLevel_{i}", chunk.ChunkLevel);
+                insertChunk.AddParameter($"$sectionHeading_{i}", (object?)chunk.SectionHeading ?? DBNull.Value);
+                insertChunk.AddParameter(
+                    $"$metadataJson_{i}",
+                    JsonSerializer.Serialize(new
+                    {
+                        document_id = documentId,
+                        page_start = chunk.PageStart,
+                        page_end = chunk.PageEnd,
+                        ordinal = chunk.Ordinal,
+                        content_hash = chunk.ContentHash,
+                        token_count = chunk.ApproximateTokenCount,
+                        parent_chunk_id = chunk.ParentChunkId,
+                        chunk_level = chunk.ChunkLevel,
+                        section_heading = chunk.SectionHeading
+                    }));
+                insertChunk.AddParameter($"$now_{i}", now);
+            }
+
+            sb.AppendLine();
+            sb.AppendLine(
+                """
                 ON CONFLICT(document_id, chunk_index) DO UPDATE SET
                     document_page_id = excluded.document_page_id,
                     content = excluded.content,
@@ -414,36 +427,11 @@ public sealed class SqliteDocumentRepository : IDocumentRepository
                     parent_chunk_id = excluded.parent_chunk_id,
                     chunk_level = excluded.chunk_level,
                     section_heading = excluded.section_heading,
-                    updated_at_utc = excluded.updated_at_utc
-                RETURNING id;
-                """;
-            insertChunk.AddParameter("$documentId", documentId);
-            insertChunk.AddParameter("$pageId", pageId);
-            insertChunk.AddParameter("$ordinal", chunk.Ordinal);
-            insertChunk.AddParameter("$text", chunk.Text);
-            insertChunk.AddParameter("$tokenCount", chunk.ApproximateTokenCount);
-            insertChunk.AddParameter("$pageStart", chunk.PageStart);
-            insertChunk.AddParameter("$pageEnd", chunk.PageEnd);
-            insertChunk.AddParameter("$contentHash", chunk.ContentHash);
-            insertChunk.AddParameter("$parentChunkId", (object?)chunk.ParentChunkId ?? DBNull.Value);
-            insertChunk.AddParameter("$chunkLevel", chunk.ChunkLevel);
-            insertChunk.AddParameter("$sectionHeading", (object?)chunk.SectionHeading ?? DBNull.Value);
-            insertChunk.AddParameter(
-                "$metadataJson",
-                JsonSerializer.Serialize(new
-                {
-                    document_id = documentId,
-                    page_start = chunk.PageStart,
-                    page_end = chunk.PageEnd,
-                    ordinal = chunk.Ordinal,
-                    content_hash = chunk.ContentHash,
-                    token_count = chunk.ApproximateTokenCount,
-                    parent_chunk_id = chunk.ParentChunkId,
-                    chunk_level = chunk.ChunkLevel,
-                    section_heading = chunk.SectionHeading
-                }));
-            insertChunk.AddParameter("$now", now);
-            await insertChunk.ExecuteScalarAsync(cancellationToken);
+                    updated_at_utc = excluded.updated_at_utc;
+                """);
+
+            insertChunk.CommandText = sb.ToString();
+            await insertChunk.ExecuteNonQueryAsync(cancellationToken);
         }
 
         await using (SqliteCommand updateDocument = connection.CreateCommand())
