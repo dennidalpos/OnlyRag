@@ -14,6 +14,8 @@ public sealed class LoggingService : ILoggingService
     private readonly object fileLock = new();
     private AppLogLevel currentMinLevel = AppLogLevel.Trace;
 
+    public event Action<LogEntry>? OnLogWritten;
+
     public LoggingService(AppStoragePaths storagePaths, LoggingSettingsStore settingsStore)
     {
         this.storagePaths = storagePaths;
@@ -88,6 +90,15 @@ public sealed class LoggingService : ILoggingService
         }
 
         WriteToFile(entry);
+
+        try
+        {
+            OnLogWritten?.Invoke(entry);
+        }
+        catch
+        {
+            // Ignora errori nei subscriber
+        }
     }
 
     public void LogTrace(string category, string message, object? data = null) => Log(AppLogLevel.Trace, category, message, null, data);

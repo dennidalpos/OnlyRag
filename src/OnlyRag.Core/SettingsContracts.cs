@@ -42,14 +42,9 @@ public sealed record OcrProcessingSettings(
 public sealed record OcrSettings(
     string Profile,
     int PdfDpi,
-    string ModelPreset,
-    string ModelVersion,
     int DetectionSideLimit,
     double DetectionThreshold,
-    double DetectionBoxThreshold,
-    double DetectionUnclipRatio,
     double RecognitionScoreThreshold,
-    bool UseTextlineOrientation,
     bool UseDocumentOrientationClassification,
     bool UseDocumentUnwarping,
     int RecognitionBatchSize,
@@ -72,6 +67,12 @@ public sealed record OcrSettings(
     public const int DefaultCpuThreads = 2;
     public const string DefaultDevice = "auto";
 
+    public string ModelPreset => DefaultModelPreset;
+    public string ModelVersion => DefaultModelVersion;
+    public double DetectionBoxThreshold => DefaultDetectionBoxThreshold;
+    public double DetectionUnclipRatio => DefaultDetectionUnclipRatio;
+    public bool UseTextlineOrientation => DefaultUseTextlineOrientation;
+
     public static OcrSettings Default { get; } = ForProfile(DefaultProfile);
 
     public static OcrSettings ForProfile(string profile)
@@ -81,57 +82,73 @@ public sealed record OcrSettings(
 
     public static OcrSettings ForProfile(string profile, string device)
     {
-        return NormalizeProfile(profile) switch
+        string targetProfile = NormalizeProfile(profile);
+        if (targetProfile == "auto")
+        {
+            targetProfile = ResolveAutoOcrProfile();
+        }
+
+        bool isAuto = NormalizeProfile(profile) == "auto";
+
+        return targetProfile switch
         {
             "fast" => new OcrSettings(
-                "fast",
+                isAuto ? "auto" : "fast",
                 160,
-                DefaultModelPreset,
-                DefaultModelVersion,
                 896,
                 0.38d,
-                0.68d,
-                1.35d,
                 0.58d,
-                true,
                 false,
                 false,
                 ResolveRecognitionBatchSize("fast", device, 4),
-                1,
+                isAuto ? ResolveCpuThreads("fast") : 1,
                 NormalizeDevice(device)),
             "accurate" => new OcrSettings(
-                "accurate",
+                isAuto ? "auto" : "accurate",
                 300,
-                DefaultModelPreset,
-                DefaultModelVersion,
                 1536,
                 0.23d,
-                0.52d,
-                1.75d,
                 0.42d,
                 true,
                 true,
-                true,
                 ResolveRecognitionBatchSize("accurate", device, 8),
-                4,
+                isAuto ? ResolveCpuThreads("accurate") : 4,
                 NormalizeDevice(device)),
             _ => new OcrSettings(
-                DefaultProfile,
+                isAuto ? "auto" : DefaultProfile,
                 DefaultPdfDpi,
-                DefaultModelPreset,
-                DefaultModelVersion,
                 DefaultDetectionSideLimit,
                 DefaultDetectionThreshold,
-                DefaultDetectionBoxThreshold,
-                DefaultDetectionUnclipRatio,
                 DefaultRecognitionScoreThreshold,
-                DefaultUseTextlineOrientation,
                 DefaultUseDocumentOrientationClassification,
                 DefaultUseDocumentUnwarping,
                 ResolveRecognitionBatchSize(DefaultProfile, device, DefaultRecognitionBatchSize),
-                DefaultCpuThreads,
+                isAuto ? ResolveCpuThreads("balanced") : DefaultCpuThreads,
                 NormalizeDevice(device))
         };
+    }
+
+    public static string ResolveAutoOcrProfile()
+    {
+        try
+        {
+            double totalGiB = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024d / 1024d / 1024d;
+            if ((totalGiB > 0d && totalGiB < 7.5d) || Environment.ProcessorCount <= 4)
+            {
+                return "fast";
+            }
+
+            if (totalGiB >= 14.0d && Environment.ProcessorCount >= 8)
+            {
+                return "accurate";
+            }
+
+            return "balanced";
+        }
+        catch
+        {
+            return "balanced";
+        }
     }
 
     public static OcrSettings Normalize(OcrSettings settings)
@@ -147,14 +164,9 @@ public sealed record OcrSettings(
         return new OcrSettings(
             profile,
             Math.Clamp(settings.PdfDpi, 96, 400),
-            NormalizeToken(settings.ModelPreset, DefaultModelPreset, 64),
-            NormalizeToken(settings.ModelVersion, DefaultModelVersion, 64),
             Math.Clamp(settings.DetectionSideLimit, 320, 4096),
             Math.Clamp(settings.DetectionThreshold, 0.01d, 0.99d),
-            Math.Clamp(settings.DetectionBoxThreshold, 0.01d, 0.99d),
-            Math.Clamp(settings.DetectionUnclipRatio, 1.0d, 3.0d),
             Math.Clamp(settings.RecognitionScoreThreshold, 0.01d, 0.99d),
-            settings.UseTextlineOrientation,
             settings.UseDocumentOrientationClassification,
             settings.UseDocumentUnwarping,
             Math.Clamp(settings.RecognitionBatchSize, 1, 32),
@@ -182,11 +194,26 @@ public sealed record OcrSettings(
             normalized.CpuThreads.ToString(CultureInfo.InvariantCulture),
             normalized.Device);
     }
+    normalized.PdfDpi.ToString(CultureInfo.InvariantCulture),
+            normalized.ModelPreset,
+            normalized.ModelVersion,
+            normalized.DetectionSideLimit.ToString(CultureInfo.InvariantCulture),
+            normalized.DetectionThreshold.ToString("0.###", CultureInfo.InvariantCulture),
+            normalized.DetectionBoxThreshold.ToString("0.###", CultureInfo.InvariantCulture),
+            normalized.DetectionUnclipRatio.ToString("0.###", CultureInfo.InvariantCulture),
+            normalized.RecognitionScoreThreshold.ToString("0.###", CultureInfo.InvariantCulture),
+            normalized.UseTextlineOrientation? "1" : "0",
+            normalized.UseDocumentOrientationClassification? "1" : "0",
+            normalized.UseDocumentUnwarping? "1" : "0",
+            normalized.RecognitionBatchSize.ToString(CultureInfo.InvariantCulture),
+            normalized.CpuThreads.ToString(CultureInfo.InvariantCulture),
+            normalized.Device);
+    }
 
     private static string NormalizeProfile(string value)
     {
         string normalized = NormalizeToken(value, DefaultProfile, 32).ToLowerInvariant();
-        return normalized is "fast" or "balanced" or "accurate" or "custom"
+        return normalized is "fast" or "balanced" or "accurate" or "custom" or "auto"
             ? normalized
             : DefaultProfile;
     }
@@ -197,6 +224,17 @@ public sealed record OcrSettings(
         return normalized is "auto" or "cpu" or "gpu"
             ? normalized
             : DefaultDevice;
+    }
+
+    private static int ResolveCpuThreads(string profile)
+    {
+        int count = Environment.ProcessorCount;
+        return profile switch
+        {
+            "fast" => Math.Clamp(count / 4, 1, 2),
+            "accurate" => Math.Clamp(count / 2, 2, 8),
+            _ => Math.Clamp(count / 2, 1, 4)
+        };
     }
 
     private static int ResolveRecognitionBatchSize(string profile, string device, int cpuBatchSize)

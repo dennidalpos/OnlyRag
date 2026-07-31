@@ -134,6 +134,26 @@
   flex-shrink: 0;
 }
 
+.workspace-badge-chip__remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-light, #94a3b8);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius-sm, 4px);
+  margin-left: 4px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.workspace-badge-chip__remove-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
 
 
 

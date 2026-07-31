@@ -75,14 +75,9 @@ export type PerformanceProfile = "auto" | "eco" | "balanced" | "power" | "custom
 export type OcrSettings = {
   profile: string;
   pdfDpi: number;
-  modelPreset: string;
-  modelVersion: string;
   detectionSideLimit: number;
   detectionThreshold: number;
-  detectionBoxThreshold: number;
-  detectionUnclipRatio: number;
   recognitionScoreThreshold: number;
-  useTextlineOrientation: boolean;
   useDocumentOrientationClassification: boolean;
   useDocumentUnwarping: boolean;
   recognitionBatchSize: number;

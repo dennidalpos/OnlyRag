@@ -168,6 +168,25 @@ public sealed partial class InProcessBackendTests
     }
 
     [Fact]
+    public async Task OcrSettings_AutoProfileResolvesBasedOnHardware()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(tempDescriptor.Descriptor);
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        OcrSettings autoRequest = OcrSettings.ForProfile("auto");
+        Assert.Equal("auto", autoRequest.Profile);
+        Assert.True(autoRequest.CpuThreads >= 1);
+
+        using HttpResponseMessage putResponse = await httpClient.PutAsJsonAsync("/api/settings/ocr", autoRequest, JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+
+        OcrSettings? saved = await putResponse.Content.ReadFromJsonAsync<OcrSettings>(JsonOptions);
+        Assert.NotNull(saved);
+        Assert.Equal("auto", saved.Profile);
+    }
+
+    [Fact]
     public async Task QdrantSettings_DoesNotReturnStoredApiKey()
     {
         using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
@@ -279,14 +298,9 @@ public sealed partial class InProcessBackendTests
         OcrSettings request = new(
             Profile: "accurate",
             PdfDpi: 300,
-            ModelPreset: "PP-OCRv5",
-            ModelVersion: "PP-OCRv5",
             DetectionSideLimit: 1280,
             DetectionThreshold: 0.25d,
-            DetectionBoxThreshold: 0.55d,
-            DetectionUnclipRatio: 1.7d,
             RecognitionScoreThreshold: 0.45d,
-            UseTextlineOrientation: false,
             UseDocumentOrientationClassification: true,
             UseDocumentUnwarping: true,
             RecognitionBatchSize: 12,

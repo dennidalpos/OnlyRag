@@ -36,6 +36,63 @@ public static partial class InProcessBackend
             return Results.Ok(logs);
         });
 
+        app.MapGet("/api/logs/stream", async (
+            HttpContext httpContext,
+            ILoggingService loggingService) =>
+        {
+            httpContext.Response.ContentType = "text/event-stream";
+            httpContext.Response.Headers.CacheControl = "no-cache";
+            httpContext.Response.Headers.Connection = "keep-alive";
+
+            var channel = System.Threading.Channels.Channel.CreateUnbounded<LogEntry>();
+
+            void OnLog(LogEntry entry)
+            {
+                channel.Writer.TryWrite(entry);
+            }
+
+            LoggingService? concreteLogging = loggingService as LoggingService;
+            if (concreteLogging is not null)
+            {
+                concreteLogging.OnLogWritten += OnLog;
+            }
+
+            try
+            {
+                var initialLogs = loggingService.GetRecentLogs(limit: 50);
+                var reversed = initialLogs.Reverse().ToList();
+                foreach (var log in reversed)
+                {
+                    string json = System.Text.Json.JsonSerializer.Serialize(log, AgentJsonOptions);
+                    await httpContext.Response.WriteAsync($"data: {json}\n\n", httpContext.RequestAborted);
+                }
+                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+
+                while (await channel.Reader.WaitToReadAsync(httpContext.RequestAborted))
+                {
+                    while (channel.Reader.TryRead(out var entry))
+                    {
+                        string json = System.Text.Json.JsonSerializer.Serialize(entry, AgentJsonOptions);
+                        await httpContext.Response.WriteAsync($"data: {json}\n\n", httpContext.RequestAborted);
+                    }
+                    await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Client disconnected
+            }
+            finally
+            {
+                if (concreteLogging is not null)
+                {
+                    concreteLogging.OnLogWritten -= OnLog;
+                }
+            }
+
+            return Results.Empty;
+        });
+
         app.MapGet("/api/logs/storage", (ILoggingService loggingService) =>
         {
             var storageInfo = loggingService.GetStorageInfo();

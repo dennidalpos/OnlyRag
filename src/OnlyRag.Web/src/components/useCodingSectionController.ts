@@ -80,13 +80,6 @@ export function useCodingSectionController({
     const textToSend = overridePrompt ?? agentStream.promptInput;
     if (!textToSend.trim() || agentStream.isGenerating) return;
 
-    if (!workspace.workspaceConfig?.isAuthorized) {
-      workspace.setWorkspaceStatusMessage(
-        "⚠️ Selezionare una cartella di progetto prima di avviare l'Agente Autonomo."
-      );
-      void workspace.handlePickWindowsFolder();
-      return;
-    }
     return agentStream.handleSendAgentMessage(textToSend);
   }
 
@@ -137,6 +130,7 @@ export function useCodingSectionController({
     handleScrollContainer,
     scrollToBottom,
     handlePickWindowsFolder: workspace.handlePickWindowsFolder,
+    handleClearWorkspaceFolder: workspace.handleClearWorkspaceFolder,
     handleAttachWorkspaceFile: workspace.handleAttachWorkspaceFile,
     handleSaveAttachedFileContent: workspace.handleSaveAttachedFileContent,
     handleOpenExternalFile: workspace.handleOpenExternalFile,

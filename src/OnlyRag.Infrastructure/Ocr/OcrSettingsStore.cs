@@ -8,14 +8,9 @@ public sealed class OcrSettingsStore
 {
     private const string ProfileKey = "ocr.profile";
     private const string PdfDpiKey = "ocr.pdfDpi";
-    private const string ModelPresetKey = "ocr.modelPreset";
-    private const string ModelVersionKey = "ocr.modelVersion";
     private const string DetectionSideLimitKey = "ocr.detectionSideLimit";
     private const string DetectionThresholdKey = "ocr.detectionThreshold";
-    private const string DetectionBoxThresholdKey = "ocr.detectionBoxThreshold";
-    private const string DetectionUnclipRatioKey = "ocr.detectionUnclipRatio";
     private const string RecognitionScoreThresholdKey = "ocr.recognitionScoreThreshold";
-    private const string UseTextlineOrientationKey = "ocr.useTextlineOrientation";
     private const string UseDocumentOrientationClassificationKey = "ocr.useDocumentOrientationClassification";
     private const string UseDocumentUnwarpingKey = "ocr.useDocumentUnwarping";
     private const string RecognitionBatchSizeKey = "ocr.recognitionBatchSize";
@@ -38,14 +33,9 @@ public sealed class OcrSettingsStore
         return OcrSettings.Normalize(new OcrSettings(
             await ReadStringAsync(ProfileKey, defaults.Profile, cancellationToken),
             await ReadIntAsync(PdfDpiKey, defaults.PdfDpi, cancellationToken),
-            await ReadStringAsync(ModelPresetKey, defaults.ModelPreset, cancellationToken),
-            await ReadStringAsync(ModelVersionKey, defaults.ModelVersion, cancellationToken),
             await ReadIntAsync(DetectionSideLimitKey, defaults.DetectionSideLimit, cancellationToken),
             await ReadDoubleAsync(DetectionThresholdKey, defaults.DetectionThreshold, cancellationToken),
-            await ReadDoubleAsync(DetectionBoxThresholdKey, defaults.DetectionBoxThreshold, cancellationToken),
-            await ReadDoubleAsync(DetectionUnclipRatioKey, defaults.DetectionUnclipRatio, cancellationToken),
             await ReadDoubleAsync(RecognitionScoreThresholdKey, defaults.RecognitionScoreThreshold, cancellationToken),
-            await ReadBoolAsync(UseTextlineOrientationKey, defaults.UseTextlineOrientation, cancellationToken),
             await ReadBoolAsync(UseDocumentOrientationClassificationKey, defaults.UseDocumentOrientationClassification, cancellationToken),
             await ReadBoolAsync(UseDocumentUnwarpingKey, defaults.UseDocumentUnwarping, cancellationToken),
             await ReadIntAsync(RecognitionBatchSizeKey, defaults.RecognitionBatchSize, cancellationToken),
@@ -94,14 +84,9 @@ public sealed class OcrSettingsStore
     {
         await settingsRepository.UpsertAsync(ProfileKey, normalized.Profile, cancellationToken);
         await settingsRepository.UpsertAsync(PdfDpiKey, normalized.PdfDpi.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await settingsRepository.UpsertAsync(ModelPresetKey, normalized.ModelPreset, cancellationToken);
-        await settingsRepository.UpsertAsync(ModelVersionKey, normalized.ModelVersion, cancellationToken);
         await settingsRepository.UpsertAsync(DetectionSideLimitKey, normalized.DetectionSideLimit.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await settingsRepository.UpsertAsync(DetectionThresholdKey, normalized.DetectionThreshold.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await settingsRepository.UpsertAsync(DetectionBoxThresholdKey, normalized.DetectionBoxThreshold.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await settingsRepository.UpsertAsync(DetectionUnclipRatioKey, normalized.DetectionUnclipRatio.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await settingsRepository.UpsertAsync(RecognitionScoreThresholdKey, normalized.RecognitionScoreThreshold.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await settingsRepository.UpsertAsync(UseTextlineOrientationKey, normalized.UseTextlineOrientation ? "true" : "false", cancellationToken);
         await settingsRepository.UpsertAsync(UseDocumentOrientationClassificationKey, normalized.UseDocumentOrientationClassification ? "true" : "false", cancellationToken);
         await settingsRepository.UpsertAsync(UseDocumentUnwarpingKey, normalized.UseDocumentUnwarping ? "true" : "false", cancellationToken);
         await settingsRepository.UpsertAsync(RecognitionBatchSizeKey, normalized.RecognitionBatchSize.ToString(CultureInfo.InvariantCulture), cancellationToken);

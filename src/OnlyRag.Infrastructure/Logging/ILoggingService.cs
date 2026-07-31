@@ -4,6 +4,8 @@ namespace OnlyRag.Infrastructure.Logging;
 
 public interface ILoggingService
 {
+    event Action<LogEntry>? OnLogWritten;
+
     Task<LoggingSettings> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task UpdateSettingsAsync(LoggingSettings settings, CancellationToken cancellationToken = default);
 

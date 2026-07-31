@@ -48,13 +48,19 @@ export function PerformanceSettingsPanel() {
   const manualControlsEnabled = performanceFormState.profile === "custom";
 
   const activePreset: UnifiedPresetLevel =
+    performanceFormState.profile === "auto" ? "auto" :
     performanceFormState.profile === "eco" ? "basso" :
     performanceFormState.profile === "balanced" ? "medio" :
     performanceFormState.profile === "power" ? "alto" : "custom";
 
+  const autoDetectedLabel =
+    performanceFormState.effectiveProfile === "eco" ? "Basso (Eco)" :
+    performanceFormState.effectiveProfile === "power" ? "Alto (Potente)" : "Medio (Bilanciato)";
+
   function handleSelectPreset(preset: UnifiedPresetLevel) {
     let targetProfile: PerformanceProfile = "custom";
-    if (preset === "basso") targetProfile = "eco";
+    if (preset === "auto") targetProfile = "auto";
+    else if (preset === "basso") targetProfile = "eco";
     else if (preset === "medio") targetProfile = "balanced";
     else if (preset === "alto") targetProfile = "power";
 
@@ -69,8 +75,12 @@ export function PerformanceSettingsPanel() {
           <div className="settings-form">
             <UnifiedPresetBar
               title="Preset Prestazioni"
-              subtitle="Standardizza l'uso di risorse CPU/RAM/VRAM per tutti gli elaboratori locali."
-              allowedPresets={["basso", "medio", "alto", "custom"]}
+              subtitle={
+                performanceFormState.profile === "auto"
+                  ? `Rilevamento automatico hardware hardware attivo: ${autoDetectedLabel}`
+                  : "Standardizza l'uso di risorse CPU/RAM/VRAM per tutti gli elaboratori locali."
+              }
+              allowedPresets={["auto", "basso", "medio", "alto", "custom"]}
               activePreset={activePreset}
               onSelectPreset={handleSelectPreset}
             />

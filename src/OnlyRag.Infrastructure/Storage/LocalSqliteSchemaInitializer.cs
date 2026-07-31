@@ -244,6 +244,30 @@ public sealed class LocalSqliteSchemaInitializer
             await using SqliteCommand cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS agent_episodic_memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    key_facts_json TEXT NOT NULL DEFAULT '[]',
+                    qdrant_point_id TEXT NULL,
+                    created_at_utc TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS agent_skills (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    skill_id TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    pattern_description TEXT NOT NULL,
+                    solution_template TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_episodic_memories_session ON agent_episodic_memories(session_id);
+                CREATE INDEX IF NOT EXISTS idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+                CREATE INDEX IF NOT EXISTS idx_agent_skills_category ON agent_skills(category);
+                CREATE INDEX IF NOT EXISTS idx_agent_skills_created ON agent_skills(created_at_utc DESC);
                 CREATE INDEX IF NOT EXISTS idx_documents_original_path ON documents(original_path);
                 """;
             await cmd.ExecuteNonQueryAsync(cancellationToken);
@@ -340,7 +364,9 @@ public sealed class LocalSqliteSchemaInitializer
             && await TableExistsAsync(connection, "chunks", cancellationToken)
             && await TableExistsAsync(connection, "settings", cancellationToken)
             && await TableExistsAsync(connection, "document_graph_nodes", cancellationToken)
+            && await TableExistsAsync(connection, "document_graph_edges", cancellationToken)
             && await TableExistsAsync(connection, "agent_episodic_memories", cancellationToken)
+            && await TableExistsAsync(connection, "agent_skills", cancellationToken)
             && !await TableExistsAsync(connection, "schema_migrations", cancellationToken);
     }
 
@@ -608,6 +634,16 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
+            CREATE TABLE agent_skills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                pattern_description TEXT NOT NULL,
+                solution_template TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL
+            );
+
             CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
             CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
             CREATE INDEX idx_document_pages_document ON document_pages(document_id);
@@ -637,6 +673,8 @@ public sealed class LocalSqliteSchemaInitializer
             CREATE INDEX idx_graph_edges_target ON document_graph_edges(target_node_id);
             CREATE INDEX idx_episodic_memories_session ON agent_episodic_memories(session_id);
             CREATE INDEX idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+            CREATE INDEX idx_agent_skills_category ON agent_skills(category);
+            CREATE INDEX idx_agent_skills_created ON agent_skills(created_at_utc DESC);
             CREATE INDEX idx_documents_original_path ON documents(original_path);
             {{ftsSql}}
 

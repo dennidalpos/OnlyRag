@@ -36,12 +36,14 @@ export function OcrEngineSettingsPanel() {
   }, [hasNvidiaGpu, ocrFormState.device, updateOcrSettings]);
 
   const activePreset: UnifiedPresetLevel =
+    ocrFormState.profile === "auto" ? "auto" :
     ocrFormState.profile === "fast" ? "basso" :
     ocrFormState.profile === "balanced" ? "medio" :
     ocrFormState.profile === "accurate" ? "alto" : "custom";
 
   function handleSelectPreset(preset: UnifiedPresetLevel) {
-    if (preset === "basso") applyOcrProfile("fast");
+    if (preset === "auto") applyOcrProfile("auto");
+    else if (preset === "basso") applyOcrProfile("fast");
     else if (preset === "medio") applyOcrProfile("balanced");
     else if (preset === "alto") applyOcrProfile("accurate");
   }
@@ -55,7 +57,7 @@ export function OcrEngineSettingsPanel() {
             <UnifiedPresetBar
               title="Preset OCR Engine"
               subtitle="Seleziona la precisione dell'estrazione testo e risoluzione DPI per PDF/Immagini."
-              allowedPresets={["basso", "medio", "alto", "custom"]}
+              allowedPresets={["auto", "basso", "medio", "alto", "custom"]}
               activePreset={activePreset}
               onSelectPreset={handleSelectPreset}
             />
@@ -79,122 +81,6 @@ export function OcrEngineSettingsPanel() {
                 id="ocr-pdf-dpi"
                 label="DPI PDF"
                 tooltip="Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
-                min={96}
-                max={400}
-                value={ocrFormState.pdfDpi}
-                onChange={(value) => updateOcrSettings({ pdfDpi: value })}
-              />
-              <OcrSelectField
-                id="ocr-model-preset"
-                label="Preset modello"
-                tooltip="Preset PaddleOCR passato al bridge. Il menu mostra i preset noti nel progetto e conserva eventuali valori gia salvati."
-                value={ocrFormState.modelPreset}
-                options={getOcrSelectOptions(ocrFormState.modelPreset, PADDLE_OCR_MODEL_PRESETS).map((option) => ({
-                  value: option,
-                  label: option
-                }))}
-                onChange={(value) => updateOcrSettings({ modelPreset: value })}
-              />
-              <OcrSelectField
-                id="ocr-model-version"
-                label="Versione modello"
-                tooltip="Versione OCR passata a PaddleOCR come ocr_version quando supportata. Il valore salvato resta selezionabile anche se non e' nell'elenco noto."
-                value={ocrFormState.modelVersion}
-                options={getOcrSelectOptions(ocrFormState.modelVersion, PADDLE_OCR_MODEL_VERSIONS).map((option) => ({
-                  value: option,
-                  label: option
-                }))}
-                onChange={(value) => updateOcrSettings({ modelVersion: value })}
-              />
-              <OcrRangeField
-                id="ocr-detection-side-limit"
-                label="Lato massimo detection"
-                tooltip="Dimensione massima usata dal detector testo. Valori bassi riducono tempo e memoria, valori alti aiutano pagine grandi o dettagli fini."
-                min={320}
-                max={4096}
-                value={ocrFormState.detectionSideLimit}
-                onChange={(value) => updateOcrSettings({ detectionSideLimit: value })}
-              />
-              <OcrRangeField
-                id="ocr-detection-threshold"
-                label="Soglia detection"
-                tooltip="Confidenza minima per proporre aree di testo. Valori bassi rilevano piu elementi, valori alti scartano rumore."
-                min={0.01}
-                max={0.99}
-                step={0.01}
-                value={ocrFormState.detectionThreshold}
-                formatValue={formatOcrDecimal}
-                onChange={(value) => updateOcrSettings({ detectionThreshold: value })}
-              />
-              <OcrRangeField
-                id="ocr-detection-box-threshold"
-                label="Soglia box"
-                tooltip="Filtro sui riquadri rilevati. Valori bassi sono piu permissivi, valori alti tengono solo box piu affidabili."
-                min={0.01}
-                max={0.99}
-                step={0.01}
-                value={ocrFormState.detectionBoxThreshold}
-                formatValue={formatOcrDecimal}
-                onChange={(value) => updateOcrSettings({ detectionBoxThreshold: value })}
-              />
-              <OcrRangeField
-                id="ocr-detection-unclip-ratio"
-                label="Unclip ratio"
-                tooltip="Espansione dei box di testo rilevati. Valori bassi sono piu stretti, valori alti includono piu margine intorno al testo."
-                min={1}
-                max={3}
-                step={0.05}
-                value={ocrFormState.detectionUnclipRatio}
-                formatValue={formatOcrDecimal}
-                onChange={(value) => updateOcrSettings({ detectionUnclipRatio: value })}
-              />
-              <OcrRangeField
-                id="ocr-recognition-score-threshold"
-                label="Soglia riconoscimento"
-                tooltip="Confidenza minima delle parole riconosciute. Valori bassi mantengono piu testo, valori alti privilegiano risultati piu affidabili."
-                min={0.01}
-                max={0.99}
-                step={0.01}
-                value={ocrFormState.recognitionScoreThreshold}
-                formatValue={formatOcrDecimal}
-                onChange={(value) => updateOcrSettings({ recognitionScoreThreshold: value })}
-              />
-              <OcrRangeField
-                id="ocr-recognition-batch-size"
-                label="Batch riconoscimento"
-                tooltip="Numero di crop di testo riconosciuti insieme. Valori bassi consumano meno memoria, valori alti possono accelerare su hardware adeguato."
-                min={1}
-                max={32}
-                value={ocrFormState.recognitionBatchSize}
-                onChange={(value) => updateOcrSettings({ recognitionBatchSize: value })}
-              />
-              <OcrRangeField
-                id="ocr-cpu-threads"
-                label="Thread CPU"
-                tooltip="Thread CPU dedicati a PaddleOCR. Valori bassi lasciano il PC piu reattivo, valori alti possono ridurre i tempi OCR."
-                min={1}
-                max={16}
-                value={ocrFormState.cpuThreads}
-                onChange={(value) => updateOcrSettings({ cpuThreads: value })}
-              />
-            </div>
-            <label className="toggle-row" htmlFor="ocr-textline-orientation">
-              <input
-                id="ocr-textline-orientation"
-                type="checkbox"
-                checked={ocrFormState.useTextlineOrientation}
-                onChange={(event) =>
-                  updateOcrSettings({ useTextlineOrientation: event.target.checked })
-                }
-              />
-              <span>Orientamento righe testo</span>
-            </label>
-            <label className="toggle-row" htmlFor="ocr-document-orientation">
-              <input
-                id="ocr-document-orientation"
-                type="checkbox"
-                checked={ocrFormState.useDocumentOrientationClassification}
-                onChange={(event) =>
                   updateOcrSettings({ useDocumentOrientationClassification: event.target.checked })
                 }
               />

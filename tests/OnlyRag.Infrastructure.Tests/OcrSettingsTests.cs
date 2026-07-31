@@ -11,14 +11,9 @@ public sealed partial class OcrPipelineTests
         OcrSettings normalized = OcrSettings.Normalize(new OcrSettings(
             Profile: "unknown",
             PdfDpi: 999,
-            ModelPreset: "PP-OCRv5",
-            ModelVersion: "PP-OCRv5",
             DetectionSideLimit: 100,
             DetectionThreshold: 2,
-            DetectionBoxThreshold: -1,
-            DetectionUnclipRatio: 9,
             RecognitionScoreThreshold: 0,
-            UseTextlineOrientation: true,
             UseDocumentOrientationClassification: true,
             UseDocumentUnwarping: true,
             RecognitionBatchSize: 100,
@@ -43,14 +38,9 @@ public sealed partial class OcrPipelineTests
         OcrSettings normalized = OcrSettings.Normalize(new OcrSettings(
             Profile: "custom",
             PdfDpi: 999,
-            ModelPreset: "PP-OCRv5",
-            ModelVersion: "PP-OCRv5",
             DetectionSideLimit: 100,
             DetectionThreshold: 2,
-            DetectionBoxThreshold: -1,
-            DetectionUnclipRatio: 9,
             RecognitionScoreThreshold: 0,
-            UseTextlineOrientation: true,
             UseDocumentOrientationClassification: true,
             UseDocumentUnwarping: true,
             RecognitionBatchSize: 100,
@@ -61,8 +51,8 @@ public sealed partial class OcrPipelineTests
         Assert.Equal(400, normalized.PdfDpi);
         Assert.Equal(320, normalized.DetectionSideLimit);
         Assert.Equal(0.99d, normalized.DetectionThreshold);
-        Assert.Equal(0.01d, normalized.DetectionBoxThreshold);
-        Assert.Equal(3.0d, normalized.DetectionUnclipRatio);
+        Assert.Equal(0.60d, normalized.DetectionBoxThreshold);
+        Assert.Equal(1.50d, normalized.DetectionUnclipRatio);
         Assert.Equal(0.01d, normalized.RecognitionScoreThreshold);
         Assert.Equal(32, normalized.RecognitionBatchSize);
         Assert.Equal(16, normalized.CpuThreads);
@@ -70,18 +60,15 @@ public sealed partial class OcrPipelineTests
     }
 
     [Theory]
-    [InlineData("fast", 160, 896, 0.38d, 0.68d, 1.35d, 0.58d, true, false, false, 4, 1)]
-    [InlineData("balanced", 220, 1152, 0.30d, 0.60d, 1.50d, 0.50d, true, false, false, 6, 2)]
-    [InlineData("accurate", 300, 1536, 0.23d, 0.52d, 1.75d, 0.42d, true, true, true, 8, 4)]
+    [InlineData("fast", 160, 896, 0.38d, 0.58d, false, false, 4, 1)]
+    [InlineData("balanced", 220, 1152, 0.30d, 0.50d, false, false, 6, 2)]
+    [InlineData("accurate", 300, 1536, 0.23d, 0.42d, true, true, 8, 4)]
     public void OcrSettings_NormalizeAppliesProfilePresets(
         string profile,
         int pdfDpi,
         int detectionSideLimit,
         double detectionThreshold,
-        double detectionBoxThreshold,
-        double detectionUnclipRatio,
         double recognitionScoreThreshold,
-        bool useTextlineOrientation,
         bool useDocumentOrientationClassification,
         bool useDocumentUnwarping,
         int recognitionBatchSize,
@@ -98,10 +85,10 @@ public sealed partial class OcrPipelineTests
         Assert.Equal(pdfDpi, normalized.PdfDpi);
         Assert.Equal(detectionSideLimit, normalized.DetectionSideLimit);
         Assert.Equal(detectionThreshold, normalized.DetectionThreshold);
-        Assert.Equal(detectionBoxThreshold, normalized.DetectionBoxThreshold);
-        Assert.Equal(detectionUnclipRatio, normalized.DetectionUnclipRatio);
+        Assert.Equal(0.60d, normalized.DetectionBoxThreshold);
+        Assert.Equal(1.50d, normalized.DetectionUnclipRatio);
         Assert.Equal(recognitionScoreThreshold, normalized.RecognitionScoreThreshold);
-        Assert.Equal(useTextlineOrientation, normalized.UseTextlineOrientation);
+        Assert.True(normalized.UseTextlineOrientation);
         Assert.Equal(useDocumentOrientationClassification, normalized.UseDocumentOrientationClassification);
         Assert.Equal(useDocumentUnwarping, normalized.UseDocumentUnwarping);
         Assert.Equal(recognitionBatchSize, normalized.RecognitionBatchSize);
@@ -153,14 +140,9 @@ public sealed partial class OcrPipelineTests
         OcrSettings saved = await store.UpdateAsync(new OcrSettings(
             Profile: "accurate",
             PdfDpi: 300,
-            ModelPreset: "PP-OCRv5",
-            ModelVersion: "PP-OCRv5",
             DetectionSideLimit: 1280,
             DetectionThreshold: 0.25d,
-            DetectionBoxThreshold: 0.55d,
-            DetectionUnclipRatio: 1.7d,
             RecognitionScoreThreshold: 0.45d,
-            UseTextlineOrientation: true,
             UseDocumentOrientationClassification: true,
             UseDocumentUnwarping: true,
             RecognitionBatchSize: 8,
@@ -184,14 +166,9 @@ public sealed partial class OcrPipelineTests
         OcrSettings request = new(
             Profile: "custom",
             PdfDpi: 260,
-            ModelPreset: "PP-OCRv5",
-            ModelVersion: "PP-OCRv5",
             DetectionSideLimit: 1152,
             DetectionThreshold: 0.28d,
-            DetectionBoxThreshold: 0.58d,
-            DetectionUnclipRatio: 1.6d,
             RecognitionScoreThreshold: 0.48d,
-            UseTextlineOrientation: false,
             UseDocumentOrientationClassification: true,
             UseDocumentUnwarping: false,
             RecognitionBatchSize: 10,

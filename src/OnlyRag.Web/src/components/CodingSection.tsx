@@ -31,6 +31,7 @@ export function CodingSection({
         workspaceConfig={ctrl.workspaceConfig}
         workspaceFilesCount={ctrl.workspaceFiles.length}
         onPickFolder={() => void ctrl.handlePickWindowsFolder()}
+        onClearFolder={() => void ctrl.handleClearWorkspaceFolder()}
         onOpenFilePicker={() => ctrl.setIsWorkspaceFilePickerOpen(true)}
       />
 

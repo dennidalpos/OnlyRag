@@ -85,6 +85,23 @@ export function useWorkspaceManager() {
     }
   }
 
+  async function handleClearWorkspaceFolder() {
+    try {
+      const config = await apiRequest<WorkspaceConfig>("/api/workspace/clear", {
+        method: "POST"
+      });
+      setWorkspaceConfig(config);
+      setWorkspaceFiles([]);
+      setSelectedWorkspaceFile(null);
+      setAttachedFileContent(null);
+      setWorkspaceStatusMessage("Cartella di progetto rimossa.");
+    } catch (err) {
+      setWorkspaceStatusMessage(
+        err instanceof Error ? err.message : "Errore durante la rimozione della cartella."
+      );
+    }
+  }
+
   async function handleAttachWorkspaceFile(relativePath: string) {
     try {
       const res = await apiRequest<ReadWorkspaceFileResponse>("/api/workspace/read-file", {
@@ -284,6 +301,7 @@ export function useWorkspaceManager() {
     diffModalFileApplied,
     fetchWorkspaceFiles,
     handlePickWindowsFolder,
+    handleClearWorkspaceFolder,
     handleAttachWorkspaceFile,
     handleSaveAttachedFileContent,
     handleOpenExternalFile,

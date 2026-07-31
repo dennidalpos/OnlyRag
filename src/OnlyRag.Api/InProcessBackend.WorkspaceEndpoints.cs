@@ -42,6 +42,19 @@ internal static class WorkspaceEndpoints
             }
         });
 
+        group.MapPost("/clear", async (WorkspaceService service, CancellationToken ct) =>
+        {
+            try
+            {
+                WorkspaceConfig config = await service.ClearWorkspaceAsync(ct);
+                return Results.Ok(config);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        });
+
         group.MapGet("/files", async (WorkspaceService service, CancellationToken ct) =>
         {
             try

@@ -1,4 +1,4 @@
-import { Bot, FileCode, FolderOpen, FolderSearch } from "lucide-react";
+import { Bot, FileCode, FolderOpen, FolderSearch, X } from "lucide-react";
 import type { OllamaModel } from "../api";
 import type { WorkspaceConfig } from "../apiTypes";
 
@@ -10,6 +10,7 @@ type CodingToolbarProps = {
   workspaceConfig: WorkspaceConfig | null;
   workspaceFilesCount: number;
   onPickFolder: () => void;
+  onClearFolder: () => void;
   onOpenFilePicker: () => void;
 };
 
@@ -21,6 +22,7 @@ export function CodingToolbar({
   workspaceConfig,
   workspaceFilesCount,
   onPickFolder,
+  onClearFolder,
   onOpenFilePicker
 }: CodingToolbarProps) {
   return (
@@ -50,6 +52,15 @@ export function CodingToolbar({
                 onClick={onOpenFilePicker}
               >
                 <FileCode size={14} /> File ({workspaceFilesCount})
+              </button>
+              <button
+                type="button"
+                className="workspace-badge-chip__remove-btn"
+                onClick={onClearFolder}
+                title="Rimuovi cartella di progetto"
+                aria-label="Rimuovi cartella di progetto"
+              >
+                <X size={15} />
               </button>
             </div>
           ) : null}

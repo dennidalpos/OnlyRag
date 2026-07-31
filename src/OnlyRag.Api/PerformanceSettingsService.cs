@@ -28,8 +28,8 @@ internal sealed class PerformanceSettingsService : IPerformanceSettingsService
     public const string MaxContextChunksKey = "performance.maxContextChunks";
     private const string ProfileKey = "performance.profile";
     private const string EnableLowResourceModeKey = "performance.enableLowResourceMode";
-    private const string RequestTimeoutSecondsKey = "ollama.requestTimeoutSeconds";
-    private const string EmbeddingBatchSizeKey = "ollama.embeddingBatchSize";
+    private const string RequestTimeoutSecondsKey = "performance.requestTimeoutSeconds";
+    private const string EmbeddingBatchSizeKey = "performance.embeddingBatchSize";
 
     private readonly ISettingsRepository settingsRepository;
 
@@ -148,12 +148,12 @@ internal sealed class PerformanceSettingsService : IPerformanceSettingsService
         {
             await Task.CompletedTask;
             double totalGiB = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024d / 1024d / 1024d;
-            if ((totalGiB > 0d && totalGiB < 8d) || Environment.ProcessorCount <= 4)
+            if ((totalGiB > 0d && totalGiB < 7.5d) || Environment.ProcessorCount <= 4)
             {
                 return PerformanceProfileNames.Eco;
             }
 
-            if (totalGiB >= 16d && Environment.ProcessorCount >= 8)
+            if (totalGiB >= 14.0d && Environment.ProcessorCount >= 8)
             {
                 return PerformanceProfileNames.Power;
             }
@@ -211,9 +211,9 @@ internal sealed class PerformanceSettingsService : IPerformanceSettingsService
         {
             PerformanceProfileNames.Auto => PerformanceProfileNames.Auto,
             PerformanceProfileNames.Eco => PerformanceProfileNames.Eco,
-            "bilanciato" or PerformanceProfileNames.Balanced => PerformanceProfileNames.Balanced,
-            "potente" or PerformanceProfileNames.Power => PerformanceProfileNames.Power,
-            "personalizzato" or PerformanceProfileNames.Custom => PerformanceProfileNames.Custom,
+            PerformanceProfileNames.Balanced => PerformanceProfileNames.Balanced,
+            PerformanceProfileNames.Power => PerformanceProfileNames.Power,
+            PerformanceProfileNames.Custom => PerformanceProfileNames.Custom,
             _ => PerformanceProfileNames.Auto
         };
     }

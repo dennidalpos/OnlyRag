@@ -79,4 +79,96 @@ describe("CodingSection", () => {
       expect(screen.getAllByText(/Analizzo il progetto/i).length).toBeGreaterThan(0);
     });
   });
+
+  it("sends prompt in chat when no project folder is set", async () => {
+    const user = userEvent.setup();
+    mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: null,
+          isAuthorized: false,
+          canRead: false,
+          canWrite: false,
+          fileCount: 0,
+          lastVerifiedAt: null
+        }
+      },
+      {
+        path: "/api/agent/run-stream",
+        method: "POST",
+        response: 'data: {"type":"final_response","content":"Risposta senza cartella!"}\n\ndata: [DONE]\n\n'
+      }
+    ]);
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText(/Modalità AGENTE SCRITTURA/i);
+    await user.type(promptInput, "Ciao senza cartella");
+
+    const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Risposta senza cartella!")).toBeInTheDocument();
+    });
+  });
+
+  it("allows clearing the selected workspace folder", async () => {
+    const user = userEvent.setup();
+    mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: "C:\\Projects\\App",
+          isAuthorized: true,
+          canRead: true,
+          canWrite: true,
+          fileCount: 10,
+          lastVerifiedAt: "2026-07-24T12:00:00Z"
+        }
+      },
+      {
+        path: "/api/workspace/files",
+        method: "GET",
+        response: []
+      },
+      {
+        path: "/api/workspace/clear",
+        method: "POST",
+        response: {
+          rootPath: null,
+          isAuthorized: false,
+          canRead: false,
+          canWrite: false,
+          fileCount: 0,
+          lastVerifiedAt: null
+        }
+      }
+    ]);
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+      />
+    );
+
+    expect(await screen.findByText("C:\\Projects\\App")).toBeInTheDocument();
+
+    const removeBtn = screen.getByRole("button", { name: /Rimuovi cartella di progetto/i });
+    await user.click(removeBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText("C:\\Projects\\App")).not.toBeInTheDocument();
+      expect(screen.getByText("Cartella di progetto rimossa.")).toBeInTheDocument();
+    });
+  });
 });

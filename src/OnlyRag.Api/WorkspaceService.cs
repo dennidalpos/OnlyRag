@@ -43,6 +43,20 @@ internal sealed class WorkspaceService
             LastVerifiedAt: DateTimeOffset.UtcNow);
     }
 
+    public async Task<WorkspaceConfig> ClearWorkspaceAsync(CancellationToken cancellationToken = default)
+    {
+        PersistedWorkspaceData emptyData = new(null, null);
+        await SaveDataAsync(emptyData, cancellationToken);
+
+        return new WorkspaceConfig(
+            RootPath: null,
+            IsAuthorized: false,
+            CanRead: false,
+            CanWrite: false,
+            FileCount: 0,
+            LastVerifiedAt: null);
+    }
+
     public async Task<WorkspaceConfig> SelectWorkspaceAsync(SelectWorkspaceRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.FolderPath))

@@ -92,16 +92,11 @@ export const emptyOcrProcessingSettings: OcrProcessingSettings = {
 };
 
 export const emptyOcrSettings: OcrSettings = {
-  profile: "balanced",
+  profile: "auto",
   pdfDpi: 220,
-  modelPreset: "PP-OCRv5",
-  modelVersion: "PP-OCRv5",
   detectionSideLimit: 1152,
   detectionThreshold: 0.3,
-  detectionBoxThreshold: 0.6,
-  detectionUnclipRatio: 1.5,
   recognitionScoreThreshold: 0.5,
-  useTextlineOrientation: true,
   useDocumentOrientationClassification: false,
   useDocumentUnwarping: false,
   recognitionBatchSize: 6,
@@ -116,21 +111,20 @@ export const ocrProfilePresets: Record<string, OcrSettings> = {
     pdfDpi: 160,
     detectionSideLimit: 896,
     detectionThreshold: 0.38,
-    detectionBoxThreshold: 0.68,
-    detectionUnclipRatio: 1.35,
     recognitionScoreThreshold: 0.58,
     recognitionBatchSize: 4,
     cpuThreads: 1
   },
-  balanced: emptyOcrSettings,
+  balanced: {
+    ...emptyOcrSettings,
+    profile: "balanced"
+  },
   accurate: {
     ...emptyOcrSettings,
     profile: "accurate",
     pdfDpi: 300,
     detectionSideLimit: 1536,
     detectionThreshold: 0.23,
-    detectionBoxThreshold: 0.52,
-    detectionUnclipRatio: 1.75,
     recognitionScoreThreshold: 0.42,
     useDocumentOrientationClassification: true,
     useDocumentUnwarping: true,
@@ -140,15 +134,18 @@ export const ocrProfilePresets: Record<string, OcrSettings> = {
 };
 
 export function getOcrProfilePreset(profile: string, device: string): OcrSettings | null {
-  const preset = ocrProfilePresets[profile];
+  const targetKey = profile === "auto" ? "balanced" : profile;
+  const preset = ocrProfilePresets[targetKey];
   if (!preset) {
     return null;
   }
 
+  const baseSettings = profile === "auto" ? { ...preset, profile: "auto" } : preset;
+
   if (device !== "gpu") {
-    return { ...preset, device: "cpu" };
+    return { ...baseSettings, device: "cpu" };
   }
 
-  const recognitionBatchSize = profile === "fast" ? 8 : profile === "accurate" ? 16 : 12;
-  return { ...preset, device: "gpu", recognitionBatchSize };
+  const recognitionBatchSize = targetKey === "fast" ? 8 : targetKey === "accurate" ? 16 : 12;
+  return { ...baseSettings, device: "gpu", recognitionBatchSize };
 }

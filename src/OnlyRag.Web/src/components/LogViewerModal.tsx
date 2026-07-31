@@ -12,15 +12,23 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
   const [filterLevel, setFilterLevel] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLiveStreaming, setIsLiveStreaming] = useState(true);
   const [copied, setCopied] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchLogs();
-  }, [filterLevel, searchQuery]);
 
-  async function fetchLogs() {
-    setIsLoading(true);
+    if (!isLiveStreaming) return;
+    const interval = setInterval(() => {
+      void fetchLogs(true);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [filterLevel, searchQuery, isLiveStreaming]);
+
+  async function fetchLogs(isSilent = false) {
+    if (!isSilent) setIsLoading(true);
     try {
       const params = new URLSearchParams();
       if (filterLevel !== "ALL") {
@@ -37,7 +45,7 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
     } catch {
       // Ignorato
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   }
 
@@ -119,6 +127,26 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
             <span style={{ background: "#334155", color: "#cbd5e1", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem" }}>
               {logs.length} voci
             </span>
+            <button
+              type="button"
+              onClick={() => setIsLiveStreaming((prev) => !prev)}
+              style={{
+                background: isLiveStreaming ? "rgba(16, 185, 129, 0.2)" : "#334155",
+                color: isLiveStreaming ? "#34d399" : "#cbd5e1",
+                border: isLiveStreaming ? "1px solid #10b981" : "1px solid #475569",
+                borderRadius: 12,
+                padding: "2px 10px",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4
+              }}
+              title={isLiveStreaming ? "Pausa l'aggiornamento in tempo reale" : "Attiva l'aggiornamento automatico live ogni 2 secondi"}
+            >
+              {isLiveStreaming ? "🟢 Live Active (2s)" : "⏸️ Live Pausato"}
+            </button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

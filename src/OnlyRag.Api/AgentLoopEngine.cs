@@ -646,7 +646,7 @@ internal sealed class AgentLoopEngine
             | read_file | relativePath, startLine?, endLine? | Read file content with optional line range |
             | write_file | relativePath, content | Create or overwrite a file |
             | replace_file_content | relativePath, targetContent, replacementContent | Replace an exact block in a file |
-            | multi_replace_file_content | relativePath, chunks[{targetContent, replacementContent}] | Multiple non-contiguous replacements |
+            | multi_replace_file_content | relativePath, chunks[{targetContent, replacementContent}] | Multiple non-contiguous replacements in a specific file (relativePath must be a single file path) |
             | grep_search | query, searchPath | Fast code search (ripgrep) |
             | git_diff_inspect | relativePath? | Git status and diff |
             | run_command | commandLine, isAsync? | Execute PowerShell 7 command |

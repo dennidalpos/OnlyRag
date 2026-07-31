@@ -51,9 +51,10 @@ public sealed class WorkspaceToolExecutor
     {
         logger?.LogTrace("AgentEngine", $"[TOOL EXEC START] Tool: '{toolName}', CallID: '{callId}', Args: {argumentsJson}");
 
-        if (string.IsNullOrWhiteSpace(workspaceRoot) || !Directory.Exists(workspaceRoot))
+        bool requiresWorkspace = IsWorkspaceFolderRequired(toolName);
+        if (requiresWorkspace && (string.IsNullOrWhiteSpace(workspaceRoot) || !Directory.Exists(workspaceRoot)))
         {
-            string err = "No authorized project folder found on the system.";
+            string err = "Nessuna cartella di progetto selezionata. Seleziona una cartella di progetto prima di accedere ai file o eseguire comandi su disco.";
             logger?.LogWarning("AgentEngine", $"[TOOL EXEC FAIL] {err}");
             return new AgentToolResult(callId, toolName, false, string.Empty, err);
         }
@@ -71,7 +72,7 @@ public sealed class WorkspaceToolExecutor
                 return new AgentToolResult(callId, toolName, false, string.Empty, err);
             }
 
-            AgentToolResult result = await handler.ExecuteAsync(callId, toolName, root, workspaceRoot, onStep, cancellationToken);
+            AgentToolResult result = await handler.ExecuteAsync(callId, toolName, root, workspaceRoot ?? string.Empty, onStep, cancellationToken);
 
             if (result.Success)
             {
@@ -90,6 +91,22 @@ public sealed class WorkspaceToolExecutor
             logger?.LogError("AgentEngine", err, ex);
             return new AgentToolResult(callId, toolName, false, string.Empty, err);
         }
+    }
+
+    private static bool IsWorkspaceFolderRequired(string toolName)
+    {
+        string name = toolName.ToLowerInvariant();
+        return name switch
+        {
+            "plan_task" or "create_plan" or "update_plan" or
+            "reflect_step" or "reflect" or "self_reflection" or
+            "web_search" or "search_web" or
+            "query_retrieval_index" or "search_vector_index" or
+            "generate_image_onnx" or "generate_image" or
+            "invoke_subagent" or "spawn_subagent" or
+            "manage_task" => false,
+            _ => true
+        };
     }
 
     public async Task<IReadOnlyList<AgentToolResult>> ExecuteToolsBatchAsync(
