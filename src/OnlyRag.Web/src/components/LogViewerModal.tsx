@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { apiRequest } from "../api";
 import type { AppLogLevel, LogEntry } from "../apiTypes/settings";
 
@@ -15,6 +16,18 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
   const [isLiveStreaming, setIsLiveStreaming] = useState(true);
   const [copied, setCopied] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     void fetchLogs();
@@ -41,9 +54,12 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
 
       const query = params.toString() ? `?${params.toString()}` : "";
       const result = await apiRequest<LogEntry[]>(`/api/logs${query}`);
-      setLogs(result);
-    } catch {
-      // Ignorato
+      setLogs(Array.isArray(result) ? result : []);
+      setError(null);
+    } catch (err) {
+      if (!isSilent) {
+        setError(err instanceof Error ? err.message : "Impossibile leggere i log dal backend locale.");
+      }
     } finally {
       if (!isSilent) setIsLoading(false);
     }
@@ -54,26 +70,72 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
     try {
       await apiRequest<{ success: boolean }>("/api/logs", { method: "DELETE" });
       setLogs([]);
+      setError(null);
       onLogsCleared?.();
-    } catch {
-      // Ignorato
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore durante la cancellazione dei log.");
     }
   }
 
   function handleCopy() {
-    const text = logs.map((l) => {
-      let line = `[${l.timestampUtc}] [${l.level}] [${l.category}] ${l.message}`;
-      if (l.dataJson) line += ` | DATA: ${l.dataJson}`;
-      if (l.exceptionDetails) line += `\n[EXCEPTION]\n${l.exceptionDetails}`;
-      return line;
-    }).join("\n");
+    const text = logs
+      .map((l) => {
+        const levelName = normalizeLogLevel(l.level);
+        let line = `[${l.timestampUtc}] [${levelName}] [${l.category}] ${l.message}`;
+        if (l.dataJson) line += ` | DATA: ${l.dataJson}`;
+        if (l.exceptionDetails) line += `\n[EXCEPTION]\n${l.exceptionDetails}`;
+        return line;
+      })
+      .join("\n");
 
     void navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function getLevelBadgeStyle(level: AppLogLevel) {
+  const levelCounts = useMemo(() => {
+    let errorCount = 0;
+    let warningCount = 0;
+    let infoCount = 0;
+    let otherCount = 0;
+
+    for (const log of logs) {
+      const lvl = normalizeLogLevel(log.level);
+      if (lvl === "Error") errorCount++;
+      else if (lvl === "Warning") warningCount++;
+      else if (lvl === "Information") infoCount++;
+      else otherCount++;
+    }
+
+    return { errorCount, warningCount, infoCount, otherCount };
+  }, [logs]);
+
+  function normalizeLogLevel(rawLevel: unknown): AppLogLevel {
+    if (typeof rawLevel === "number") {
+      switch (rawLevel) {
+        case 0: return "Trace";
+        case 1: return "Debug";
+        case 2: return "Information";
+        case 3: return "Warning";
+        case 4: return "Error";
+        case 5: return "None";
+        default: return "Information";
+      }
+    }
+    if (typeof rawLevel === "string") {
+      const s = rawLevel.trim().toLowerCase();
+      if (s === "0" || s === "trace") return "Trace";
+      if (s === "1" || s === "debug") return "Debug";
+      if (s === "2" || s === "information" || s === "info") return "Information";
+      if (s === "3" || s === "warning" || s === "warn") return "Warning";
+      if (s === "4" || s === "error" || s === "err") return "Error";
+      if (s === "5" || s === "none") return "None";
+    }
+    return "Information";
+  }
+
+  function getLevelBadgeStyle(rawLevel: unknown) {
+    const level = normalizeLogLevel(rawLevel);
     switch (level) {
       case "Error": return { bg: "#7f1d1d", color: "#fca5a5", border: "#ef4444" };
       case "Warning": return { bg: "#78350f", color: "#fde047", border: "#f59e0b" };
@@ -83,33 +145,44 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
     }
   }
 
-  return (
-    <div style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: "rgba(15, 23, 42, 0.85)",
-      backdropFilter: "blur(6px)",
-      zIndex: 9999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 20
-    }}>
-      <div style={{
-        background: "#0f172a",
-        border: "1px solid #334155",
-        borderRadius: 12,
-        width: "90%",
-        maxWidth: 1100,
-        height: "85vh",
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="log-viewer-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(15, 23, 42, 0.85)",
+        backdropFilter: "blur(6px)",
+        zIndex: 9999,
         display: "flex",
-        flexDirection: "column",
-        boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-        overflow: "hidden"
-      }}>
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#0f172a",
+          border: "1px solid #334155",
+          borderRadius: 12,
+          width: "90%",
+          maxWidth: 1100,
+          height: "85vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+          overflow: "hidden"
+        }}
+      >
         {/* HEADER MODALE */}
         <div style={{
           padding: "16px 20px",
@@ -119,14 +192,24 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
           alignItems: "center",
           justifyContent: "space-between"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ fontSize: "1.3rem" }}>📜</span>
-            <h2 style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem", fontWeight: 700 }}>
-              Visualizzatore Log Live & Diagnostic Errors
+            <h2 id="log-viewer-modal-title" style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem", fontWeight: 700 }}>
+              Visualizzatore Log Live &amp; Diagnostica
             </h2>
             <span style={{ background: "#334155", color: "#cbd5e1", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem" }}>
               {logs.length} voci
             </span>
+            {levelCounts.errorCount > 0 && (
+              <span style={{ background: "#7f1d1d", color: "#fca5a5", border: "1px solid #ef4444", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem", fontWeight: 700 }}>
+                {levelCounts.errorCount} Errori
+              </span>
+            )}
+            {levelCounts.warningCount > 0 && (
+              <span style={{ background: "#78350f", color: "#fde047", border: "1px solid #f59e0b", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem", fontWeight: 700 }}>
+                {levelCounts.warningCount} Avvisi
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setIsLiveStreaming((prev) => !prev)}
@@ -143,9 +226,9 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
                 alignItems: "center",
                 gap: 4
               }}
-              title={isLiveStreaming ? "Pausa l'aggiornamento in tempo reale" : "Attiva l'aggiornamento automatico live ogni 2 secondi"}
+              title={isLiveStreaming ? "Pausa aggiornamento automatico" : "Attiva aggiornamento live ogni 2s"}
             >
-              {isLiveStreaming ? "🟢 Live Active (2s)" : "⏸️ Live Pausato"}
+              {isLiveStreaming ? "🟢 Live Attivo (2s)" : "⏸️ Live Pausato"}
             </button>
           </div>
 
@@ -263,23 +346,57 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
           />
         </div>
 
+        {error && (
+          <div style={{
+            background: "#450a0a",
+            color: "#fca5a5",
+            borderBottom: "1px solid #ef4444",
+            padding: "8px 20px",
+            fontSize: "0.83rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            <span>⚠️ {error}</span>
+            <button
+              type="button"
+              onClick={() => void fetchLogs()}
+              style={{
+                background: "#7f1d1d",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                padding: "2px 8px",
+                fontSize: "0.78rem",
+                cursor: "pointer"
+              }}
+            >
+              Riprova
+            </button>
+          </div>
+        )}
+
         {/* LISTA VOCI LOG */}
-        <div style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          fontFamily: "monospace",
-          fontSize: "0.83rem"
-        }}>
+        <div
+          ref={listContainerRef}
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            fontFamily: "monospace",
+            fontSize: "0.83rem"
+          }}
+        >
           {isLoading && logs.length === 0 ? (
             <div style={{ color: "#94a3b8", textAlign: "center", padding: 40 }}>Caricamento log in corso...</div>
           ) : logs.length === 0 ? (
             <div style={{ color: "#64748b", textAlign: "center", padding: 40 }}>Nessun registro di log trovato.</div>
           ) : (
             logs.map((item) => {
+              const normalizedLevel = normalizeLogLevel(item.level);
               const badge = getLevelBadgeStyle(item.level);
               const isExpanded = expandedId === item.id;
               const hasExtra = Boolean(item.exceptionDetails || item.dataJson);
@@ -309,7 +426,7 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
                         fontWeight: 700,
                         textTransform: "uppercase"
                       }}>
-                        {item.level}
+                        {normalizedLevel}
                       </span>
 
                       <span style={{ color: "#38bdf8", fontWeight: 600 }}>
@@ -373,6 +490,7 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

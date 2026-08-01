@@ -67,10 +67,15 @@ public sealed record OcrSettings(
     public const int DefaultCpuThreads = 2;
     public const string DefaultDevice = "auto";
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public string ModelPreset => DefaultModelPreset;
+    [System.Text.Json.Serialization.JsonIgnore]
     public string ModelVersion => DefaultModelVersion;
+    [System.Text.Json.Serialization.JsonIgnore]
     public double DetectionBoxThreshold => DefaultDetectionBoxThreshold;
+    [System.Text.Json.Serialization.JsonIgnore]
     public double DetectionUnclipRatio => DefaultDetectionUnclipRatio;
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool UseTextlineOrientation => DefaultUseTextlineOrientation;
 
     public static OcrSettings Default { get; } = ForProfile(DefaultProfile);
@@ -190,21 +195,6 @@ public sealed record OcrSettings(
             normalized.UseTextlineOrientation ? "1" : "0",
             normalized.UseDocumentOrientationClassification ? "1" : "0",
             normalized.UseDocumentUnwarping ? "1" : "0",
-            normalized.RecognitionBatchSize.ToString(CultureInfo.InvariantCulture),
-            normalized.CpuThreads.ToString(CultureInfo.InvariantCulture),
-            normalized.Device);
-    }
-    normalized.PdfDpi.ToString(CultureInfo.InvariantCulture),
-            normalized.ModelPreset,
-            normalized.ModelVersion,
-            normalized.DetectionSideLimit.ToString(CultureInfo.InvariantCulture),
-            normalized.DetectionThreshold.ToString("0.###", CultureInfo.InvariantCulture),
-            normalized.DetectionBoxThreshold.ToString("0.###", CultureInfo.InvariantCulture),
-            normalized.DetectionUnclipRatio.ToString("0.###", CultureInfo.InvariantCulture),
-            normalized.RecognitionScoreThreshold.ToString("0.###", CultureInfo.InvariantCulture),
-            normalized.UseTextlineOrientation? "1" : "0",
-            normalized.UseDocumentOrientationClassification? "1" : "0",
-            normalized.UseDocumentUnwarping? "1" : "0",
             normalized.RecognitionBatchSize.ToString(CultureInfo.InvariantCulture),
             normalized.CpuThreads.ToString(CultureInfo.InvariantCulture),
             normalized.Device);

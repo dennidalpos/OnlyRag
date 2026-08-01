@@ -55,26 +55,26 @@ test("navigation & settings: keyboard shortcuts Ctrl+1-6 and section navigation"
       return;
     }
 
-    await fulfillJson(route, { detail: `Unhandled route ${method} ${path}` }, 200);
+    await fulfillJson(route, { detail: `Unhandled route ${method} ${path}` }, 404);
   });
 
   await page.goto("/");
 
   // Test Ctrl+1 -> Chat section
   await page.keyboard.press("Control+1");
-  await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Chat" })).toBeVisible();
 
   // Test Ctrl+3 -> Documents section
   await page.keyboard.press("Control+3");
-  await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Documenti" })).toBeVisible();
 
   // Test Ctrl+6 -> Settings section
   await page.keyboard.press("Control+6");
-  await expect(page.getByRole("heading", { name: "Impostazioni", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Impostazioni" })).toBeVisible();
 
   // Test Ctrl+2 -> Coding section
   await page.keyboard.press("Control+2");
-  await expect(page.getByRole("heading", { name: "Coding", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Coding" })).toBeVisible();
 });
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {

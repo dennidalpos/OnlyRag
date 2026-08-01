@@ -1,3 +1,10 @@
 {
-  "todos": []
+  "todos": [
+    "Implement batched tensor processing in OnnxCrossEncoderReRankerService for GPU acceleration",
+    "Refactor StorageService monolith into single-responsibility repository services",
+    "Convert PaddleOCR bridge from per-call process to persistent background service",
+    "Integrate CRAG confidence feedback loop directly into AgentLoopEngine tool execution",
+    "Add auto-download mechanism for default ONNX cross-encoder model on first use",
+    "Add frontend reasoning transparency UI to display CRAG confidence, retrieval stages, and thinking trace"
+  ]
 }

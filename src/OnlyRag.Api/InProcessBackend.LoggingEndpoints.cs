@@ -28,11 +28,18 @@ public static partial class InProcessBackend
 
         app.MapGet("/api/logs", (
             ILoggingService loggingService,
-            AppLogLevel? minLevel,
+            string? minLevel,
             string? search,
             int? limit) =>
         {
-            var logs = loggingService.GetRecentLogs(minLevel, search, limit ?? 200);
+            AppLogLevel? filterLevel = null;
+            if (!string.IsNullOrWhiteSpace(minLevel) &&
+                Enum.TryParse<AppLogLevel>(minLevel, ignoreCase: true, out var parsedLevel))
+            {
+                filterLevel = parsedLevel;
+            }
+
+            var logs = loggingService.GetRecentLogs(filterLevel, search, limit ?? 200);
             return Results.Ok(logs);
         });
 

@@ -8,7 +8,10 @@ namespace OnlyRag.Api;
 
 public static partial class InProcessBackend
 {
-    private static readonly JsonSerializerOptions AgentJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions AgentJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 
     internal static void MapAgentEndpoints(this WebApplication app)
     {

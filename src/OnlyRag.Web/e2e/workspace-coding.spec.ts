@@ -80,23 +80,23 @@ test("workspace & coding section: folder selection, prompt sending, and diff mod
       return;
     }
 
-    await fulfillJson(route, { detail: `Unhandled route ${method} ${path}` }, 200);
+    await fulfillJson(route, { detail: `Unhandled route ${method} ${path}` }, 404);
   });
 
   await page.goto("/");
 
   // Verify Coding section is default
-  await expect(page.getByRole("heading", { name: "Coding" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Coding" })).toBeVisible();
 
   // Pick workspace folder button visible
   await expect(page.getByText("D:\\Project\\OnlyRag")).toBeVisible();
 
   // Select model dropdown
-  const modelSelect = page.getByRole("combobox", { name: /Seleziona Modello/i });
+  const modelSelect = page.getByRole("combobox", { name: /Modello/i });
   await expect(modelSelect).toBeVisible();
 
   // Send a prompt
-  const promptTextarea = page.getByPlaceholder("Descrivi il task di programmazione...");
+  const promptTextarea = page.getByPlaceholder(/Modalità|Descrivi/i);
   await promptTextarea.fill("Refattorizza la funzione di login");
   await page.getByRole("button", { name: /Invia/i }).click();
 

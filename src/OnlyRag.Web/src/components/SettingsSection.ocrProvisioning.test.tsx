@@ -26,12 +26,14 @@ describe("SettingsSection OCR provisioning", () => {
       engineVersion: "3.3.1",
       nvidiaName: "NVIDIA RTX",
       driverVersion: "596.49",
+      cudaVersion: "12.9",
       compiledWithCuda: true,
       cudaDeviceCount: 1,
-      activeDevice: "gpu:0",
+      activeDevice: "0",
       packageVersions: {},
       capabilityStatus: "usable"
     };
+
     const api = mockApi([
       { path: "/api/settings/pdf-export", response: { libreOfficePath: null, conversionTimeoutSeconds: 120 } },
       {
@@ -119,7 +121,6 @@ describe("SettingsSection OCR provisioning", () => {
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "Installa OCR CPU" }));
-
     expect(await screen.findByText("Configurazione OCR avviata.")).toBeInTheDocument();
     expect(api.calls.some((call) => call.path === "/api/settings/ocr/auto-enable-gpu")).toBe(true);
     expect(api.calls.filter((call) => call.path === "/api/settings/ocr")).toHaveLength(2);
@@ -130,14 +131,9 @@ function createOcrSettings(overrides: Partial<OcrSettings> = {}): OcrSettings {
   return {
     profile: "balanced",
     pdfDpi: 220,
-    modelPreset: "PP-OCRv5",
-    modelVersion: "PP-OCRv5",
     detectionSideLimit: 1152,
     detectionThreshold: 0.3,
-    detectionBoxThreshold: 0.6,
-    detectionUnclipRatio: 1.5,
     recognitionScoreThreshold: 0.5,
-    useTextlineOrientation: true,
     useDocumentOrientationClassification: false,
     useDocumentUnwarping: false,
     recognitionBatchSize: 6,

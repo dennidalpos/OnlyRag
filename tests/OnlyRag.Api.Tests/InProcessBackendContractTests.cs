@@ -256,7 +256,7 @@ public sealed partial class InProcessBackendTests
     {
         string[] expectedProperties = typeof(TDto)
             .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.GetMethod is not null)
+            .Where(property => property.GetMethod is not null && property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
             .Select(GetJsonPropertyName)
             .ToArray();
         string[] actualProperties = ReadTypeScriptObjectPropertyNames(apiSource, typeScriptTypeName).ToArray();

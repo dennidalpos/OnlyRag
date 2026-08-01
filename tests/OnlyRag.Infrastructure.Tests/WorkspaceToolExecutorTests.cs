@@ -112,4 +112,72 @@ public sealed class WorkspaceToolExecutorTests
         Assert.True(result.Success);
         Assert.Contains("Vector RAG retrieval", result.Output);
     }
+
+    [Fact]
+    public async Task ParallelToolCalls_UnpacksAndExecutesSubTools()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "OnlyRagToolTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        string testFile = Path.Combine(tempDir, "sample.txt");
+        await File.WriteAllTextAsync(testFile, "Hello World");
+
+        try
+        {
+            var taskManager = new BackgroundTaskManager();
+            var executor = new WorkspaceToolExecutor(taskManager);
+
+            string argsJson = JsonSerializer.Serialize(new[]
+            {
+                new { tool = "read_file", arguments = new { relativePath = "sample.txt" } }
+            });
+
+            var result = await executor.ExecuteToolAsync("call_p1", "parallel_tool_calls", argsJson, tempDir);
+
+            Assert.True(result.Success);
+            Assert.Contains("Hello World", result.Output);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MultiReplaceFileContent_HandlesArrayRelativePathParameter()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "OnlyRagToolTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        string testFile = Path.Combine(tempDir, "array_test.txt");
+        await File.WriteAllTextAsync(testFile, "Old text");
+
+        try
+        {
+            var taskManager = new BackgroundTaskManager();
+            var executor = new WorkspaceToolExecutor(taskManager);
+
+            string argsJson = JsonSerializer.Serialize(new
+            {
+                relativePath = new[] { "array_test.txt" },
+                chunks = new[]
+                {
+                    new { targetContent = "Old text", replacementContent = "New text" }
+                }
+            });
+
+            var result = await executor.ExecuteToolAsync("call_arr", "multi_replace_file_content", argsJson, tempDir);
+
+            Assert.True(result.Success);
+            Assert.Equal("New text", await File.ReadAllTextAsync(testFile));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }

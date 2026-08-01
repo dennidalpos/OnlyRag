@@ -551,11 +551,13 @@ internal sealed class AgentLoopEngine
                 if (!res.Success && !string.IsNullOrEmpty(res.Error))
                 {
                     batchMsgSb.AppendLine($"Error: {res.Error}");
-                    batchMsgSb.AppendLine("\n[SYSTEM DIAGNOSTIC & SELF-CORRECTION GUIDANCE]");
-                    batchMsgSb.AppendLine($"The action '{res.ToolName}' encountered an error.");
-                    batchMsgSb.AppendLine("1. Identify the root cause of the error by analyzing the output above.");
-                    batchMsgSb.AppendLine("2. Inspect the relevant code files with read_file before making blind attempts.");
-                    batchMsgSb.AppendLine("3. If a modification caused the error, apply a targeted fix or change strategy.");
+                    batchMsgSb.AppendLine("\n[SYSTEM DIAGNOSTIC & MANDATORY ERROR EVALUATION]");
+                    batchMsgSb.AppendLine($"The action '{res.ToolName}' encountered an error or non-zero exit status.");
+                    batchMsgSb.AppendLine("CRITICAL REQUIREMENT: Evaluate and resolve this error immediately before continuing!");
+                    batchMsgSb.AppendLine("1. Analyze the exact error message and stack trace above to identify the root cause.");
+                    batchMsgSb.AppendLine("2. Inspect affected code files using read_file or grep_search to understand the issue.");
+                    batchMsgSb.AppendLine("3. Apply a targeted code or environment fix to resolve the root cause.");
+                    batchMsgSb.AppendLine("4. Re-run verification (e.g. dotnet build, npm test via run_command) to verify the fix before moving to next steps.");
                 }
                 batchMsgSb.AppendLine();
             }
@@ -692,6 +694,8 @@ internal sealed class AgentLoopEngine
             6. **Final answer format.** When the goal is complete, respond with a clean Markdown summary: what changed, files affected, and verification results. Do NOT call any more tools after the final answer.
             7. **Project context awareness.** If AGENTS.md or PROJECT_STATUS.json exist at the workspace root, read them first and follow their conventions.
             8. **Workspace safety.** Never write outside the authorized workspace root. Never print secrets, keys, or credentials.
+            9. **INTERNAL CLI EXECUTION MANDATE.** NEVER emit file-opening GUI commands (`start`, `open`, `explorer`, `code`, `notepad`, `Invoke-Item`). Execute all builds, tests, scripts, and commands internally via `run_command` (e.g. `dotnet build`, `npm test`, `pwsh .\\scripts\\...`).
+            10. **MANDATORY ERROR EVALUATION & RESOLUTION.** When a command or tool call fails or produces an error/exception, you MUST immediately evaluate the error output, identify the root cause, apply a resolution, and re-verify the fix before continuing to subsequent task steps.
             """;
     }
 }

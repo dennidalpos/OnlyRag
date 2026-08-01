@@ -7,15 +7,22 @@ using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Images;
 
-public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationEngine
+public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationEngine, IDisposable
 {
     private const string DirectMlProvider = "DirectML";
     private const string CpuProvider = "CPU";
 
     private readonly object gate = new();
+    private readonly SemaphoreSlim pipelineSemaphore = new(1, 1);
     private string activeExecutionProvider = DirectMlProvider;
     private string? fallbackReason;
     private bool isInitialized;
+
+    // Cached pipeline state
+    private StableDiffusionXLPipeline? cachedPipeline;
+    private string? cachedModelDirectory;
+    private string? cachedProviderName;
+    private ModelType? cachedModelType;
 
     public ImageGenerationEngineStatus GetStatus()
     {
@@ -47,6 +54,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             }
             catch (Exception ex) when (IsRecoverableProviderException(ex))
             {
+                await InvalidateCachedPipelineAsync();
                 SetStatus(DirectMlProvider, $"DirectML GPU non disponibile: {ex.Message}");
                 throw new ImageGenerationException(
                     ImageGenerationErrorKind.InvalidConfiguration,
@@ -69,6 +77,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         }
         catch (Exception ex) when (IsRecoverableProviderException(ex))
         {
+            await InvalidateCachedPipelineAsync();
             SetStatus(CpuProvider, "CPU non disponibile per la generazione immagini.");
             throw new ImageGenerationException(
                 ImageGenerationErrorKind.InvalidConfiguration,
@@ -77,7 +86,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         }
     }
 
-    private static async Task<ImageGenerationEngineResult> GenerateWithProviderAsync(
+    private async Task<ImageGenerationEngineResult> GenerateWithProviderAsync(
         ImageGenerationRequest request,
         string modelDirectory,
         OnnxExecutionProvider provider,
@@ -85,14 +94,13 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         string? fallbackReason,
         CancellationToken cancellationToken)
     {
-        StableDiffusionXLPipeline pipeline = StableDiffusionXLPipeline.CreatePipeline(
-            provider,
-            modelDirectory,
-            ResolveModelType(request.ModelId),
-            logger: null);
-
+        await pipelineSemaphore.WaitAsync(cancellationToken);
         try
         {
+            ModelType modelType = ResolveModelType(request.ModelId);
+            StableDiffusionXLPipeline pipeline = await GetOrCreatePipelineAsync(
+                modelDirectory, provider, providerName, modelType);
+
             List<ImageGenerationBinary> images = [];
             for (int index = 0; index < request.BatchSize; index++)
             {
@@ -113,7 +121,59 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         }
         finally
         {
-            await pipeline.UnloadAsync();
+            pipelineSemaphore.Release();
+        }
+    }
+
+    private async Task<StableDiffusionXLPipeline> GetOrCreatePipelineAsync(
+        string modelDirectory,
+        OnnxExecutionProvider provider,
+        string providerName,
+        ModelType modelType)
+    {
+        bool needsNewPipeline = cachedPipeline is null
+            || !string.Equals(cachedModelDirectory, modelDirectory, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(cachedProviderName, providerName, StringComparison.OrdinalIgnoreCase)
+            || cachedModelType != modelType;
+
+        if (needsNewPipeline)
+        {
+            if (cachedPipeline is not null)
+            {
+                await cachedPipeline.UnloadAsync();
+                cachedPipeline = null;
+            }
+
+            cachedPipeline = StableDiffusionXLPipeline.CreatePipeline(
+                provider,
+                modelDirectory,
+                modelType,
+                logger: null);
+            cachedModelDirectory = modelDirectory;
+            cachedProviderName = providerName;
+            cachedModelType = modelType;
+        }
+
+        return cachedPipeline!;
+    }
+
+    private async Task InvalidateCachedPipelineAsync()
+    {
+        await pipelineSemaphore.WaitAsync();
+        try
+        {
+            if (cachedPipeline is not null)
+            {
+                await cachedPipeline.UnloadAsync();
+                cachedPipeline = null;
+                cachedModelDirectory = null;
+                cachedProviderName = null;
+                cachedModelType = null;
+            }
+        }
+        finally
+        {
+            pipelineSemaphore.Release();
         }
     }
 
@@ -233,5 +293,16 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             or InvalidOperationException
             or NotSupportedException
             or IOException and not FileNotFoundException and not DirectoryNotFoundException;
+    }
+
+    public void Dispose()
+    {
+        if (cachedPipeline is not null)
+        {
+            cachedPipeline.UnloadAsync().GetAwaiter().GetResult();
+            cachedPipeline = null;
+        }
+
+        pipelineSemaphore.Dispose();
     }
 }

@@ -97,7 +97,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         // ── Stage 6: CRAG Confidence Check ─────────────────────────────────
         double cragThreshold = await GetCragThresholdAsync(cancellationToken);
-        CragDecision cragResult = cragEvaluator.Evaluate(finalResults, query, cragThreshold);
+        CragDecision cragResult = await cragEvaluator.EvaluateAsync(finalResults, query, cragThreshold, cancellationToken: cancellationToken);
 
         if (cragResult.Action == CragAction.Abstain)
         {
@@ -338,7 +338,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         int limit,
         CancellationToken cancellationToken)
     {
-        const double k = 60d; // RRF constant
+        double k = options.RrfK;
         Dictionary<long, double> rrfScores = [];
 
         for (int rank = 0; rank < keywordResults.Count; rank++)

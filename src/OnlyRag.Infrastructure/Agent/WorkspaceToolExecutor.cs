@@ -64,6 +64,12 @@ public sealed class WorkspaceToolExecutor
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson, s_jsonDocOptions);
             var root = doc.RootElement;
 
+            string normName = toolName.ToLowerInvariant();
+            if (normName is "parallel_tool_calls" or "parallel_tools" or "batch_tool_calls" or "tool_calls")
+            {
+                return await HandleParallelToolCallsAsync(callId, toolName, root, workspaceRoot, onStep, cancellationToken);
+            }
+
             var handler = handlers.FirstOrDefault(h => h.CanHandle(toolName));
             if (handler is null)
             {
@@ -91,6 +97,88 @@ public sealed class WorkspaceToolExecutor
             logger?.LogError("AgentEngine", err, ex);
             return new AgentToolResult(callId, toolName, false, string.Empty, err);
         }
+    }
+
+    private async Task<AgentToolResult> HandleParallelToolCallsAsync(
+        string callId,
+        string toolName,
+        JsonElement root,
+        string workspaceRoot,
+        Action<AgentStepEvent>? onStep,
+        CancellationToken cancellationToken)
+    {
+        JsonElement items = default;
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            items = root;
+        }
+        else if (root.TryGetProperty("calls", out var callsElem) && callsElem.ValueKind == JsonValueKind.Array)
+        {
+            items = callsElem;
+        }
+        else if (root.TryGetProperty("tools", out var toolsElem) && toolsElem.ValueKind == JsonValueKind.Array)
+        {
+            items = toolsElem;
+        }
+        else if (root.TryGetProperty("tool_calls", out var tcElem) && tcElem.ValueKind == JsonValueKind.Array)
+        {
+            items = tcElem;
+        }
+        else if (root.TryGetProperty("parallel_tool_calls", out var ptElem) && ptElem.ValueKind == JsonValueKind.Array)
+        {
+            items = ptElem;
+        }
+
+        if (items.ValueKind != JsonValueKind.Array || items.GetArrayLength() == 0)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "parallel_tool_calls requires a JSON array of tool invocation objects.");
+        }
+
+        var outputs = new List<string>();
+        var errors = new List<string>();
+        int index = 0;
+
+        foreach (var item in items.EnumerateArray())
+        {
+            index++;
+            string? subTool = ToolHelper.GetArgString(item, "tool", "name", "tool_name", "function", "action");
+            if (string.IsNullOrWhiteSpace(subTool))
+            {
+                errors.Add($"[Call #{index}] Tool name missing");
+                continue;
+            }
+
+            string subArgs = "{}";
+            if (item.TryGetProperty("arguments", out var argElem))
+            {
+                subArgs = argElem.GetRawText();
+            }
+            else if (item.TryGetProperty("args", out argElem))
+            {
+                subArgs = argElem.GetRawText();
+            }
+            else if (item.TryGetProperty("parameters", out argElem))
+            {
+                subArgs = argElem.GetRawText();
+            }
+
+            string subCallId = $"{callId}_{index}";
+            AgentToolResult subRes = await ExecuteToolAsync(subCallId, subTool, subArgs, workspaceRoot, onStep, cancellationToken);
+            if (subRes.Success)
+            {
+                outputs.Add($"[{subTool}]: {subRes.Output}");
+            }
+            else
+            {
+                errors.Add($"[{subTool} Error]: {subRes.Error}");
+            }
+        }
+
+        bool success = errors.Count == 0;
+        string combinedOutput = string.Join("\n\n", outputs);
+        string combinedError = string.Join("\n\n", errors);
+
+        return new AgentToolResult(callId, toolName, success, combinedOutput, combinedError);
     }
 
     private static bool IsWorkspaceFolderRequired(string toolName)

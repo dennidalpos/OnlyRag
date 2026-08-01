@@ -71,8 +71,11 @@ public sealed class FileSystemToolHandler : IToolHandler
 
     private async Task<AgentToolResult> ReadFileAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = ToolHelper.GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
-            ?? throw new ArgumentException("The file path parameter ('relativePath' or 'path') is required");
+        string? relative = ToolHelper.GetArgString(args, "relativePath", "targetFile", "target_file", "filePath", "file_path", "path", "file", "filepath", "filename", "target");
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The file path parameter ('relativePath' or 'targetFile') is required.");
+        }
 
         int? startLine = ToolHelper.GetArgInt(args, "startLine", "start", "fromLine");
         int? endLine = ToolHelper.GetArgInt(args, "endLine", "end", "toLine");
@@ -112,8 +115,11 @@ public sealed class FileSystemToolHandler : IToolHandler
 
     private async Task<AgentToolResult> WriteFileAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = ToolHelper.GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
-            ?? throw new ArgumentException("The file path parameter ('relativePath' or 'path') is required");
+        string? relative = ToolHelper.GetArgString(args, "relativePath", "targetFile", "target_file", "filePath", "file_path", "path", "file", "filepath", "filename", "target");
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The file path parameter ('relativePath' or 'targetFile') is required.");
+        }
 
         string content = ToolHelper.GetArgString(args, "content", "text", "code", "fileContent") ?? "";
 
@@ -133,14 +139,23 @@ public sealed class FileSystemToolHandler : IToolHandler
 
     private async Task<AgentToolResult> ReplaceFileContentAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = ToolHelper.GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
-            ?? throw new ArgumentException("The file path parameter ('relativePath' or 'path') is required");
+        string? relative = ToolHelper.GetArgString(args, "relativePath", "targetFile", "target_file", "filePath", "file_path", "path", "file", "filepath", "filename", "target");
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The file path parameter ('relativePath' or 'targetFile') is required.");
+        }
 
-        string target = ToolHelper.GetArgString(args, "targetContent", "target", "oldContent", "old_string", "search")
-            ?? throw new ArgumentException("The 'targetContent' parameter is required");
+        string? target = ToolHelper.GetArgString(args, "targetContent", "target", "oldContent", "old_string", "search");
+        if (string.IsNullOrEmpty(target))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The 'targetContent' parameter is required.");
+        }
 
-        string replacement = ToolHelper.GetArgString(args, "replacementContent", "replacement", "newContent", "new_string", "replace")
-            ?? throw new ArgumentException("The 'replacementContent' parameter is required");
+        string? replacement = ToolHelper.GetArgString(args, "replacementContent", "replacement", "newContent", "new_string", "replace");
+        if (replacement is null)
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The 'replacementContent' parameter is required.");
+        }
 
         int? startLine = ToolHelper.GetArgInt(args, "startLine", "start", "fromLine");
         int? endLine = ToolHelper.GetArgInt(args, "endLine", "end", "toLine");
@@ -249,8 +264,11 @@ public sealed class FileSystemToolHandler : IToolHandler
 
     private async Task<AgentToolResult> MultiReplaceFileContentAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
     {
-        string relative = ToolHelper.GetArgString(args, "relativePath", "path", "file", "filepath", "filename", "target")
-            ?? throw new ArgumentException("The file path parameter ('relativePath' or 'path') is required");
+        string? relative = ToolHelper.GetArgString(args, "relativePath", "targetFile", "target_file", "filePath", "file_path", "path", "file", "filepath", "filename", "target");
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The file path parameter ('relativePath' or 'targetFile') is required.");
+        }
 
         string safePath = ToolHelper.ResolveSafePathWithSmartFallback(rootPath, relative, out _);
         if (!File.Exists(safePath))

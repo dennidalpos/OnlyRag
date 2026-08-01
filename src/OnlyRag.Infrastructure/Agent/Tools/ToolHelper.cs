@@ -9,20 +9,40 @@ public static class ToolHelper
     {
         foreach (var prop in propertyNames)
         {
-            if (root.TryGetProperty(prop, out var elem) && elem.ValueKind == JsonValueKind.String)
+            if (root.TryGetProperty(prop, out var elem))
             {
-                return elem.GetString();
+                string? parsed = ExtractStringValue(elem);
+                if (parsed is not null) return parsed;
             }
         }
         foreach (var prop in root.EnumerateObject())
         {
             if (propertyNames.Any(p => p.Equals(prop.Name, StringComparison.OrdinalIgnoreCase)))
             {
-                if (prop.Value.ValueKind == JsonValueKind.String)
-                {
-                    return prop.Value.GetString();
-                }
+                string? parsed = ExtractStringValue(prop.Value);
+                if (parsed is not null) return parsed;
             }
+        }
+        return null;
+    }
+
+    private static string? ExtractStringValue(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.String)
+        {
+            return elem.GetString();
+        }
+        if (elem.ValueKind == JsonValueKind.Array && elem.GetArrayLength() > 0)
+        {
+            var first = elem[0];
+            if (first.ValueKind == JsonValueKind.String)
+            {
+                return first.GetString();
+            }
+        }
+        if (elem.ValueKind == JsonValueKind.Number)
+        {
+            return elem.GetRawText();
         }
         return null;
     }
@@ -31,9 +51,16 @@ public static class ToolHelper
     {
         foreach (var prop in propertyNames)
         {
-            if (root.TryGetProperty(prop, out var elem) && elem.ValueKind == JsonValueKind.Number)
+            if (root.TryGetProperty(prop, out var elem))
             {
-                return elem.GetInt32();
+                if (elem.ValueKind == JsonValueKind.Number)
+                {
+                    return elem.GetInt32();
+                }
+                if (elem.ValueKind == JsonValueKind.String && int.TryParse(elem.GetString(), out int parsed))
+                {
+                    return parsed;
+                }
             }
         }
         return null;

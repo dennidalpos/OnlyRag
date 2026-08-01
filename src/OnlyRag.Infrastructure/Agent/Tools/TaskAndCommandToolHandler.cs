@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using OnlyRag.Core;
 
@@ -45,6 +46,17 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
         string commandLine = ToolHelper.GetArgString(args, "commandLine", "command", "cmd", "script")
             ?? throw new ArgumentException("The 'commandLine' parameter is required");
 
+        if (IsGuiFileOpenCommand(commandLine))
+        {
+            return new AgentToolResult(
+                callId,
+                toolName,
+                false,
+                string.Empty,
+                "GUI file opening commands ('start', 'explorer', 'notepad', 'code', 'Invoke-Item', etc.) are disabled. " +
+                "Do NOT attempt to open files in external GUI applications. Perform CLI builds, tests, and scripts directly inside PowerShell using run_command (e.g. 'dotnet build', 'npm test', 'pwsh .\\scripts\\...').");
+        }
+
         bool isAsync = (args.TryGetProperty("isAsync", out var a) && a.GetBoolean()) ||
                        (args.TryGetProperty("async", out var a2) && a2.GetBoolean());
 
@@ -55,10 +67,11 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
         }
 
         string shellExe = ResolveShellExecutable();
+        string encodedCmd = Convert.ToBase64String(Encoding.Unicode.GetBytes(commandLine));
         var psi = new ProcessStartInfo
         {
             FileName = shellExe,
-            Arguments = $"-NoProfile -NonInteractive -Command \"{commandLine.Replace("\"", "\\\"")}\"",
+            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encodedCmd}",
             WorkingDirectory = rootPath,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -86,6 +99,23 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
             process.ExitCode == 0,
             combined,
             process.ExitCode == 0 ? null : $"Process exited with code {process.ExitCode}");
+    }
+
+    private static bool IsGuiFileOpenCommand(string commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine)) return false;
+        string trimmed = commandLine.Trim().ToLowerInvariant();
+
+        return trimmed.StartsWith("start ") ||
+               trimmed.StartsWith("start-process ") ||
+               trimmed.StartsWith("explorer") ||
+               trimmed.StartsWith("notepad") ||
+               trimmed.StartsWith("code ") ||
+               trimmed.StartsWith("invoke-item ") ||
+               trimmed.StartsWith("ii ") ||
+               trimmed.StartsWith("open ") ||
+               trimmed.Contains("cmd /c start") ||
+               trimmed.Contains("cmd.exe /c start");
     }
 
     private static string ResolveShellExecutable()

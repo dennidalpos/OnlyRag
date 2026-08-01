@@ -18,11 +18,12 @@ public sealed class BackgroundTaskManager
 
         string taskId = $"task_{Guid.NewGuid():N}"[..12];
         string shellExecutable = ResolveShellExecutable();
+        string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
 
         var psi = new ProcessStartInfo
         {
             FileName = shellExecutable,
-            Arguments = $"-NoProfile -NonInteractive -Command \"{command.Replace("\"", "\\\"")}\"",
+            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
