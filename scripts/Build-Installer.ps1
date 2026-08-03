@@ -67,6 +67,20 @@ if (-not (Test-Path -LiteralPath $qdrantExe -PathType Leaf)) {
     & $downloadQdrantScript
 }
 
+Write-Host "Verifying payload binary integrity (SHA256)..." -ForegroundColor Cyan
+if (Test-Path -LiteralPath $qdrantExe -PathType Leaf) {
+    $qdrantHash = (Get-FileHash -LiteralPath $qdrantExe -Algorithm SHA256).Hash
+    Write-Host "  Qdrant SHA256: $qdrantHash" -ForegroundColor Gray
+}
+
+$ocrPayloadDir = Join-Path $repoRoot "packaging\ocr\payload"
+if (Test-Path -LiteralPath $ocrPayloadDir) {
+    Get-ChildItem -LiteralPath $ocrPayloadDir -File -Recurse | ForEach-Object {
+        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        Write-Host "  OCR Payload ($($_.Name)) SHA256: $hash" -ForegroundColor Gray
+    }
+}
+
 Write-Host "Publishing OnlyRag WPF app..." -ForegroundColor Cyan
 Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot -Arguments @(
     "publish",

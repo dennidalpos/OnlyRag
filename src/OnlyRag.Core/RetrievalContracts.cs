@@ -6,6 +6,13 @@ public sealed record VectorSearchResult(
     int ChunkIndex,
     double Score);
 
+public enum QdrantQuantizationMode
+{
+    Disabled = 0,
+    ScalarSQ8 = 1,
+    ProductPQ = 2
+}
+
 public sealed record QdrantSettings(
     string GrpcEndpoint = "http://127.0.0.1:6334",
     string? ApiKey = null,
@@ -13,7 +20,8 @@ public sealed record QdrantSettings(
     bool RequireTlsForRemoteEndpoint = true,
     bool UseLocalBundledServer = true,
     int LocalGrpcPort = 6334,
-    int RequestTimeoutSeconds = 30);
+    int RequestTimeoutSeconds = 30,
+    QdrantQuantizationMode QuantizationMode = QdrantQuantizationMode.ScalarSQ8);
 
 public sealed record QdrantSettingsResponse(
     string GrpcEndpoint,
@@ -22,7 +30,8 @@ public sealed record QdrantSettingsResponse(
     bool RequireTlsForRemoteEndpoint,
     bool UseLocalBundledServer,
     int LocalGrpcPort,
-    int RequestTimeoutSeconds);
+    int RequestTimeoutSeconds,
+    QdrantQuantizationMode QuantizationMode);
 
 public sealed record QdrantStatusResponse(
     string Status,

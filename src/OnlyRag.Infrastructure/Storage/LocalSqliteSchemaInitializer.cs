@@ -214,6 +214,17 @@ public sealed class LocalSqliteSchemaInitializer
                     created_at_utc TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS subagent_report_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    role TEXT NOT NULL,
+                    prompt_hash TEXT NOT NULL,
+                    workspace_root TEXT NOT NULL,
+                    report_markdown TEXT NOT NULL,
+                    key_facts_json TEXT NOT NULL DEFAULT '[]',
+                    modified_files_json TEXT NOT NULL DEFAULT '[]',
+                    created_at_utc TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_graph_nodes_name ON document_graph_nodes(name);
                 CREATE INDEX IF NOT EXISTS idx_graph_nodes_document ON document_graph_nodes(document_id);
                 CREATE INDEX IF NOT EXISTS idx_graph_edges_source ON document_graph_edges(source_node_id);
@@ -641,6 +652,17 @@ public sealed class LocalSqliteSchemaInitializer
                 category TEXT NOT NULL,
                 pattern_description TEXT NOT NULL,
                 solution_template TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE subagent_report_cache (
+                cache_key TEXT PRIMARY KEY,
+                role TEXT NOT NULL,
+                prompt_hash TEXT NOT NULL,
+                workspace_root TEXT NOT NULL,
+                report_markdown TEXT NOT NULL,
+                key_facts_json TEXT NOT NULL DEFAULT '[]',
+                modified_files_json TEXT NOT NULL DEFAULT '[]',
                 created_at_utc TEXT NOT NULL
             );
 

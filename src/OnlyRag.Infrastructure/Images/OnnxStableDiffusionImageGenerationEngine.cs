@@ -55,11 +55,32 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             catch (Exception ex) when (IsRecoverableProviderException(ex))
             {
                 await InvalidateCachedPipelineAsync();
-                SetStatus(DirectMlProvider, $"DirectML GPU non disponibile: {ex.Message}");
-                throw new ImageGenerationException(
-                    ImageGenerationErrorKind.InvalidConfiguration,
-                    $"Generazione immagini GPU DirectML non riuscita: {ex.Message}. Esecuzione interrotta (Fail-Fast).",
-                    ex);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                string reason = $"Fallback automatico da DirectML GPU a CPU per insufficiente memoria VRAM o inaccessibilità driver GPU: {ex.Message}";
+                SetStatus(CpuProvider, reason);
+
+                try
+                {
+                    ImageGenerationEngineResult cpuFallbackResult = await GenerateWithProviderAsync(
+                        request,
+                        modelDirectory,
+                        CreateCpuProvider(),
+                        CpuProvider,
+                        fallbackReason: reason,
+                        cancellationToken);
+                    SetStatus(cpuFallbackResult.ActiveExecutionProvider, cpuFallbackResult.FallbackReason);
+                    return cpuFallbackResult;
+                }
+                catch (Exception cpuEx) when (IsRecoverableProviderException(cpuEx))
+                {
+                    await InvalidateCachedPipelineAsync();
+                    throw new ImageGenerationException(
+                        ImageGenerationErrorKind.InvalidConfiguration,
+                        $"Esecuzione fallita su GPU DirectML ({ex.Message}) e su CPU Fallback ({cpuEx.Message}).",
+                        cpuEx);
+                }
             }
         }
 

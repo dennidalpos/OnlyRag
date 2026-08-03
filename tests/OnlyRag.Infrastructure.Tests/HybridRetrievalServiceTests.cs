@@ -386,6 +386,15 @@ public sealed class HybridRetrievalServiceTests
             return Task.CompletedTask;
         }
 
+        public Task UpsertChunkBatchAsync(IReadOnlyList<QdrantChunkPayload> chunks, CancellationToken cancellationToken = default)
+        {
+            foreach (var chunk in chunks)
+            {
+                vectors.Add((new DocumentChunkForEmbedding(chunk.ChunkId, chunk.DocumentId, chunk.ChunkIndex, string.Empty, chunk.ContentHash), chunk.Model, chunk.Vector));
+            }
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(string model, IReadOnlyList<float> queryVector, IReadOnlyCollection<long> documentIds, int limit, CancellationToken cancellationToken = default)
         {
             if (ThrowOnSearch)

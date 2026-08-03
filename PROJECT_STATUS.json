@@ -1,9 +1,9 @@
 {
   "todos": [
-    "Integrare MCTS Rollouts e Checkpoint Rollback (AgentMctsStateMachine) nell'AgentLoopEngine per l'esplorazione sicura dei rami di codice",
-    "Implementare l'espansione HyDE (Hypothetical Document Embeddings) nella Query Transformation del RAG 2.0",
-    "Estendere il GraphRagAstSymbolIndexer per l'indicizzazione ricorsiva dell'albero AST (C#, TypeScript, Python)",
-    "Implementare la decodifica vincolata a schema JSON per garantire la conformita' dei tool call con Ollama",
-    "Aggiungere la ricerca vettoriale nella memoria episodica dello storico sessioni (SqliteQdrantEpisodicMemoryService)"
+    "Integrazione completa del protocollo MCP (Model Context Protocol) per server personalizzati in src/OnlyRag.Api/Mcp con validazione dinamica JSON Schema dei tool",
+    "Auto-tuning dinamico dei parametri HNSW (ef_construct, m) in Qdrant Vector Store per bilanciare velocità di ricerca e consumo di memoria",
+    "Ottimizzazione del caching multilivello per il bilanciamento di carico delle chiamate Ollama LLM e riutilizzo degli embedding di query",
+    "Allineamento automatico dei layout multi-colonna nel parser di documenti PDF/OCR per preservare la struttura delle tabelle nel chunking Dual-Tier",
+    "Supporto avanzato per il backup e il ripristino cifrato AES-256 del database SQLite, delle impostazioni e degli indici vettoriali Qdrant"
   ]
 }

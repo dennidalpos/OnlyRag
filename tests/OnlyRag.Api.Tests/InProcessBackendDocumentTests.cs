@@ -556,6 +556,13 @@ public sealed partial class InProcessBackendTests
             return Task.CompletedTask;
         }
 
+        public Task UpsertChunkBatchAsync(
+            IReadOnlyList<OnlyRag.Infrastructure.Vector.QdrantChunkPayload> chunks,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
             string model,
             IReadOnlyList<float> queryVector,

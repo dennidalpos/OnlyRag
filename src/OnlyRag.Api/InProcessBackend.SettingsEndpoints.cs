@@ -508,7 +508,8 @@ public static partial class InProcessBackend
             settings.RequireTlsForRemoteEndpoint,
             settings.UseLocalBundledServer,
             settings.LocalGrpcPort,
-            settings.RequestTimeoutSeconds);
+            settings.RequestTimeoutSeconds,
+            settings.QuantizationMode);
     }
 
     private static async Task<LocalJob?> FindActiveModelPullJobAsync(

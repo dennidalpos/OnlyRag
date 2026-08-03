@@ -121,18 +121,23 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
                 Output:
                 """,
             QueryTransformationStrategy.HyDE =>
-                $"""
-                Write a hypothetical passage (2-4 sentences) that a document answering the topic would contain.
+                $$"""
+                Write a hypothetical document passage OR a hypothetical code snippet/class signature that directly answers or implements the following topic.
                 Constraints:
-                - Must be factual-sounding, not opinion.
-                - Focus on terminology and concepts likely to appear in matching documents.
-                - Do not include conversational filler.
+                - If the topic is about programming, APIs, or code, output a realistic code snippet, class definition, or function signature with technical comments.
+                - If the topic is general, output a factual 2-4 sentence passage.
+                - Do not include conversational filler or meta-explanations.
                 
-                Example Input: "benefits of meditation for stress"
+                Example Input: "how to implement JWT token authentication in ASP.NET Core Minimal API"
                 Example Output:
-                Mindfulness meditation has been clinically shown to reduce cortisol levels, a primary stress hormone. Regular practice promotes neuroplasticity in the amygdala, reducing anxiety responses. Studies indicate that just 15 minutes of daily meditation can significantly improve overall emotional regulation.
+                // ASP.NET Core Minimal API JWT Authentication implementation
+                builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                    .AddJwtBearer(options => {
+                        options.TokenValidationParameters = new TokenValidationParameters { ValidateIssuer = true, ValidateAudience = true };
+                    });
+                app.MapPost("/api/login", (UserCredentials creds) => GenerateJwtToken(creds));
                 
-                Input: "{query}"
+                Input: "{{query}}"
                 Output:
                 """,
             _ => string.Empty
@@ -150,30 +155,42 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         }
 
         List<string> list = [];
-        string[] lines = rawResponse.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        foreach (string line in lines)
+        if (strategy == QueryTransformationStrategy.HyDE)
         {
-            string cleanLine = CleanLine(line);
-
-            string[] words = cleanLine.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length < 3) continue;
-
-            if (cleanLine.StartsWith("Here are", StringComparison.OrdinalIgnoreCase) ||
-                cleanLine.StartsWith("Alternative", StringComparison.OrdinalIgnoreCase) ||
-                cleanLine.StartsWith("Query", StringComparison.OrdinalIgnoreCase))
+            string cleanPassage = CleanLine(rawResponse.Trim());
+            if (!string.IsNullOrWhiteSpace(cleanPassage) && !string.Equals(cleanPassage, query, StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                list.Add(cleanPassage);
             }
+        }
+        else
+        {
+            string[] lines = rawResponse.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-            if (ComputeWordJaccard(query, cleanLine) > 0.85)
+            foreach (string line in lines)
             {
-                continue;
-            }
+                string cleanLine = CleanLine(line);
 
-            if (!string.Equals(cleanLine, query, StringComparison.OrdinalIgnoreCase))
-            {
-                list.Add(cleanLine);
+                string[] words = cleanLine.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+                if (words.Length < 3) continue;
+
+                if (cleanLine.StartsWith("Here are", StringComparison.OrdinalIgnoreCase) ||
+                    cleanLine.StartsWith("Alternative", StringComparison.OrdinalIgnoreCase) ||
+                    cleanLine.StartsWith("Query", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (ComputeWordJaccard(query, cleanLine) > 0.85)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(cleanLine, query, StringComparison.OrdinalIgnoreCase))
+                {
+                    list.Add(cleanLine);
+                }
             }
         }
 
@@ -290,7 +307,23 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
     {
         var list = new List<string> { query };
 
-        string syntheticPassage = $"This document describes and provides specific details about: {query}. It contains technical explanations, key concepts, and related definitions.";
+        bool isCodeQuery = query.Contains("class", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("interface", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("function", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("method", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("code", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("api", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("c#", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("typescript", StringComparison.OrdinalIgnoreCase) ||
+                           query.Contains("sql", StringComparison.OrdinalIgnoreCase);
+
+        if (isCodeQuery)
+        {
+            string syntheticCode = $"// Hypothetical implementation snippet for: {query}\npublic class HypotheticalCodeImplementation\n{{\n    // Primary method logic and signature for {query}\n    public async Task ExecuteAsync()\n    {{\n    }}\n}}";
+            list.Add(syntheticCode);
+        }
+
+        string syntheticPassage = $"This document describes and provides specific details about: {query}. It contains technical explanations, key concepts, code definitions, and related signatures.";
         list.Add(syntheticPassage);
 
         var multiQuery = GenerateMultiQueryVariants(query);

@@ -59,4 +59,68 @@ public class GraphRagAstSymbolIndexerTests
         Assert.Contains("Callers: Main", representation);
         Assert.Contains("Callees: ValidateInput", representation);
     }
+
+    [Fact]
+    public void ExtractWorkspaceAstSymbols_ParsesFilesRecursively()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"ast_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string subDir = Path.Combine(tempDir, "sub");
+            Directory.CreateDirectory(subDir);
+            File.WriteAllText(Path.Combine(tempDir, "App.cs"), "public class AppHost { public void Run() {} }");
+            File.WriteAllText(Path.Combine(subDir, "helper.py"), "class Helper:\n    def do_stuff(self):\n        pass");
+
+            var indexer = new GraphRagAstSymbolIndexer();
+            var symbols = indexer.ExtractWorkspaceAstSymbols(tempDir);
+
+            Assert.True(symbols.Count >= 3);
+            Assert.Contains(symbols, s => s.SymbolName == "AppHost");
+            Assert.Contains(symbols, s => s.SymbolName == "Helper");
+            Assert.Contains(symbols, s => s.SymbolName == "do_stuff");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void ConvertToGraphRepresentation_MapsAstSymbolsToGraphNodesAndEdges()
+    {
+        var symbols = new[]
+        {
+            new AstSymbolNode("ast1", "CallerMethod", "Method", "App.cs", 10, Array.Empty<string>(), new[] { "CalleeMethod" }, 1, "public void CallerMethod()"),
+            new AstSymbolNode("ast2", "CalleeMethod", "Method", "App.cs", 20, Array.Empty<string>(), Array.Empty<string>(), 1, "public void CalleeMethod()")
+        };
+
+        var indexer = new GraphRagAstSymbolIndexer();
+        var (nodes, edges) = indexer.ConvertToGraphRepresentation(symbols);
+
+        Assert.Equal(2, nodes.Count);
+        Assert.Single(edges);
+        Assert.Equal("ast1", edges[0].SourceNodeId);
+        Assert.Equal("ast2", edges[0].TargetNodeId);
+        Assert.Equal("CALLS", edges[0].RelationType);
+    }
+
+    [Fact]
+    public void ValidateAstGraph_DetectsOrphansAndUnresolvedCallees()
+    {
+        var symbols = new[]
+        {
+            new AstSymbolNode("ast1", "CallerMethod", "Method", "App.cs", 10, Array.Empty<string>(), new[] { "ExternalMethod" }, 1, "public void CallerMethod()"),
+            new AstSymbolNode("ast2", "OrphanMethod", "Method", "App.cs", 30, Array.Empty<string>(), Array.Empty<string>(), 1, "public void OrphanMethod()")
+        };
+
+        var indexer = new GraphRagAstSymbolIndexer();
+        var validation = indexer.ValidateAstGraph(symbols);
+
+        Assert.True(validation.IsValid);
+        Assert.Equal(2, validation.TotalSymbols);
+        Assert.Contains(validation.Anomalies, a => a.Type == "OrphanSymbol" && a.SymbolName == "OrphanMethod");
+        Assert.Contains(validation.Anomalies, a => a.Type == "UnresolvedCallee" && a.SymbolName == "CallerMethod");
+        Assert.True(validation.SemanticAlignmentScore > 0.0 && validation.SemanticAlignmentScore <= 1.0);
+    }
 }

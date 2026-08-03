@@ -18,7 +18,17 @@ public interface IOcrEngine
         OcrPagePreparationRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(
+        IReadOnlyList<OcrPagePreparationRequest> requests,
+        int maxConcurrency = 4,
+        CancellationToken cancellationToken = default);
+
     Task<OcrPageResult> RecognizeAsync(
         OcrRecognitionRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(
+        IReadOnlyList<OcrRecognitionRequest> requests,
+        int maxConcurrency = 4,
         CancellationToken cancellationToken = default);
 }

@@ -12,6 +12,7 @@ public sealed class QdrantSettingsStore
     private const string UseLocalKey = "qdrant.useLocalBundledServer";
     private const string LocalPortKey = "qdrant.localGrpcPort";
     private const string TimeoutKey = "qdrant.requestTimeoutSeconds";
+    private const string QuantizationModeKey = "qdrant.quantizationMode";
 
     private readonly ISettingsRepository settings;
 
@@ -25,6 +26,11 @@ public sealed class QdrantSettingsStore
     public async Task<QdrantSettings> GetAsync(CancellationToken cancellationToken = default)
     {
         QdrantSettings defaults = new();
+        string? quantStr = await settings.GetValueAsync(QuantizationModeKey, cancellationToken);
+        QdrantQuantizationMode quantizationMode = Enum.TryParse<QdrantQuantizationMode>(quantStr, ignoreCase: true, out var mode)
+            ? mode
+            : defaults.QuantizationMode;
+
         return Normalize(new QdrantSettings(
             GrpcEndpoint: await settings.GetValueAsync(EndpointKey, cancellationToken) ?? defaults.GrpcEndpoint,
             ApiKey: NormalizeOptional(await settings.GetValueAsync(ApiKeyKey, cancellationToken)),
@@ -32,7 +38,8 @@ public sealed class QdrantSettingsStore
             RequireTlsForRemoteEndpoint: ParseBool(await settings.GetValueAsync(RequireTlsKey, cancellationToken), defaults.RequireTlsForRemoteEndpoint),
             UseLocalBundledServer: ParseBool(await settings.GetValueAsync(UseLocalKey, cancellationToken), defaults.UseLocalBundledServer),
             LocalGrpcPort: ParseInt(await settings.GetValueAsync(LocalPortKey, cancellationToken), defaults.LocalGrpcPort, 1, 65535),
-            RequestTimeoutSeconds: ParseInt(await settings.GetValueAsync(TimeoutKey, cancellationToken), defaults.RequestTimeoutSeconds, 1, 300)));
+            RequestTimeoutSeconds: ParseInt(await settings.GetValueAsync(TimeoutKey, cancellationToken), defaults.RequestTimeoutSeconds, 1, 300),
+            QuantizationMode: quantizationMode));
     }
 
     public async Task<QdrantSettings> UpdateAsync(QdrantSettings request, CancellationToken cancellationToken = default)
@@ -45,6 +52,7 @@ public sealed class QdrantSettingsStore
         await settings.UpsertAsync(UseLocalKey, normalized.UseLocalBundledServer.ToString(), cancellationToken);
         await settings.UpsertAsync(LocalPortKey, normalized.LocalGrpcPort.ToString(), cancellationToken);
         await settings.UpsertAsync(TimeoutKey, normalized.RequestTimeoutSeconds.ToString(), cancellationToken);
+        await settings.UpsertAsync(QuantizationModeKey, normalized.QuantizationMode.ToString(), cancellationToken);
         SettingsChanged?.Invoke();
         return normalized;
     }

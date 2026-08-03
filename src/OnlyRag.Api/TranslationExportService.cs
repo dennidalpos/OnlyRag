@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml.Packaging;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Storage;
 using W = DocumentFormat.OpenXml.Wordprocessing;
@@ -14,13 +15,16 @@ public sealed class TranslationExportService
     private static readonly Regex UnsafeSegmentCharacters = new(@"[^A-Za-z0-9._ -]+", RegexOptions.Compiled);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly ITranslationRepository translations;
+    private readonly PdfExportSettingsStore? pdfExportSettings;
 
     public TranslationExportService(
         InProcessBackendDescriptor descriptor,
-        ITranslationRepository translations)
+        ITranslationRepository translations,
+        PdfExportSettingsStore? pdfExportSettings = null)
     {
         this.descriptor = descriptor;
         this.translations = translations;
+        this.pdfExportSettings = pdfExportSettings;
     }
 
     public async Task<TranslationExportResponse?> ExportAsync(
@@ -189,11 +193,18 @@ public sealed class TranslationExportService
         builder.AppendLine("<meta charset=\"utf-8\">");
         builder.Append("<title>").Append(Html(translation.DocumentName)).AppendLine("</title>");
         builder.AppendLine("<style>");
-        builder.AppendLine("body{font-family:'Segoe UI',Arial,sans-serif;line-height:1.55;margin:32px;color:#111827;background:#fff;}");
-        builder.AppendLine("main{max-width:900px;margin:0 auto;}");
-        builder.AppendLine("h1{font-size:28px;margin:0 0 8px;} h2{font-size:20px;margin:32px 0 12px;border-bottom:1px solid #d1d5db;padding-bottom:6px;}");
-        builder.AppendLine(".meta{color:#4b5563;margin:0 0 24px;} p{margin:0 0 12px;white-space:pre-wrap;} table{width:100%;border-collapse:collapse;margin:8px 0 16px;} td{border:1px solid #d1d5db;padding:8px;vertical-align:top;}");
-        builder.AppendLine("@media print{body{margin:18mm;} section.page{break-after:page;} section.page:last-child{break-after:auto;}}");
+        builder.AppendLine("body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.6;margin:32px;color:#111827;background:#fff;}");
+        builder.AppendLine("main{max-width:960px;margin:0 auto;}");
+        builder.AppendLine("h1{font-size:26px;margin:0 0 12px;color:#1e3a8a;border-bottom:2px solid #3b82f6;padding-bottom:8px;}");
+        builder.AppendLine("h2{font-size:18px;margin:24px 0 10px;color:#1f2937;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}");
+        builder.AppendLine(".meta{color:#6b7280;font-size:14px;margin:0 0 20px;}");
+        builder.AppendLine("p{margin:0 0 12px;white-space:pre-wrap;word-break:break-word;}");
+        builder.AppendLine(".multicol-container{column-count:1;column-gap:24px;}");
+        builder.AppendLine("table{width:100%;border-collapse:collapse;margin:12px 0 20px;table-layout:fixed;}");
+        builder.AppendLine("th,td{border:1px solid #d1d5db;padding:10px 12px;text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;}");
+        builder.AppendLine("th{background:#f3f4f6;font-weight:600;color:#111827;}");
+        builder.AppendLine("tr:nth-child(even){background-color:#f9fafb;}");
+        builder.AppendLine("@media print{@page{size:A4;margin:15mm;} body{margin:0;} section.page{break-after:page;page-break-after:always;} table{page-break-inside:avoid;}}");
         builder.AppendLine("</style>");
         builder.AppendLine("</head>");
         builder.AppendLine("<body>");
@@ -488,12 +499,56 @@ public sealed class TranslationExportService
         IReadOnlyList<StoredTranslationUnit> units,
         CancellationToken cancellationToken)
     {
-        // Direct HTML export for PDF rendering
-        string htmlPath = Path.ChangeExtension(outputPath, ".html");
-        await WriteTextAsync(htmlPath, BuildHtml(translation, units), cancellationToken);
-        if (File.Exists(htmlPath))
+        string? customPath = null;
+        if (pdfExportSettings != null)
         {
-            File.Move(htmlPath, outputPath, overwrite: true);
+            PdfExportSettings settings = await pdfExportSettings.GetAsync(cancellationToken);
+            customPath = settings.LibreOfficePath;
+        }
+
+        string? executable = OnlyRag.Infrastructure.Export.PdfExportSettingsStore.ResolveLibreOfficeExecutable(customPath);
+        string tempDocxPath = Path.Combine(Path.GetTempPath(), $"onlyrag_pdf_{Guid.NewGuid():N}.docx");
+        string tempOutputDir = Path.Combine(Path.GetTempPath(), $"onlyrag_pdf_out_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempOutputDir);
+
+        try
+        {
+            WriteDocx(tempDocxPath, translation, units);
+
+            if (executable != null && File.Exists(executable))
+            {
+                using var process = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = executable,
+                        Arguments = $"--headless --convert-to pdf --outdir \"{tempOutputDir}\" \"{tempDocxPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    }
+                };
+
+                process.Start();
+                await process.WaitForExitAsync(cancellationToken);
+
+                string generatedPdf = Path.Combine(tempOutputDir, Path.ChangeExtension(Path.GetFileName(tempDocxPath), ".pdf"));
+                if (File.Exists(generatedPdf))
+                {
+                    File.Move(generatedPdf, outputPath, overwrite: true);
+                    return;
+                }
+            }
+
+            // Fallback to HTML formatting
+            string htmlContent = BuildHtml(translation, units);
+            await WriteTextAsync(outputPath, htmlContent, cancellationToken);
+        }
+        finally
+        {
+            if (File.Exists(tempDocxPath)) { try { File.Delete(tempDocxPath); } catch { } }
+            TryDeleteDirectory(tempOutputDir);
         }
     }
 

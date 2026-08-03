@@ -111,6 +111,8 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         CancellationToken cancellationToken)
     {
         int nextUnitIndex = checkpoint.NextUnitIndex;
+        int maxBatchTokens = Math.Clamp((translationNumCtx ?? 4096) / 2, 512, 4096);
+
         while (true)
         {
             StoredTranslation? current = await translations.GetAsync(payload.TranslationId, cancellationToken);
@@ -120,41 +122,58 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                 return;
             }
 
-            bool completedBatch = false;
+            var batchUnits = new List<StoredTranslationUnit>();
+            int currentBatchTokens = 0;
+
             for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 StoredTranslationUnit? unit = await translations.GetNextPendingUnitAsync(
                     payload.TranslationId,
-                    nextUnitIndex,
+                    nextUnitIndex + batchUnits.Count,
                     cancellationToken);
-                if (unit is null && nextUnitIndex > 0 && current.CompletedUnitCount < current.UnitCount)
+
+                if (unit is null && nextUnitIndex > 0 && batchUnits.Count == 0 && current.CompletedUnitCount < current.UnitCount)
                 {
                     nextUnitIndex = 0;
-                    continue;
+                    unit = await translations.GetNextPendingUnitAsync(payload.TranslationId, 0, cancellationToken);
                 }
 
-                if (unit is null)
+                if (unit is null) break;
+
+                int estimatedUnitTokens = EstimateTokens(unit.SourceText);
+                if (batchUnits.Count > 0 && currentBatchTokens + estimatedUnitTokens > maxBatchTokens)
                 {
-                    IReadOnlyList<StoredTranslationUnit> units = await translations.ListUnitsAsync(payload.TranslationId, cancellationToken);
-                    StoredTranslationUnit? failedUnit = units.FirstOrDefault(item => item.Status == "Failed");
-                    if (failedUnit is not null)
-                    {
-                        string error = failedUnit.Error ?? "Una o piu unita non sono state tradotte.";
-                        await translations.RefreshProgressAsync(payload.TranslationId, "Failed", error, cancellationToken);
-                        current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
-                    }
-
-                    await SaveCheckpointAsync(job, queue, current, int.MaxValue, "completed", cancellationToken);
-                    return;
+                    break;
                 }
 
-                UnitTranslationResult unitResult = await TranslateUnitWithRepairAsync(
-                    payload.TargetLanguage,
-                    unit,
-                    model,
-                    translationNumCtx,
-                    cancellationToken);
+                batchUnits.Add(unit);
+                currentBatchTokens += estimatedUnitTokens;
+            }
+
+            if (batchUnits.Count == 0)
+            {
+                IReadOnlyList<StoredTranslationUnit> units = await translations.ListUnitsAsync(payload.TranslationId, cancellationToken);
+                StoredTranslationUnit? failedUnit = units.FirstOrDefault(item => item.Status == "Failed");
+                if (failedUnit is not null)
+                {
+                    string error = failedUnit.Error ?? "Una o piu unita non sono state tradotte.";
+                    await translations.RefreshProgressAsync(payload.TranslationId, "Failed", error, cancellationToken);
+                    current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
+                }
+
+                await SaveCheckpointAsync(job, queue, current, int.MaxValue, "completed", cancellationToken);
+                return;
+            }
+
+            // Parallel execution across batchUnits with adaptive token batching
+            UnitTranslationResult[] results = await Task.WhenAll(batchUnits.Select(u =>
+                TranslateUnitWithRepairAsync(payload.TargetLanguage, u, model, translationNumCtx, cancellationToken)));
+
+            for (int i = 0; i < batchUnits.Count; i++)
+            {
+                StoredTranslationUnit unit = batchUnits[i];
+                UnitTranslationResult unitResult = results[i];
 
                 if (unitResult.IsFailure)
                 {
@@ -176,17 +195,11 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                         cancellationToken);
                     await translations.RefreshProgressAsync(payload.TranslationId, "Running", null, cancellationToken);
                 }
-                current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
                 nextUnitIndex = unit.UnitIndex + 1;
-                await SaveCheckpointAsync(job, queue, current, nextUnitIndex, "running", cancellationToken);
-                completedBatch = true;
             }
 
-            if (!completedBatch)
-            {
-                await SaveCheckpointAsync(job, queue, current, int.MaxValue, "completed", cancellationToken);
-                return;
-            }
+            current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
+            await SaveCheckpointAsync(job, queue, current, nextUnitIndex, "running", cancellationToken);
         }
     }
 
@@ -335,5 +348,11 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                     && !string.Equals(trimmed, "</source_text>", StringComparison.OrdinalIgnoreCase);
             });
         return string.Join('\n', lines).Trim();
+    }
+
+    private static int EstimateTokens(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        return Math.Max(1, (int)Math.Ceiling(text.Length / 3.5));
     }
 }

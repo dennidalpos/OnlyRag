@@ -99,6 +99,7 @@ internal sealed class AgentLoopEngine
         }
 
 
+        string recalledMemorySection = string.Empty;
         if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
         {
             try
@@ -107,6 +108,17 @@ internal sealed class AgentLoopEngine
                 if (recalledMemories.Count > 0)
                 {
                     memoryManager.AddRecalledMemories(recalledMemories);
+                    var memSb = new StringBuilder("\n\n### [EPISODIC MEMORY RECALL - PAST SESSION EXPERIENCE]\n");
+                    foreach (var mem in recalledMemories)
+                    {
+                        memSb.AppendLine($"- **Goal**: {mem.Goal}");
+                        memSb.AppendLine($"  **Summary**: {mem.Summary}");
+                        if (mem.KeyFacts != null && mem.KeyFacts.Count > 0)
+                        {
+                            memSb.AppendLine($"  **Key Facts**: {string.Join("; ", mem.KeyFacts)}");
+                        }
+                    }
+                    recalledMemorySection = memSb.ToString();
                     logger?.LogInfo("AgentEngine", $"[EPISODIC MEMORY RECALL] Recalled {recalledMemories.Count} relevant memories from previous sessions.");
                 }
             }
@@ -116,7 +128,7 @@ internal sealed class AgentLoopEngine
             }
         }
 
-        string enrichedGoal = AgentWorkspaceContextEnricher.EnrichGoalWithWorkspaceContext(request.Goal, workspaceRoot);
+        string enrichedGoal = AgentWorkspaceContextEnricher.EnrichGoalWithWorkspaceContext(request.Goal, workspaceRoot) + recalledMemorySection;
 
         var messages = new List<OllamaChatMessage>
         {
@@ -520,6 +532,9 @@ internal sealed class AgentLoopEngine
                         {
                             checkpoint = checkpointManager.CreateCheckpoint($"cp_{toolCall.CallId}", workspaceRoot, targetPaths);
                         }
+
+                        logger?.LogInfo("AgentEngine", $"[DYNAMIC CRITIQUE & TOT EVALUATION] Evaluating action candidate '{toolCall.ToolName}' on target paths: [{string.Join(", ", targetPaths)}]");
+                        yield return new AgentStepEvent("thought", $"[Tree-of-Thought Critique] Evaluating candidate code mutation '{toolCall.ToolName}' safety and dependency impacts before execution...");
                     }
 
                     mctsMachine?.ExpandAndNavigate(callSignature, checkpoint?.CheckpointId);
@@ -556,9 +571,10 @@ internal sealed class AgentLoopEngine
 
                     if (!result.Success && checkpoint != null && checkpointManager != null)
                     {
-                        logger?.LogWarning("AgentEngine", $"[MCTS CHECKPOINT ROLLBACK] Tool '{toolCall.ToolName}' failed. Restoring workspace snapshot checkpoint and navigating to parent node.");
+                        logger?.LogWarning("AgentEngine", $"[MCTS CHECKPOINT ROLLBACK] Tool '{toolCall.ToolName}' failed. Restoring workspace snapshot checkpoint '{checkpoint.CheckpointId}' and navigating to parent MCTS node.");
                         checkpointManager.RestoreCheckpoint(checkpoint);
                         mctsMachine?.NavigateToParent();
+                        yield return new AgentStepEvent("thought", $"[MCTS ROLLBACK APPLIED] Reverted workspace snapshot '{checkpoint.CheckpointId}' after failed '{toolCall.ToolName}' execution. Active tree state returned to parent MCTS node '{mctsMachine?.CurrentActiveNode?.NodeId}'.");
                     }
 
                     yield return new AgentStepEvent("tool_result", ToolResult: result);

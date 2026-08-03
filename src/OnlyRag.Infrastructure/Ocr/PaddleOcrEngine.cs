@@ -124,6 +124,33 @@ public sealed class PaddleOcrEngine : IOcrEngine
             response.Height);
     }
 
+    public async Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(
+        IReadOnlyList<OcrPagePreparationRequest> requests,
+        int maxConcurrency = 4,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0) return [];
+
+        int concurrency = Math.Clamp(maxConcurrency, 1, 16);
+        using var semaphore = new SemaphoreSlim(concurrency, concurrency);
+
+        var tasks = requests.Select(async req =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                return await Task.Run(() => PreparePageAsync(req, cancellationToken), cancellationToken);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        return await Task.WhenAll(tasks);
+    }
+
     public async Task<OcrPageResult> RecognizeAsync(
         OcrRecognitionRequest request,
         CancellationToken cancellationToken = default)
@@ -149,6 +176,33 @@ public sealed class PaddleOcrEngine : IOcrEngine
             EngineName,
             string.IsNullOrWhiteSpace(response.EngineVersion) ? EngineVersion : response.EngineVersion,
             request.Language);
+    }
+
+    public async Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(
+        IReadOnlyList<OcrRecognitionRequest> requests,
+        int maxConcurrency = 4,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0) return [];
+
+        int concurrency = Math.Clamp(maxConcurrency, 1, 16);
+        using var semaphore = new SemaphoreSlim(concurrency, concurrency);
+
+        var tasks = requests.Select(async req =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                return await Task.Run(() => RecognizeAsync(req, cancellationToken), cancellationToken);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        return await Task.WhenAll(tasks);
     }
 
     internal static string[] BuildRecognizeArguments(OcrRecognitionRequest request)

@@ -38,6 +38,19 @@ public class AgentMctsStateMachineTests
     }
 
     [Fact]
+    public void MctsStateMachine_PrunesLowReflectionBranches()
+    {
+        var checkpointManager = new WorkspaceSnapshotCheckpointManager();
+        var stateMachine = new AgentMctsStateMachine(checkpointManager, "Test goal");
+
+        var badChild = stateMachine.ExpandAndNavigate("write_file:bad.cs");
+        stateMachine.EvaluateAndBackpropagateCurrent(success: true, hasCompilationError: false, reflectionScore: 0.1, minReflectionThreshold: 0.25);
+
+        Assert.True(badChild.IsTerminal);
+        Assert.Empty(stateMachine.Root.Children);
+    }
+
+    [Fact]
     public void WorkspaceSnapshotCheckpointManager_CapturesAndRestoresFiles()
     {
         string tempDir = Path.Combine(Path.GetTempPath(), $"onlyrag_mcts_test_{Guid.NewGuid():N}");

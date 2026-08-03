@@ -85,52 +85,97 @@ public sealed class SqliteQdrantEpisodicMemoryService : IAgentEpisodicMemoryServ
         }
 
         var results = new List<AgentEpisodicMemory>();
-        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+        var seenSessionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var words = currentGoal.Split(Separators, StringSplitOptions.RemoveEmptyEntries)
-                               .Where(w => w.Length >= 3)
-                               .Take(4)
-                               .ToList();
-
-        if (words.Count == 0)
+        // 1. Vector similarity search in Qdrant if vectorStore & embeddingGenerator available
+        if (vectorStore != null && embeddingGenerator != null)
         {
-            await using SqliteCommand cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT session_id, goal, summary, key_facts_json, created_at_utc
-                FROM agent_episodic_memories
-                ORDER BY id DESC
-                LIMIT $limit;
-                """;
-            cmd.AddParameter("$limit", topK);
-
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            try
             {
-                results.Add(ParseMemory(reader));
+                var embedRes = await embeddingGenerator.GenerateAsync(currentGoal, cancellationToken);
+                if (embedRes?.Vector != null && embedRes.Vector.Count > 0)
+                {
+                    var vectorMatches = await vectorStore.SearchAsync("agent-episodic-memory", embedRes.Vector, Array.Empty<long>(), topK, cancellationToken);
+                    if (vectorMatches.Count > 0)
+                    {
+                        var matchedHashIds = vectorMatches.Select(m => m.ChunkId).ToHashSet();
+                        await using SqliteConnection conn = await connectionFactory.OpenConnectionAsync(cancellationToken);
+                        await using SqliteCommand cmd = conn.CreateCommand();
+                        cmd.CommandText = "SELECT session_id, goal, summary, key_facts_json, created_at_utc FROM agent_episodic_memories ORDER BY id DESC;";
+                        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                        while (await reader.ReadAsync(cancellationToken))
+                        {
+                            var mem = ParseMemory(reader);
+                            long hashId = Math.Abs(mem.SessionId.GetHashCode());
+                            if (matchedHashIds.Contains(hashId) && seenSessionIds.Add(mem.SessionId))
+                            {
+                                results.Add(mem);
+                            }
+                        }
+                    }
+                }
             }
-            return results;
+            catch
+            {
+                // Vector search failure falls back to keyword SQLite search.
+            }
         }
 
-        foreach (string word in words)
+        // 2. Keyword fallback / augmentation via SQLite LIKE queries
+        if (results.Count < topK)
         {
-            await using SqliteCommand cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT session_id, goal, summary, key_facts_json, created_at_utc
-                FROM agent_episodic_memories
-                WHERE goal LIKE $pattern OR summary LIKE $pattern
-                ORDER BY id DESC
-                LIMIT $limit;
-                """;
-            cmd.AddParameter("$pattern", $"%{word}%");
-            cmd.AddParameter("$limit", topK);
+            await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
 
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            var words = currentGoal.Split(Separators, StringSplitOptions.RemoveEmptyEntries)
+                                   .Where(w => w.Length >= 3)
+                                   .Take(4)
+                                   .ToList();
+
+            if (words.Count == 0)
             {
-                var mem = ParseMemory(reader);
-                if (!results.Any(r => r.SessionId.Equals(mem.SessionId, StringComparison.OrdinalIgnoreCase)))
+                await using SqliteCommand cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                    SELECT session_id, goal, summary, key_facts_json, created_at_utc
+                    FROM agent_episodic_memories
+                    ORDER BY id DESC
+                    LIMIT $limit;
+                    """;
+                cmd.AddParameter("$limit", topK);
+
+                await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
                 {
-                    results.Add(mem);
+                    var mem = ParseMemory(reader);
+                    if (seenSessionIds.Add(mem.SessionId))
+                    {
+                        results.Add(mem);
+                    }
+                }
+            }
+            else
+            {
+                foreach (string word in words)
+                {
+                    await using SqliteCommand cmd = connection.CreateCommand();
+                    cmd.CommandText = """
+                        SELECT session_id, goal, summary, key_facts_json, created_at_utc
+                        FROM agent_episodic_memories
+                        WHERE goal LIKE $pattern OR summary LIKE $pattern
+                        ORDER BY id DESC
+                        LIMIT $limit;
+                        """;
+                    cmd.AddParameter("$pattern", $"%{word}%");
+                    cmd.AddParameter("$limit", topK);
+
+                    await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                    while (await reader.ReadAsync(cancellationToken))
+                    {
+                        var mem = ParseMemory(reader);
+                        if (seenSessionIds.Add(mem.SessionId))
+                        {
+                            results.Add(mem);
+                        }
+                    }
                 }
             }
         }

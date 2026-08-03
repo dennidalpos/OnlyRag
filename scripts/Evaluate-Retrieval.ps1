@@ -92,6 +92,29 @@ function Measure-Case {
     $recallAtK = $hits.Count / [double]$expectedChunkIds.Count
     $reciprocalRank = if ($null -eq $firstRelevantRank) { 0.0 } else { 1.0 / [double]$firstRelevantRank }
 
+    $dcgAtK = 0.0
+    $hitsCount = 0
+    $sumPrecision = 0.0
+
+    for ($index = 0; $index -lt $returnedChunkIds.Count; $index++) {
+        $rank = $index + 1
+        if ($expectedChunkIds -contains $returnedChunkIds[$index]) {
+            $hitsCount++
+            $sumPrecision += ($hitsCount / [double]$rank)
+            $dcgAtK += (1.0 / [Math]::Log2($rank + 1))
+        }
+    }
+
+    $maxPossibleHits = [Math]::Min($CaseTopK, $expectedChunkIds.Count)
+    $apAtK = if ($maxPossibleHits -gt 0) { $sumPrecision / [double]$maxPossibleHits } else { 0.0 }
+
+    $idcgAtK = 0.0
+    for ($rank = 1; $rank -le $maxPossibleHits; $rank++) {
+        $idcgAtK += (1.0 / [Math]::Log2($rank + 1))
+    }
+
+    $ndcgAtK = if ($idcgAtK -gt 0.0) { $dcgAtK / $idcgAtK } else { 0.0 }
+
     return [ordered]@{
         id = [string]$Case.id
         query = [string]$Case.query
@@ -101,6 +124,8 @@ function Measure-Case {
         hitChunkIds = $hits
         recallAtK = [Math]::Round($recallAtK, 4)
         reciprocalRank = [Math]::Round($reciprocalRank, 4)
+        apAtK = [Math]::Round($apAtK, 4)
+        ndcgAtK = [Math]::Round($ndcgAtK, 4)
         firstRelevantRank = $firstRelevantRank
         contextCharacters = $contextCharacters
         maxContextCharacters = $Response.maxContextCharacters
@@ -148,6 +173,8 @@ foreach ($case in $cases) {
 
 $averageRecall = ($evaluatedCases | ForEach-Object { [double]$_["recallAtK"] } | Measure-Object -Average).Average
 $mrr = ($evaluatedCases | ForEach-Object { [double]$_["reciprocalRank"] } | Measure-Object -Average).Average
+$mapAtK = ($evaluatedCases | ForEach-Object { [double]$_["apAtK"] } | Measure-Object -Average).Average
+$ndcgAtK = ($evaluatedCases | ForEach-Object { [double]$_["ndcgAtK"] } | Measure-Object -Average).Average
 $averageContextCharacters = ($evaluatedCases | ForEach-Object { [double]$_["contextCharacters"] } | Measure-Object -Average).Average
 $evaluatedCaseArray = $evaluatedCases.ToArray()
 
@@ -159,6 +186,8 @@ $report = [ordered]@{
     summary = [ordered]@{
         recallAtK = [Math]::Round([double]$averageRecall, 4)
         mrr = [Math]::Round([double]$mrr, 4)
+        mapAtK = [Math]::Round([double]$mapAtK, 4)
+        ndcgAtK = [Math]::Round([double]$ndcgAtK, 4)
         averageContextCharacters = [Math]::Round([double]$averageContextCharacters, 2)
     }
     cases = $evaluatedCaseArray
@@ -171,4 +200,4 @@ if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
 
 $report | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $OutputPath -Encoding utf8
 Write-Host "Retrieval evaluation written to $OutputPath"
-Write-Host "recall@$defaultTopK=$($report.summary.recallAtK) mrr=$($report.summary.mrr) avgContextChars=$($report.summary.averageContextCharacters)"
+Write-Host "recall@$defaultTopK=$($report.summary.recallAtK) mrr=$($report.summary.mrr) map@$defaultTopK=$($report.summary.mapAtK) ndcg@$defaultTopK=$($report.summary.ndcgAtK) avgContextChars=$($report.summary.averageContextCharacters)"

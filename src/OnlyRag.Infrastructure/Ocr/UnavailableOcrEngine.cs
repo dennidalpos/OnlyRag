@@ -31,8 +31,24 @@ public sealed class UnavailableOcrEngine : IOcrEngine
         throw new OcrEngineUnavailableException("Runtime OCR non installato.");
     }
 
+    public Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(
+        IReadOnlyList<OcrPagePreparationRequest> requests,
+        int maxConcurrency = 4,
+        CancellationToken cancellationToken = default)
+    {
+        throw new OcrEngineUnavailableException("Runtime OCR non installato.");
+    }
+
     public Task<OcrPageResult> RecognizeAsync(
         OcrRecognitionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        throw new OcrEngineUnavailableException("Runtime OCR non installato.");
+    }
+
+    public Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(
+        IReadOnlyList<OcrRecognitionRequest> requests,
+        int maxConcurrency = 4,
         CancellationToken cancellationToken = default)
     {
         throw new OcrEngineUnavailableException("Runtime OCR non installato.");

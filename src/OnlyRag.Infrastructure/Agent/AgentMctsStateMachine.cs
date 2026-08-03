@@ -111,20 +111,49 @@ public sealed class AgentMctsStateMachine
     }
 
     /// <summary>
-    /// Evaluates outcome for the current active node, backpropagates reward, and flags terminal state on total failure.
+    /// Evaluates outcome for the current active node, backpropagates reward, and flags terminal state or prunes branches on low reflection score.
     /// </summary>
-    public double EvaluateAndBackpropagateCurrent(bool success, bool hasCompilationError, double reflectionScore = 0.5)
+    public double EvaluateAndBackpropagateCurrent(bool success, bool hasCompilationError, double reflectionScore = 0.5, double minReflectionThreshold = 0.25)
     {
         double reward = EvaluateReward(success, hasCompilationError, reflectionScore);
         currentActiveNode.ReflectionScore = reflectionScore;
 
-        if (!success)
+        if (!success || reflectionScore < minReflectionThreshold)
         {
             currentActiveNode.IsTerminal = true;
         }
 
         Backpropagate(currentActiveNode, reward);
+        PruneLowReflectionBranches(minReflectionThreshold);
         return reward;
+    }
+
+    /// <summary>
+    /// Prunes branches in the MCTS tree whose reflection score falls below the minimum threshold.
+    /// </summary>
+    public int PruneLowReflectionBranches(double minReflectionThreshold = 0.25)
+    {
+        return PruneNodeRecursive(rootNode, minReflectionThreshold);
+    }
+
+    private int PruneNodeRecursive(AgentMctsNode node, double minReflectionThreshold)
+    {
+        int prunedCount = 0;
+        for (int i = node.Children.Count - 1; i >= 0; i--)
+        {
+            var child = node.Children[i];
+            if (child.VisitCount > 0 && child.ReflectionScore < minReflectionThreshold)
+            {
+                child.IsTerminal = true;
+                node.Children.RemoveAt(i);
+                prunedCount++;
+            }
+            else
+            {
+                prunedCount += PruneNodeRecursive(child, minReflectionThreshold);
+            }
+        }
+        return prunedCount;
     }
 
     /// <summary>

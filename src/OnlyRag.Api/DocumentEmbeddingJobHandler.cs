@@ -151,6 +151,7 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                 numCtx,
                 cancellationToken);
 
+            var batchPayloads = new List<OnlyRag.Infrastructure.Vector.QdrantChunkPayload>();
             for (int index = 0; index < chunks.Count; index++)
             {
                 IReadOnlyList<float> vector = vectors[index];
@@ -158,15 +159,20 @@ internal sealed class DocumentEmbeddingJobHandler : ILocalJobHandler
                 {
                     throw new InvalidOperationException("Ollama returned an empty embedding.");
                 }
-
-                await vectorStore.UpsertChunkAsync(
+                batchPayloads.Add(new OnlyRag.Infrastructure.Vector.QdrantChunkPayload(
                     chunks[index].Id,
                     chunks[index].DocumentId,
                     chunks[index].ChunkIndex,
                     model,
                     chunks[index].ContentHash,
-                    vector,
-                    cancellationToken);
+                    vector));
+            }
+
+            await vectorStore.UpsertChunkBatchAsync(batchPayloads, cancellationToken);
+
+            for (int index = 0; index < chunks.Count; index++)
+            {
+                IReadOnlyList<float> vector = vectors[index];
                 await embeddings.MarkChunkIndexedAsync(
                     chunks[index].Id,
                     model,

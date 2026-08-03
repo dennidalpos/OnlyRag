@@ -91,17 +91,42 @@ public sealed class SubagentRunner : ISubagentRunner
         try
         {
             using var scope = serviceProvider.CreateScope();
+            var cacheRepo = scope.ServiceProvider.GetService<OnlyRag.Infrastructure.Agent.Memory.ISubagentReportCacheRepository>();
+            if (cacheRepo != null)
+            {
+                try
+                {
+                    var cached = await cacheRepo.GetCachedReportAsync(spec.Role, spec.Prompt, workspaceRoot, cancellationToken);
+                    if (cached != null)
+                    {
+                        logger?.LogInfo("SubagentRunner", $"[SUBAGENT CACHE HIT] Role: '{spec.Role}', PromptHash: '{cached.PromptHash}'");
+                        return new SubagentExecutionResult(spec.Role, true, cached.ReportMarkdown, string.Empty, cached.KeyFacts, cached.ModifiedFiles);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning("SubagentRunner", $"Subagent cache check failed: {ex.Message}");
+                }
+            }
+
             var engine = scope.ServiceProvider.GetRequiredService<AgentLoopEngine>();
 
-            bool isReadOnlyRole = spec.Role.Contains("research", StringComparison.OrdinalIgnoreCase) ||
-                                  spec.Role.Contains("explore", StringComparison.OrdinalIgnoreCase) ||
-                                  spec.Role.Contains("inspect", StringComparison.OrdinalIgnoreCase) ||
-                                  spec.Role.Contains("audit", StringComparison.OrdinalIgnoreCase);
-
+            string roleLower = spec.Role.ToLowerInvariant();
+            bool isReadOnlyRole = roleLower.Contains("research") || roleLower.Contains("explore") || roleLower.Contains("inspect") || roleLower.Contains("audit");
             string mode = isReadOnlyRole ? "ask" : "write";
-            string roleInstruction = isReadOnlyRole
-                ? "[SUBAGENT ROLE DIRECTIVE - RESEARCHER & EXPLORER]\nYou are a specialized read-only research and exploration subagent. Focus on inspection, ripgrep, and web search. Do NOT modify files."
-                : $"[SUBAGENT ROLE DIRECTIVE - {spec.Role.ToUpperInvariant()}]\nYou are an autonomous subagent focused on this specific sub-goal. Execute the necessary actions and produce a clear report of results.";
+
+            string roleInstruction = roleLower switch
+            {
+                var r when r.Contains("architect") =>
+                    "[SUBAGENT ROLE DIRECTIVE - ARCHITECT]\nYou are a senior system architect subagent. Focus on high-level system decomposition, API contract design, layer boundaries, and structural dependency planning. Provide clear architectural blueprints and recommendations.",
+                var r when r.Contains("research") || r.Contains("explore") || r.Contains("inspect") || r.Contains("audit") =>
+                    "[SUBAGENT ROLE DIRECTIVE - RESEARCH & EXPLORATION]\nYou are a specialized read-only research subagent. Focus on codebase search, ripgrep inspection, documentation review, and web search. Do NOT modify workspace code files.",
+                var r when r.Contains("refactor") || r.Contains("clean") =>
+                    "[SUBAGENT ROLE DIRECTIVE - REFACTOR & CLEANUP]\nYou are a code refactoring subagent. Focus on eliminating technical debt, simplifying complex methods, preserving existing public API contracts, and ensuring clean AST symbol renaming.",
+                var r when r.Contains("verifier") || r.Contains("verifier") || r.Contains("test") || r.Contains("audit") =>
+                    "[SUBAGENT ROLE DIRECTIVE - VERIFIER & TESTER]\nYou are a QA verification subagent. Focus on running build scripts, unit tests, static linter checks, and validating overall code health.",
+                _ => $"[SUBAGENT ROLE DIRECTIVE - {spec.Role.ToUpperInvariant()}]\nYou are an autonomous subagent focused on this specific sub-goal. Execute the necessary actions and produce a clear report of results."
+            };
 
             var runRequest = new AgentRunRequest(
                 Goal: $"{roleInstruction}\n\n[ASSIGNED OBJECTIVE]\n{spec.Prompt}",
@@ -150,6 +175,25 @@ public sealed class SubagentRunner : ISubagentRunner
 
             string formattedResult = $"### [SUBAGENT OUTPUT: {spec.Role}]\n\n{agentOutput}";
             logger?.LogInfo("SubagentRunner", $"[SUBAGENT COMPLETE] Role: '{spec.Role}' finished execution.");
+
+            if (cacheRepo != null && !string.IsNullOrWhiteSpace(formattedResult))
+            {
+                try
+                {
+                    string promptHash = OnlyRag.Infrastructure.Agent.Memory.SqliteSubagentReportCacheRepository.ComputeHash($"{spec.Role.Trim().ToLowerInvariant()}:{spec.Prompt.Trim()}:{workspaceRoot.Trim().ToLowerInvariant()}");
+                    var cacheEntry = new OnlyRag.Infrastructure.Agent.Memory.CachedSubagentReport(
+                        spec.Role,
+                        promptHash,
+                        workspaceRoot,
+                        formattedResult,
+                        keyFacts,
+                        modifiedFiles,
+                        DateTimeOffset.UtcNow);
+                    await cacheRepo.SaveCachedReportAsync(cacheEntry, CancellationToken.None);
+                }
+                catch { }
+            }
+
             return new SubagentExecutionResult(spec.Role, true, formattedResult, string.Empty, keyFacts, modifiedFiles);
         }
         catch (Exception ex)
@@ -198,9 +242,10 @@ public sealed class SubagentRunner : ISubagentRunner
 
         string role = GetStringProp(elem, "role", "Role", "typeName", "TypeName", "subagent", "Subagent") ?? "Subagent";
         string? model = GetStringProp(elem, "model", "Model");
+        string? workspace = GetStringProp(elem, "workspace", "Workspace", "mode", "Mode");
         int maxIter = GetIntProp(elem, "max_iterations", "maxIterations", "MaxIterations") ?? DefaultSubagentMaxIterations;
 
-        return new SubagentSpec(role, prompt, model, maxIter);
+        return new SubagentSpec(role, prompt, model, maxIter, workspace);
     }
 
     private static string? GetStringProp(JsonElement elem, params string[] props)
@@ -227,5 +272,5 @@ public sealed class SubagentRunner : ISubagentRunner
         return null;
     }
 
-    private record SubagentSpec(string Role, string Prompt, string? Model, int MaxIterations);
+    private record SubagentSpec(string Role, string Prompt, string? Model, int MaxIterations, string? Workspace = null);
 }

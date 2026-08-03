@@ -21,6 +21,8 @@ public sealed class RerankerModelManager
     public const string DefaultModelId = "bge-reranker-base";
     public const string DefaultModelFileName = "bge-reranker-base.onnx";
     public const string DefaultDownloadUrl = "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/onnx/model.onnx";
+    public const string VocabFileName = "vocab.txt";
+    public const string VocabDownloadUrl = "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/vocab.txt";
 
     private readonly AppStoragePaths storagePaths;
     private readonly HttpClient httpClient;
@@ -43,15 +45,16 @@ public sealed class RerankerModelManager
 
     public string GetDefaultModelPath() => Path.Combine(GetModelDirectory(), DefaultModelFileName);
 
-    public string GetVocabPath() => Path.Combine(GetModelDirectory(), "vocab.txt");
+    public string GetVocabPath() => Path.Combine(GetModelDirectory(), VocabFileName);
 
     public Task<RerankerModelInfo> GetModelStatusAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         string modelPath = GetDefaultModelPath();
-        bool downloaded = File.Exists(modelPath);
-        long fileSize = downloaded ? new FileInfo(modelPath).Length : 560_000_000L;
+        string vocabPath = GetVocabPath();
+        bool downloaded = File.Exists(modelPath) && File.Exists(vocabPath);
+        long fileSize = downloaded ? (new FileInfo(modelPath).Length + new FileInfo(vocabPath).Length) : 560_000_000L;
 
         lock (lockObj)
         {
@@ -77,8 +80,10 @@ public sealed class RerankerModelManager
         string modelDirectory = GetModelDirectory();
         Directory.CreateDirectory(modelDirectory);
 
-        string targetPath = GetDefaultModelPath();
-        string tempPath = targetPath + ".tmp";
+        string targetModelPath = GetDefaultModelPath();
+        string targetVocabPath = GetVocabPath();
+        string tempModelPath = targetModelPath + ".tmp";
+        string tempVocabPath = targetVocabPath + ".tmp";
 
         lock (lockObj)
         {
@@ -96,44 +101,17 @@ public sealed class RerankerModelManager
 
         try
         {
-            using HttpResponseMessage response = await httpClient.GetAsync(
-                DefaultDownloadUrl,
-                HttpCompletionOption.ResponseHeadersRead,
-                token);
+            // 1. Download model.onnx
+            await DownloadFileWithProgressAsync(DefaultDownloadUrl, tempModelPath, 0.0d, 0.9d, progress, token);
 
-            response.EnsureSuccessStatusCode();
+            // 2. Download vocab.txt
+            await DownloadFileWithProgressAsync(VocabDownloadUrl, tempVocabPath, 0.9d, 1.0d, progress, token);
 
-            long? totalBytes = response.Content.Headers.ContentLength;
+            if (File.Exists(targetModelPath)) File.Delete(targetModelPath);
+            File.Move(tempModelPath, targetModelPath);
 
-            using (Stream source = await response.Content.ReadAsStreamAsync(token))
-            using (FileStream target = new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-            {
-                byte[] buffer = new byte[81920];
-                long totalRead = 0;
-                int bytesRead;
-
-                while ((bytesRead = await source.ReadAsync(buffer, token)) > 0)
-                {
-                    await target.WriteAsync(buffer.AsMemory(0, bytesRead), token);
-                    totalRead += bytesRead;
-
-                    if (totalBytes.HasValue && totalBytes.Value > 0)
-                    {
-                        double p = (double)totalRead / totalBytes.Value;
-                        lock (lockObj)
-                        {
-                            currentProgress = Math.Clamp(p, 0.0d, 1.0d);
-                        }
-                        progress?.Report(currentProgress);
-                    }
-                }
-            }
-
-            if (File.Exists(targetPath))
-            {
-                File.Delete(targetPath);
-            }
-            File.Move(tempPath, targetPath);
+            if (File.Exists(targetVocabPath)) File.Delete(targetVocabPath);
+            File.Move(tempVocabPath, targetVocabPath);
 
             lock (lockObj)
             {
@@ -145,10 +123,8 @@ public sealed class RerankerModelManager
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            if (File.Exists(tempPath))
-            {
-                try { File.Delete(tempPath); } catch { }
-            }
+            if (File.Exists(tempModelPath)) { try { File.Delete(tempModelPath); } catch { } }
+            if (File.Exists(tempVocabPath)) { try { File.Delete(tempVocabPath); } catch { } }
 
             lock (lockObj)
             {
@@ -168,6 +144,49 @@ public sealed class RerankerModelManager
         }
     }
 
+    private async Task DownloadFileWithProgressAsync(
+        string url,
+        string destinationPath,
+        double startProgress,
+        double endProgress,
+        IProgress<double>? progress,
+        CancellationToken token)
+    {
+        using HttpResponseMessage response = await httpClient.GetAsync(
+            url,
+            HttpCompletionOption.ResponseHeadersRead,
+            token);
+
+        response.EnsureSuccessStatusCode();
+
+        long? totalBytes = response.Content.Headers.ContentLength;
+
+        using (Stream source = await response.Content.ReadAsStreamAsync(token))
+        using (FileStream target = new(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+        {
+            byte[] buffer = new byte[81920];
+            long totalRead = 0;
+            int bytesRead;
+
+            while ((bytesRead = await source.ReadAsync(buffer, token)) > 0)
+            {
+                await target.WriteAsync(buffer.AsMemory(0, bytesRead), token);
+                totalRead += bytesRead;
+
+                if (totalBytes.HasValue && totalBytes.Value > 0)
+                {
+                    double fileP = (double)totalRead / totalBytes.Value;
+                    double overallP = startProgress + fileP * (endProgress - startProgress);
+                    lock (lockObj)
+                    {
+                        currentProgress = Math.Clamp(overallP, 0.0d, 1.0d);
+                    }
+                    progress?.Report(currentProgress);
+                }
+            }
+        }
+    }
+
     public Task CancelDownloadAsync()
     {
         lock (lockObj)
@@ -181,11 +200,35 @@ public sealed class RerankerModelManager
     {
         cancellationToken.ThrowIfCancellationRequested();
         string path = GetDefaultModelPath();
+        string vocabPath = GetVocabPath();
+        bool deleted = false;
         if (File.Exists(path))
         {
             File.Delete(path);
-            return Task.FromResult(true);
+            deleted = true;
         }
-        return Task.FromResult(false);
+        if (File.Exists(vocabPath))
+        {
+            File.Delete(vocabPath);
+            deleted = true;
+        }
+        return Task.FromResult(deleted);
+    }
+
+    public static double CalculateDynamicCutoffThreshold(double baseThreshold, double cragConfidenceScore)
+    {
+        double clampedBase = Math.Clamp(baseThreshold, 0.05, 0.95);
+        double clampedCrag = Math.Clamp(cragConfidenceScore, 0.0, 1.0);
+
+        if (clampedCrag >= 0.75)
+        {
+            return Math.Min(0.90, clampedBase + 0.10);
+        }
+        else if (clampedCrag >= 0.35)
+        {
+            return Math.Max(0.15, clampedBase - 0.10);
+        }
+
+        return clampedBase;
     }
 }

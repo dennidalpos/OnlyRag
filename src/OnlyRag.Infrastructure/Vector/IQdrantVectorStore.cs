@@ -2,6 +2,14 @@ using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Vector;
 
+public record QdrantChunkPayload(
+    long ChunkId,
+    long DocumentId,
+    int ChunkIndex,
+    string Model,
+    string ContentHash,
+    IReadOnlyList<float> Vector);
+
 public interface IQdrantVectorStore
 {
     string BackendName { get; }
@@ -23,6 +31,10 @@ public interface IQdrantVectorStore
         string model,
         string contentHash,
         IReadOnlyList<float> vector,
+        CancellationToken cancellationToken = default);
+
+    Task UpsertChunkBatchAsync(
+        IReadOnlyList<QdrantChunkPayload> chunks,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<VectorSearchResult>> SearchAsync(

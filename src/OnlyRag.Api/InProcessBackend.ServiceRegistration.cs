@@ -126,11 +126,13 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IAgentEpisodicMemoryService, SqliteQdrantEpisodicMemoryService>();
         services.AddSingleton<IAgentSkillRepository, SqliteAgentSkillRepository>();
         services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
+        services.AddSingleton<ISubagentReportCacheRepository, SqliteSubagentReportCacheRepository>();
         services.AddSingleton<IWorkspaceVectorIndexerService, WorkspaceVectorIndexerService>();
         services.AddSingleton<IAstDependencyGraphService, AstDependencyGraphService>();
         services.AddSingleton<IGraphRagAstSymbolIndexer, GraphRagAstSymbolIndexer>();
         services.AddSingleton<WorkspaceSnapshotCheckpointManager>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
+        services.AddSingleton<IRetrievalBenchmarkReportService, RetrievalBenchmarkReportService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();

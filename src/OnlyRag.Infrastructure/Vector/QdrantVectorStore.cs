@@ -63,30 +63,58 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         IReadOnlyList<float> vector,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(model);
-        ArgumentException.ThrowIfNullOrWhiteSpace(contentHash);
-        if (vector.Count == 0)
-        {
-            throw new ArgumentException("Vector must contain at least one dimension.", nameof(vector));
-        }
+        await UpsertChunkBatchAsync(
+            [new QdrantChunkPayload(chunkId, documentId, chunkIndex, model, contentHash, vector)],
+            cancellationToken);
+    }
 
-        string collection = BuildCollectionName(model, vector.Count);
+    public async Task UpsertChunkBatchAsync(
+        IReadOnlyList<QdrantChunkPayload> chunks,
+        CancellationToken cancellationToken = default)
+    {
+        if (chunks == null || chunks.Count == 0) return;
+
+        var groups = chunks
+            .Where(c => c.Vector.Count > 0 && !string.IsNullOrWhiteSpace(c.Model) && !string.IsNullOrWhiteSpace(c.ContentHash))
+            .GroupBy(c => BuildCollectionName(c.Model, c.Vector.Count));
+
         QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-        await EnsureCollectionAsync(client, collection, vector.Count, cancellationToken);
 
-        ulong pointId = checked((ulong)chunkId);
-        PointStruct point = new()
+        foreach (var group in groups)
         {
-            Id = new PointId { Num = pointId },
-            Vectors = vector.ToArray()
-        };
-        point.Payload["chunk_id"] = chunkId;
-        point.Payload["document_id"] = documentId;
-        point.Payload["chunk_index"] = chunkIndex;
-        point.Payload["model"] = model;
-        point.Payload["content_hash"] = contentHash;
+            cancellationToken.ThrowIfCancellationRequested();
+            string collection = group.Key;
+            int dimensions = group.First().Vector.Count;
 
-        await client.UpsertAsync(collection, [point], cancellationToken: cancellationToken);
+            QdrantQuantizationMode mode = _cachedSettings?.QuantizationMode ?? QdrantQuantizationMode.ScalarSQ8;
+            await EnsureCollectionAsync(client, collection, dimensions, mode, cancellationToken);
+
+            var uniqueChunks = group
+                .GroupBy(c => c.ContentHash)
+                .Select(g => g.First())
+                .ToList();
+
+            var points = uniqueChunks.Select(c =>
+            {
+                ulong pointId = checked((ulong)c.ChunkId);
+                PointStruct point = new()
+                {
+                    Id = new PointId { Num = pointId },
+                    Vectors = c.Vector.ToArray()
+                };
+                point.Payload["chunk_id"] = c.ChunkId;
+                point.Payload["document_id"] = c.DocumentId;
+                point.Payload["chunk_index"] = c.ChunkIndex;
+                point.Payload["model"] = c.Model;
+                point.Payload["content_hash"] = c.ContentHash;
+                return point;
+            }).ToList();
+
+            if (points.Count > 0)
+            {
+                await client.UpsertAsync(collection, points, cancellationToken: cancellationToken);
+            }
+        }
     }
 
     public async Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
@@ -217,6 +245,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         QdrantClient client,
         string collection,
         int dimensions,
+        QdrantQuantizationMode quantizationMode,
         CancellationToken cancellationToken)
     {
         if (await client.CollectionExistsAsync(collection, cancellationToken))
@@ -224,9 +253,31 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             return;
         }
 
+        QuantizationConfig? quantizationConfig = quantizationMode switch
+        {
+            QdrantQuantizationMode.ScalarSQ8 => new QuantizationConfig
+            {
+                Scalar = new ScalarQuantization
+                {
+                    Type = QuantizationType.Int8,
+                    AlwaysRam = true
+                }
+            },
+            QdrantQuantizationMode.ProductPQ => new QuantizationConfig
+            {
+                Product = new ProductQuantization
+                {
+                    Compression = CompressionRatio.X8,
+                    AlwaysRam = true
+                }
+            },
+            _ => null
+        };
+
         await client.CreateCollectionAsync(
             collection,
             new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
+            quantizationConfig: quantizationConfig,
             cancellationToken: cancellationToken);
     }
 

@@ -82,11 +82,21 @@ public sealed class DiagnosticsProbeCacheServiceTests
             throw new NotSupportedException();
         }
 
+        public Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(IReadOnlyList<OcrPagePreparationRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<OcrPageResult> RecognizeAsync(
             OcrRecognitionRequest request,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
+        }
+
+        public Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(IReadOnlyList<OcrRecognitionRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
         }
     }
 }

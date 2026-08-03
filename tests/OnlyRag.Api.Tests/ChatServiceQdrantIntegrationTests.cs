@@ -234,6 +234,17 @@ public sealed class ChatServiceQdrantIntegrationTests
             return Task.CompletedTask;
         }
 
+        public Task UpsertChunkBatchAsync(
+            IReadOnlyList<OnlyRag.Infrastructure.Vector.QdrantChunkPayload> chunks,
+            CancellationToken cancellationToken = default)
+        {
+            foreach (var c in chunks)
+            {
+                vectors.Add((new DocumentChunkForEmbedding(c.ChunkId, c.DocumentId, c.ChunkIndex, string.Empty, c.ContentHash), c.Model, c.Vector));
+            }
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
             string model,
             IReadOnlyList<float> queryVector,

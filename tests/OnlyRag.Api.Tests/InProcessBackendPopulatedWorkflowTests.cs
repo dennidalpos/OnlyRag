@@ -223,6 +223,21 @@ public sealed partial class InProcessBackendTests
             return Task.CompletedTask;
         }
 
+        public Task UpsertChunkBatchAsync(
+            IReadOnlyList<OnlyRag.Infrastructure.Vector.QdrantChunkPayload> chunks,
+            CancellationToken cancellationToken = default)
+        {
+            lock (vectors)
+            {
+                foreach (var c in chunks)
+                {
+                    vectors.RemoveAll(item => item.ChunkId == c.ChunkId && item.Model == c.Model);
+                    vectors.Add(new StoredVector(c.ChunkId, c.DocumentId, c.ChunkIndex, c.Model, c.Vector.ToArray()));
+                }
+            }
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
             string model,
             IReadOnlyList<float> queryVector,

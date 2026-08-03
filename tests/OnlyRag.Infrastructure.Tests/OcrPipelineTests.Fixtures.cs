@@ -62,6 +62,11 @@ public sealed partial class OcrPipelineTests
             return new OcrPagePreparation(output, hash, 100, 100);
         }
 
+        public Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(IReadOnlyList<OcrPagePreparationRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<OcrPageResult> RecognizeAsync(
             OcrRecognitionRequest request,
             CancellationToken cancellationToken = default)
@@ -70,6 +75,11 @@ public sealed partial class OcrPipelineTests
             LastLanguage = request.Language;
             LastSettings = request.Settings;
             return Task.FromResult(new OcrPageResult(text, [], confidence, EngineName, EngineVersion, request.Language));
+        }
+
+        public Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(IReadOnlyList<OcrRecognitionRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
         }
     }
 
