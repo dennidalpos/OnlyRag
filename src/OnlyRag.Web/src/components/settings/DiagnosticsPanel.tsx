@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 import { ProgressBar } from "../common/ProgressBar";
 import { LogViewerModal } from "../layout/LogViewerModal";
+import { InfoTip } from "../common/InfoTip";
 
 export function DiagnosticsPanel() {
   const [showLogViewer, setShowLogViewer] = useState(false);
@@ -57,7 +58,10 @@ export function DiagnosticsPanel() {
         {diagnostics ? (
           <>
             <div className="diagnostic-row">
-              <span className="diagnostic-label">Database</span>
+              <span className="diagnostic-label">
+                Database
+                <InfoTip label="Archivio locale">Percorso del database SQLite locale che conserva documenti, metadati e impostazioni.</InfoTip>
+              </span>
               <code className="diagnostic-value">{diagnostics.databasePath}</code>
             </div>
             <div className="diagnostic-row">
@@ -91,7 +95,10 @@ export function DiagnosticsPanel() {
               </div>
             )}
             <div className="diagnostic-row">
-              <span className="diagnostic-label">Qdrant</span>
+              <span className="diagnostic-label">
+                Qdrant
+                <InfoTip label="Indice vettoriale">Servizio locale che conserva i vettori usati per la ricerca semantica.</InfoTip>
+              </span>
               <span
                 className={`status-chip status-chip--${diagnostics.qdrant.isReachable ? "online" : "offline"}`}
               >
@@ -132,7 +139,10 @@ export function DiagnosticsPanel() {
             </div>
             {!noNvidiaGpu && (
               <div className="diagnostic-row">
-                <span className="diagnostic-label">Supporto OCR GPU</span>
+                <span className="diagnostic-label">
+                  Supporto OCR GPU
+                  <InfoTip label="Accelerazione OCR">Indica se il runtime OCR può usare una GPU NVIDIA per elaborare più velocemente le immagini.</InfoTip>
+                </span>
                 <span
                   className={`status-chip status-chip--${diagnostics.ocrGpuCapability.isUsable ? "online" : "offline"}`}
                 >

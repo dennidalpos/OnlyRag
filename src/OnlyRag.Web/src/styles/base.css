@@ -921,6 +921,29 @@ textarea:hover:not(:disabled) {
   margin: 0;
 }
 
+.setup-banner__details {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.setup-banner__details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.setup-banner__subitems {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.setup-banner__subitem {
+  line-height: 1.45;
+}
+
 .setup-banner__actions {
   display: flex;
   align-items: center;

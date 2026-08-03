@@ -1,5 +1,6 @@
 import { apiRequest, type LocalJob } from "../../api";
 import { ProgressBar } from "../common/ProgressBar";
+import { InfoTip } from "../common/InfoTip";
 import {
   formatModelSize
 } from "./SettingsSection.helpers";
@@ -31,7 +32,10 @@ export function ModelManagementPanel() {
   return (
         <div className="settings-card">
           <div className="settings-card__header">
-            <h3>Gestione modelli</h3>
+            <h3>
+              Gestione modelli
+              <InfoTip label="Modelli Ollama">I modelli sono scaricati e rimossi soltanto dal computer locale.</InfoTip>
+            </h3>
           </div>
           <div className="settings-form">
             <label className="field-group" htmlFor="model-install">

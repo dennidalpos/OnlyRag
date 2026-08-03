@@ -1,15 +1,16 @@
 {
   "todos": [
-    "Completare e verificare l'audit responsive nelle sezioni dell'app alle larghezze 320, 520, 700 e 980 px, correggendo sovrapposizioni, overflow e controlli non raggiungibili",
-    "Ridurre il testo informativo residuo in setup, diagnostica, gestione modelli e benchmark RAG mediante InfoTip o dettagli espandibili, preservando errori e stati operativi",
-    "Implementare autoriparazione OCR in background con un solo tentativo automatico per sessione, annullamento, timeout, avanzamento osservabile e fallback all'azione manuale",
-    "Aggiungere test unitari, di integrazione e UI per creazione, corruzione, riparazione, timeout e annullamento dell'ambiente virtuale OCR",
-    "Implementare il servizio di ingestione batch con coda, avanzamento per file, annullamento/ripresa e risultato aggregato",
-    "Implementare estrazione streaming sicura di archivi ZIP, TAR e 7Z con limiti configurabili di dimensione, numero file e profondità, più difese da path traversal e archive bomb",
-    "Collegare gli elementi estratti al flusso normale di importazione, deduplicazione e indicizzazione RAG preservando provenienza, stato e risultati per elemento",
-    "Aggiungere test per archivi validi e corrotti, limiti di sicurezza, duplicati, annullamento e ripresa dell'ingestione batch; aggiornare documentazione e skill RAG",
-    "Progettare il protocollo di pairing e autenticazione della sincronizzazione locale multi-dispositivo, inclusi identificativi dispositivo, autorizzazione esplicita e gestione sicura delle chiavi",
-    "Implementare sincronizzazione LAN cifrata AES-256 per snapshot consistenti di SQLite e indice Qdrant, con trasferimenti incrementali, verifica d'integrità e recupero da interruzioni",
-    "Aggiungere UI, diagnostica e test end-to-end per pairing, conflitti, cifratura, ripresa, ripristino e revoca della sincronizzazione multi-dispositivo; aggiornare documentazione operativa"
+    "P0 OCR: implementare autoriparazione del runtime in background, con un solo tentativo automatico per sessione, timeout, annullamento, avanzamento osservabile e fallback esplicito all'azione manuale",
+    "P0 OCR: aggiungere test unitari, integrazione e UI per creazione, corruzione, riparazione, timeout, annullamento e fallback dell'ambiente virtuale OCR",
+    "P1 Ingestione: definire i limiti configurabili e implementare l'estrazione streaming sicura di ZIP, TAR e 7Z, con difese da path traversal, archive bomb, eccesso di file, dimensione e profondita'",
+    "P1 Ingestione: implementare la coda batch con avanzamento per file, annullamento, ripresa e risultato aggregato",
+    "P1 Ingestione: integrare gli elementi estratti nell'importazione, deduplicazione e indicizzazione RAG, preservando provenienza, stato e risultato di ogni elemento",
+    "P1 Ingestione: aggiungere test per archivi validi e corrotti, limiti di sicurezza, duplicati, annullamento e ripresa; aggiornare documentazione e skill RAG",
+    "P2 Sincronizzazione: progettare e documentare il protocollo LAN di pairing e autenticazione, inclusi identificativi dispositivo, consenso esplicito, modello di minaccia e gestione sicura delle chiavi",
+    "P2 Sincronizzazione: implementare il pairing, la persistenza locale dei dispositivi autorizzati e la revoca sicura delle autorizzazioni",
+    "P2 Sincronizzazione: implementare snapshot consistenti di SQLite e Qdrant con cifratura AES-256, trasferimento incrementale, verifica d'integrita' e ripresa dopo interruzioni",
+    "P2 Sincronizzazione: implementare rilevazione e risoluzione dei conflitti, ripristino verificato e pulizia sicura degli artefatti temporanei",
+    "P2 Sincronizzazione: aggiungere UI e diagnostica per pairing, stato trasferimenti, conflitti, ripristino e revoca",
+    "P2 Sincronizzazione: aggiungere test unitari, integrazione ed end-to-end per pairing, cifratura, conflitti, ripresa, ripristino e revoca; aggiornare documentazione operativa e skill pertinenti"
   ]
 }

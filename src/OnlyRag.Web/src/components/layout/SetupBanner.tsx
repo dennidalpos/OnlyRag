@@ -83,18 +83,27 @@ export function SetupBanner({
             </p>
           )}
           {items.length > 1 && (
-            <div className="setup-banner__subitems">
-              {items.map((item) => (
-                <div key={item.key} className="setup-banner__subitem">
-                  <span>{item.title}</span>: <span>{item.detail}</span>
-                </div>
-              ))}
-            </div>
+            <details className="setup-banner__details">
+              <summary>Mostra tutti gli avvisi ({items.length})</summary>
+              <div className="setup-banner__subitems">
+                {items.map((item) => (
+                  <div key={item.key} className="setup-banner__subitem">
+                    <span>{item.title}</span>: <span>{item.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
-          {ocrProvisionStatus?.runtimeDetail && (
+          {ocrProvisionStatus?.runtimeDetail && ocrProvisionStatus.isRunning && (
             <p className="setup-banner__desc setup-banner__desc--muted">
               {ocrProvisionStatus.runtimeDetail}
             </p>
+          )}
+          {ocrProvisionStatus?.runtimeDetail && !ocrProvisionStatus.isRunning && (
+            <details className="setup-banner__details">
+              <summary>Dettagli runtime OCR</summary>
+              <p className="setup-banner__desc setup-banner__desc--muted">{ocrProvisionStatus.runtimeDetail}</p>
+            </details>
           )}
           {ocrLastCheckedAt && (
             <div className="sr-only">
