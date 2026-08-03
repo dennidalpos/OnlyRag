@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Gauge, Play, Activity, Clock, ShieldCheck, Zap, Server } from "lucide-react";
 import { runRagBenchmark } from "../../apiClient";
 import type { RetrievalBenchmarkReport } from "../../apiTypes/search";
+import { InfoTip } from "../common/InfoTip";
 
 export const RagBenchmarkPanel: React.FC = () => {
   const [report, setReport] = useState<RetrievalBenchmarkReport | null>(null);
@@ -29,13 +30,11 @@ export const RagBenchmarkPanel: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-indigo-400" />
-            <h2 className="text-xl font-bold text-slate-100">
-              Benchmarking Prestazioni Retrieval RAG
-            </h2>
+            <h2 className="text-xl font-bold text-slate-100">Benchmark Retrieval RAG</h2>
+            <InfoTip label="Metriche incluse">
+              Misura le latenze di embedding, Qdrant HNSW, SQLite FTS5 e re-ranking, oltre al punteggio di confidenza CRAG.
+            </InfoTip>
           </div>
-          <p className="mt-1 text-sm text-slate-400">
-            Diagnostica in tempo reale delle latenze di embedding, Qdrant HNSW, SQLite FTS5, Re-Ranking e punteggi di confidenza CRAG.
-          </p>
         </div>
 
         <button
@@ -196,7 +195,7 @@ export const RagBenchmarkPanel: React.FC = () => {
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/20 p-8 text-center text-slate-400">
-          Clicca su <strong className="text-slate-200">"Esegui Benchmark Ora"</strong> per avviare il test di misurazione delle prestazioni del retrieval RAG.
+          Nessun report disponibile.
         </div>
       )}
     </div>

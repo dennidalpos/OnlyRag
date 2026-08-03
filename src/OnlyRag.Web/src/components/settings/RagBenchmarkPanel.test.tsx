@@ -10,7 +10,8 @@ vi.mock("../../apiClient", () => ({
 describe("RagBenchmarkPanel", () => {
   it("renders benchmark launch button", () => {
     render(<RagBenchmarkPanel />);
-    expect(screen.getByText("Benchmarking Prestazioni Retrieval RAG")).toBeInTheDocument();
+    expect(screen.getByText("Benchmark Retrieval RAG")).toBeInTheDocument();
+    expect(screen.getByTitle("Metriche incluse")).toBeInTheDocument();
     expect(screen.getByText("Esegui Benchmark Ora")).toBeInTheDocument();
   });
 

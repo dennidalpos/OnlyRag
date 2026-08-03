@@ -153,16 +153,22 @@ public sealed class DependencyProvisioningService
             };
         }
 
-        string message = string.IsNullOrWhiteSpace(availability.Message)
-            || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
-            ? "OCR to install. Use Install OCR to prepare local dependencies automatically."
-            : availability.Message;
+        OcrRuntimeEnvironmentDiagnostic environmentDiagnostic = new OcrRuntimeEnvironment(ResolveOcrInstallRoot()).Inspect();
+        string message = environmentDiagnostic.State switch
+        {
+            "corrupt" or "incomplete" => "Runtime OCR locale incompleto o danneggiato. Usa Ripara OCR per ricrearlo in sicurezza.",
+            _ => string.IsNullOrWhiteSpace(availability.Message)
+                || availability.Message.Contains("Bootstrap", StringComparison.OrdinalIgnoreCase)
+                ? "OCR to install. Use Install OCR to prepare local dependencies automatically."
+                : availability.Message
+        };
 
         return new OcrProvisionStatus(
             false,
             false,
             message,
             null,
+            RuntimeDetail: environmentDiagnostic.Detail,
             UpdatedAtUtc: DateTimeOffset.UtcNow,
             StepKey: "not-configured",
             StepLabel: "OCR to install",
@@ -281,43 +287,24 @@ public sealed class DependencyProvisioningService
             OcrPythonCommand python = await ResolveOcrPythonCommandAsync(cancellationToken);
 
             string installRoot = ResolveOcrInstallRoot();
-            string venvPath = Path.Combine(installRoot, ".venv");
-            string venvPython = Path.Combine(venvPath, "Scripts", "python.exe");
-            Directory.CreateDirectory(installRoot);
+            OcrRuntimeEnvironment environment = new(installRoot);
+            OcrRuntimeEnvironmentDiagnostic environmentDiagnostic = environment.Inspect();
+            using OcrRuntimeEnvironmentTransaction transaction = environment.BeginTransaction();
+            string venvPython = transaction.PythonPath;
 
-            bool createVenv = !File.Exists(venvPython);
-            if (!createVenv)
-            {
-                LocalProcessResult venvVersionResult = await processLauncher.RunAsync(
-                    venvPython,
-                    ["--version"],
-                    null,
-                    cancellationToken);
-                string venvVersionText = OcrPythonRuntime.GetVersionText(venvVersionResult);
-                Version? venvVersion = ParsePythonVersion(venvVersionText);
-                if (venvVersionResult.ExitCode != 0 || venvVersion is null || !IsSupportedOcrPythonVersion(venvVersion))
-                {
-                    Directory.Delete(venvPath, recursive: true);
-                    createVenv = true;
-                }
-            }
-
-            if (createVenv)
-            {
-                SetLastOcrStatus(CreateRunningOcrStatus(
-                    runtimeTarget,
-                    runtime.ResolvedRuntime,
-                    "OCR Python environment creation in progress.",
-                    $"Runtime folder: {installRoot}",
-                    "venv",
-                    "Environment creation",
-                    3));
-                await RunProcessAsync(
-                    python.FileName,
-                    python.WithArguments(["-m", "venv", venvPath]),
-                    null,
-                    cancellationToken);
-            }
+            SetLastOcrStatus(CreateRunningOcrStatus(
+                runtimeTarget,
+                runtime.ResolvedRuntime,
+                "OCR Python environment creation in progress.",
+                $"Building a new environment separately from the existing one ({environmentDiagnostic.State}).",
+                "venv",
+                "Environment creation",
+                3));
+            await RunProcessAsync(
+                python.FileName,
+                python.WithArguments(["-m", "venv", transaction.StagingPath]),
+                null,
+                cancellationToken);
 
             SetLastOcrStatus(CreateRunningOcrStatus(
                 runtimeTarget,
@@ -357,6 +344,7 @@ public sealed class DependencyProvisioningService
                 "Runtime verification",
                 7));
             await RunProcessAsync(venvPython, [bridgePath, "--mode", "check", "--device", runtime.IsNvidia ? "gpu" : "cpu"], null, cancellationToken);
+            transaction.Commit(runtime.ResolvedRuntime, runtime.RequirementsFileName);
 
             SetLastOcrStatus(new OcrProvisionStatus(
                 true,

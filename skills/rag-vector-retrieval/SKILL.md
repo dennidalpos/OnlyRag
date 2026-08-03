@@ -55,3 +55,6 @@ Evaluation metrics calculated:
 1. Always preserve document citation metadata (document id, file name, page number, chunk index, parent context) from ingestion through search response.
 2. Ensure graceful degrading when external endpoints (Ollama) or local services (Qdrant) are unresponsive.
 3. Protect database transactions when writing chunk embeddings; use batch inserts for vector updates to maintain responsiveness.
+4. Treat PaddleOCR as an optional, private runtime. Its virtual environment must be built in a
+   sibling staging directory and published only after a bridge health check; never repair packages
+   in the live environment or surface raw Python/pip output to the UI.

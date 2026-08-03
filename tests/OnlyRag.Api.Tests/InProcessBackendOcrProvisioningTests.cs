@@ -113,6 +113,7 @@ public sealed partial class InProcessBackendTests
 
             Assert.True(cancel.Started);
             await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForProvisionToStopAsync(dependencies, processLauncher);
         }
         finally
         {
@@ -192,5 +193,27 @@ public sealed partial class InProcessBackendTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    private static async Task WaitForProvisionToStopAsync(
+        DependencyProvisioningService dependencies,
+        ILocalProcessLauncher processLauncher)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            OcrProvisionStatus status = await dependencies.GetOcrStatusAsync(
+                new UnavailableOcrEngine(),
+                new OcrGpuCapabilityService(processLauncher),
+                CancellationToken.None);
+            if (!status.IsRunning)
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        throw new TimeoutException("OCR provisioning did not finish cancellation cleanup.");
     }
 }

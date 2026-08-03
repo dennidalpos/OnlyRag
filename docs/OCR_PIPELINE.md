@@ -16,6 +16,8 @@ prerequisites are prepared.
   and settings code.
 - [`src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs`](../src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs):
   runtime selection support used by the app.
+- [`src/OnlyRag.Api/OcrRuntimeEnvironment.cs`](../src/OnlyRag.Api/OcrRuntimeEnvironment.cs):
+  transactional lifecycle for the private virtual environment.
 
 ## Runtime Selection
 
@@ -23,6 +25,21 @@ Python 3.10 through 3.13 is supported. Python 3.14 is not supported by the pinne
 runtime. Provisioning selects NVIDIA GPU wheels only when compatible local driver/runtime signals
 are available; CPU OCR is the fallback. The app selects GPU automatically after Diagnostics proves
 OCR GPU usable, unless the user saved CPU manually.
+
+## Environment lifecycle and recovery
+
+The application-owned environment is `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`. Provisioning
+never changes that live directory while package installation is running: it creates a uniquely
+named sibling staging directory, installs the selected pinned requirements there, and performs the
+PaddleOCR bridge check there. Only a checked environment containing `Scripts\python.exe` and a
+runtime stamp is published. The previous environment is retained until publication succeeds, so a
+cancelled, timed-out, or failed installation leaves the last working environment untouched.
+
+Diagnostics classify the local environment as `missing`, `incomplete`, `corrupt`, or `ready`
+without exposing Python command output or local paths to the UI. The dependency status endpoint
+keeps progress, the selected runtime, a safe user-facing error, and a retry action. Use **Install
+OCR** (or **Repair OCR**) to rebuild an incomplete or corrupt runtime; the action may be cancelled
+from Diagnostics and has a 45-minute application timeout.
 
 ## Verification
 
