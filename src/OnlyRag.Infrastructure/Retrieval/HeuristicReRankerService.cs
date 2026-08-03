@@ -37,7 +37,7 @@ public sealed class HeuristicReRankerService : IReRankerService
                 .Select(m => m.Value)
                 .Where(w => w.Length > 2)
                 .ToList();
-            
+
             candidateTokensList.Add(tokens);
 
             HashSet<string> uniqueTokens = tokens.ToHashSet();
@@ -62,11 +62,11 @@ public sealed class HeuristicReRankerService : IReRankerService
             cancellationToken.ThrowIfCancellationRequested();
             ReRankCandidate candidate = candidates[i];
             double score = ComputeCrossScore(
-                normalizedQuery, 
-                queryTerms, 
-                queryBigramSet, 
-                idf, 
-                candidate.Content, 
+                normalizedQuery,
+                queryTerms,
+                queryBigramSet,
+                idf,
+                candidate.Content,
                 candidateTokensList[i]);
 
             results.Add(new ReRankResult(candidate.ChunkId, Math.Round(score, 4)));
@@ -90,11 +90,11 @@ public sealed class HeuristicReRankerService : IReRankerService
     }
 
     private static double ComputeCrossScore(
-        string normalizedQuery, 
-        HashSet<string> queryTerms, 
-        HashSet<string> queryBigramSet, 
-        Dictionary<string, double> idf, 
-        string content, 
+        string normalizedQuery,
+        HashSet<string> queryTerms,
+        HashSet<string> queryBigramSet,
+        Dictionary<string, double> idf,
+        string content,
         List<string> candidateTokens)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -147,7 +147,7 @@ public sealed class HeuristicReRankerService : IReRankerService
             }
         }
 
-        double bigramRatio = queryBigramSet.Count > 0 
+        double bigramRatio = queryBigramSet.Count > 0
             ? Math.Min((double)bigramMatches / queryBigramSet.Count, 1.0d)
             : 0d;
 

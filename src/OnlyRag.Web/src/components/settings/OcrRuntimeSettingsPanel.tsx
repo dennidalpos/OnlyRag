@@ -1,5 +1,5 @@
-import { SettingsRangeField } from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+import { SettingsRangeField } from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function OcrRuntimeSettingsPanel() {
   const {

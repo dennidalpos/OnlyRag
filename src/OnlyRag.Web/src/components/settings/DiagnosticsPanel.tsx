@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
-import { ProgressBar } from "../ProgressBar";
-import { LogViewerModal } from "../LogViewerModal";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
+import { ProgressBar } from "../common/ProgressBar";
+import { LogViewerModal } from "../layout/LogViewerModal";
 
 export function DiagnosticsPanel() {
   const [showLogViewer, setShowLogViewer] = useState(false);

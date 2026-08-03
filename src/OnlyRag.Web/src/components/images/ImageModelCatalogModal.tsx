@@ -7,7 +7,7 @@ import {
   type ImageModelLocalState,
   type ImageModelUrlVerificationResponse
 } from "../../api";
-import { formatFileSize } from "../DocumentsSection.formatting";
+import { formatFileSize } from "../documents/DocumentsSection.formatting";
 import { createEmptyModelDraft, modelTemplates, type ModelDraft } from "./imageTypes";
 
 type Props = {

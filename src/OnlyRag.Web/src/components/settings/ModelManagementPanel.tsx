@@ -1,9 +1,9 @@
 import { apiRequest, type LocalJob } from "../../api";
-import { ProgressBar } from "../ProgressBar";
+import { ProgressBar } from "../common/ProgressBar";
 import {
   formatModelSize
-} from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+} from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function ModelManagementPanel() {
   const {

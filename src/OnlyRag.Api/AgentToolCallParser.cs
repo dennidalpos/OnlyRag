@@ -255,6 +255,7 @@ internal static class AgentToolCallParser
             "write" or "writefile" or "create_file" or "create" or "write_to_file" => "write_file",
             "replace" or "replacefile" or "replace_content" or "edit" or "edit_file" => "replace_file_content",
             "multi_replace" or "multi_replace_file_content" or "batch_replace" => "multi_replace_file_content",
+            "apply_patch" or "git_diff_patch" or "diff_patch" or "apply_diff_patch" => "apply_diff_patch",
             "grep" or "search" or "find" or "grep_search" or "find_in_files" => "grep_search",
             "git_diff" or "git_status" or "git_diff_inspect" or "git" => "git_diff_inspect",
             "run" or "exec" or "execute" or "command" or "terminal" or "run_command" or "cmd" or "powershell" => "run_command",

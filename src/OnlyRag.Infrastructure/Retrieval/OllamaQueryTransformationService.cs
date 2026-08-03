@@ -36,7 +36,7 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         List<string> variants = strategy switch
         {
             QueryTransformationStrategy.MultiQuery => GenerateMultiQueryVariants(trimmed),
-            QueryTransformationStrategy.SubQuery => [trimmed],
+            QueryTransformationStrategy.SubQuery => GenerateSubQueryVariants(trimmed),
             QueryTransformationStrategy.HyDE => GenerateZeroShotHydeVariants(trimmed),
             _ => [trimmed]
         };
@@ -155,17 +155,17 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         foreach (string line in lines)
         {
             string cleanLine = CleanLine(line);
-            
+
             string[] words = cleanLine.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
             if (words.Length < 3) continue;
-            
+
             if (cleanLine.StartsWith("Here are", StringComparison.OrdinalIgnoreCase) ||
                 cleanLine.StartsWith("Alternative", StringComparison.OrdinalIgnoreCase) ||
                 cleanLine.StartsWith("Query", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
-            
+
             if (ComputeWordJaccard(query, cleanLine) > 0.85)
             {
                 continue;
@@ -263,6 +263,29 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
         return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    private static List<string> GenerateSubQueryVariants(string query)
+    {
+        List<string> list = [query];
+        string[] delimiters = [" and ", " e ", " vs ", " versus ", " compared to ", " confronta ", " oltre a ", " nonche ", " e anche ", " e ", " - ", " ; ", ", "];
+
+        foreach (string delim in delimiters)
+        {
+            if (query.Contains(delim, StringComparison.OrdinalIgnoreCase))
+            {
+                string[] parts = query.Split(new[] { delim }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (string part in parts)
+                {
+                    if (part.Length >= 4 && !list.Contains(part, StringComparer.OrdinalIgnoreCase))
+                    {
+                        list.Add(part);
+                    }
+                }
+            }
+        }
+
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     private static List<string> GenerateZeroShotHydeVariants(string query)
     {
         var list = new List<string> { query };
@@ -286,13 +309,13 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
     {
         var setA = new HashSet<string>(a.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
         var setB = new HashSet<string>(b.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
-        
+
         if (setA.Count == 0 && setB.Count == 0) return 1.0;
         if (setA.Count == 0 || setB.Count == 0) return 0.0;
-        
+
         int intersection = setA.Intersect(setB, StringComparer.OrdinalIgnoreCase).Count();
         int union = setA.Count + setB.Count - intersection;
-        
+
         return (double)intersection / union;
     }
 }

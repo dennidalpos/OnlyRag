@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { resolveBackendErrorMessage } from "./api";
-import { AppHeader } from "./components/AppHeader";
-import { ChatSection } from "./components/ChatSection";
-import { CodingSection } from "./components/CodingSection";
-import { DocumentsSection } from "./components/DocumentsSection";
-import { ImagesSection } from "./components/ImagesSection";
-import { JobsDrawer } from "./components/JobsDrawer";
-import { SectionId, Sidebar } from "./components/Sidebar";
-import { SettingsSection } from "./components/SettingsSection";
-import { SetupBanner } from "./components/SetupBanner";
-import { TranslationSection } from "./components/TranslationSection";
+import { AppHeader } from "./components/layout/AppHeader";
+import { ChatSection } from "./components/chat/ChatSection";
+import { CodingSection } from "./components/coding/CodingSection";
+import { DocumentsSection } from "./components/documents/DocumentsSection";
+import { ImagesSection } from "./components/images/ImagesSection";
+import { JobsDrawer } from "./components/layout/JobsDrawer";
+import { SectionId, Sidebar } from "./components/layout/Sidebar";
+import { SettingsSection } from "./components/settings/SettingsSection";
+import { SetupBanner } from "./components/layout/SetupBanner";
+import { TranslationSection } from "./components/translation/TranslationSection";
+import { CommandPaletteModal } from "./components/layout/CommandPaletteModal";
 import { QueryProvider } from "./context/QueryProvider";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { useAppSetup } from "./hooks/useAppSetup";
@@ -31,6 +32,7 @@ export function AppContent() {
   const [activeSection, setActiveSection] = useState<SectionId>("coding");
   const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const setup = useAppSetup();
 
@@ -41,6 +43,11 @@ export function AppContent() {
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey || event.metaKey) {
+        if (event.key.toLowerCase() === "k") {
+          event.preventDefault();
+          setIsCommandPaletteOpen((prev) => !prev);
+          return;
+        }
         switch (event.key) {
           case "1":
             event.preventDefault();
@@ -109,6 +116,7 @@ export function AppContent() {
           backendStatus={setup.backendStatus}
           diagnostics={setup.diagnostics}
           onOpenJobsDrawer={() => setIsJobsDrawerOpen(true)}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
         <section key={activeSection} className={`workspace-content workspace-content--${activeSection} workspace-section-animate`} aria-labelledby="workspace-title">
           {setup.statusChecked && setup.backendStatus.backendTone === "offline" && (
@@ -186,9 +194,18 @@ export function AppContent() {
         onClose={() => setIsJobsDrawerOpen(false)}
         onJobsChanged={() => void setup.backendQuery.refetch()}
       />
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectSection={(section) => {
+          setActiveSection(section);
+          setIsJobsDrawerOpen(false);
+        }}
+      />
     </div>
   );
 }
+
 
 export default function App() {
   return (

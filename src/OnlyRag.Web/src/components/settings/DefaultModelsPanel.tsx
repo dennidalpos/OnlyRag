@@ -3,8 +3,8 @@ import {
   UnifiedPresetBar,
   normalizeOptionalValue,
   type UnifiedPresetLevel
-} from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+} from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function DefaultModelsPanel() {
   const {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../../api";
 import type { AppLogLevel, LoggingSettings, LogStorageInfo } from "../../apiTypes/settings";
-import { LogViewerModal } from "../LogViewerModal";
+import { LogViewerModal } from "../layout/LogViewerModal";
 
 export function LoggingSettingsPanel() {
   const [minLevel, setMinLevel] = useState<AppLogLevel>("Trace");

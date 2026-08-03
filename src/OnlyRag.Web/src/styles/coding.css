@@ -29,11 +29,11 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--bg-card, #0f172a);
-  border: 1px solid var(--border-light, #334155);
-  border-radius: var(--radius-md, 10px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   padding: 14px 18px;
-  box-shadow: var(--shadow-md, 0 4px 14px rgba(0, 0, 0, 0.35));
+  box-shadow: var(--shadow-md);
   flex-shrink: 0;
 }
 
@@ -54,7 +54,7 @@
 .coding-hub-toolbar__title h2 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-main, #f8fafc);
+  color: var(--text-main);
   margin: 0;
   display: flex;
   align-items: center;
@@ -63,7 +63,7 @@
 
 .coding-hub-toolbar__subtitle {
   font-size: 0.8rem;
-  color: var(--text-light, #94a3b8);
+  color: var(--text-light);
 }
 
 .coding-hub-toolbar__actions {
@@ -82,23 +82,23 @@
 .coding-model-label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text-muted, #cbd5e1);
+  color: var(--text-muted);
 }
 
 .coding-model-select {
-  background: var(--bg-app, #0b0f19);
-  border: 1px solid var(--border-light, #334155);
-  color: var(--text-main, #f8fafc);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
   padding: 5px 10px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 0.82rem;
   font-weight: 500;
   outline: none;
-  transition: border-color var(--transition-fast, 0.15s ease);
+  transition: border-color var(--transition-fast);
 }
 
 .coding-model-select:focus {
-  border-color: var(--border-focus, #818cf8);
+  border-color: var(--border-focus);
 }
 
 /* WORKSPACE BADGE CHIP */
@@ -106,11 +106,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-app, #0b0f19);
-  border: 1px solid var(--border-light, #334155);
-  color: var(--accent-cyan, #38bdf8);
+  background: var(--primary-light);
+  border: 1px solid var(--border-light);
+  color: var(--accent-cyan);
   padding: 5px 12px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 0.82rem;
   max-width: 480px;
   min-width: 0;
@@ -120,7 +120,7 @@
 
 .workspace-badge-chip__path {
   font-weight: 600;
-  color: var(--text-main, #f8fafc);
+  color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -129,7 +129,7 @@
 }
 
 .workspace-badge-chip__count {
-  color: var(--text-light, #94a3b8);
+  color: var(--text-light);
   font-size: 0.78rem;
   flex-shrink: 0;
 }
@@ -137,13 +137,13 @@
 .workspace-badge-chip__remove-btn {
   background: transparent;
   border: none;
-  color: var(--text-light, #94a3b8);
+  color: var(--text-light);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 3px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   margin-left: 4px;
   flex-shrink: 0;
   transition: all 0.15s ease;
@@ -152,6 +152,71 @@
 .workspace-badge-chip__remove-btn:hover {
   background: rgba(239, 68, 68, 0.18);
   color: #f87171;
+}
+
+/* CHAT MESSAGES CONTAINER */
+.vibe-chat-messages {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  background: var(--bg-app);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.vibe-chat-empty-state {
+  margin: auto;
+  text-align: center;
+  color: var(--text-light);
+  max-width: 520px;
+  padding: 24px;
+}
+
+.vibe-chat-empty-state__icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.vibe-chat-empty-state__title {
+  color: var(--text-main);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.vibe-chat-empty-state__text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* MESSAGE BUBBLES */
+.vibe-message-bubble {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-glass);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  max-width: min(920px, 92%);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  animation: animate-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(12px);
+}
+
+.vibe-message-bubble--user {
+  align-self: flex-end;
+  border-color: var(--primary);
+  background: var(--primary-gradient);
+  color: #ffffff;
 }
 
 

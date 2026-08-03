@@ -2,8 +2,8 @@ import {
   SettingsFieldLabel,
   SettingsRangeField,
   normalizeOptionalValue
-} from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+} from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function PdfExportPanel() {
   const {

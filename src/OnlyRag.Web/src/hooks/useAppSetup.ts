@@ -7,7 +7,7 @@ import {
   type OllamaStatusResponse
 } from "../api";
 import { initializeAppLifecycleBridge } from "../appLifecycle";
-import { useOcrStartupPrompt } from "../components/useOcrStartupPrompt";
+import { useOcrStartupPrompt } from "../components/layout/useOcrStartupPrompt";
 import { useBackendStatusQuery } from "./useBackendStatusQuery";
 import { useDiagnosticsQuery } from "./useDiagnosticsQuery";
 import { useOllamaStatusQuery } from "./useOllamaStatusQuery";

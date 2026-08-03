@@ -75,7 +75,7 @@ public sealed class SubagentRunner : ISubagentRunner
             resultError ?? string.Empty);
     }
 
-    private async Task<(bool Success, string Output, string Error)> RunSingleSubagentAsync(
+    private async Task<SubagentExecutionResult> RunSingleSubagentAsync(
         SubagentSpec spec,
         string workspaceRoot,
         int nextDepth,
@@ -84,6 +84,9 @@ public sealed class SubagentRunner : ISubagentRunner
     {
         s_nestingDepth.Value = nextDepth;
         logger?.LogInfo("SubagentRunner", $"[SUBAGENT START] Role: '{spec.Role}', Prompt: '{spec.Prompt}'");
+
+        var keyFacts = new List<string>();
+        var modifiedFiles = new List<string>();
 
         try
         {
@@ -125,6 +128,17 @@ public sealed class SubagentRunner : ISubagentRunner
                 {
                     recentThoughts.Append(stepEvent.Content);
                 }
+                else if (stepEvent.Type == "tool_result" && stepEvent.ToolResult != null)
+                {
+                    if (stepEvent.ToolResult.Success && (stepEvent.ToolResult.ToolName.Contains("write") || stepEvent.ToolResult.ToolName.Contains("replace")))
+                    {
+                        modifiedFiles.Add(stepEvent.ToolResult.ToolName);
+                    }
+                    if (stepEvent.ToolResult.Success && stepEvent.ToolResult.ToolName == "reflect_step")
+                    {
+                        keyFacts.Add(stepEvent.ToolResult.Output);
+                    }
+                }
                 else if (stepEvent.Type == "error" && !string.IsNullOrWhiteSpace(stepEvent.Content))
                 {
                     logger?.LogWarning("SubagentRunner", $"[SUBAGENT STEP ERROR] Role: '{spec.Role}', Error: {stepEvent.Content}");
@@ -136,15 +150,16 @@ public sealed class SubagentRunner : ISubagentRunner
 
             string formattedResult = $"### [SUBAGENT OUTPUT: {spec.Role}]\n\n{agentOutput}";
             logger?.LogInfo("SubagentRunner", $"[SUBAGENT COMPLETE] Role: '{spec.Role}' finished execution.");
-            return (true, formattedResult, string.Empty);
+            return new SubagentExecutionResult(spec.Role, true, formattedResult, string.Empty, keyFacts, modifiedFiles);
         }
         catch (Exception ex)
         {
             string err = $"Error executing subagent '{spec.Role}': {ex.Message}";
             logger?.LogError("SubagentRunner", err, ex);
-            return (false, $"### [SUBAGENT FAILED: {spec.Role}]\n\n{err}", err);
+            return new SubagentExecutionResult(spec.Role, false, $"### [SUBAGENT FAILED: {spec.Role}]\n\n{err}", err, keyFacts, modifiedFiles);
         }
     }
+
 
     private static List<SubagentSpec> ParseSubagentSpecs(JsonElement args)
     {

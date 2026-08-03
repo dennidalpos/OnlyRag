@@ -128,6 +128,8 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
         services.AddSingleton<IWorkspaceVectorIndexerService, WorkspaceVectorIndexerService>();
         services.AddSingleton<IAstDependencyGraphService, AstDependencyGraphService>();
+        services.AddSingleton<IGraphRagAstSymbolIndexer, GraphRagAstSymbolIndexer>();
+        services.AddSingleton<WorkspaceSnapshotCheckpointManager>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();

@@ -206,8 +206,43 @@ internal sealed class AgentMemoryManager
             }
         }
 
+        if (astSymbolContexts.Count > 0)
+        {
+            sb.AppendLine("AST Structural Context & Code Symbols:");
+            foreach (var (file, syms) in astSymbolContexts.Take(10))
+            {
+                sb.AppendLine($"  - [{file}]: {syms}");
+            }
+        }
+
         return sb.ToString().TrimEnd();
     }
+
+    private readonly Dictionary<string, string> astSymbolContexts = new(StringComparer.OrdinalIgnoreCase);
+
+    public void RegisterAstSymbols(string relativePath, IEnumerable<string> definedSymbols, IEnumerable<string> dependencies)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return;
+        string cleanPath = relativePath.Replace('\\', '/');
+        string symStr = $"Symbols: [{string.Join(", ", definedSymbols.Take(8))}], Deps: [{string.Join(", ", dependencies.Take(6))}]";
+        astSymbolContexts[cleanPath] = symStr;
+        logger?.LogInfo("AgentMemory", $"[AST SYMBOL REGISTERED] {cleanPath} -> {symStr}");
+    }
+
+    public void RegisterSubagentResult(string role, bool success, string summary, IEnumerable<string>? facts, IEnumerable<string>? files)
+    {
+        string statusStr = success ? "SUCCESS" : "FAILED";
+        AddKeyFact($"[Subagent Result ({role}) - {statusStr}] {summary}");
+        if (facts != null)
+        {
+            foreach (var f in facts) AddKeyFact($"[{role}] {f}");
+        }
+        if (files != null)
+        {
+            foreach (var file in files) RegisterModifiedFile(file);
+        }
+    }
+
 
     public bool CompressContext(List<OllamaChatMessage> messages, int maxMessagesThreshold = 20)
     {

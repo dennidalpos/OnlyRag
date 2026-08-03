@@ -413,9 +413,75 @@ def benchmark(args):
     return 0
 
 
+def daemon_loop(parser):
+    from io import StringIO
+    sys.stdout.write(json.dumps({"status": "ready"}) + "\n")
+    sys.stdout.flush()
+
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        if line in ("exit", "quit"):
+            break
+
+        try:
+            cmd_args = json.loads(line)
+            if isinstance(cmd_args, list):
+                parsed = parser.parse_args(cmd_args)
+            elif isinstance(cmd_args, dict):
+                arg_list = []
+                for k, v in cmd_args.items():
+                    arg_list.extend([f"--{k}", str(v)])
+                parsed = parser.parse_args(arg_list)
+            else:
+                raise ValueError("JSON request must be an array or object")
+
+            buffer = StringIO()
+            original_stdout = sys.stdout
+            try:
+                sys.stdout = buffer
+                dispatch_mode(parsed)
+            finally:
+                sys.stdout = original_stdout
+
+            out_text = buffer.getvalue().strip()
+            sys.stdout.write((out_text or json.dumps({"status": "ok"})) + "\n")
+            sys.stdout.flush()
+        except Exception as exc:
+            sys.stdout.write(json.dumps({"error": str(exc)}) + "\n")
+            sys.stdout.flush()
+
+    return 0
+
+
+def dispatch_mode(args):
+    if args.mode == "check":
+        return check(args)
+    if args.mode == "version":
+        return version(args)
+    if args.mode == "prepare":
+        if not args.input or not args.output_dir:
+            raise ValueError("--input e --output-dir sono obbligatori per prepare")
+        return prepare(args)
+    if args.mode == "ocr":
+        if not args.input:
+            raise ValueError("--input e obbligatorio per ocr")
+        return ocr(args)
+    if args.mode == "ocr-page":
+        return ocr_page(args)
+    if args.mode in ("layout", "table", "structure"):
+        if not args.input:
+            raise ValueError("--input e obbligatorio")
+        return structured_mode(args, args.mode)
+    if args.mode == "benchmark":
+        return benchmark(args)
+    return 2
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["check", "version", "prepare", "ocr", "ocr-page", "layout", "table", "structure", "benchmark"], required=True)
+    parser.add_argument("--mode", choices=["check", "version", "prepare", "ocr", "ocr-page", "layout", "table", "structure", "benchmark", "daemon"], required=True)
     parser.add_argument("--input")
     parser.add_argument("--kind", choices=["pdf", "image"], default="image")
     parser.add_argument("--page", type=int, default=1)
@@ -439,27 +505,9 @@ def main():
     args = parser.parse_args()
     configure_runtime_environment(args)
 
-    if args.mode == "check":
-        return check(args)
-    if args.mode == "version":
-        return version(args)
-    if args.mode == "prepare":
-        if not args.input or not args.output_dir:
-            raise ValueError("--input e --output-dir sono obbligatori per prepare")
-        return prepare(args)
-    if args.mode == "ocr":
-        if not args.input:
-            raise ValueError("--input e obbligatorio per ocr")
-        return ocr(args)
-    if args.mode == "ocr-page":
-        return ocr_page(args)
-    if args.mode in ("layout", "table", "structure"):
-        if not args.input:
-            raise ValueError("--input e obbligatorio")
-        return structured_mode(args, args.mode)
-    if args.mode == "benchmark":
-        return benchmark(args)
-    return 2
+    if args.mode == "daemon":
+        return daemon_loop(parser)
+    return dispatch_mode(args)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,14 @@ internal static class AgentCycleGuard
         if (history.Count < 3) return false;
         int n = history.Count;
 
+        // 1. Detect 3 consecutive EXACT identical tool calls (same tool and exact same arguments)
+        if (string.Equals(history[n - 1], history[n - 2], StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(history[n - 2], history[n - 3], StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // 2. Detect 3 consecutive identical meta-tool calls with empty or identical arguments
         static string GetToolName(string sig)
         {
             int idx = sig.IndexOf(':');
@@ -17,39 +25,37 @@ internal static class AgentCycleGuard
         string t2 = GetToolName(history[n - 2]);
         string t3 = GetToolName(history[n - 3]);
 
-        if (t1 is "reflect_step" or "plan_task" && t2 is "reflect_step" or "plan_task" && t3 is "reflect_step" or "plan_task")
+        if ((t1 == "reflect_step" && t2 == "reflect_step" && t3 == "reflect_step") ||
+            (t1 == "plan_task" && t2 == "plan_task" && t3 == "plan_task"))
         {
-            return true;
+            if (string.Equals(history[n - 1], history[n - 2], StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(history[n - 2], history[n - 3], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
 
-        if (history.Count >= 4)
+        // 3. Detect repeating exact cycles of period 2 to 4 (must match exact call signatures, not just tool names)
+        if (history.Count >= 6)
         {
-            if (history[n - 1] == history[n - 2] && history[n - 2] == history[n - 3]) return true;
-
             for (int period = 2; period <= 4; period++)
             {
                 if (n >= period * 3)
                 {
                     bool matchExact = true;
-                    bool matchToolName = true;
 
                     for (int i = 0; i < period; i++)
                     {
                         string elem = history[n - 1 - i];
-                        string name = GetToolName(elem);
-
-                        if (history[n - 1 - i - period] != elem || history[n - 1 - i - (period * 2)] != elem)
+                        if (!string.Equals(history[n - 1 - i - period], elem, StringComparison.OrdinalIgnoreCase) ||
+                            !string.Equals(history[n - 1 - i - (period * 2)], elem, StringComparison.OrdinalIgnoreCase))
                         {
                             matchExact = false;
-                        }
-
-                        if (GetToolName(history[n - 1 - i - period]) != name || GetToolName(history[n - 1 - i - (period * 2)]) != name)
-                        {
-                            matchToolName = false;
+                            break;
                         }
                     }
 
-                    if (matchExact || matchToolName) return true;
+                    if (matchExact) return true;
                 }
             }
         }
@@ -57,3 +63,4 @@ internal static class AgentCycleGuard
         return false;
     }
 }
+

@@ -70,11 +70,17 @@ public sealed class SearchAndInspectToolHandler : IToolHandler
             using var proc = Process.Start(psi);
             if (proc is null) return null;
 
-            string stdout = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(10_000);
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+            var stderrTask = proc.StandardError.ReadToEndAsync();
+            Task.WaitAll(stdoutTask, stderrTask);
+            if (!proc.WaitForExit(10_000))
+            {
+                try { proc.Kill(true); } catch { }
+            }
 
             if (proc.ExitCode > 1) return null;
 
+            string stdout = stdoutTask.Result;
             if (string.IsNullOrWhiteSpace(stdout))
             {
                 return new AgentToolResult(callId, toolName, true, $"No results found for '{query}'.");
@@ -159,13 +165,15 @@ public sealed class SearchAndInspectToolHandler : IToolHandler
             var psiStatus = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = "status --short",
+                Arguments = "-c core.pager=cat status --short",
                 WorkingDirectory = safePath,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
+            psiStatus.EnvironmentVariables["PAGER"] = "cat";
+            psiStatus.EnvironmentVariables["GIT_PAGER"] = "cat";
 
             using var pStatus = Process.Start(psiStatus);
             if (pStatus is null)
@@ -173,23 +181,41 @@ public sealed class SearchAndInspectToolHandler : IToolHandler
                 return new AgentToolResult(callId, toolName, false, string.Empty, "Unable to start Git process.");
             }
 
-            string statusOut = pStatus.StandardOutput.ReadToEnd();
-            pStatus.WaitForExit();
+            var statusOutTask = pStatus.StandardOutput.ReadToEndAsync();
+            var statusErrTask = pStatus.StandardError.ReadToEndAsync();
+            Task.WaitAll(statusOutTask, statusErrTask);
+            if (!pStatus.WaitForExit(5000))
+            {
+                try { pStatus.Kill(true); } catch { }
+            }
+            string statusOut = statusOutTask.Result;
 
             var psiDiff = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = "diff --stat",
+                Arguments = "-c core.pager=cat diff --stat",
                 WorkingDirectory = safePath,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
+            psiDiff.EnvironmentVariables["PAGER"] = "cat";
+            psiDiff.EnvironmentVariables["GIT_PAGER"] = "cat";
 
             using var pDiff = Process.Start(psiDiff);
-            string diffOut = pDiff is not null ? pDiff.StandardOutput.ReadToEnd() : "";
-            pDiff?.WaitForExit();
+            string diffOut = "";
+            if (pDiff is not null)
+            {
+                var diffOutTask = pDiff.StandardOutput.ReadToEndAsync();
+                var diffErrTask = pDiff.StandardError.ReadToEndAsync();
+                Task.WaitAll(diffOutTask, diffErrTask);
+                if (!pDiff.WaitForExit(5000))
+                {
+                    try { pDiff.Kill(true); } catch { }
+                }
+                diffOut = diffOutTask.Result;
+            }
 
             var sb = new StringBuilder();
             sb.AppendLine($"[GIT LOCAL WORKSPACE STATUS: {safePath}]");

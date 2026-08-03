@@ -3,6 +3,15 @@ using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Agent;
 
+public record SubagentExecutionResult(
+    string Role,
+    bool Success,
+    string Output,
+    string Error,
+    IReadOnlyList<string> KeyFacts,
+    IReadOnlyList<string> ModifiedFiles
+);
+
 public interface ISubagentRunner
 {
     Task<AgentToolResult> InvokeSubagentAsync(
@@ -13,3 +22,4 @@ public interface ISubagentRunner
         Action<AgentStepEvent>? onStep = null,
         CancellationToken cancellationToken = default);
 }
+

@@ -22,6 +22,8 @@ internal sealed class AgentLoopEngine
     private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService;
     private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentSkillRepository? skillRepository;
     private readonly OnlyRag.Infrastructure.Agent.Memory.IAgentSkillAutoLearner? skillAutoLearner;
+    private readonly WorkspaceSnapshotCheckpointManager? checkpointManager;
+    private readonly IAstDependencyGraphService? astGraphService;
     private readonly ILoggingService? logger;
 
     private readonly ConcurrentDictionary<string, (AgentToolCall Call, TaskCompletionSource<bool> Tcs)> pendingApprovals = new();
@@ -34,6 +36,8 @@ internal sealed class AgentLoopEngine
         OnlyRag.Infrastructure.Agent.Memory.IAgentEpisodicMemoryService? episodicMemoryService = null,
         OnlyRag.Infrastructure.Agent.Memory.IAgentSkillRepository? skillRepository = null,
         OnlyRag.Infrastructure.Agent.Memory.IAgentSkillAutoLearner? skillAutoLearner = null,
+        WorkspaceSnapshotCheckpointManager? checkpointManager = null,
+        IAstDependencyGraphService? astGraphService = null,
         ILoggingService? logger = null)
     {
         this.ollamaClient = ollamaClient;
@@ -43,8 +47,11 @@ internal sealed class AgentLoopEngine
         this.episodicMemoryService = episodicMemoryService;
         this.skillRepository = skillRepository;
         this.skillAutoLearner = skillAutoLearner;
+        this.checkpointManager = checkpointManager;
+        this.astGraphService = astGraphService;
         this.logger = logger;
     }
+
 
     public bool ApproveToolCall(string callId, bool approved)
     {
@@ -85,6 +92,12 @@ internal sealed class AgentLoopEngine
         }
 
         var memoryManager = new AgentMemoryManager(logger);
+        var mctsMachine = checkpointManager != null ? new AgentMctsStateMachine(checkpointManager, request.Goal) : null;
+        if (mctsMachine != null)
+        {
+            logger?.LogInfo("AgentEngine", "[MCTS TREE-OF-THOUGHT ENGINE INITIALIZED] Active state tracking & candidate branch selection enabled.");
+        }
+
 
         if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
         {
@@ -142,6 +155,7 @@ internal sealed class AgentLoopEngine
         var accumulatedToolResults = new List<AgentToolResult>();
         int iteration = 0;
         int jsonRetryCount = 0;
+        int cycleGuardTriggerCount = 0;
 
         // Cache settings once before the hot loop — avoid I/O on every iteration
         OllamaSettings? cachedSettings = null;
@@ -169,73 +183,104 @@ internal sealed class AgentLoopEngine
             yield return new AgentStepEvent("thought", $"[Agent Step {iterLabel}] Generating LLM response and analyzing reasoning...");
 
             var responseSb = new StringBuilder();
-            IAsyncEnumerator<string>? enumerator = null;
             string? streamError = null;
-            try
-            {
-                enumerator = ollamaClient.GenerateChatStreamAsync(
-                    model,
-                    messages,
-                    numCtx: numCtx,
-                    cancellationToken: cancellationToken)
-                    .GetAsyncEnumerator(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                streamError = $"Error querying Ollama with model '{model}': {ex.Message}";
-                logger?.LogError("AgentEngine", streamError, ex);
-            }
 
-            if (streamError != null)
+            int maxStreamRetries = 2;
+            for (int streamAttempt = 1; streamAttempt <= maxStreamRetries; streamAttempt++)
             {
-                yield return new AgentStepEvent("error", streamError);
-                yield break;
-            }
+                responseSb.Clear();
+                streamError = null;
+                IAsyncEnumerator<string>? enumerator = null;
 
-            if (enumerator != null)
-            {
-                var chunkBatch = new StringBuilder();
-                await using (enumerator)
+                try
                 {
-                    while (true)
+                    enumerator = ollamaClient.GenerateChatStreamAsync(
+                        model,
+                        messages,
+                        numCtx: numCtx,
+                        format: AgentToolJsonSchemaBuilder.BuildToolCallJsonSchema(),
+                        cancellationToken: cancellationToken)
+                        .GetAsyncEnumerator(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    streamError = $"Error querying Ollama with model '{model}': {ex.Message}";
+                    logger?.LogError("AgentEngine", streamError, ex);
+                }
+
+                if (streamError != null)
+                {
+                    break;
+                }
+
+                if (enumerator != null)
+                {
+                    var chunkBatch = new StringBuilder();
+                    await using (enumerator)
                     {
-                        string? chunk = null;
-                        bool hasMore = false;
-                        try
+                        while (true)
                         {
-                            hasMore = await enumerator.MoveNextAsync();
-                            if (hasMore) chunk = enumerator.Current;
-                        }
-                        catch (Exception ex)
-                        {
-                            streamError = $"Error during Ollama streaming with model '{model}': {ex.Message}";
-                            logger?.LogError("AgentEngine", streamError, ex);
-                            break;
-                        }
-
-                        if (!hasMore)
-                        {
-                            if (chunkBatch.Length > 0)
+                            string? chunk = null;
+                            bool hasMore = false;
+                            try
                             {
-                                yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
-                                chunkBatch.Clear();
+                                hasMore = await enumerator.MoveNextAsync();
+                                if (hasMore) chunk = enumerator.Current;
                             }
-                            break;
-                        }
-
-                        if (!string.IsNullOrEmpty(chunk))
-                        {
-                            responseSb.Append(chunk);
-                            chunkBatch.Append(chunk);
-
-                            if (chunkBatch.Length >= 40 || chunk.Contains('\n'))
+                            catch (Exception ex)
                             {
-                                yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
-                                chunkBatch.Clear();
+                                if (cancellationToken.IsCancellationRequested)
+                                {
+                                    streamError = $"Ollama streaming cancelled by caller.";
+                                    break;
+                                }
+                                else if (ex is OperationCanceledException or System.IO.IOException)
+                                {
+                                    streamError = $"Ollama transport reset (attempt {streamAttempt}/{maxStreamRetries}): {ex.Message}";
+                                    logger?.LogWarning("AgentEngine", streamError);
+                                }
+                                else
+                                {
+                                    streamError = $"Error during Ollama streaming with model '{model}': {ex.Message}";
+                                    logger?.LogError("AgentEngine", streamError, ex);
+                                    break;
+                                }
+                            }
+
+                            if (streamError != null) break;
+
+                            if (!hasMore)
+                            {
+                                if (chunkBatch.Length > 0)
+                                {
+                                    yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
+                                    chunkBatch.Clear();
+                                }
+                                break;
+                            }
+
+                            if (!string.IsNullOrEmpty(chunk))
+                            {
+                                responseSb.Append(chunk);
+                                chunkBatch.Append(chunk);
+
+                                if (chunkBatch.Length >= 40 || chunk.Contains('\n'))
+                                {
+                                    yield return new AgentStepEvent("thought_chunk", Content: chunkBatch.ToString());
+                                    chunkBatch.Clear();
+                                }
                             }
                         }
                     }
                 }
+
+                if (streamError == null || cancellationToken.IsCancellationRequested || streamAttempt == maxStreamRetries)
+                {
+                    break;
+                }
+
+                logger?.LogWarning("AgentEngine", $"Retrying Ollama chat stream (attempt {streamAttempt + 1}/{maxStreamRetries}) after transient transport error...");
+                await Task.Delay(500 * streamAttempt, cancellationToken);
             }
 
             if (streamError != null)
@@ -320,6 +365,16 @@ internal sealed class AgentLoopEngine
 
                 if (AgentCycleGuard.IsCyclicPatternDetected(recentToolSignatures))
                 {
+                    recentToolSignatures.Clear();
+                    cycleGuardTriggerCount++;
+                    if (cycleGuardTriggerCount >= 2)
+                    {
+                        logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TERMINATION] Reached maximum cycle guard warnings in parallel execution. Forcing loop completion.");
+                        yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Repeated cycle detected. Concluding agent loop with final summary.");
+                        yield return new AgentStepEvent("final_response", "Agent execution paused after detecting repeated tool invocation patterns. Current findings have been saved.");
+                        yield break;
+                    }
+
                     logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Detected repetitive call cycle in parallel execution.");
                     yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Detected repetitive call cycle in parallel execution. Injecting conclusion directive...");
                     messages.Add(new("user",
@@ -397,6 +452,16 @@ internal sealed class AgentLoopEngine
 
                     if (AgentCycleGuard.IsCyclicPatternDetected(recentToolSignatures))
                     {
+                        recentToolSignatures.Clear();
+                        cycleGuardTriggerCount++;
+                        if (cycleGuardTriggerCount >= 2)
+                        {
+                            logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TERMINATION] Reached maximum cycle guard warnings. Forcing loop completion.");
+                            yield return new AgentStepEvent("thought", "[Agent Cycle Guard] Repeated cycle detected. Concluding agent loop with final summary.");
+                            yield return new AgentStepEvent("final_response", "Agent execution paused after detecting repeated tool invocation patterns. Current findings have been saved.");
+                            yield break;
+                        }
+
                         logger?.LogWarning("AgentEngine", $"[CYCLE GUARD TRIGGERED] Detected repetitive call cycle: {callSignature}");
                         yield return new AgentStepEvent("thought", $"[Agent Cycle Guard] Detected repetitive action cycle ({toolCall.ToolName}). Injecting conclusion directive...");
                         messages.Add(new("user",
@@ -447,6 +512,18 @@ internal sealed class AgentLoopEngine
                         }
                     }
 
+                    WorkspaceSnapshotCheckpoint? checkpoint = null;
+                    if (checkpointManager != null && !AgentToolCallParser.IsReadOnlyTool(toolCall))
+                    {
+                        var targetPaths = ExtractTargetPathsFromArguments(toolCall.ArgumentsJson);
+                        if (targetPaths.Count > 0)
+                        {
+                            checkpoint = checkpointManager.CreateCheckpoint($"cp_{toolCall.CallId}", workspaceRoot, targetPaths);
+                        }
+                    }
+
+                    mctsMachine?.ExpandAndNavigate(callSignature, checkpoint?.CheckpointId);
+
                     var subagentChannel = System.Threading.Channels.Channel.CreateUnbounded<AgentStepEvent>();
 
                     var toolTask = toolExecutor.ExecuteToolAsync(
@@ -472,11 +549,47 @@ internal sealed class AgentLoopEngine
 
                     var result = await toolTask;
 
+                    bool isCompilationError = !result.Success &&
+                        (!string.IsNullOrEmpty(result.Error) && (result.Error.Contains("error CS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("TS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("Build failed", StringComparison.OrdinalIgnoreCase)));
+
+                    mctsMachine?.EvaluateAndBackpropagateCurrent(result.Success, isCompilationError);
+
+                    if (!result.Success && checkpoint != null && checkpointManager != null)
+                    {
+                        logger?.LogWarning("AgentEngine", $"[MCTS CHECKPOINT ROLLBACK] Tool '{toolCall.ToolName}' failed. Restoring workspace snapshot checkpoint and navigating to parent node.");
+                        checkpointManager.RestoreCheckpoint(checkpoint);
+                        mctsMachine?.NavigateToParent();
+                    }
+
                     yield return new AgentStepEvent("tool_result", ToolResult: result);
                     resultsList.Add(result);
 
                     if (result.Success)
                     {
+                        cycleGuardTriggerCount = 0;
+
+                        if (astGraphService != null && !string.IsNullOrWhiteSpace(workspaceRoot))
+                        {
+                            var paths = ExtractTargetPathsFromArguments(toolCall.ArgumentsJson);
+                            foreach (var p in paths)
+                            {
+                                string ext = Path.GetExtension(p).ToLowerInvariant();
+                                if (ext is ".cs" or ".ts" or ".tsx" or ".js")
+                                {
+                                    try
+                                    {
+                                        var graphRes = await astGraphService.AnalyzeWorkspaceDependenciesAsync(workspaceRoot, p, cancellationToken);
+                                        if (graphRes != null)
+                                        {
+                                            memoryManager.RegisterAstSymbols(p, graphRes.DirectDependencies, graphRes.DependentFiles);
+                                        }
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
+
+
                         if (AgentToolCallParser.IsReadOnlyTool(toolCall))
                         {
                             executedReadOnlyCallSignatures.Add(callSignature);
@@ -566,7 +679,12 @@ internal sealed class AgentLoopEngine
 
             if (batchMsgSb.Length > 0)
             {
-                messages.Add(new("user", batchMsgSb.ToString().TrimEnd()));
+                string batchText = batchMsgSb.ToString().TrimEnd();
+                if (batchText.Length > 8000)
+                {
+                    batchText = batchText[..7800] + "\n\n...[WORKING CONTEXT TRUNCATED FOR CONTEXT BUDGET SAFETY]...";
+                }
+                messages.Add(new("user", batchText));
             }
         }
 
@@ -649,6 +767,7 @@ internal sealed class AgentLoopEngine
             | write_file | relativePath, content | Create or overwrite a file |
             | replace_file_content | relativePath, targetContent, replacementContent | Replace an exact block in a file |
             | multi_replace_file_content | relativePath, chunks[{targetContent, replacementContent}] | Multiple non-contiguous replacements in a specific file (relativePath must be a single file path) |
+            | apply_diff_patch | relativePath?, patch | Apply standard Unified Diff patch (git diff) |
             | grep_search | query, searchPath | Fast code search (ripgrep) |
             | git_diff_inspect | relativePath? | Git status and diff |
             | run_command | commandLine, isAsync? | Execute PowerShell 7 command |
@@ -697,6 +816,23 @@ internal sealed class AgentLoopEngine
             9. **INTERNAL CLI EXECUTION MANDATE.** NEVER emit file-opening GUI commands (`start`, `open`, `explorer`, `code`, `notepad`, `Invoke-Item`). Execute all builds, tests, scripts, and commands internally via `run_command` (e.g. `dotnet build`, `npm test`, `pwsh .\\scripts\\...`).
             10. **MANDATORY ERROR EVALUATION & RESOLUTION.** When a command or tool call fails or produces an error/exception, you MUST immediately evaluate the error output, identify the root cause, apply a resolution, and re-verify the fix before continuing to subsequent task steps.
             """;
+    }
+
+    private static List<string> ExtractTargetPathsFromArguments(string argumentsJson)
+    {
+        var paths = new List<string>();
+        if (string.IsNullOrWhiteSpace(argumentsJson)) return paths;
+        try
+        {
+            using var doc = JsonDocument.Parse(argumentsJson);
+            if (doc.RootElement.TryGetProperty("relativePath", out var rp) || doc.RootElement.TryGetProperty("path", out rp) || doc.RootElement.TryGetProperty("targetFile", out rp))
+            {
+                string? p = rp.GetString();
+                if (!string.IsNullOrWhiteSpace(p)) paths.Add(p);
+            }
+        }
+        catch { }
+        return paths;
     }
 }
 

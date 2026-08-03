@@ -6,7 +6,7 @@ import {
   type OcrProcessingSettings,
   type VectorBackendHealth
 } from "../api";
-import { fallbackOcrLanguages } from "../components/DocumentsSection.controllerHelpers";
+import { fallbackOcrLanguages } from "../components/documents/DocumentsSection.controllerHelpers";
 
 export function useDocumentListQuery() {
   return useQuery<ImportedDocument[], Error>({

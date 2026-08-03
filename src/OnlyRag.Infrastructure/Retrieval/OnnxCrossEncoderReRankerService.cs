@@ -40,12 +40,13 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
         try
         {
-            List<ReRankResult> results = [];
-            foreach (ReRankCandidate candidate in candidates)
+            cancellationToken.ThrowIfCancellationRequested();
+            double[] scores = ComputeCrossScoresBatched(currentSession, currentVocab, query, candidates);
+
+            List<ReRankResult> results = new(candidates.Count);
+            for (int i = 0; i < candidates.Count; i++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                double score = ComputeCrossScore(currentSession, currentVocab, query, candidate.Content);
-                results.Add(new ReRankResult(candidate.ChunkId, Math.Round(score, 4)));
+                results.Add(new ReRankResult(candidates[i].ChunkId, Math.Round(scores[i], 4)));
             }
 
             return results
@@ -109,56 +110,62 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         }
     }
 
-    private static double ComputeCrossScore(
+    private static double[] ComputeCrossScoresBatched(
         InferenceSession currentSession,
         BertVocab currentVocab,
         string query,
-        string content)
+        IReadOnlyList<ReRankCandidate> candidates)
     {
+        int batchSize = candidates.Count;
+        if (batchSize == 0)
+        {
+            return [];
+        }
+
         const int maxSeqLength = 512;
+        long[] inputIds = new long[batchSize * maxSeqLength];
+        long[] attentionMask = new long[batchSize * maxSeqLength];
+        long[] tokenTypeIds = new long[batchSize * maxSeqLength];
 
-        // Tokenize via real WordPiece using the loaded vocab.
-        List<int> queryTokenIds = currentVocab.Tokenize(query, maxSeqLength / 2 - 2);
-        int remaining = maxSeqLength - queryTokenIds.Count - 3; // [CLS] + [SEP] + [SEP]
-        List<int> contentTokenIds = currentVocab.Tokenize(content, Math.Max(1, remaining));
-
-        // Build BERT dual-segment input: [CLS] query [SEP] content [SEP] [PAD...]
-        long[] inputIds = new long[maxSeqLength];
-        long[] attentionMask = new long[maxSeqLength];
-        long[] tokenTypeIds = new long[maxSeqLength];
-
-        int pos = 0;
-        inputIds[pos] = currentVocab.ClsId;
-        attentionMask[pos] = 1;
-        pos++;
-
-        foreach (int id in queryTokenIds)
+        for (int i = 0; i < batchSize; i++)
         {
-            inputIds[pos] = id;
-            attentionMask[pos] = 1;
+            int offset = i * maxSeqLength;
+            string content = candidates[i].Content;
+
+            List<int> queryTokenIds = currentVocab.Tokenize(query, maxSeqLength / 2 - 2);
+            int remaining = maxSeqLength - queryTokenIds.Count - 3;
+            List<int> contentTokenIds = currentVocab.Tokenize(content, Math.Max(1, remaining));
+
+            int pos = 0;
+            inputIds[offset + pos] = currentVocab.ClsId;
+            attentionMask[offset + pos] = 1;
             pos++;
+
+            foreach (int id in queryTokenIds)
+            {
+                inputIds[offset + pos] = id;
+                attentionMask[offset + pos] = 1;
+                pos++;
+            }
+
+            inputIds[offset + pos] = currentVocab.SepId;
+            attentionMask[offset + pos] = 1;
+            pos++;
+
+            foreach (int id in contentTokenIds)
+            {
+                inputIds[offset + pos] = id;
+                attentionMask[offset + pos] = 1;
+                tokenTypeIds[offset + pos] = 1;
+                pos++;
+            }
+
+            inputIds[offset + pos] = currentVocab.SepId;
+            attentionMask[offset + pos] = 1;
+            tokenTypeIds[offset + pos] = 1;
         }
 
-        inputIds[pos] = currentVocab.SepId;
-        attentionMask[pos] = 1;
-        pos++;
-
-        foreach (int id in contentTokenIds)
-        {
-            inputIds[pos] = id;
-            attentionMask[pos] = 1;
-            tokenTypeIds[pos] = 1; // Segment B
-            pos++;
-        }
-
-        inputIds[pos] = currentVocab.SepId;
-        attentionMask[pos] = 1;
-        tokenTypeIds[pos] = 1;
-        pos++;
-
-        // Remaining positions stay 0 (PAD, no attention, segment A).
-
-        int[] shape = [1, maxSeqLength];
+        int[] shape = [batchSize, maxSeqLength];
         DenseTensor<long> inputIdsTensor = new(inputIds, shape);
         DenseTensor<long> attentionMaskTensor = new(attentionMask, shape);
         DenseTensor<long> tokenTypeIdsTensor = new(tokenTypeIds, shape);
@@ -174,12 +181,18 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         DisposableNamedOnnxValue? outputValue = results.Count > 0 ? results[0] : null;
         if (outputValue is null)
         {
-            return 0.5d;
+            return candidates.Select(_ => 0.5d).ToArray();
         }
 
         Tensor<float> logits = outputValue.AsTensor<float>();
-        float rawScore = logits.GetValue(0);
-        return Sigmoid(rawScore);
+        double[] scores = new double[batchSize];
+        for (int i = 0; i < batchSize; i++)
+        {
+            float rawScore = logits.Dimensions.Length > 1 ? logits[i, 0] : logits[i];
+            scores[i] = Sigmoid(rawScore);
+        }
+
+        return scores;
     }
 
     private static double Sigmoid(float x) => 1.0d / (1.0d + Math.Exp(-x));

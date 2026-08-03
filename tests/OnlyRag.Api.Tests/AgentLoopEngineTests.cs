@@ -88,17 +88,27 @@ public sealed class AgentLoopEngineTests
         var method = typeof(AgentLoopEngine).GetMethod("IsCyclicPatternDetected", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
-        var historyMetaSpins = new List<string>
+        var historyDistinctMeta = new List<string>
         {
             "reflect_step:{\"stepId\":\"1\"}",
             "plan_task:{\"steps\":[]}",
             "reflect_step:{\"stepId\":\"2\"}"
         };
 
-        bool isMetaSpinDetected = (bool)method.Invoke(null, [historyMetaSpins])!;
-        Assert.True(isMetaSpinDetected);
+        bool isDistinctMetaDetected = (bool)method.Invoke(null, [historyDistinctMeta])!;
+        Assert.False(isDistinctMetaDetected);
 
-        var historyToolNameCycle = new List<string>
+        var historyIdenticalMetaSpin = new List<string>
+        {
+            "reflect_step:{\"stepId\":\"1\"}",
+            "reflect_step:{\"stepId\":\"1\"}",
+            "reflect_step:{\"stepId\":\"1\"}"
+        };
+
+        bool isIdenticalMetaSpinDetected = (bool)method.Invoke(null, [historyIdenticalMetaSpin])!;
+        Assert.True(isIdenticalMetaSpinDetected);
+
+        var historyDistinctFiles = new List<string>
         {
             "list_dir:{\"relativePath\":\"a\"}",
             "read_file:{\"relativePath\":\"b\"}",
@@ -108,8 +118,21 @@ public sealed class AgentLoopEngineTests
             "read_file:{\"relativePath\":\"f\"}"
         };
 
-        bool isToolNameCycleDetected = (bool)method.Invoke(null, [historyToolNameCycle])!;
-        Assert.True(isToolNameCycleDetected);
+        bool isDistinctFilesCycleDetected = (bool)method.Invoke(null, [historyDistinctFiles])!;
+        Assert.False(isDistinctFilesCycleDetected);
+
+        var historyRepeatedExactCycle = new List<string>
+        {
+            "list_dir:{\"relativePath\":\"a\"}",
+            "read_file:{\"relativePath\":\"b\"}",
+            "list_dir:{\"relativePath\":\"a\"}",
+            "read_file:{\"relativePath\":\"b\"}",
+            "list_dir:{\"relativePath\":\"a\"}",
+            "read_file:{\"relativePath\":\"b\"}"
+        };
+
+        bool isRepeatedExactCycleDetected = (bool)method.Invoke(null, [historyRepeatedExactCycle])!;
+        Assert.True(isRepeatedExactCycleDetected);
     }
 
     [Fact]

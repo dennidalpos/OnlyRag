@@ -79,9 +79,9 @@
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  background: #1e293b;
+  background: var(--bg-card);
   transition: all var(--transition-fast);
 }
 
@@ -92,10 +92,10 @@
 
 .document-row[role="option"]:hover,
 .document-row[role="button"]:hover {
-  border-color: #6366f1;
-  background: #334155;
+  border-color: var(--border-focus);
+  background: var(--primary-light);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .document-row[aria-disabled="true"] {
@@ -105,13 +105,13 @@
 
 .document-row--selected {
   border-color: var(--primary);
-  background: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 2px var(--primary-light);
 }
 
 .document-row--selected .document-row__header span,
 .document-row--selected .document-row__meta span {
-  color: #cbd5e1;
+  color: var(--text-main);
   font-weight: 500;
 }
 
@@ -184,9 +184,9 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  background: #0f172a;
+  background: var(--bg-card);
 }
 
 .document-job-progress {
@@ -232,10 +232,10 @@
 
 .search-result-row {
   min-width: 0;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: #1e293b;
+  background: var(--bg-card-glass);
 }
 
 .search-result-row__header {

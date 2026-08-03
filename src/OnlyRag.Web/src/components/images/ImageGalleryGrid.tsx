@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import type { GeneratedImage } from "../../api";
-import { formatFileSize } from "../DocumentsSection.formatting";
-import { useImageObjectUrl } from "../ImagesSection";
+import { formatFileSize } from "../documents/DocumentsSection.formatting";
+import { useImageObjectUrl } from "./ImagesSection";
 
 type Props = {
   images: GeneratedImage[];

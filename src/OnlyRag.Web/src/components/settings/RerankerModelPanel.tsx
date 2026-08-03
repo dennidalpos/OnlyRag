@@ -1,6 +1,6 @@
-import { ProgressBar } from "../ProgressBar";
-import { formatModelSize } from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+import { ProgressBar } from "../common/ProgressBar";
+import { formatModelSize } from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function RerankerModelPanel() {
   const {

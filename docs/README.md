@@ -17,6 +17,7 @@ current technical and operational documentation. Do not use these pages as chang
   test surfaces.
 - [Application flow](APP_FLOW.md): desktop startup, backend bridge, job flow, shutdown, and the
   editable draw.io diagram.
+- [Agent evolution plan](AGENT_EVOLUTION_PLAN.md): SOTA autonomous reasoning roadmap, MCTS tree search, AST Knowledge Graph, and verification protocol.
 
 ## Feature Pipelines
 

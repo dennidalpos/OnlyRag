@@ -114,9 +114,9 @@
   width: 100%;
   min-height: 36px;
   padding: 8px 10px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  background: #060911;
+  background: var(--bg-card);
   color: var(--text-main);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -126,7 +126,7 @@
 .field-group textarea:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 .field-group textarea {
@@ -153,9 +153,9 @@
   place-items: center;
   width: 18px;
   height: 18px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: 50%;
-  background: #1e293b;
+  background: var(--bg-card-glass);
   color: var(--primary);
   cursor: help;
   font-size: 12px;
@@ -180,9 +180,9 @@
   justify-self: start;
   max-width: 100%;
   padding: 3px 8px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  background: #1e293b;
+  background: var(--bg-card-glass);
   color: var(--text-main);
   font-size: 12px;
   font-weight: 700;
@@ -201,9 +201,9 @@
   justify-self: start;
   max-width: 100%;
   padding: 3px 8px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  background: #1e293b;
+  background: var(--bg-card-glass);
   color: var(--text-main);
   font-size: 12px;
   font-weight: 700;

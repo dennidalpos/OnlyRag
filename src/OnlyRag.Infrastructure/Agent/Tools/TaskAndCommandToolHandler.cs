@@ -85,9 +85,13 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
             return new AgentToolResult(callId, toolName, false, string.Empty, "Cannot start shell process.");
         }
 
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        Task.WaitAll(stdoutTask, stderrTask);
         process.WaitForExit();
+
+        string stdout = stdoutTask.Result;
+        string stderr = stderrTask.Result;
 
         string combined = string.IsNullOrWhiteSpace(stderr)
             ? stdout

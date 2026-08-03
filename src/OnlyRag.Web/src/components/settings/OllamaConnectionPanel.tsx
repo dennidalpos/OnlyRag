@@ -1,5 +1,5 @@
-import { SettingsFieldLabel } from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+import { SettingsFieldLabel } from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 export function OllamaConnectionPanel() {
   const {

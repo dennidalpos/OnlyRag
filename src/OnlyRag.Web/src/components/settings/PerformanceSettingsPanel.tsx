@@ -1,7 +1,7 @@
 import type { PerformanceProfile, PerformanceSettings } from "../../api";
-import { performanceProfilePresets } from "../SettingsSection.defaults";
-import { SettingsRangeField, UnifiedPresetBar, type UnifiedPresetLevel } from "../SettingsSection.helpers";
-import { useSettingsSectionContext } from "../SettingsSectionContext";
+import { performanceProfilePresets } from "./SettingsSection.defaults";
+import { SettingsRangeField, UnifiedPresetBar, type UnifiedPresetLevel } from "./SettingsSection.helpers";
+import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 
 

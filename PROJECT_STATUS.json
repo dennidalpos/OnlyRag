@@ -1,10 +1,11 @@
 {
   "todos": [
-    "Implement batched tensor processing in OnnxCrossEncoderReRankerService for GPU acceleration",
-    "Refactor StorageService monolith into single-responsibility repository services",
-    "Convert PaddleOCR bridge from per-call process to persistent background service",
-    "Integrate CRAG confidence feedback loop directly into AgentLoopEngine tool execution",
-    "Add auto-download mechanism for default ONNX cross-encoder model on first use",
-    "Add frontend reasoning transparency UI to display CRAG confidence, retrieval stages, and thinking trace"
+    "Implementare l'interazione per l'approvazione passo-passo dei diff prima dell'applicazione delle modifiche file nel Subagent Studio",
+    "Aggiungere supporto all'auto-grow height ed ai template di system prompt nella prompt bar della Chat",
+    "Aggiungere l'overlay di dropzone globale per il caricamento documenti con selezione preventiva della modalità OCR",
+    "Aggiungere la barra strumenti fluttuante per la maschera di inpainting e lo storico undo/redo nell'Image Canvas Editor",
+    "Implementare lo scorrimento sincronizzato side-by-side ed i contatori di parole/caratteri nel Traduttore Multilingua"
   ]
 }
+
+

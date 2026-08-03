@@ -19,7 +19,8 @@ public sealed class FileSystemToolHandler : IToolHandler
         return toolName.ToLowerInvariant() switch
         {
             "list_dir" or "read_file" or "view_file" or "write_file" or "write_to_file" or
-            "replace_file_content" or "multi_replace_file_content" => true,
+            "replace_file_content" or "multi_replace_file_content" or
+            "apply_diff_patch" or "apply_patch" or "git_diff_patch" or "diff_patch" => true,
             _ => false
         };
     }
@@ -39,6 +40,7 @@ public sealed class FileSystemToolHandler : IToolHandler
             "write_file" or "write_to_file" => await WriteFileAsync(callId, toolName, args, workspaceRoot, cancellationToken),
             "replace_file_content" => await ReplaceFileContentAsync(callId, toolName, args, workspaceRoot, cancellationToken),
             "multi_replace_file_content" => await MultiReplaceFileContentAsync(callId, toolName, args, workspaceRoot, cancellationToken),
+            "apply_diff_patch" or "apply_patch" or "git_diff_patch" or "diff_patch" => await ApplyDiffPatchAsync(callId, toolName, args, workspaceRoot, cancellationToken),
             _ => new AgentToolResult(callId, toolName, false, string.Empty, $"Tool '{toolName}' not supported by FileSystemToolHandler")
         };
     }
@@ -346,5 +348,85 @@ public sealed class FileSystemToolHandler : IToolHandler
         }
 
         return new AgentToolResult(callId, toolName, true, msg);
+    }
+
+    private async Task<AgentToolResult> ApplyDiffPatchAsync(string callId, string toolName, JsonElement args, string rootPath, CancellationToken cancellationToken)
+    {
+        string? relative = ToolHelper.GetArgString(args, "relativePath", "targetFile", "target_file", "filePath", "file_path", "path", "file", "filepath", "filename", "target");
+        string patchText = ToolHelper.GetArgString(args, "patch", "diff", "patchContent", "diffContent", "content") ?? "";
+
+        if (string.IsNullOrWhiteSpace(patchText))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The 'patch' or 'diff' parameter containing the Unified Diff patch is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            // Try extracting relative path from diff header (--- a/path or +++ b/path)
+            var match = System.Text.RegularExpressions.Regex.Match(patchText, @"\+\+\+\s+(?:b/)?([^\s\t\r\n]+)");
+            if (match.Success)
+            {
+                relative = match.Groups[1].Value;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return new AgentToolResult(callId, toolName, false, string.Empty, "The file path parameter ('relativePath') could not be identified.");
+        }
+
+        string safePath = ToolHelper.ResolveSafePathWithSmartFallback(rootPath, relative, out _);
+        if (!File.Exists(safePath))
+        {
+            string suggestions = ToolHelper.GetNearbyFileSuggestions(rootPath, relative);
+            return new AgentToolResult(callId, toolName, false, string.Empty, $"File not found: {relative}.{suggestions}");
+        }
+
+        string original = await File.ReadAllTextAsync(safePath, cancellationToken);
+        string[] patchLines = patchText.Replace("\r\n", "\n").Split('\n');
+
+        var hunkRemovals = new List<string>();
+        var hunkAdditions = new List<string>();
+        bool inHunk = false;
+
+        foreach (var pLine in patchLines)
+        {
+            if (pLine.StartsWith("@@"))
+            {
+                inHunk = true;
+                continue;
+            }
+            if (!inHunk) continue;
+
+            if (pLine.StartsWith('-'))
+            {
+                hunkRemovals.Add(pLine[1..]);
+            }
+            else if (pLine.StartsWith('+'))
+            {
+                hunkAdditions.Add(pLine[1..]);
+            }
+            else if (pLine.StartsWith(' '))
+            {
+                hunkRemovals.Add(pLine[1..]);
+                hunkAdditions.Add(pLine[1..]);
+            }
+        }
+
+        string targetBlock = string.Join("\n", hunkRemovals);
+        string replacementBlock = string.Join("\n", hunkAdditions);
+
+        string normOriginal = original.Replace("\r\n", "\n");
+        if (normOriginal.Contains(targetBlock))
+        {
+            string updated = normOriginal.Replace(targetBlock, replacementBlock);
+            if (original.Contains("\r\n")) updated = updated.Replace("\n", "\r\n");
+            await File.WriteAllTextAsync(safePath, updated, cancellationToken);
+            _ = vectorIndexer?.IndexWorkspaceFileAsync(rootPath, relative, cancellationToken);
+            string patch = ToolHelper.GenerateUnifiedDiffPatch(relative, original, updated);
+            return new AgentToolResult(callId, toolName, true, $"Unified Diff Patch applied successfully to: {relative}", DiffPatch: patch);
+        }
+
+        return new AgentToolResult(callId, toolName, false, string.Empty, $"Target context block from unified diff not found in {relative}.");
     }
 }
