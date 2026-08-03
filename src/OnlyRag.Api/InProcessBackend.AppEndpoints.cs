@@ -44,6 +44,19 @@ public static partial class InProcessBackend
         app.MapGet("/api/app/storage-status", async (ILocalStorageService storage, CancellationToken cancellationToken) =>
             Results.Ok(await storage.GetStatusAsync(cancellationToken)));
 
+        app.MapGet("/api/system/hardware", async (OnlyRag.Core.IHardwareMonitorService hardwareMonitor, CancellationToken cancellationToken) =>
+            Results.Ok(await hardwareMonitor.GetMetricsAsync(cancellationToken)));
+
+        app.MapPost("/api/system/hardware/profile", async (
+            SetEnergyProfileRequest request,
+            OnlyRag.Core.IHardwareMonitorService hardwareMonitor,
+            CancellationToken cancellationToken) =>
+        {
+            await hardwareMonitor.SetEnergyProfileAsync(request.Profile, cancellationToken);
+            var updatedMetrics = await hardwareMonitor.GetMetricsAsync(cancellationToken);
+            return Results.Ok(updatedMetrics);
+        });
+
         app.MapPost("/api/app/prepare-shutdown", async (
             ApplicationShutdownService shutdown,
             CancellationToken cancellationToken) =>

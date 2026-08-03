@@ -38,7 +38,7 @@ internal sealed class OllamaQueryEmbeddingGenerator : IQueryEmbeddingGenerator
                 [query],
                 cancellationToken: cancellationToken);
             IReadOnlyList<float> vector = embeddings.Count == 0 ? [] : embeddings[0];
-            
+
             if (vector.Count > 0)
             {
                 embeddingCache.Set(model, query, vector);

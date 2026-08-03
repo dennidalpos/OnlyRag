@@ -10,6 +10,7 @@ import { PdfExportPanel } from "./PdfExportPanel";
 import { PerformanceSettingsPanel } from "./PerformanceSettingsPanel";
 import { RerankerModelPanel } from "./RerankerModelPanel";
 import { ThemeSelectorPanel } from "./SettingsSection.fields";
+import { HardwareMonitorPanel } from "./HardwareMonitorPanel";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 type SettingsTab = "all" | "theme" | "models" | "rag" | "ocr" | "diagnostics";
@@ -76,6 +77,7 @@ export function SettingsSectionPanels() {
             <h3 id="settings-rag-title">Ricerca RAG &amp; Prestazioni</h3>
             <div className="settings-section__grid">
               <PerformanceSettingsPanel />
+              <HardwareMonitorPanel />
               <IngestionSettingsPanel />
               <RerankerModelPanel />
             </div>

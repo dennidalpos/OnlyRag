@@ -251,7 +251,7 @@ export function ChatSection({
           selectedDocumentIds,
           conversationId
         },
-        (evt) => {
+        (evt: ChatStreamChunkEvent) => {
           if (evt.eventType === "meta") {
             if (evt.conversationId) setConversationId(evt.conversationId);
             if (evt.sources) {
@@ -262,7 +262,7 @@ export function ChatSection({
               );
             }
             if (evt.notices) {
-              setNotices(evt.notices.map((n) => n.message));
+              setNotices(evt.notices.map((n: { message: string }) => n.message));
             }
           } else if (evt.eventType === "chunk" && evt.content) {
             setMessages((current) =>

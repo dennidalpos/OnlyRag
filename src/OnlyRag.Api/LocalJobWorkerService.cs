@@ -11,6 +11,7 @@ internal sealed class LocalJobWorkerService : BackgroundService
     private readonly RunningJobCancellationRegistry cancellationRegistry;
     private readonly IPerformanceSettingsService performanceSettings;
     private readonly InProcessBackendDescriptor backendDescriptor;
+    private readonly OnlyRag.Core.IHardwareMonitorService? hardwareMonitor;
 
     public LocalJobWorkerService(
         ILocalJobQueue queue,
@@ -18,7 +19,8 @@ internal sealed class LocalJobWorkerService : BackgroundService
         IEnumerable<ILocalJobHandler> handlers,
         RunningJobCancellationRegistry cancellationRegistry,
         IPerformanceSettingsService performanceSettings,
-        InProcessBackendDescriptor backendDescriptor)
+        InProcessBackendDescriptor backendDescriptor,
+        OnlyRag.Core.IHardwareMonitorService? hardwareMonitor = null)
     {
         this.queue = queue;
         this.descriptor = descriptor;
@@ -26,6 +28,7 @@ internal sealed class LocalJobWorkerService : BackgroundService
         this.cancellationRegistry = cancellationRegistry;
         this.performanceSettings = performanceSettings;
         this.backendDescriptor = backendDescriptor;
+        this.hardwareMonitor = hardwareMonitor;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,7 +40,15 @@ internal sealed class LocalJobWorkerService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            int workerCount = Math.Max(1, (await performanceSettings.GetAsync(stoppingToken)).MaxParallelJobs);
+            int configuredParallelJobs = Math.Max(1, (await performanceSettings.GetAsync(stoppingToken)).MaxParallelJobs);
+            int workerCount = configuredParallelJobs;
+            int delayMs = 50;
+
+            if (hardwareMonitor != null)
+            {
+                (workerCount, delayMs) = await hardwareMonitor.GetThrottledWorkerParametersAsync(configuredParallelJobs, stoppingToken);
+            }
+
             Task<bool>[] workers = Enumerable.Range(0, workerCount)
                 .Select(_ => ProcessOneAsync(stoppingToken))
                 .ToArray();
@@ -50,7 +61,7 @@ internal sealed class LocalJobWorkerService : BackgroundService
             }
             else
             {
-                await Task.Delay(50, stoppingToken); // Brief pause for batch opportunity
+                await Task.Delay(delayMs, stoppingToken);
             }
         }
     }

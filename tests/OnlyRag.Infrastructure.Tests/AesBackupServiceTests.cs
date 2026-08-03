@@ -16,7 +16,7 @@ public class AesBackupServiceTests : IDisposable
         Directory.CreateDirectory(_tempDir);
         _paths = AppStoragePaths.FromRoot(_tempDir);
         _backupService = new AesBackupService(_paths);
-        
+
         // Ensure data directory exists
         Directory.CreateDirectory(_paths.DataDirectory);
         File.WriteAllText(_paths.DatabasePath, "DUMMY SQLITE DATA");

@@ -2,7 +2,9 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
+using OnlyRag.Infrastructure.Agents;
 using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
@@ -93,6 +95,8 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IAesBackupService, AesBackupService>();
+        services.AddSingleton<ISqliteMaintenanceService, SqliteMaintenanceService>();
+        services.AddHostedService<SqliteMaintenanceBackgroundService>();
         return services;
     }
 
@@ -111,6 +115,7 @@ internal static class InProcessBackendServiceRegistration
         }
 
         services.AddSingleton<QdrantLocalRuntimeService>();
+        services.AddSingleton<OnlyRag.Core.IQdrantSyncRepairService, OnlyRag.Infrastructure.Vector.QdrantSyncRepairService>();
         services.AddSingleton(HybridRetrievalOptions.Default);
         services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
         services.AddSingleton<IRetrievalChunkRepository, SqliteRetrievalChunkRepository>();
@@ -118,6 +123,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<HeuristicReRankerService>();
         services.AddSingleton<RerankerModelManager>();
         services.AddSingleton<IReRankerService, OnnxCrossEncoderReRankerService>();
+        services.AddSingleton<IQueryIntentClassifierService, QueryIntentClassifierService>();
         services.AddSingleton<ILlmQueryExpander, OllamaLlmQueryExpander>();
         services.AddSingleton<IQueryTransformationService, OllamaQueryTransformationService>();
         services.AddSingleton<ParentChildChunkResolver>();
@@ -128,6 +134,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IAgentSkillRepository, SqliteAgentSkillRepository>();
         services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
         services.AddSingleton<ISubagentReportCacheRepository, SqliteSubagentReportCacheRepository>();
+        services.AddSingleton<IMultiAgentOrchestratorService, MultiAgentOrchestratorService>();
         services.AddSingleton<IWorkspaceVectorIndexerService, WorkspaceVectorIndexerService>();
         services.AddSingleton<IAstDependencyGraphService, AstDependencyGraphService>();
         services.AddSingleton<IGraphRagAstSymbolIndexer, GraphRagAstSymbolIndexer>();
@@ -139,6 +146,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<BackgroundTaskManager>();
         services.AddSingleton<ISubagentRunner, SubagentRunner>();
         services.AddSingleton<WorkspaceToolExecutor>();
+        services.AddHttpClient<OnlyRag.Core.Mcp.IMcpSseClient, OnlyRag.Api.Mcp.McpSseClientService>();
         services.AddSingleton<OnlyRag.Core.Mcp.IMcpClientService, OnlyRag.Api.Mcp.McpClientService>();
         services.AddTransient<AgentLoopEngine>();
         return services;
@@ -147,6 +155,7 @@ internal static class InProcessBackendServiceRegistration
     private static IServiceCollection AddOnlyRagDocumentServices(this IServiceCollection services)
     {
         services.AddSingleton<TranslationExportService>();
+        services.AddSingleton<OnlyRag.Core.IChatReportExportService, OnlyRag.Infrastructure.Export.ChatReportExportService>();
         services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
         services.AddSingleton<LocalDocumentStorageGuard>();
         services.AddSingleton<IngestionSettingsStore>();
@@ -173,6 +182,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<OllamaQueryEmbeddingCache>();
         services.AddSingleton<IOllamaLoadBalancer, OllamaLoadBalancer>();
         services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
+        services.AddSingleton<OnlyRag.Core.IHardwareMonitorService, OnlyRag.Infrastructure.Hardware.HardwareMonitorService>();
         services.AddSingleton<PdfExportSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.ILoggingService, OnlyRag.Infrastructure.Logging.LoggingService>();

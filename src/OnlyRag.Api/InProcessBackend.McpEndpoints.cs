@@ -42,6 +42,12 @@ public static class InProcessBackendMcpEndpoints
             return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
         });
 
+        group.MapGet("/servers/{serverId}/sse-status", (string serverId, IMcpSseClient sseClient) =>
+        {
+            var status = sseClient.GetSessionStatus(serverId);
+            return Results.Ok(status);
+        });
+
         return endpoints;
     }
 }

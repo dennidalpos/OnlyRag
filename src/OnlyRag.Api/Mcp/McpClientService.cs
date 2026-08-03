@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 
+using OnlyRag.Core;
 using OnlyRag.Core.Mcp;
 using OnlyRag.Infrastructure.Storage;
 
@@ -10,12 +11,19 @@ public sealed class McpClientService : IMcpClientService, IDisposable
 {
     private const string SettingsKey = "mcp.servers.config";
     private readonly ISettingsRepository _settingsRepository;
+    private readonly AppStoragePaths _storagePaths;
+    private readonly IMcpSseClient? _sseClient;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly Dictionary<string, Process> _runningProcesses = new(StringComparer.OrdinalIgnoreCase);
 
-    public McpClientService(ISettingsRepository settingsRepository)
+    public McpClientService(
+        ISettingsRepository settingsRepository,
+        AppStoragePaths storagePaths,
+        IMcpSseClient? sseClient = null)
     {
         _settingsRepository = settingsRepository;
+        _storagePaths = storagePaths;
+        _sseClient = sseClient;
     }
 
     public async Task<IReadOnlyList<McpServerConfig>> GetConfiguredServersAsync(CancellationToken cancellationToken = default)
@@ -95,7 +103,7 @@ public sealed class McpClientService : IMcpClientService, IDisposable
             }
             catch (Exception ex)
             {
-                BackendLog.Write($"Errore recupero tool da server MCP '{server.Name}': {ex.Message}");
+                BackendLog.Write(_storagePaths, $"Errore recupero tool da server MCP '{server.Name}': {ex.Message}");
             }
         }
 
@@ -144,7 +152,10 @@ public sealed class McpClientService : IMcpClientService, IDisposable
     {
         if (server.Transport == McpTransportType.HttpSse)
         {
-            // Simple HTTP fallback metadata endpoint check if available
+            if (_sseClient != null)
+            {
+                return await _sseClient.FetchToolsAsync(server, cancellationToken);
+            }
             return [];
         }
 
@@ -189,6 +200,14 @@ public sealed class McpClientService : IMcpClientService, IDisposable
 
     private async Task<string> InvokeToolOnServerAsync(McpServerConfig server, string toolName, JsonElement arguments, CancellationToken cancellationToken)
     {
+        if (server.Transport == McpTransportType.HttpSse)
+        {
+            if (_sseClient != null)
+            {
+                return await _sseClient.CallToolAsync(server, toolName, arguments, cancellationToken);
+            }
+            throw new InvalidOperationException("Transport HttpSse non supportato senza IMcpSseClient registrato.");
+        }
         string requestJson = JsonSerializer.Serialize(new
         {
             jsonrpc = "2.0",

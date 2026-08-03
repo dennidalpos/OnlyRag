@@ -20,6 +20,93 @@ export type ApiRequestOptions = RequestInit & {
   retryOnStatusCodes?: number[];
 };
 
+export type HardwareMetricsResponse = {
+  cpuUsagePercentage: number;
+  memoryAvailableMB: number;
+  memoryTotalMB: number;
+  powerSource: "ACPower" | "Battery" | "Unknown";
+  batteryPercentage?: number | null;
+  loadLevel: "Low" | "Normal" | "High" | "Critical";
+  energySaverActive: boolean;
+  activeProfile: "Performance" | "Balanced" | "Eco";
+  recommendedMaxWorkers: number;
+  recommendedDelayMs: number;
+  sampledAt: string;
+};
+
+export type SqliteDatabaseStatus = {
+  databasePath: string;
+  exists: boolean;
+  fileSizeBytes: number;
+  formattedFileSize: string;
+  fts5Enabled: boolean;
+  lastMaintenanceAtUtc?: string | null;
+  maintenanceStatus: string;
+};
+
+export type SqliteMaintenanceResult = {
+  success: boolean;
+  initialFileSizeBytes: number;
+  finalFileSizeBytes: number;
+  bytesReclaimed: number;
+  duration: string;
+  message: string;
+  executedAtUtc: string;
+};
+
+export type ExportPreviewRequest = {
+  title: string;
+  format: "Pdf" | "Docx";
+  messages: Array<{
+    role: string;
+    text: string;
+    citations?: Array<{ documentName: string; pageStart?: number; snippet: string }>;
+  }>;
+  includeCitations?: boolean;
+  notes?: string;
+  theme?: string;
+};
+
+export type ExportPreviewResponse = {
+  htmlPreview: string;
+  estimatedPageCount: number;
+  totalMessageCount: number;
+  totalCitationCount: number;
+  estimatedFileSizeBytes: number;
+  theme: string;
+};
+
+export type MultiAgentSubtask = {
+  subtaskId: string;
+  role: string;
+  goal: string;
+  dependsOnSubtaskIds: string[];
+  status: "Pending" | "Running" | "Completed" | "Failed";
+  output?: string | null;
+  error?: string | null;
+  startedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+};
+
+export type InterAgentMessage = {
+  messageId: string;
+  senderRole: string;
+  recipientRole: string;
+  messageText: string;
+  sentAtUtc: string;
+};
+
+export type MultiAgentOrchestrationStatus = {
+  orchestrationId: string;
+  overallGoal: string;
+  isCompleted: boolean;
+  hasFailed: boolean;
+  subtasks: MultiAgentSubtask[];
+  messages: InterAgentMessage[];
+  startedAtUtc: string;
+  finishedAtUtc?: string | null;
+};
+
 declare global {
   interface Window {
     __ONLYRAG_BACKEND__?: BackendBridge;
@@ -102,196 +189,74 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
   headers.set(sessionToken.headerName, sessionToken.token);
 
   let attempt = 0;
-  while (attempt <= retries) {
-    let response: Response;
-    try {
-      response = await fetch(requestUrl, { ...init, headers });
-    } catch {
-      if (attempt < retries) {
-        attempt++;
-        await delay(retryDelayMs * Math.pow(2, attempt - 1));
-        continue;
-      }
-      markBackendOffline();
-      throw new Error("Il backend locale non è raggiungibile. Riavviare l'applicazione.");
-    }
+  let lastError: Error | null = null;
 
-    if (response.ok) {
-      if (response.status === 204) {
-        return undefined as T;
+  while (attempt <= retries) {
+    try {
+      const response = await fetch(requestUrl, {
+        ...init,
+        headers
+      });
+
+      if (!response.ok) {
+        if (retryOnStatusCodes.includes(response.status) && attempt < retries) {
+          attempt++;
+          await delay(retryDelayMs * Math.pow(2, attempt - 1));
+          continue;
+        }
+
+        const errorMessage = await readProblemMessage(response, path);
+        const error = new Error(errorMessage);
+        (error as Error & { status?: number }).status = response.status;
+        throw error;
       }
+
+      markBackendOnline();
       return (await response.json()) as T;
-    }
-
-    if (attempt < retries && retryOnStatusCodes.includes(response.status)) {
-      attempt++;
-      await delay(retryDelayMs * Math.pow(2, attempt - 1));
-      continue;
-    }
-
-    throw new Error(await readProblemMessage(response, path));
-  }
-
-  throw new Error("Richiesta fallita dopo diversi tentativi.");
-}
-
-export async function apiStreamRequest<T>(
-  path: string,
-  body: unknown,
-  onEvent: (event: T) => void,
-  signal?: AbortSignal,
-  options?: ApiRequestOptions
-): Promise<void> {
-  const {
-    retries = DEFAULT_RETRIES,
-    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
-    retryOnStatusCodes = DEFAULT_RETRY_STATUS_CODES
-  } = options ?? {};
-
-  const baseUrl = resolveBackendBaseUrl();
-  if (!baseUrl) {
-    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile. Riavviare l'applicazione.");
-  }
-
-  const requestUrl = resolveBackendRequestUrl(path, baseUrl);
-  const headers = new Headers();
-  headers.set("Content-Type", "application/json");
-
-  const sessionToken = resolveBackendSessionToken();
-  if (!sessionToken) {
-    throw new Error("Il token di sessione del backend locale non è disponibile. Riavviare l'applicazione.");
-  }
-  headers.set(sessionToken.headerName, sessionToken.token);
-
-  let response: Response | undefined;
-  let attempt = 0;
-
-  while (attempt <= retries) {
-    try {
-      response = await fetch(requestUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal
-      });
-    } catch (e) {
-      if (attempt < retries && !(signal?.aborted)) {
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < retries && !(err as Error & { status?: number }).status) {
         attempt++;
         await delay(retryDelayMs * Math.pow(2, attempt - 1));
         continue;
       }
-      throw e;
-    }
-
-    if (response.ok) {
       break;
     }
-
-    if (attempt < retries && retryOnStatusCodes.includes(response.status) && !(signal?.aborted)) {
-      attempt++;
-      await delay(retryDelayMs * Math.pow(2, attempt - 1));
-      continue;
-    }
-
-    throw new Error(await readProblemMessage(response, path));
   }
 
-  if (!response || !response.ok) {
-    throw new Error("Impossibile stabilire la connessione di streaming.");
+  if (lastError && !(lastError as Error & { status?: number }).status) {
+    markBackendOffline();
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) return;
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      const dataStr = trimmed.slice(6);
-      if (dataStr === "[DONE]") break;
-      try {
-        const parsed = JSON.parse(dataStr) as T;
-        onEvent(parsed);
-      } catch (e) {
-        if (e instanceof Error && !e.message.includes("JSON")) throw e;
-      }
-    }
-  }
+  throw lastError ?? new Error("Richiesta API non riuscita.");
 }
 
-export async function apiAgentStreamRequest(
+export async function apiStreamRequest<T = unknown>(
   path: string,
   body: unknown,
-  onEvent: (event: unknown) => void,
-  signal?: AbortSignal,
-  options?: ApiRequestOptions
+  onChunk: (event: T) => void,
+  signal?: AbortSignal
 ): Promise<void> {
-  const {
-    retries = DEFAULT_RETRIES,
-    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
-    retryOnStatusCodes = DEFAULT_RETRY_STATUS_CODES
-  } = options ?? {};
-
   const baseUrl = resolveBackendBaseUrl();
   if (!baseUrl) {
-    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile. Riavviare l'applicazione.");
+    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile.");
   }
-
   const requestUrl = resolveBackendRequestUrl(path, baseUrl);
-  const headers = new Headers();
-  headers.set("Content-Type", "application/json");
-
   const sessionToken = resolveBackendSessionToken();
-  if (!sessionToken) {
-    throw new Error("Il token di sessione del backend locale non è disponibile. Riavviare l'applicazione.");
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (sessionToken) {
+    headers.set(sessionToken.headerName, sessionToken.token);
   }
-  headers.set(sessionToken.headerName, sessionToken.token);
 
-  let response: Response | undefined;
-  let attempt = 0;
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal
+  });
 
-  while (attempt <= retries) {
-    try {
-      response = await fetch(requestUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal
-      });
-    } catch (e) {
-      if (attempt < retries && !(signal?.aborted)) {
-        attempt++;
-        await delay(retryDelayMs * Math.pow(2, attempt - 1));
-        continue;
-      }
-      throw e;
-    }
-
-    if (response.ok) {
-      break;
-    }
-
-    if (attempt < retries && retryOnStatusCodes.includes(response.status) && !(signal?.aborted)) {
-      attempt++;
-      await delay(retryDelayMs * Math.pow(2, attempt - 1));
-      continue;
-    }
-
+  if (!response.ok) {
     throw new Error(await readProblemMessage(response, path));
-  }
-
-  if (!response || !response.ok) {
-    throw new Error("Impossibile stabilire la connessione di streaming agent.");
   }
 
   const reader = response.body?.getReader();
@@ -314,13 +279,57 @@ export async function apiAgentStreamRequest(
       const dataStr = trimmed.slice(6);
       if (dataStr === "[DONE]") return;
       try {
-        const parsed = JSON.parse(dataStr) as unknown;
-        onEvent(parsed);
+        const parsed = JSON.parse(dataStr) as T;
+        onChunk(parsed);
       } catch (err) {
-        console.warn("[apiAgentStreamRequest] Errore di parsing dell'evento SSE:", err, "Dati grezzi:", dataStr);
+        console.warn("[apiStreamRequest] Errore parsing SSE:", err);
       }
     }
   }
+}
+
+export async function apiAgentStreamRequest(
+  path: string,
+  body: unknown,
+  onEvent: (event: unknown) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  return apiStreamRequest<unknown>(path, body, onEvent, signal);
+}
+
+export async function setHardwareEnergyProfile(profile: "Performance" | "Balanced" | "Eco"): Promise<HardwareMetricsResponse> {
+  return apiRequest<HardwareMetricsResponse>("/api/system/hardware/profile", {
+    method: "POST",
+    body: JSON.stringify({ profile })
+  });
+}
+
+export async function getDatabaseStatus(): Promise<SqliteDatabaseStatus> {
+  return apiRequest<SqliteDatabaseStatus>("/api/system/database/status");
+}
+
+export async function runDatabaseMaintenance(): Promise<SqliteMaintenanceResult> {
+  return apiRequest<SqliteMaintenanceResult>("/api/system/database/maintenance", {
+    method: "POST"
+  });
+}
+
+export async function getExportPreview(request: ExportPreviewRequest): Promise<ExportPreviewResponse> {
+  return apiRequest<ExportPreviewResponse>("/api/export/preview", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export async function startMultiAgentOrchestration(overallGoal: string): Promise<MultiAgentOrchestrationStatus> {
+  return apiRequest<MultiAgentOrchestrationStatus>("/api/agent/orchestrate", {
+    method: "POST",
+    body: JSON.stringify({ overallGoal })
+  });
+}
+
+export async function getMultiAgentOrchestrationStatus(id: string): Promise<MultiAgentOrchestrationStatus> {
+  return apiRequest<MultiAgentOrchestrationStatus>(`/api/agent/orchestrate/${encodeURIComponent(id)}`);
 }
 
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {

@@ -181,7 +181,7 @@ export function useAgentStreamHandler({
           workspaceRoot: workspaceConfig?.rootPath || null,
           autoApproveCommands
         } as AgentRunRequest,
-        (rawEvent) => {
+        (rawEvent: unknown) => {
           const event = rawEvent as AgentStepEvent;
           setMessages((prev) =>
             prev.map((msg) => {

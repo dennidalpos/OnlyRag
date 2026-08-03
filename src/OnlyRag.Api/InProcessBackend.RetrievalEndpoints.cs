@@ -112,5 +112,11 @@ public static partial class InProcessBackend
 
             return Results.Empty;
         });
+
+        app.MapPost("/api/vector/repair", async (IQdrantSyncRepairService repairService, CancellationToken cancellationToken) =>
+        {
+            QdrantSyncReport report = await repairService.AuditAndRepairAsync(cancellationToken);
+            return Results.Ok(report);
+        });
     }
 }

@@ -16,6 +16,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
     private readonly IQueryTransformationService queryTransformer;
     private readonly ParentChildChunkResolver parentChildResolver;
     private readonly CragDecisionEngine cragEvaluator;
+    private readonly IQueryIntentClassifierService queryIntentClassifier;
     private readonly HybridRetrievalOptions options;
     private readonly ISettingsRepository? settings;
 
@@ -30,6 +31,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         IQueryTransformationService? queryTransformer = null,
         ParentChildChunkResolver? parentChildResolver = null,
         CragDecisionEngine? cragEvaluator = null,
+        IQueryIntentClassifierService? queryIntentClassifier = null,
         HybridRetrievalOptions? options = null,
         ISettingsRepository? settings = null)
     {
@@ -43,6 +45,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         this.queryTransformer = queryTransformer ?? new OllamaQueryTransformationService();
         this.parentChildResolver = parentChildResolver ?? new ParentChildChunkResolver(chunks);
         this.cragEvaluator = cragEvaluator ?? new CragDecisionEngine();
+        this.queryIntentClassifier = queryIntentClassifier ?? new QueryIntentClassifierService();
         this.options = options ?? HybridRetrievalOptions.Default;
         this.settings = settings;
     }
@@ -194,7 +197,8 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             options.VectorTopK,
             cancellationToken);
 
-        // ── Stage 4: 2nd-Stage Re-ranking on child chunks ──────────────────
+        // ── Stage 4: 2nd-Stage Re-ranking on child chunks (Intent Adaptive) ──
+        QueryIntentClassificationResult intent = queryIntentClassifier.ClassifyIntent(query);
         List<ReRankCandidate> candidates = [];
         foreach (DocumentSearchResult coarse in coarseResults)
         {
@@ -211,7 +215,8 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             reRanked.Add(coarse with { Score = reRankScore, ReRankScore = reRankScore });
         }
 
-        IReadOnlyList<DocumentSearchResult> topK = reRanked
+        var filteredByThreshold = reRanked.Where(r => (r.ReRankScore ?? r.Score) >= intent.MinimumRerankScoreThreshold).ToList();
+        IReadOnlyList<DocumentSearchResult> topK = (filteredByThreshold.Count > 0 ? filteredByThreshold : reRanked)
             .OrderByDescending(r => r.ReRankScore ?? r.Score)
             .Take(finalLimit)
             .ToList();
@@ -339,23 +344,48 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         CancellationToken cancellationToken)
     {
         double k = options.RrfK;
+        double wKey = options.KeywordWeight;
+        double wVec = options.VectorWeight;
+
+        if (settings != null)
+        {
+            string? rrfKVal = await settings.GetValueAsync("retrieval.rrfK", cancellationToken);
+            if (double.TryParse(rrfKVal, System.Globalization.CultureInfo.InvariantCulture, out double parsedK))
+            {
+                k = Math.Clamp(parsedK, 1d, 100d);
+            }
+
+            string? wKeyVal = await settings.GetValueAsync("retrieval.keywordWeight", cancellationToken);
+            if (double.TryParse(wKeyVal, System.Globalization.CultureInfo.InvariantCulture, out double parsedWKey))
+            {
+                wKey = Math.Clamp(parsedWKey, 0.05, 0.95);
+            }
+
+            string? wVecVal = await settings.GetValueAsync("retrieval.vectorWeight", cancellationToken);
+            if (double.TryParse(wVecVal, System.Globalization.CultureInfo.InvariantCulture, out double parsedWVec))
+            {
+                wVec = Math.Clamp(parsedWVec, 0.05, 0.95);
+            }
+        }
+
         Dictionary<long, double> rrfScores = [];
 
         for (int rank = 0; rank < keywordResults.Count; rank++)
         {
             long chunkId = keywordResults[rank].ChunkId;
-            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (1d / (k + rank + 1));
+            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (wKey / (k + rank + 1));
         }
 
         for (int rank = 0; rank < vectorResults.Count; rank++)
         {
             long chunkId = vectorResults[rank].ChunkId;
-            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (1d / (k + rank + 1));
+            rrfScores[chunkId] = rrfScores.GetValueOrDefault(chunkId, 0d) + (wVec / (k + rank + 1));
         }
 
-        // Normalize RRF scores to [0, 1] range.
-        double maxRrfScore = rrfScores.Count > 0 ? rrfScores.Values.Max() : 1d;
-        if (maxRrfScore <= 0d) maxRrfScore = 1d;
+        // Max possible RRF score under given weights for normalization
+        double maxPossibleScore = (wKey / (k + 1)) + (wVec / (k + 1));
+        double maxRrfScore = rrfScores.Count > 0 ? rrfScores.Values.Max() : maxPossibleScore;
+        if (maxRrfScore <= 0d) maxRrfScore = maxPossibleScore;
 
         long[] chunkIds = rrfScores.Keys.ToArray();
         IReadOnlyDictionary<long, SearchChunk> chunkMap = await chunks.GetChunksAsync(chunkIds, cancellationToken);
@@ -368,7 +398,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
                 continue;
             }
 
-            double normalizedScore = Math.Round(kvp.Value / maxRrfScore, 4);
+            double normalizedScore = Math.Round(Math.Clamp(kvp.Value / maxRrfScore, 0d, 1d), 4);
             results.Add(new DocumentSearchResult(
                 chunk.DocumentId,
                 chunk.DocumentName,

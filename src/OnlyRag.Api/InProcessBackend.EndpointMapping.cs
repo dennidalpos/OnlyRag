@@ -17,10 +17,12 @@ internal static class InProcessBackendEndpointMapping
         app.MapImageEndpoints();
         app.MapWorkspaceEndpoints();
         app.MapAgentEndpoints();
+        app.MapMultiAgentEndpoints();
         app.MapMcpEndpoints();
+        app.MapExportEndpoints();
         app.MapBackupEndpoints();
+        app.MapDatabaseEndpoints();
         app.MapLoggingEndpoints();
         return app;
     }
 }
-
