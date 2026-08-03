@@ -31,7 +31,7 @@ public sealed class SqliteMaintenanceService : ISqliteMaintenanceService
             try
             {
                 await using SqliteConnection connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-                
+
                 // Check if FTS5 is compiled into SQLite
                 await using SqliteCommand cmd = connection.CreateCommand();
                 cmd.CommandText = "PRAGMA compile_options;";
@@ -92,7 +92,7 @@ public sealed class SqliteMaintenanceService : ISqliteMaintenanceService
         try
         {
             await using SqliteConnection connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-            
+
             // 1. Optimize SQLite internal query planner
             await using (SqliteCommand optCmd = connection.CreateCommand())
             {

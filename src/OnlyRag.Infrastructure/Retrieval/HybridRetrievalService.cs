@@ -62,6 +62,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         bool isReformulation,
         CancellationToken cancellationToken = default)
     {
+        var totalSw = System.Diagnostics.Stopwatch.StartNew();
         string query = request.Query?.Trim() ?? string.Empty;
         IReadOnlyList<long> requestedDocumentIds = request.DocumentIds ?? [];
         long[] documentIds = requestedDocumentIds
@@ -74,12 +75,14 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
 
         if (string.IsNullOrWhiteSpace(query) || documentIds.Length == 0)
         {
+            totalSw.Stop();
             return new DocumentSearchResponse(
                 [],
                 await BuildDocumentStatusesAsync(documentIds, model: null, cancellationToken),
                 "none",
                 vectorSearch.BackendName,
-                options.MaxContextCharacters);
+                options.MaxContextCharacters,
+                new RagLatencyMetrics(0, 0, 0, 0, totalSw.Elapsed.TotalMilliseconds));
         }
 
         List<RetrievalNotice> notices = [];
@@ -141,18 +144,28 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             pipelineResult.QueryEmbedding?.Model,
             cancellationToken);
 
+        totalSw.Stop();
+        var latencyMetrics = new RagLatencyMetrics(
+            Math.Round(pipelineResult.EmbeddingMs, 2),
+            Math.Round(pipelineResult.QdrantMs, 2),
+            Math.Round(pipelineResult.Fts5Ms, 2),
+            Math.Round(pipelineResult.ReRankMs, 2),
+            Math.Round(totalSw.Elapsed.TotalMilliseconds, 2),
+            Math.Round(cragResult.HighestScore, 4));
+
         return new DocumentSearchResponse(
             finalResults,
             documentStatuses,
             pipelineResult.KeywordBackendName,
             pipelineResult.VectorAttempt.BackendName,
-            options.MaxContextCharacters)
+            options.MaxContextCharacters,
+            latencyMetrics)
         {
             Notices = notices
         };
     }
 
-    private async Task<(IReadOnlyList<DocumentSearchResult> Results, VectorSearchAttempt VectorAttempt, string KeywordBackendName, QueryEmbeddingResult? QueryEmbedding)> ExecuteStages2To5Async(
+    private async Task<(IReadOnlyList<DocumentSearchResult> Results, VectorSearchAttempt VectorAttempt, string KeywordBackendName, QueryEmbeddingResult? QueryEmbedding, double EmbeddingMs, double QdrantMs, double Fts5Ms, double ReRankMs)> ExecuteStages2To5Async(
         string query,
         IReadOnlyList<string> searchQueries,
         long[] documentIds,
@@ -161,8 +174,10 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         CancellationToken cancellationToken)
     {
         // ── Stage 2: Coarse Hybrid Retrieval (FTS5 + Qdrant in parallel) ───
+        var embedSw = System.Diagnostics.Stopwatch.StartNew();
         Task<QueryEmbeddingResult?> embeddingTask = TryGenerateQueryEmbeddingAsync(query, notices, cancellationToken);
 
+        var fts5Sw = System.Diagnostics.Stopwatch.StartNew();
         List<Task<KeywordSearchResponse>> keywordTasks = [];
         foreach (string q in searchQueries)
         {
@@ -170,12 +185,16 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         }
 
         await Task.WhenAll([.. keywordTasks, embeddingTask]);
+        embedSw.Stop();
 
         QueryEmbeddingResult? queryEmbedding = await embeddingTask;
 
+        var qdrantSw = System.Diagnostics.Stopwatch.StartNew();
         VectorSearchAttempt vectorSearchAttempt = queryEmbedding is null
             ? new VectorSearchAttempt([], "Qdrant unavailable")
             : await TryVectorSearchAsync(queryEmbedding, documentIds, notices, cancellationToken);
+        qdrantSw.Stop();
+        fts5Sw.Stop();
 
         List<KeywordSearchResult> allKeywordResults = [];
         string keywordBackendName = "none";
@@ -198,6 +217,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             cancellationToken);
 
         // ── Stage 4: 2nd-Stage Re-ranking on child chunks (Intent Adaptive) ──
+        var reRankSw = System.Diagnostics.Stopwatch.StartNew();
         QueryIntentClassificationResult intent = queryIntentClassifier.ClassifyIntent(query);
         List<ReRankCandidate> candidates = [];
         foreach (DocumentSearchResult coarse in coarseResults)
@@ -206,6 +226,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
         }
 
         IReadOnlyList<ReRankResult> reRankedScores = await reRanker.ReRankAsync(query, candidates, cancellationToken);
+        reRankSw.Stop();
         Dictionary<long, double> scoreMap = reRankedScores.ToDictionary(s => s.ChunkId, s => s.Score);
 
         List<DocumentSearchResult> reRanked = [];
@@ -239,7 +260,7 @@ public sealed class HybridRetrievalService : IHybridRetrievalService
             });
         }
 
-        return (finalResults, vectorSearchAttempt, keywordBackendName, queryEmbedding);
+        return (finalResults, vectorSearchAttempt, keywordBackendName, queryEmbedding, embedSw.Elapsed.TotalMilliseconds, qdrantSw.Elapsed.TotalMilliseconds, fts5Sw.Elapsed.TotalMilliseconds, reRankSw.Elapsed.TotalMilliseconds);
     }
 
     private int NormalizeTopK(int? requestedTopK)

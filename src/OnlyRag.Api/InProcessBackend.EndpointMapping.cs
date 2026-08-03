@@ -8,7 +8,6 @@ internal static class InProcessBackendEndpointMapping
     {
         app.MapAppEndpoints();
         app.MapRetrievalEndpoints();
-        app.MapRerankerEndpoints();
         app.MapSettingsEndpoints();
         app.MapDependencyEndpoints();
         app.MapJobEndpoints();
@@ -17,8 +16,6 @@ internal static class InProcessBackendEndpointMapping
         app.MapImageEndpoints();
         app.MapWorkspaceEndpoints();
         app.MapAgentEndpoints();
-        app.MapMultiAgentEndpoints();
-        app.MapMcpEndpoints();
         app.MapExportEndpoints();
         app.MapBackupEndpoints();
         app.MapDatabaseEndpoints();

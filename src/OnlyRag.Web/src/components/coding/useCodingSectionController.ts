@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AgentStepEvent, OllamaModel } from "../../api";
 import type { FileAction } from "./CodingSection.types";
 import { useAgentStreamHandler } from "./useAgentStreamHandler";
+import { useSmartIntentRouter } from "./useSmartIntentRouter";
 import { useWorkspaceManager } from "./useWorkspaceManager";
 
 export type CodingMessage = {
@@ -31,6 +32,12 @@ export function useCodingSectionController({
   const [isUserScrolledUp, setIsUserScrolledUp] = useState<boolean>(false);
 
   const workspace = useWorkspaceManager();
+
+  const intentMeta = useSmartIntentRouter({
+    promptInput: workspace.selectedWorkspaceFile || "",
+    selectedWorkspaceFile: workspace.selectedWorkspaceFile,
+    attachedFileContent: workspace.attachedFileContent
+  });
 
   const agentStream = useAgentStreamHandler({
     selectedModel,
@@ -79,6 +86,10 @@ export function useCodingSectionController({
   async function handleSendMessage(overridePrompt?: string) {
     const textToSend = overridePrompt ?? agentStream.promptInput;
     if (!textToSend.trim() || agentStream.isGenerating) return;
+
+    if (intentMeta.recommendedOperatingMode !== operatingMode) {
+      setOperatingMode(intentMeta.recommendedOperatingMode);
+    }
 
     return agentStream.handleSendAgentMessage(textToSend);
   }

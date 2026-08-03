@@ -2,7 +2,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using OnlyRag.Core;
+using OnlyRag.Core.Mcp;
 
 namespace OnlyRag.Api;
 
@@ -67,6 +69,69 @@ public static partial class InProcessBackend
 
             bool success = agentEngine.ApproveToolCall(request.CallId, request.Approved);
             return Results.Ok(new { Success = success });
+        });
+
+        // Multi-Agent Orchestration
+        app.MapPost("/api/agent/orchestrate", async (
+            MultiAgentOrchestrationRequest request,
+            IMultiAgentOrchestratorService orchestrator,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.OverallGoal))
+            {
+                return Results.BadRequest(new { title = "Obiettivo non valido", detail = "Specificare un obiettivo valido per l'orchestrazione." });
+            }
+
+            var status = await orchestrator.StartOrchestrationAsync(request, cancellationToken);
+            return Results.Ok(status);
+        });
+
+        app.MapGet("/api/agent/orchestrate/{id}", async (
+            string id,
+            IMultiAgentOrchestratorService orchestrator,
+            CancellationToken cancellationToken) =>
+        {
+            var status = await orchestrator.GetStatusAsync(id, cancellationToken);
+            return status is not null ? Results.Ok(status) : Results.NotFound();
+        });
+
+        // MCP Integration
+        RouteGroupBuilder mcpGroup = app.MapGroup("/api/mcp").WithTags("MCP");
+
+        mcpGroup.MapGet("/servers", async (IMcpClientService mcpService, CancellationToken ct) =>
+        {
+            var servers = await mcpService.GetConfiguredServersAsync(ct);
+            return Results.Ok(servers);
+        });
+
+        mcpGroup.MapPost("/servers", async (McpServerConfig config, IMcpClientService mcpService, CancellationToken ct) =>
+        {
+            var saved = await mcpService.RegisterServerAsync(config, ct);
+            return Results.Ok(saved);
+        });
+
+        mcpGroup.MapDelete("/servers/{serverId}", async (string serverId, IMcpClientService mcpService, CancellationToken ct) =>
+        {
+            await mcpService.UnregisterServerAsync(serverId, ct);
+            return Results.NoContent();
+        });
+
+        mcpGroup.MapGet("/tools", async (IMcpClientService mcpService, CancellationToken ct) =>
+        {
+            var tools = await mcpService.GetAvailableToolsAsync(ct);
+            return Results.Ok(tools);
+        });
+
+        mcpGroup.MapPost("/tools/call", async (McpToolCallRequest request, IMcpClientService mcpService, CancellationToken ct) =>
+        {
+            var result = await mcpService.CallToolAsync(request, ct);
+            return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
+        });
+
+        mcpGroup.MapGet("/servers/{serverId}/sse-status", (string serverId, IMcpSseClient sseClient) =>
+        {
+            var status = sseClient.GetSessionStatus(serverId);
+            return Results.Ok(status);
         });
     }
 }

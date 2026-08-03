@@ -46,6 +46,6 @@ public sealed class QdrantSyncRepairServiceTests
         Assert.Equal(10, report.TotalChunksInStorage);
         Assert.Equal(4, report.MissingVectorCount);
         Assert.Equal(1, report.EnqueuedRepairJobs);
-        await jobQueue.Received(1).CreateAsync(Arg.Is<CreateLocalJobRequest>(req => req.Type == "document.embedding" && req.PayloadJson.Contains("\"documentId\": 1")), Arg.Any<CancellationToken>());
+        await jobQueue.Received(1)!.CreateAsync(Arg.Is<CreateLocalJobRequest>(req => req != null && req.Type == "document.embedding" && req.PayloadJson != null && req.PayloadJson.Contains("\"documentId\": 1")), Arg.Any<CancellationToken>());
     }
 }

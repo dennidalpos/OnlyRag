@@ -1,14 +1,13 @@
 import {
-  BookOpen,
   Edit3,
   FileCode,
   Paperclip,
-  PenTool,
   Sparkles,
   Square,
   Trash2,
   X
 } from "lucide-react";
+import { useSmartIntentRouter } from "./useSmartIntentRouter";
 
 type CodingPromptBarProps = {
   selectedWorkspaceFile: string | null;
@@ -38,8 +37,8 @@ export function CodingPromptBar({
   onRemoveAttachedFile,
   promptInput,
   onPromptInputChange,
-  operatingMode,
-  onSelectOperatingMode,
+  operatingMode: _operatingMode,
+  onSelectOperatingMode: _onSelectOperatingMode,
   autoApproveCommands,
   onToggleAutoApproveCommands,
   workspaceConfigAuthorized,
@@ -49,6 +48,12 @@ export function CodingPromptBar({
   onCancelGeneration,
   onClearMessages
 }: CodingPromptBarProps) {
+  const intentMeta = useSmartIntentRouter({
+    promptInput,
+    selectedWorkspaceFile,
+    attachedFileContent
+  });
+
   return (
     <div className="coding-prompt-card">
       {/* ATTACHED FILE CHIP BAR */}
@@ -97,11 +102,7 @@ export function CodingPromptBar({
       <textarea
         className="coding-prompt-textarea"
         rows={3}
-        placeholder={
-          operatingMode === "plan"
-            ? "Modalità PIANO: Descrivi l'analisi, i flussi o l'architettura da pianificare (l'agente non applicherà modifiche sul disco)..."
-            : "Modalità AGENTE SCRITTURA: Inserisci l'obiettivo (es: esplora il progetto, applica le modifiche, esegui i test ed auto-correggi)..."
-        }
+        placeholder="Inserisci l'obiettivo o la domanda (es: analizza il codice, crea una feature, applica modifiche o risolvi un bug)..."
         value={promptInput}
         onChange={(e) => onPromptInputChange(e.target.value)}
         onKeyDown={(e) => {
@@ -115,28 +116,25 @@ export function CodingPromptBar({
 
       {/* PROMPT ACTION TOOLBAR */}
       <div className="coding-prompt-actions">
-        {/* MODE TOGGLE SWITCH: PIANO vs SCRITTURA */}
+        {/* SMART INTENT BADGE & MODE SELECTOR */}
         <div className="segmented-mode-selector">
-          <span className="segmented-mode-label">Modalità:</span>
-          <div className="segmented-mode-group">
-            <button
-              type="button"
-              className={`segmented-mode-button ${operatingMode === "plan" ? "segmented-mode-button--plan-active" : ""}`}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={() => onSelectOperatingMode("plan")}
-              title="Modalità Piano/Lettura: analizza e pianifica senza modificare direttamente i file"
-            >
-              <BookOpen size={14} /> Lettura / Piano
-            </button>
-            <button
-              type="button"
-              className={`segmented-mode-button ${operatingMode === "write" ? "segmented-mode-button--write-active" : ""}`}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={() => onSelectOperatingMode("write")}
-              title="Modalità Scrittura: esplora il progetto, crea/modifica file nel workspace ed esegui comandi in loop"
-            >
-              <PenTool size={14} /> Agente Scrittura
-            </button>
+          <div
+            className="smart-intent-badge"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              borderRadius: 12,
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              border: `1px solid ${intentMeta.badgeColor}`,
+              color: intentMeta.badgeColor,
+              fontSize: "0.78rem",
+              fontWeight: 600
+            }}
+            title={intentMeta.description}
+          >
+            {intentMeta.label}
           </div>
 
           <label className="auto-approve-checkbox-label">

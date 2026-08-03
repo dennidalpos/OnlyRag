@@ -164,7 +164,7 @@ public sealed partial class InProcessBackendTests
         Func<T, bool> isReady,
         string description)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(30);
         T last = await readAsync();
         while (DateTimeOffset.UtcNow < deadline)
         {

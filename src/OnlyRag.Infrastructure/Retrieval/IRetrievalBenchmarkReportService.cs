@@ -1,3 +1,5 @@
+using OnlyRag.Core;
+
 namespace OnlyRag.Infrastructure.Retrieval;
 
 public record RetrievalBenchmarkTestCase(
@@ -18,7 +20,8 @@ public record RetrievalBenchmarkCaseResult(
     double ReciprocalRank,
     double ApAtK,
     double NdcgAtK,
-    int? FirstRelevantRank);
+    int? FirstRelevantRank,
+    RagLatencyMetrics? Latency = null);
 
 public record RetrievalBenchmarkReport(
     DateTimeOffset EvaluatedAtUtc,
@@ -28,7 +31,8 @@ public record RetrievalBenchmarkReport(
     double Mrr,
     double MapAtK,
     double NdcgAtK,
-    IReadOnlyList<RetrievalBenchmarkCaseResult> Cases);
+    IReadOnlyList<RetrievalBenchmarkCaseResult> Cases,
+    RagLatencyMetrics? AverageLatency = null);
 
 public interface IRetrievalBenchmarkReportService
 {

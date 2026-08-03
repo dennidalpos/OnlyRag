@@ -68,3 +68,12 @@ public sealed record RetrievalSettings(
 {
     public static RetrievalSettings Default { get; } = new();
 }
+
+public sealed record RagLatencyMetrics(
+    double QueryEmbeddingMs,
+    double QdrantSearchMs,
+    double Fts5SearchMs,
+    double ReRankingMs,
+    double TotalMs,
+    double AverageCragScore = 0.0);
+

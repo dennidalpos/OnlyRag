@@ -31,8 +31,7 @@ describe("CodingSection", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: /Coding & Vibe Hub/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sfoglia Cartella/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Lettura \/ Piano/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Agente Scrittura/i })).toBeInTheDocument();
+    expect(screen.getByText(/Smart Router:/i)).toBeInTheDocument();
   });
 
   it("sends prompt in Agent mode and renders agent thought events", async () => {
@@ -69,7 +68,7 @@ describe("CodingSection", () => {
       />
     );
 
-    const promptInput = screen.getByPlaceholderText(/Modalità AGENTE SCRITTURA/i);
+    const promptInput = screen.getByPlaceholderText(/Inserisci l'obiettivo o la domanda/i);
     await user.type(promptInput, "Analizza il codice");
 
     const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
@@ -109,7 +108,7 @@ describe("CodingSection", () => {
       />
     );
 
-    const promptInput = screen.getByPlaceholderText(/Modalità AGENTE SCRITTURA/i);
+    const promptInput = screen.getByPlaceholderText(/Inserisci l'obiettivo o la domanda/i);
     await user.type(promptInput, "Ciao senza cartella");
 
     const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });

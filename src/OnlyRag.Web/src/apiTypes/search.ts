@@ -1,5 +1,14 @@
 import type { DocumentStatus } from "./documents";
 
+export type RagLatencyMetrics = {
+  queryEmbeddingMs: number;
+  qdrantSearchMs: number;
+  fts5SearchMs: number;
+  reRankingMs: number;
+  totalMs: number;
+  averageCragScore?: number;
+};
+
 export type DocumentSearchRequest = {
   query: string;
   documentIds: number[];
@@ -44,5 +53,33 @@ export type DocumentSearchResponse = {
   keywordBackend: string;
   vectorBackend: string;
   maxContextCharacters: number;
+  latencyMetrics?: RagLatencyMetrics | null;
   notices: RetrievalNotice[];
+};
+
+export type RetrievalBenchmarkCaseResult = {
+  id: string;
+  query: string;
+  topK: number;
+  expectedChunkIds: number[];
+  returnedChunkIds: number[];
+  hitChunkIds: number[];
+  recallAtK: number;
+  reciprocalRank: number;
+  apAtK: number;
+  ndcgAtK: number;
+  firstRelevantRank: number | null;
+  latency?: RagLatencyMetrics | null;
+};
+
+export type RetrievalBenchmarkReport = {
+  evaluatedAtUtc: string;
+  defaultTopK: number;
+  caseCount: number;
+  averageRecallAtK: number;
+  mrr: number;
+  mapAtK: number;
+  ndcgAtK: number;
+  cases: RetrievalBenchmarkCaseResult[];
+  averageLatency?: RagLatencyMetrics | null;
 };

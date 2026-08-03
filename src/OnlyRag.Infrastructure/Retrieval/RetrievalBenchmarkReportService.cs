@@ -1,3 +1,5 @@
+using OnlyRag.Core;
+
 namespace OnlyRag.Infrastructure.Retrieval;
 
 public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportService
@@ -27,7 +29,7 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
             cancellationToken.ThrowIfCancellationRequested();
             int topK = testCase.TopK ?? defaultTopK;
 
-            var request = new OnlyRag.Core.DocumentSearchRequest(
+            var request = new DocumentSearchRequest(
                 testCase.Query,
                 (testCase.DocumentIds ?? []).ToList(),
                 topK);
@@ -91,13 +93,25 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
                 Math.Round(reciprocalRank, 4),
                 Math.Round(apAtK, 4),
                 Math.Round(ndcgAtK, 4),
-                firstRelevantRank));
+                firstRelevantRank,
+                searchResponse.LatencyMetrics));
         }
 
         double avgRecall = results.Average(r => r.RecallAtK);
         double mrr = results.Average(r => r.ReciprocalRank);
         double mapAtK = results.Average(r => r.ApAtK);
         double avgNdcg = results.Average(r => r.NdcgAtK);
+
+        var validLatencies = results.Select(r => r.Latency).Where(l => l is not null).Cast<RagLatencyMetrics>().ToList();
+        RagLatencyMetrics? avgLatency = validLatencies.Count > 0
+            ? new RagLatencyMetrics(
+                Math.Round(validLatencies.Average(l => l.QueryEmbeddingMs), 2),
+                Math.Round(validLatencies.Average(l => l.QdrantSearchMs), 2),
+                Math.Round(validLatencies.Average(l => l.Fts5SearchMs), 2),
+                Math.Round(validLatencies.Average(l => l.ReRankingMs), 2),
+                Math.Round(validLatencies.Average(l => l.TotalMs), 2),
+                Math.Round(validLatencies.Average(l => l.AverageCragScore), 4))
+            : null;
 
         return new RetrievalBenchmarkReport(
             DateTimeOffset.UtcNow,
@@ -107,6 +121,7 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
             Math.Round(mrr, 4),
             Math.Round(mapAtK, 4),
             Math.Round(avgNdcg, 4),
-            results);
+            results,
+            avgLatency);
     }
 }

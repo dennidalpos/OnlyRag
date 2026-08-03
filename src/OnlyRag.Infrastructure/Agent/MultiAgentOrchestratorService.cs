@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using OnlyRag.Core;
 
-namespace OnlyRag.Infrastructure.Agents;
+namespace OnlyRag.Infrastructure.Agent;
 
 public sealed class MultiAgentOrchestratorService : IMultiAgentOrchestratorService
 {
@@ -67,7 +67,7 @@ public sealed class MultiAgentOrchestratorService : IMultiAgentOrchestratorServi
 
             var task = updatedSubtasks[i];
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
-            
+
             // Mark Running
             updatedSubtasks[i] = task with { Status = MultiAgentSubtaskStatus.Running, StartedAtUtc = startTime };
             _orchestrationStore[id] = currentStatus with { Subtasks = updatedSubtasks.ToList(), Messages = updatedMessages.ToList() };

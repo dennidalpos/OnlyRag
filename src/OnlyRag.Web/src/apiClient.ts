@@ -332,6 +332,12 @@ export async function getMultiAgentOrchestrationStatus(id: string): Promise<Mult
   return apiRequest<MultiAgentOrchestrationStatus>(`/api/agent/orchestrate/${encodeURIComponent(id)}`);
 }
 
+export async function runRagBenchmark(): Promise<import("./apiTypes/search").RetrievalBenchmarkReport> {
+  return apiRequest<import("./apiTypes/search").RetrievalBenchmarkReport>("/api/rag/benchmark/run", {
+    method: "POST"
+  });
+}
+
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
   const url = new URL(path, baseUrl);
   const backendOrigin = new URL(baseUrl).origin;

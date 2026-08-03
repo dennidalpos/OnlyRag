@@ -159,7 +159,10 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
                 {
                     string error = failedUnit.Error ?? "Una o piu unita non sono state tradotte.";
                     await translations.RefreshProgressAsync(payload.TranslationId, "Failed", error, cancellationToken);
-                    current = await translations.GetAsync(payload.TranslationId, cancellationToken) ?? current;
+                }
+                else
+                {
+                    await translations.RefreshProgressAsync(payload.TranslationId, "Completed", null, cancellationToken);
                 }
 
                 await SaveCheckpointAsync(job, queue, current, int.MaxValue, "completed", cancellationToken);

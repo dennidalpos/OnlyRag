@@ -96,7 +96,7 @@ test("workspace & coding section: folder selection, prompt sending, and diff mod
   await expect(modelSelect).toBeVisible();
 
   // Send a prompt
-  const promptTextarea = page.getByPlaceholder(/Modalità|Descrivi/i);
+  const promptTextarea = page.getByPlaceholder(/Inserisci|analizza|obiettivo/i);
   await promptTextarea.fill("Refattorizza la funzione di login");
   await page.getByRole("button", { name: /Invia/i }).click();
 

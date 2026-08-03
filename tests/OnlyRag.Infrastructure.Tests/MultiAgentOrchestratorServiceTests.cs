@@ -1,5 +1,5 @@
 using OnlyRag.Core;
-using OnlyRag.Infrastructure.Agents;
+using OnlyRag.Infrastructure.Agent;
 using Xunit;
 
 namespace OnlyRag.Infrastructure.Tests;

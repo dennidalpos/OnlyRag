@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
-using OnlyRag.Infrastructure.Agents;
 using OnlyRag.Infrastructure.Export;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;

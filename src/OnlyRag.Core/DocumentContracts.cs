@@ -141,7 +141,8 @@ public sealed record DocumentSearchResponse(
     IReadOnlyList<DocumentSearchDocumentStatus> Documents,
     string KeywordBackend,
     string VectorBackend,
-    int MaxContextCharacters)
+    int MaxContextCharacters,
+    RagLatencyMetrics? LatencyMetrics = null)
 {
     public IReadOnlyList<RetrievalNotice> Notices { get; init; } = [];
 }

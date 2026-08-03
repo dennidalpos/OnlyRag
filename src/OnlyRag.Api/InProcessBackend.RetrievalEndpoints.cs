@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Retrieval;
+using OnlyRag.Infrastructure.Storage;
 
 namespace OnlyRag.Api;
 
@@ -116,6 +117,78 @@ public static partial class InProcessBackend
         app.MapPost("/api/vector/repair", async (IQdrantSyncRepairService repairService, CancellationToken cancellationToken) =>
         {
             QdrantSyncReport report = await repairService.AuditAndRepairAsync(cancellationToken);
+            return Results.Ok(report);
+        });
+
+        // ONNX Reranker Model Endpoints
+        app.MapGet("/api/rag/reranker/model", async (
+            RerankerModelManager rerankerModelManager,
+            CancellationToken cancellationToken) =>
+        {
+            RerankerModelInfo status = await rerankerModelManager.GetModelStatusAsync(cancellationToken);
+            return Results.Ok(status);
+        });
+
+        app.MapPost("/api/rag/reranker/download", async (
+            RerankerModelManager rerankerModelManager,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                bool result = await rerankerModelManager.DownloadModelAsync(null, cancellationToken);
+                return Results.Ok(new { Success = result });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return CreateBadRequestProblem("Download already in progress", ex.Message, "reranker_download_in_progress");
+            }
+            catch (Exception ex)
+            {
+                return CreateBadRequestProblem("ONNX model download error", ex.Message, "reranker_download_error");
+            }
+        });
+
+        app.MapDelete("/api/rag/reranker/download", async (
+            RerankerModelManager rerankerModelManager) =>
+        {
+            await rerankerModelManager.CancelDownloadAsync();
+            return Results.Ok(new { Success = true });
+        });
+
+        app.MapDelete("/api/rag/reranker/model", async (
+            RerankerModelManager rerankerModelManager,
+            CancellationToken cancellationToken) =>
+        {
+            bool deleted = await rerankerModelManager.DeleteModelAsync(cancellationToken);
+            return Results.Ok(new { Deleted = deleted });
+        });
+
+        // RAG Benchmark & Performance Telemetry
+        app.MapPost("/api/rag/benchmark/run", async (
+            IRetrievalBenchmarkReportService benchmarkService,
+            IDocumentRepository documentRepository,
+            CancellationToken cancellationToken) =>
+        {
+            var docs = await documentRepository.ListAsync(cancellationToken);
+            var indexedDocs = docs.Where(d => d.Status == DocumentStatus.Indexed).ToList();
+
+            var testCases = new List<RetrievalBenchmarkTestCase>();
+            foreach (var doc in indexedDocs.Take(5))
+            {
+                testCases.Add(new RetrievalBenchmarkTestCase(
+                    $"bench_{doc.Id}",
+                    doc.OriginalFileName,
+                    [1],
+                    [doc.Id],
+                    TopK: 5));
+            }
+
+            if (testCases.Count == 0)
+            {
+                testCases.Add(new RetrievalBenchmarkTestCase("bench_sample", "Retrieval performance evaluation", [1], null, TopK: 5));
+            }
+
+            var report = await benchmarkService.EvaluateBenchmarkAsync(testCases, 5, cancellationToken);
             return Results.Ok(report);
         });
     }

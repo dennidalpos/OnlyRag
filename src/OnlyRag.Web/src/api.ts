@@ -7,6 +7,7 @@ export {
   resolveBackendBaseUrl,
   resolveBackendBaseUrlDirect,
   resolveBackendErrorMessage,
+  runRagBenchmark,
   resolveBackendSessionToken
 } from "./apiClient";
 export type { ApiProblemDetails, BackendBridge } from "./apiClient";

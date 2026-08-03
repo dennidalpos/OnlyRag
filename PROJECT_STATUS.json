@@ -1,8 +1,7 @@
 {
   "todos": [
-    "Dashboard di Benchmarking delle Prestazioni di Retrieval RAG per la misurazione della latenza di embedding, risposta Qdrant e punteggi CRAG",
-    "Sincronizzazione Multi-Dispositivo crittografata AES-256 dell'indice vettoriale Qdrant e del database SQLite su rete locale",
     "Gestione avanzata e autoriparazione trasparente in background degli ambienti virtuali Python per il runtime PaddleOCR su Windows",
-    "Modalità Ingestion Batch per la decompressione streaming ed indicizzazione automatica di archivi compressi (ZIP/TAR/7Z)"
+    "Modalità Ingestion Batch per la decompressione streaming ed indicizzazione automatica di archivi compressi (ZIP/TAR/7Z)",
+    "Sincronizzazione Multi-Dispositivo crittografata AES-256 dell'indice vettoriale Qdrant e del database SQLite su rete locale"
   ]
 }

@@ -11,6 +11,7 @@ import { PerformanceSettingsPanel } from "./PerformanceSettingsPanel";
 import { RerankerModelPanel } from "./RerankerModelPanel";
 import { ThemeSelectorPanel } from "./SettingsSection.fields";
 import { HardwareMonitorPanel } from "./HardwareMonitorPanel";
+import { RagBenchmarkPanel } from "./RagBenchmarkPanel";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 type SettingsTab = "all" | "theme" | "models" | "rag" | "ocr" | "diagnostics";
@@ -80,6 +81,9 @@ export function SettingsSectionPanels() {
               <HardwareMonitorPanel />
               <IngestionSettingsPanel />
               <RerankerModelPanel />
+            </div>
+            <div className="mt-6">
+              <RagBenchmarkPanel />
             </div>
           </section>
         )}
