@@ -6,6 +6,7 @@ import {
   imageTooltips,
   type GenerationProfile
 } from "./imageTypes";
+import { InfoTip } from "../common/InfoTip";
 
 type ImageGeneratorControlsProps = {
   selectedModel: ImageModelCatalogEntry | null;
@@ -89,9 +90,10 @@ export function ImageGeneratorControls({
             required
           />
         </label>
-        <small className="image-prompt-hint">
-          🌐 Traduzione automatica attiva in inglese per la massima qualità di generazione.
-        </small>
+        <div className="field-secondary-note">
+          Traduzione inglese automatica
+          <InfoTip label="Informazioni sulla traduzione del prompt">Il prompt viene tradotto automaticamente in inglese per migliorare la compatibilità con i modelli di generazione.</InfoTip>
+        </div>
 
         {/* Resolution Preset */}
         <div className="field-group">

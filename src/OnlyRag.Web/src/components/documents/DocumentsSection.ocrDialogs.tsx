@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { OcrLanguage, OcrPolicy } from "../../api";
 import { useModalFocusTrap } from "../common/useModalFocusTrap";
+import { InfoTip } from "../common/InfoTip";
 import { getPreferredOcrLanguage } from "./DocumentsSection.formatting";
 
 export function OcrChoiceDialog({
@@ -41,8 +42,9 @@ export function OcrChoiceDialog({
           value={selectedLanguage}
           onChange={setSelectedLanguage}
         />
-        <div className="panel-note">
-          <p>La lingua scelta viene usata per questo import e riproposta alla prossima operazione OCR.</p>
+        <div className="dialog-secondary-note">
+          La scelta viene ricordata per il prossimo OCR.
+          <InfoTip label="Dettagli sulla lingua OCR">La lingua selezionata viene usata per questo import e proposta alla prossima operazione OCR.</InfoTip>
         </div>
 
         <div className="ocr-choice-options">
@@ -114,8 +116,9 @@ export function OcrLanguageDialog({
           value={selectedLanguage}
           onChange={setSelectedLanguage}
         />
-        <div className="panel-note">
-          <p>La lingua scelta viene usata per questa operazione e riproposta alla prossima operazione OCR.</p>
+        <div className="dialog-secondary-note">
+          La scelta viene ricordata per il prossimo OCR.
+          <InfoTip label="Dettagli sulla lingua OCR">La lingua selezionata viene usata per questa operazione e proposta alla prossima operazione OCR.</InfoTip>
         </div>
 
         <div className="settings-actions" style={{ justifyContent: "flex-end" }}>

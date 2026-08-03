@@ -171,12 +171,13 @@ export function SettingsSectionPanels() {
         return Boolean(
           rerankerModelInfo && !rerankerModelInfo.isDownloaded && !rerankerModelInfo.isDownloading
         );
-      case "ocr":
+      case "ocr": {
         const isOcrConfigured = diagnostics?.ocrIsConfigured ?? false;
         const isOcrRunning = ocrProvisionStatus?.isRunning ?? false;
         const isOcrMissing = diagnostics !== null && !isOcrConfigured && !isOcrRunning;
         const isPdfExportMissing = pdfExportStatus !== null && !pdfExportStatus.isAvailable;
         return isOcrMissing || isPdfExportMissing;
+      }
       case "diagnostics":
         return Boolean(
           diagnostics && (diagnostics.qdrant.warning || diagnostics.qdrant.error)
@@ -278,6 +279,5 @@ export function SettingsSectionPanels() {
     </div>
   );
 }
-
 
 

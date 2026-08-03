@@ -1,5 +1,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using System.Text;
+using System.Text.Json;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
@@ -10,7 +12,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
     private readonly object sessionLock = new();
 
     private InferenceSession? session;
-    private BertVocab? vocab;
+    private XlmRobertaTokenizer? vocab;
     private bool isInitialized;
     private bool sessionFailed;
 
@@ -32,7 +34,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
             return [];
         }
 
-        (InferenceSession? currentSession, BertVocab? currentVocab) = GetOrInitialize();
+        (InferenceSession? currentSession, XlmRobertaTokenizer? currentVocab) = GetOrInitialize();
         if (currentSession is null || currentVocab is null)
         {
             return await fallbackReRanker.ReRankAsync(query, candidates, cancellationToken);
@@ -60,7 +62,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         }
     }
 
-    private (InferenceSession?, BertVocab?) GetOrInitialize()
+    private (InferenceSession?, XlmRobertaTokenizer?) GetOrInitialize()
     {
         lock (sessionLock)
         {
@@ -83,7 +85,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
             try
             {
-                vocab = BertVocab.Load(vocabPath);
+                vocab = XlmRobertaTokenizer.Load(vocabPath);
 
                 SessionOptions options = new();
                 try
@@ -112,7 +114,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
     private static double[] ComputeCrossScoresBatched(
         InferenceSession currentSession,
-        BertVocab currentVocab,
+        XlmRobertaTokenizer currentVocab,
         string query,
         IReadOnlyList<ReRankCandidate> candidates)
     {
@@ -125,19 +127,19 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         const int maxSeqLength = 512;
         long[] inputIds = new long[batchSize * maxSeqLength];
         long[] attentionMask = new long[batchSize * maxSeqLength];
-        long[] tokenTypeIds = new long[batchSize * maxSeqLength];
+        Array.Fill(inputIds, currentVocab.PadId);
 
         for (int i = 0; i < batchSize; i++)
         {
             int offset = i * maxSeqLength;
             string content = candidates[i].Content;
 
-            List<int> queryTokenIds = currentVocab.Tokenize(query, maxSeqLength / 2 - 2);
-            int remaining = maxSeqLength - queryTokenIds.Count - 3;
+            List<int> queryTokenIds = currentVocab.Tokenize(query, maxSeqLength / 2 - 3);
+            int remaining = maxSeqLength - queryTokenIds.Count - 4;
             List<int> contentTokenIds = currentVocab.Tokenize(content, Math.Max(1, remaining));
 
             int pos = 0;
-            inputIds[offset + pos] = currentVocab.ClsId;
+            inputIds[offset + pos] = currentVocab.BosId;
             attentionMask[offset + pos] = 1;
             pos++;
 
@@ -148,7 +150,11 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
                 pos++;
             }
 
-            inputIds[offset + pos] = currentVocab.SepId;
+            inputIds[offset + pos] = currentVocab.EosId;
+            attentionMask[offset + pos] = 1;
+            pos++;
+
+            inputIds[offset + pos] = currentVocab.EosId;
             attentionMask[offset + pos] = 1;
             pos++;
 
@@ -156,25 +162,20 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
             {
                 inputIds[offset + pos] = id;
                 attentionMask[offset + pos] = 1;
-                tokenTypeIds[offset + pos] = 1;
                 pos++;
             }
 
-            inputIds[offset + pos] = currentVocab.SepId;
+            inputIds[offset + pos] = currentVocab.EosId;
             attentionMask[offset + pos] = 1;
-            tokenTypeIds[offset + pos] = 1;
         }
 
         int[] shape = [batchSize, maxSeqLength];
         DenseTensor<long> inputIdsTensor = new(inputIds, shape);
         DenseTensor<long> attentionMaskTensor = new(attentionMask, shape);
-        DenseTensor<long> tokenTypeIdsTensor = new(tokenTypeIds, shape);
-
         List<NamedOnnxValue> container =
         [
             NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
-            NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor),
-            NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIdsTensor)
+            NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor)
         ];
 
         using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results = currentSession.Run(container);
@@ -209,133 +210,81 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
     }
 
     /// <summary>
-    /// Self-contained BERT WordPiece vocabulary and tokenizer.
-    /// Loads vocab.txt (one token per line, line number = token ID) and performs
-    /// standard WordPiece sub-word tokenization matching the HuggingFace BERT convention.
+    /// Minimal XLM-RoBERTa SentencePiece-Unigram tokenizer backed by the model's
+    /// official Hugging Face tokenizer.json. It keeps the reranker self-contained.
     /// </summary>
-    private sealed class BertVocab
+    private sealed class XlmRobertaTokenizer
     {
-        private readonly Dictionary<string, int> tokenToId;
-        public int ClsId { get; }
-        public int SepId { get; }
+        private const char SpaceMarker = '▁';
+        private readonly Dictionary<string, Token> tokens;
+        private readonly int maxTokenLength;
+        public int BosId { get; }
+        public int EosId { get; }
         public int PadId { get; }
         public int UnkId { get; }
 
-        private BertVocab(Dictionary<string, int> tokenToId)
+        private XlmRobertaTokenizer(Dictionary<string, Token> tokens, int maxTokenLength)
         {
-            this.tokenToId = tokenToId;
-            ClsId = tokenToId.GetValueOrDefault("[CLS]", 101);
-            SepId = tokenToId.GetValueOrDefault("[SEP]", 102);
-            PadId = tokenToId.GetValueOrDefault("[PAD]", 0);
-            UnkId = tokenToId.GetValueOrDefault("[UNK]", 100);
+            this.tokens = tokens;
+            this.maxTokenLength = maxTokenLength;
+            BosId = tokens.GetValueOrDefault("<s>").Id;
+            EosId = tokens.GetValueOrDefault("</s>").Id;
+            PadId = tokens.GetValueOrDefault("<pad>").Id;
+            UnkId = tokens.GetValueOrDefault("<unk>").Id;
         }
 
-        public static BertVocab Load(string vocabPath)
+        public static XlmRobertaTokenizer Load(string tokenizerPath)
         {
-            Dictionary<string, int> dict = new(60_000, StringComparer.Ordinal);
-            string[] lines = File.ReadAllLines(vocabPath);
-            for (int i = 0; i < lines.Length; i++)
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(tokenizerPath));
+            JsonElement vocab = document.RootElement.GetProperty("model").GetProperty("vocab");
+            Dictionary<string, Token> result = new(vocab.GetArrayLength(), StringComparer.Ordinal);
+            int maxLength = 1;
+            int index = 0;
+            foreach (JsonElement item in vocab.EnumerateArray())
             {
-                string token = lines[i].TrimEnd();
-                if (token.Length > 0)
-                {
-                    dict[token] = i;
-                }
+                string text = item[0].GetString() ?? string.Empty;
+                result[text] = new Token(index++, item[1].GetDouble());
+                maxLength = Math.Max(maxLength, text.Length);
             }
-            return new BertVocab(dict);
+            return new XlmRobertaTokenizer(result, maxLength);
         }
 
-        /// <summary>
-        /// Performs BERT WordPiece tokenization: lowercase, split on whitespace and
-        /// punctuation, then greedily match longest subword pieces from the vocabulary.
-        /// </summary>
         public List<int> Tokenize(string text, int maxTokens)
         {
+            string normalized = SpaceMarker + string.Join(SpaceMarker, text.Normalize(NormalizationForm.FormKC)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            int length = normalized.Length;
+            double[] bestScores = Enumerable.Repeat(double.NegativeInfinity, length + 1).ToArray();
+            int[] previous = new int[length + 1];
+            int[] ids = new int[length + 1];
+            bestScores[0] = 0;
+
+            for (int start = 0; start < length; start++)
+            {
+                if (double.IsNegativeInfinity(bestScores[start])) continue;
+                bool matched = false;
+                int upperBound = Math.Min(length, start + maxTokenLength);
+                for (int end = start + 1; end <= upperBound; end++)
+                {
+                    if (!tokens.TryGetValue(normalized[start..end], out Token token)) continue;
+                    matched = true;
+                    double score = bestScores[start] + token.Score;
+                    if (score > bestScores[end]) { bestScores[end] = score; previous[end] = start; ids[end] = token.Id; }
+                }
+                if (!matched && start + 1 <= length && bestScores[start] - 10 > bestScores[start + 1])
+                {
+                    bestScores[start + 1] = bestScores[start] - 10;
+                    previous[start + 1] = start;
+                    ids[start + 1] = UnkId;
+                }
+            }
+
             List<int> result = [];
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return result;
-            }
-
-            string normalized = text.ToLowerInvariant();
-            List<string> words = SplitOnWhitespaceAndPunctuation(normalized);
-
-            foreach (string word in words)
-            {
-                if (result.Count >= maxTokens)
-                {
-                    break;
-                }
-
-                WordPieceTokenizeWord(word, result, maxTokens);
-            }
-
-            return result;
+            for (int position = length; position > 0; position = previous[position]) result.Add(ids[position]);
+            result.Reverse();
+            return result.Take(maxTokens).ToList();
         }
 
-        private void WordPieceTokenizeWord(string word, List<int> output, int maxTokens)
-        {
-            int start = 0;
-            while (start < word.Length && output.Count < maxTokens)
-            {
-                int end = word.Length;
-                bool found = false;
-
-                while (start < end)
-                {
-                    string subword = start == 0
-                        ? word[start..end]
-                        : $"##{word[start..end]}";
-
-                    if (tokenToId.TryGetValue(subword, out int id))
-                    {
-                        output.Add(id);
-                        start = end;
-                        found = true;
-                        break;
-                    }
-
-                    end--;
-                }
-
-                if (!found)
-                {
-                    // Character not in vocab — emit [UNK] and skip entire word.
-                    output.Add(UnkId);
-                    break;
-                }
-            }
-        }
-
-        private static List<string> SplitOnWhitespaceAndPunctuation(string text)
-        {
-            List<string> tokens = [];
-            int i = 0;
-            while (i < text.Length)
-            {
-                if (char.IsWhiteSpace(text[i]))
-                {
-                    i++;
-                    continue;
-                }
-
-                if (char.IsPunctuation(text[i]) || char.IsSymbol(text[i]))
-                {
-                    tokens.Add(text[i].ToString());
-                    i++;
-                    continue;
-                }
-
-                int start = i;
-                while (i < text.Length && !char.IsWhiteSpace(text[i])
-                       && !char.IsPunctuation(text[i]) && !char.IsSymbol(text[i]))
-                {
-                    i++;
-                }
-                tokens.Add(text[start..i]);
-            }
-
-            return tokens;
-        }
+        private readonly record struct Token(int Id, double Score);
     }
 }

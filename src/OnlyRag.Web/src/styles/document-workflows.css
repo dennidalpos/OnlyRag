@@ -210,6 +210,18 @@
   padding: 0 2px;
 }
 
+.dialog-secondary-note,
+.field-secondary-note,
+.model-context-bar__mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* ===================================================================
    OCR choice dialog
    =================================================================== */

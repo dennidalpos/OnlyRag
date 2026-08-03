@@ -1,7 +1,9 @@
 {
   "todos": [
-    "Gestione avanzata e autoriparazione trasparente in background degli ambienti virtuali Python per il runtime PaddleOCR su Windows",
-    "Modalità Ingestion Batch per la decompressione streaming ed indicizzazione automatica di archivi compressi (ZIP/TAR/7Z)",
-    "Sincronizzazione Multi-Dispositivo crittografata AES-256 dell'indice vettoriale Qdrant e del database SQLite su rete locale"
+    "Completare l'audit responsive con test visivi alle larghezze 320, 520, 700 e 980 px in ogni sezione e correggere eventuali controlli ancora sovrapposti",
+    "Ridurre il testo informativo residuo in setup, diagnostica, gestione modelli e benchmark RAG usando InfoTip o dettagli espandibili senza nascondere errori e stati operativi",
+    "Implementare gestione avanzata e autoriparazione trasparente in background degli ambienti virtuali Python per il runtime PaddleOCR su Windows",
+    "Implementare Ingestion Batch con decompressione streaming e indicizzazione automatica di archivi ZIP, TAR e 7Z",
+    "Implementare sincronizzazione multi-dispositivo sulla rete locale, cifrata AES-256, per indice Qdrant e database SQLite"
   ]
 }

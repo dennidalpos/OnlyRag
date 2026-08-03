@@ -21,8 +21,10 @@ public sealed class RerankerModelManager
     public const string DefaultModelId = "bge-reranker-base";
     public const string DefaultModelFileName = "bge-reranker-base.onnx";
     public const string DefaultDownloadUrl = "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/onnx/model.onnx";
-    public const string VocabFileName = "vocab.txt";
-    public const string VocabDownloadUrl = "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/vocab.txt";
+    // BGE Re-Ranker Base is an XLM-RoBERTa model.  It uses Hugging Face's
+    // tokenizer.json (SentencePiece Unigram), not a BERT vocab.txt file.
+    public const string VocabFileName = "tokenizer.json";
+    public const string VocabDownloadUrl = "https://huggingface.co/BAAI/bge-reranker-base/resolve/main/tokenizer.json";
 
     private readonly AppStoragePaths storagePaths;
     private readonly HttpClient httpClient;
@@ -101,14 +103,30 @@ public sealed class RerankerModelManager
 
         try
         {
-            // 1. Download model.onnx
-            await DownloadFileWithProgressAsync(DefaultDownloadUrl, tempModelPath, 0.0d, 0.9d, progress, token);
+            // 1. Keep a previously completed ONNX download. Earlier app versions
+            // downloaded it successfully before failing on the obsolete vocab URL.
+            bool modelAlreadyAvailable = File.Exists(targetModelPath) && new FileInfo(targetModelPath).Length > 0;
+            if (!modelAlreadyAvailable)
+            {
+                await DownloadFileWithProgressAsync(DefaultDownloadUrl, tempModelPath, 0.0d, 0.9d, progress, token);
+            }
+            else
+            {
+                lock (lockObj)
+                {
+                    currentProgress = 0.9d;
+                }
+                progress?.Report(0.9d);
+            }
 
-            // 2. Download vocab.txt
+            // 2. Download the XLM-RoBERTa tokenizer.
             await DownloadFileWithProgressAsync(VocabDownloadUrl, tempVocabPath, 0.9d, 1.0d, progress, token);
 
-            if (File.Exists(targetModelPath)) File.Delete(targetModelPath);
-            File.Move(tempModelPath, targetModelPath);
+            if (!modelAlreadyAvailable)
+            {
+                if (File.Exists(targetModelPath)) File.Delete(targetModelPath);
+                File.Move(tempModelPath, targetModelPath);
+            }
 
             if (File.Exists(targetVocabPath)) File.Delete(targetVocabPath);
             File.Move(tempVocabPath, targetVocabPath);

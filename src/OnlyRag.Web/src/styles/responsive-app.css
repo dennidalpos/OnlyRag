@@ -140,3 +140,138 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Controls must reflow before they can collide. These apply across all sections. */
+@media (max-width: 700px) {
+  .app-header,
+  .status-row,
+  .status-row__states,
+  .status-row__operations,
+  .image-gen-header,
+  .image-gen-header__info,
+  .image-gen-header__badges,
+  .image-gen-header__actions,
+  .coding-hub-toolbar__actions,
+  .coding-model-group,
+  .jobs-toolbar,
+  .documents-toolbar,
+  .document-row__header,
+  .document-row__meta,
+  .document-row__actions,
+  .document-details__row,
+  .search-result-row__header {
+    align-items: stretch;
+  }
+
+  .status-row,
+  .status-row__states,
+  .status-row__operations,
+  .image-gen-header__actions,
+  .coding-hub-toolbar__actions,
+  .document-row__actions,
+  .settings-actions {
+    width: 100%;
+  }
+
+  .status-row__operations,
+  .image-gen-header__actions,
+  .coding-hub-toolbar__actions,
+  .settings-actions {
+    justify-content: flex-start;
+  }
+
+  .status-badge,
+  .workspace-badge-chip,
+  .image-gen-header__actions > *,
+  .coding-hub-toolbar__actions > *,
+  .settings-actions > button,
+  .document-row__actions > button {
+    max-width: 100%;
+  }
+
+  .chat-toolbar,
+  .chat-input-row,
+  .document-dropzone,
+  .document-search-form,
+  .text-layer-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-toolbar .settings-actions,
+  .chat-input-row button,
+  .document-dropzone > button,
+  .document-search-form > button {
+    width: 100%;
+  }
+
+  .settings-card__header,
+  .model-row,
+  .settings-list div {
+    align-items: flex-start;
+  }
+
+  .settings-card__header,
+  .model-row {
+    flex-wrap: wrap;
+  }
+
+  .model-row__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-grid,
+  .settings-section__grid,
+  .custom-dimensions-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .desktop-shell {
+    min-width: 0;
+  }
+
+  .sidebar {
+    padding: 8px;
+  }
+
+  .navigation {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-group__title,
+  .nav-shortcut-badge,
+  .sidebar-metrics {
+    display: none;
+  }
+
+  .nav-item {
+    min-height: 38px;
+    padding: 8px;
+  }
+
+  .nav-item__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .workspace-content {
+    padding: 8px;
+  }
+
+  .coding-section-wrapper,
+  .chat-layout {
+    padding: 8px;
+  }
+
+  .status-row__clock,
+  .status-badge--theme-switcher strong,
+  .status-badge--theme-switcher span + strong {
+    display: none;
+  }
+}

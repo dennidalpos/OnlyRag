@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { OllamaModelDetails } from "../../api";
+import { InfoTip } from "../common/InfoTip";
 import { formatOcrInteger } from "./SettingsSection.formatting";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -145,12 +146,13 @@ export function AdjustableModelContextBar({
         />
         <span>Automatico</span>
       </label>
-      <div className="panel-note panel-note--compact">
-        <p>
+      <div className="model-context-bar__mode">
+        <span>{value == null ? "Gestita da Ollama" : "Configurazione manuale"}</span>
+        <InfoTip label="Dettagli finestra di contesto">
           {value == null
-            ? "Automatico: OnlyRag non invia num_ctx e lascia scegliere a Ollama la finestra effettiva."
-            : "Manuale avanzato: OnlyRag invia num_ctx a Ollama. Valori alti possono aumentare RAM/VRAM, ridurre offload GPU e sono da verificare con ollama ps."}
-        </p>
+            ? "OnlyRag lascia a Ollama la scelta della finestra effettiva."
+            : "OnlyRag invia num_ctx a Ollama. Valori alti possono aumentare RAM o VRAM e ridurre l'offload GPU."}
+        </InfoTip>
       </div>
       {value != null && (
         <SettingsRangeField
@@ -262,7 +264,7 @@ export function SettingsFieldLabel({ text, tooltip }: { text: string; tooltip?: 
   return (
     <span className="ocr-field-label">
       <span>{text}</span>
-      {tooltip && <span className="ocr-tooltip" title={tooltip} aria-hidden="true">?</span>}
+      {tooltip && <InfoTip label={`Informazioni su ${text}`}>{tooltip}</InfoTip>}
     </span>
   );
 }
@@ -299,7 +301,7 @@ export function UnifiedPresetBar({
     <div className="unified-preset-bar">
       <div className="unified-preset-bar__header">
         <span className="unified-preset-bar__title">{title}</span>
-        {subtitle && <span className="unified-preset-bar__subtitle">{subtitle}</span>}
+        {subtitle && <InfoTip label={`Informazioni su ${title}`}>{subtitle}</InfoTip>}
       </div>
       <div className="unified-preset-bar__buttons" role="group" aria-label={title}>
         {options.map((opt) => {
@@ -330,7 +332,7 @@ export function ThemeSelectorPanel() {
     <div className="unified-preset-bar">
       <div className="unified-preset-bar__header">
         <span className="unified-preset-bar__title">Tema Visivo dell'Interfaccia</span>
-        <span className="unified-preset-bar__subtitle">Personalizza lo stile visivo e i colori dell'applicazione</span>
+        <InfoTip label="Informazioni sui temi visivi">Personalizza stile visivo e colori dell'applicazione.</InfoTip>
       </div>
       <div className="unified-preset-bar__buttons" role="group" aria-label="Tema dell'Interfaccia">
         {themes.map((t) => (
