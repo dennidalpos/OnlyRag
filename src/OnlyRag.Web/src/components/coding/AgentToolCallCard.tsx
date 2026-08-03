@@ -180,28 +180,60 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
           </div>
         )}
 
-        {(tc.toolName === "replace_file_content" || tc.toolName === "multi_replace_file_content") && (
-          (() => {
+        {(() => {
+          if (
+            tc.toolName === "replace_file_content" ||
+            tc.toolName === "multi_replace_file_content" ||
+            tc.toolName === "write_file" ||
+            tc.toolName === "write_to_file"
+          ) {
             try {
-              const args = JSON.parse(tc.argumentsJson) as { targetContent?: string; replacementContent?: string };
-              if (args.targetContent || args.replacementContent) {
-                return (
-                  <div style={{ marginTop: 6, padding: 8, background: "#090d16", borderRadius: 6, border: "1px solid #1e293b", fontFamily: "monospace", fontSize: "0.78rem" }}>
-                    <div style={{ color: "#f87171", backgroundColor: "rgba(239, 68, 68, 0.1)", padding: "4px 8px", borderRadius: 4, marginBottom: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                      - {args.targetContent}
-                    </div>
-                    <div style={{ color: "#4ade80", backgroundColor: "rgba(34, 197, 94, 0.1)", padding: "4px 8px", borderRadius: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                      + {args.replacementContent}
-                    </div>
-                  </div>
-                );
+              const args = JSON.parse(tc.argumentsJson) as {
+                relativePath?: string;
+                targetContent?: string;
+                replacementContent?: string;
+                content?: string;
+                chunks?: Array<{ targetContent?: string; replacementContent?: string }>;
+              };
+              const patchLines: string[] = [];
+              const filename = args.relativePath || "file";
+
+              if (tc.toolName === "replace_file_content") {
+                patchLines.push(`--- a/${filename}`);
+                patchLines.push(`+++ b/${filename}`);
+                if (args.targetContent) {
+                  args.targetContent.split("\n").forEach((l) => patchLines.push(`-${l}`));
+                }
+                if (args.replacementContent) {
+                  args.replacementContent.split("\n").forEach((l) => patchLines.push(`+${l}`));
+                }
+              } else if (tc.toolName === "multi_replace_file_content" && Array.isArray(args.chunks)) {
+                patchLines.push(`--- a/${filename}`);
+                patchLines.push(`+++ b/${filename}`);
+                args.chunks.forEach((chunk, i) => {
+                  patchLines.push(`@@ Hunk #${i + 1} @@`);
+                  if (chunk.targetContent) {
+                    chunk.targetContent.split("\n").forEach((l) => patchLines.push(`-${l}`));
+                  }
+                  if (chunk.replacementContent) {
+                    chunk.replacementContent.split("\n").forEach((l) => patchLines.push(`+${l}`));
+                  }
+                });
+              } else if ((tc.toolName === "write_file" || tc.toolName === "write_to_file") && args.content) {
+                patchLines.push(`--- /dev/null`);
+                patchLines.push(`+++ b/${filename}`);
+                args.content.split("\n").slice(0, 50).forEach((l) => patchLines.push(`+${l}`));
+              }
+
+              if (patchLines.length > 0) {
+                return <UnifiedDiffViewer patch={patchLines.join("\n")} filename={filename} title="PROPOSTA MODIFICA FILE" />;
               }
             } catch {
               return null;
             }
-            return null;
-          })()
-        )}
+          }
+          return null;
+        })()}
 
         {isDetailsExpanded && (
           <pre style={{

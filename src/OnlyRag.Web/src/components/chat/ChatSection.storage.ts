@@ -114,6 +114,45 @@ export function saveDocumentsPanelWidth(width: number, min: number, max: number)
   );
 }
 
+export function exportSessionAsMarkdown(messages: ChatMessage[], conversationId?: string | null, selectedModel?: string | null): string {
+  const header = `# Chat Session Export\n\n- **Date**: ${new Date().toLocaleString()}\n- **Conversation ID**: ${conversationId || "N/A"}\n- **Model**: ${selectedModel || "N/A"}\n\n---\n\n`;
+  const body = messages.map((m) => {
+    const roleTitle = m.role === "user" ? "### 👤 User" : "### 🤖 Assistant";
+    let text = `${roleTitle}\n\n${m.content}\n\n`;
+    if (m.sources && m.sources.length > 0) {
+      text += `**Fonti RAG:**\n`;
+      m.sources.forEach((s) => {
+        text += `- **${s.documentName}** (Pagine ${s.pageStart ?? 1}-${s.pageEnd ?? 1}, Score: ${s.score ?? "N/A"})\n  > ${s.snippet}\n`;
+      });
+      text += `\n`;
+    }
+    return text;
+  }).join("---\n\n");
+
+  return header + body;
+}
+
+export function exportSessionAsJson(messages: ChatMessage[], conversationId?: string | null, selectedModel?: string | null): string {
+  return JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    conversationId: conversationId || null,
+    selectedModel: selectedModel || null,
+    messages
+  }, null, 2);
+}
+
+export function triggerFileDownload(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 function parseChatSession(value: unknown): PersistedChatSession | null {
   if (!isRecord(value)) {
     return null;

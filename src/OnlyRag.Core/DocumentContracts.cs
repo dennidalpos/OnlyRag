@@ -28,7 +28,9 @@ public sealed record ImportedDocument(
     string? CurrentJobId,
     string? LastError,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    IReadOnlyList<string>? Tags = null,
+    string? CollectionName = null);
 
 public sealed record DocumentPageInfo(
     int PageNumber,
@@ -130,7 +132,9 @@ public sealed record DocumentPreAnalysis(
 public sealed record DocumentSearchRequest(
     string Query,
     IReadOnlyList<long> DocumentIds,
-    int? TopK);
+    int? TopK,
+    string? CollectionName = null,
+    IReadOnlyList<string>? Tags = null);
 
 public sealed record DocumentSearchResponse(
     IReadOnlyList<DocumentSearchResult> Results,

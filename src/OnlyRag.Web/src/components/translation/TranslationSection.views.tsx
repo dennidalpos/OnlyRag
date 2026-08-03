@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 import type {
   ImportedDocument,
   OllamaModel,
@@ -47,6 +47,21 @@ export function TranslationStartCard({
   onModelChange: (model: string) => void;
   onStartTranslation: () => void;
 }) {
+  const [glossary, setGlossary] = useState<{ source: string; target: string }[]>([]);
+  const [sourceTerm, setSourceTerm] = useState("");
+  const [targetTerm, setTargetTerm] = useState("");
+
+  function handleAddGlossaryTerm() {
+    if (!sourceTerm.trim() || !targetTerm.trim()) return;
+    setGlossary((prev) => [...prev, { source: sourceTerm.trim(), target: targetTerm.trim() }]);
+    setSourceTerm("");
+    setTargetTerm("");
+  }
+
+  function handleRemoveGlossaryTerm(index: number) {
+    setGlossary((prev) => prev.filter((_, i) => i !== index));
+  }
+
   return (
     <div className="settings-card">
       <div className="settings-card__header">
@@ -101,6 +116,56 @@ export function TranslationStartCard({
           ))}
         </select>
       </label>
+
+      {/* Custom Technical Glossary Panel */}
+      <div className="glossary-section mt-3 pt-3 border-t border-light">
+        <span className="text-xs font-semibold text-main block mb-1">📖 Glossario Tecnico Personalizzato (Opzionale)</span>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="text"
+            placeholder="Termine originale (es. RAG)"
+            value={sourceTerm}
+            onChange={(e) => setSourceTerm(e.target.value)}
+            className="flex-1 px-2 py-1 bg-card border border-light rounded text-xs text-main focus:outline-none focus:border-focus"
+          />
+          <input
+            type="text"
+            placeholder="Traduzione (es. RAG)"
+            value={targetTerm}
+            onChange={(e) => setTargetTerm(e.target.value)}
+            className="flex-1 px-2 py-1 bg-card border border-light rounded text-xs text-main focus:outline-none focus:border-focus"
+          />
+          <button
+            type="button"
+            className="button-secondary button-secondary--xs"
+            onClick={handleAddGlossaryTerm}
+            disabled={!sourceTerm.trim() || !targetTerm.trim()}
+          >
+            + Aggiungi
+          </button>
+        </div>
+
+        {glossary.length > 0 && (
+          <div className="flex flex-col gap-1 max-h-28 overflow-y-auto mb-2">
+            {glossary.map((item, idx) => (
+              <div key={`${item.source}-${idx}`} className="flex items-center justify-between px-2 py-1 bg-card rounded text-xs border border-light">
+                <span>
+                  <strong className="text-primary">{item.source}</strong> ➔ <span>{item.target}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveGlossaryTerm(idx)}
+                  className="text-muted hover:text-danger ml-2 cursor-pointer"
+                  title="Rimuovi termine"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="settings-actions">
         <button type="button" disabled={!canStart} onClick={onStartTranslation}>
           {isStarting ? "Avvio..." : "Traduci"}

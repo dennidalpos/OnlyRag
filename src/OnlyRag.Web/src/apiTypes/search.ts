@@ -1,5 +1,13 @@
 import type { DocumentStatus } from "./documents";
 
+export type DocumentSearchRequest = {
+  query: string;
+  documentIds: number[];
+  topK?: number;
+  collectionName?: string;
+  tags?: string[];
+};
+
 export type DocumentSearchResult = {
   documentId: number;
   documentName: string;

@@ -7,9 +7,11 @@ internal static class DocumentTranslationPromptBuilder
 {
     public static IReadOnlyList<OllamaChatMessage> BuildMessages(
         string targetLanguage,
-        StoredTranslationUnit unit)
+        StoredTranslationUnit unit,
+        IReadOnlyDictionary<string, string>? customGlossary = null)
     {
         string language = NormalizeLanguage(targetLanguage);
+        string glossaryInstruction = BuildGlossaryInstruction(customGlossary);
         return
         [
             new OllamaChatMessage(
@@ -18,6 +20,7 @@ internal static class DocumentTranslationPromptBuilder
                 You are a document translation engine.
                 Translate only the text inside <source_text> tags.
                 {GetUnitKindInstruction(unit.UnitKind)}
+                {glossaryInstruction}
                 Preserve numbers, dates, codes, placeholders, line breaks, indentation, and list markers (-, *, 1.) exactly as they appear.
                 Do not add explanations, comments, markdown fences, XML tags, headings, or any extra text.
                 Return only the translated text with no wrapper or delimiter.
@@ -40,9 +43,11 @@ internal static class DocumentTranslationPromptBuilder
         string targetLanguage,
         StoredTranslationUnit unit,
         string failedOutput,
-        string validationWarnings)
+        string validationWarnings,
+        IReadOnlyDictionary<string, string>? customGlossary = null)
     {
         string language = NormalizeLanguage(targetLanguage);
+        string glossaryInstruction = BuildGlossaryInstruction(customGlossary);
         return
         [
             new OllamaChatMessage(
@@ -50,6 +55,7 @@ internal static class DocumentTranslationPromptBuilder
                 $"""
                 You are repairing a failed document translation unit.
                 Return only the corrected translation in {language}.
+                {glossaryInstruction}
                 Preserve every placeholder, code token, number, date, line break, indentation, and list marker exactly as in the source.
                 Do not add explanations, comments, markdown fences, XML tags, headings, or wrappers.
                 """),
@@ -71,6 +77,13 @@ internal static class DocumentTranslationPromptBuilder
                 </failed_output>
                 """)
         ];
+    }
+
+    private static string BuildGlossaryInstruction(IReadOnlyDictionary<string, string>? glossary)
+    {
+        if (glossary is null || glossary.Count == 0) return string.Empty;
+        var terms = glossary.Select(kv => $" - \"{kv.Key}\" -> \"{kv.Value}\"");
+        return "Mandatory Technical Glossary Rules (use these exact translations for the following terms):\n" + string.Join("\n", terms) + "\n";
     }
 
     private static string GetUnitKindInstruction(string? unitKind) => unitKind switch

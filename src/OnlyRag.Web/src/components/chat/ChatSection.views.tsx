@@ -1,7 +1,7 @@
-import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { ChatSource, ImportedDocument, OllamaModel, OllamaStatusResponse } from "../../api";
 import { formatPageRange } from "./ChatSection.helpers";
-import type { ChatMessage } from "./ChatSection.storage";
+import { exportSessionAsJson, exportSessionAsMarkdown, triggerFileDownload, type ChatMessage } from "./ChatSection.storage";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { ModelSelectorDropdown } from "../common/ModelSelectorDropdown";
 
@@ -18,6 +18,12 @@ export function ChatDocumentsPanel({
   selectedDocumentIds: number[];
   onToggleDocument: (documentId: number, checked: boolean) => void;
 }) {
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+
+  const filteredDocuments = documents.filter((doc) =>
+    doc.originalFileName.toLowerCase().includes(docSearchQuery.toLowerCase().trim())
+  );
+
   return (
     <section className="chat-documents-panel" aria-labelledby="chat-documents-title">
       <div className="settings-card__header">
@@ -26,17 +32,27 @@ export function ChatDocumentsPanel({
 
       {documentsError && <div className="feedback-banner feedback-banner--error" role="alert">{documentsError}</div>}
 
+      <div className="px-2 pb-2">
+        <input
+          type="text"
+          placeholder="Cerca documenti..."
+          value={docSearchQuery}
+          onChange={(e) => setDocSearchQuery(e.target.value)}
+          className="w-full px-2 py-1 bg-card border border-light rounded text-xs text-main focus:outline-none focus:border-focus"
+        />
+      </div>
+
       <div className="chat-document-list" aria-label="Documenti selezionabili per la chat">
         {isDocsLoading ? (
           <div className="empty-state chat-empty-state" role="status" aria-live="polite">
             <p>Caricamento...</p>
           </div>
-        ) : documents.length === 0 ? (
+        ) : filteredDocuments.length === 0 ? (
           <div className="empty-state chat-empty-state" role="status">
-            <p>Nessun documento importato.</p>
+            <p>{docSearchQuery ? "Nessun documento corrisponde." : "Nessun documento importato."}</p>
           </div>
         ) : (
-          documents.map((document) => (
+          filteredDocuments.map((document) => (
             <label className="chat-document-row" key={document.id} title={document.originalFileName}>
               <input
                 type="checkbox"
@@ -165,6 +181,36 @@ export function ChatMainPanel({
     onSubmit(event);
   }
 
+  function handleExportMarkdown() {
+    if (messages.length === 0) return;
+    const markdown = exportSessionAsMarkdown(messages, null, selectedModel);
+    triggerFileDownload(markdown, `chat-export-${Date.now()}.md`, "text/markdown");
+  }
+
+  function handleExportJson() {
+    if (messages.length === 0) return;
+    const json = exportSessionAsJson(messages, null, selectedModel);
+    triggerFileDownload(json, `chat-export-${Date.now()}.json`, "application/json");
+  }
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      const newHeight = Math.min(200, Math.max(48, textareaRef.current.scrollHeight));
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
+  }, [input]);
+
+  const SYSTEM_PROMPT_TEMPLATES = [
+    { label: "📊 Analisi Critica", text: "Esegui un'analisi critica approfondita ed obiettiva mettendo in luce pro, contro e punti chiave:\n\n" },
+    { label: "📋 Sintesi Esecutiva", text: "Fornisci una sintesi esecutiva strutturata con punti elenco e raccomandazioni pratiche:\n\n" },
+    { label: "⚙️ Estrazione JSON", text: "Estrai le informazioni rilevanti nel seguente formato JSON strutturato e valido:\n\n" },
+    { label: "💡 Spiegazione Semplice", text: "Spiega il concetto in modo semplice e chiaro, con metafore ed esempi pratici:\n\n" },
+    { label: "🔍 Code Reviewer", text: "Effettua una code review dettagliata individuando bug, problemi di performance e refactoring:\n\n" }
+  ];
+
   return (
     <section className="chat-main" aria-label="Chat RAG">
       <div className="chat-toolbar">
@@ -191,13 +237,32 @@ export function ChatMainPanel({
             disabled={!ollamaStatus?.isReachable || models.length === 0 || isGenerating}
           />
         </div>
-        <div className="settings-actions">
+        <div className="settings-actions flex items-center gap-2">
+          {messages.length > 0 && (
+            <>
+              <button
+                className="button-secondary button-secondary--xs"
+                type="button"
+                onClick={handleExportMarkdown}
+                title="Esporta conversazione in formato Markdown (.md)"
+              >
+                Esporta MD
+              </button>
+              <button
+                className="button-secondary button-secondary--xs"
+                type="button"
+                onClick={handleExportJson}
+                title="Esporta conversazione in formato JSON (.json)"
+              >
+                Esporta JSON
+              </button>
+            </>
+          )}
           <button className="button-secondary" type="button" onClick={onNewChat}>
             Nuova chat
           </button>
         </div>
       </div>
-
 
       <div className="chat-status-stack">
         {!ollamaStatus?.isReachable && (
@@ -297,11 +362,29 @@ export function ChatMainPanel({
         <div ref={messagesEndRef} />
       </div>
 
+      <div className="chat-prompt-templates" style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "4px 8px", background: "rgba(15, 23, 42, 0.6)", borderRadius: "6px 6px 0 0", borderTop: "1px solid #1e293b" }}>
+        <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>Template:</span>
+        {SYSTEM_PROMPT_TEMPLATES.map((tpl) => (
+          <button
+            key={tpl.label}
+            type="button"
+            className="button-secondary button-secondary--xs"
+            style={{ fontSize: "0.74rem", padding: "2px 8px", whiteSpace: "nowrap" }}
+            onClick={() => onInputChange(input ? `${tpl.text}${input}` : tpl.text)}
+            title="Inserisci questo template di system prompt"
+          >
+            {tpl.label}
+          </button>
+        ))}
+      </div>
+
       <form className="chat-input-row" onSubmit={handleFormSubmit}>
         <textarea
+          ref={textareaRef}
           aria-label="Messaggio"
           value={input}
-          rows={3}
+          rows={1}
+          style={{ minHeight: "48px", maxHeight: "200px", resize: "none", overflowY: "auto" }}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onInputKeyDown}
           placeholder={selectedDocumentIds.length > 0 ? "Fai una domanda sui documenti selezionati" : "Scrivi un messaggio"}

@@ -23,6 +23,8 @@ export type ImportedDocument = {
   lastError: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
+  tags?: string[];
+  collectionName?: string;
 };
 
 export type DocumentEmbeddingStatus = {

@@ -11,6 +11,7 @@ import { SettingsSection } from "./components/settings/SettingsSection";
 import { SetupBanner } from "./components/layout/SetupBanner";
 import { TranslationSection } from "./components/translation/TranslationSection";
 import { CommandPaletteModal } from "./components/layout/CommandPaletteModal";
+import { GlobalDropzoneOverlay } from "./components/documents/GlobalDropzoneOverlay";
 import { QueryProvider } from "./context/QueryProvider";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { useAppSetup } from "./hooks/useAppSetup";
@@ -97,6 +98,11 @@ export function AppContent() {
 
   return (
     <div className="desktop-shell" data-theme={theme}>
+      <GlobalDropzoneOverlay
+        onFilesDropped={() => {
+          setActiveSection("documents");
+        }}
+      />
       <a className="skip-link" href="#main-workspace">
         Salta al contenuto principale
       </a>

@@ -1,4 +1,4 @@
-import type { PointerEvent, RefObject } from "react";
+import { useState, type PointerEvent, type RefObject } from "react";
 import type { GeneratedImage } from "../../api";
 import { isEditStateEmpty, type ArrowLayer, type EditTool, type ImageEditState, type TextLayer } from "./imageTypes";
 
@@ -59,6 +59,9 @@ export function ImageCanvasEditor({
   hasPrevImage,
   hasNextImage
 }: Props) {
+  const [maskOpacity, setMaskOpacity] = useState(0.75);
+  const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(null);
+
   if (!selectedImage) {
     return (
       <div className="generated-image-preview generated-image-preview--empty" role="status">
@@ -68,6 +71,21 @@ export function ImageCanvasEditor({
   }
 
   const hasEdits = !isEditStateEmpty(editState);
+
+  function handlePointerMoveInternal(e: PointerEvent<HTMLDivElement>) {
+    if (previewRef.current) {
+      const rect = previewRef.current.getBoundingClientRect();
+      setBrushPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+    onPreviewPointerMove(e);
+  }
+
+  function handlePointerLeave() {
+    setBrushPos(null);
+  }
 
   return (
     <div className="canvas-editor-container">
@@ -122,8 +140,8 @@ export function ImageCanvasEditor({
         </div>
       </div>
 
-      {/* Edit History Toolbar (Undo, Redo, Specific Element Deletion) */}
-      <div className="edit-history-toolbar" style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "#1e293b", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid #334155" }}>
+      {/* Edit History Toolbar & Mask Opacity Control */}
+      <div className="edit-history-toolbar" style={{ display: "flex", gap: "10px", marginBottom: "8px", flexWrap: "wrap", alignItems: "center", background: "#1e293b", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid #334155" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1", marginRight: "4px" }}>Storico:</span>
         <button
           type="button"
@@ -144,6 +162,25 @@ export function ImageCanvasEditor({
         >
           Ripristina (Redo)
         </button>
+
+        {/* Mask Opacity Slider */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
+          <label htmlFor="mask-opacity-slider" style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8" }}>
+            Opacità Maschera:
+          </label>
+          <input
+            id="mask-opacity-slider"
+            type="range"
+            min="0.1"
+            max="1.0"
+            step="0.05"
+            value={maskOpacity}
+            onChange={(e) => setMaskOpacity(parseFloat(e.target.value))}
+            style={{ width: "70px", accentColor: "#38bdf8", cursor: "pointer" }}
+            title="Regola l'opacità della maschera sul canvas"
+          />
+          <span style={{ fontSize: "11px", color: "#f8fafc", width: "32px" }}>{Math.round(maskOpacity * 100)}%</span>
+        </div>
 
         {editState.crop && (
           <button
@@ -195,9 +232,70 @@ export function ImageCanvasEditor({
           className={`generated-image-preview-frame generated-image-preview-frame--${activeTool}`}
           ref={previewRef}
           onPointerDown={onPreviewPointerDown}
-          onPointerMove={onPreviewPointerMove}
+          onPointerMove={handlePointerMoveInternal}
           onPointerUp={onPreviewPointerUp}
+          onPointerLeave={handlePointerLeave}
+          style={{ position: "relative", opacity: 1 }}
         >
+          {/* Floating Canvas Toolbar */}
+          <div
+            className="canvas-floating-toolbar"
+            style={{
+              position: "absolute",
+              top: "12px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 30,
+              display: "flex",
+              gap: "6px",
+              alignItems: "center",
+              background: "rgba(15, 23, 42, 0.88)",
+              backdropFilter: "blur(8px)",
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.45)",
+              fontSize: "0.8rem",
+              color: "#f8fafc"
+            }}
+          >
+            <span style={{ fontWeight: 700, color: "#38bdf8", marginRight: "4px" }}>
+              {activeTool === "crop" ? "✂️ Ritaglio" : activeTool === "text" ? "💬 Testo" : activeTool === "arrow" ? "↗️ Freccia" : "🖐️ Seleziona"}
+            </span>
+            <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+            <button
+              type="button"
+              className="button-secondary button-secondary--xs"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Annulla (Ctrl+Z)"
+              style={{ padding: "3px 9px", fontSize: "0.76rem" }}
+            >
+              ↩️ Undo
+            </button>
+            <button
+              type="button"
+              className="button-secondary button-secondary--xs"
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="Ripristina (Ctrl+Y)"
+              style={{ padding: "3px 9px", fontSize: "0.76rem" }}
+            >
+              ↪️ Redo
+            </button>
+            {hasEdits && (
+              <button
+                type="button"
+                className="button-danger button-danger--xs"
+                onClick={onResetEdits}
+                title="Azzera tutte le sovrapposizioni e modifiche"
+                style={{ padding: "3px 9px", fontSize: "0.76rem" }}
+              >
+                🗑️ Reset
+              </button>
+            )}
+          </div>
+
           <img
             className="generated-image-preview"
             src={objectUrl}
@@ -205,8 +303,27 @@ export function ImageCanvasEditor({
             draggable={false}
           />
 
-          {/* SVG Overlay for Arrow Layers */}
-          <svg className="image-canvas-svg-overlay" aria-hidden="true">
+          {/* Dynamic Brush Pointer Cursor Indicator */}
+          {brushPos && (activeTool === "arrow" || activeTool === "crop") && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${brushPos.x}px`,
+                top: `${brushPos.y}px`,
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                border: "2px dashed #38bdf8",
+                boxShadow: "0 0 8px rgba(56, 189, 248, 0.6)",
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                zIndex: 45
+              }}
+            />
+          )}
+
+          {/* SVG Overlay for Arrow Layers with Opacity Control */}
+          <svg className="image-canvas-svg-overlay" aria-hidden="true" style={{ opacity: maskOpacity }}>
             <defs>
               <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
@@ -260,7 +377,8 @@ export function ImageCanvasEditor({
                 left: `${Math.max(0, Math.min(100, editState.crop.x))}%`,
                 top: `${Math.max(0, Math.min(100, editState.crop.y))}%`,
                 width: `${Math.max(0, Math.min(100 - editState.crop.x, editState.crop.width))}%`,
-                height: `${Math.max(0, Math.min(100 - editState.crop.y, editState.crop.height))}%`
+                height: `${Math.max(0, Math.min(100 - editState.crop.y, editState.crop.height))}%`,
+                opacity: maskOpacity
               }}
               aria-hidden="true"
             >
@@ -280,7 +398,8 @@ export function ImageCanvasEditor({
                 left: `${Math.max(0, Math.min(95, layer.x))}%`,
                 top: `${Math.max(0, Math.min(95, layer.y))}%`,
                 color: layer.color,
-                fontSize: `${Math.max(12, layer.fontSize / 8)}px`
+                fontSize: `${Math.max(12, layer.fontSize / 8)}px`,
+                opacity: maskOpacity
               }}
               onPointerDown={(event) => {
                 event.stopPropagation();

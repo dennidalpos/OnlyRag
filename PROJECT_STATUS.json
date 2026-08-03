@@ -1,11 +1,9 @@
 {
   "todos": [
-    "Implementare l'interazione per l'approvazione passo-passo dei diff prima dell'applicazione delle modifiche file nel Subagent Studio",
-    "Aggiungere supporto all'auto-grow height ed ai template di system prompt nella prompt bar della Chat",
-    "Aggiungere l'overlay di dropzone globale per il caricamento documenti con selezione preventiva della modalità OCR",
-    "Aggiungere la barra strumenti fluttuante per la maschera di inpainting e lo storico undo/redo nell'Image Canvas Editor",
-    "Implementare lo scorrimento sincronizzato side-by-side ed i contatori di parole/caratteri nel Traduttore Multilingua"
+    "Integrare MCTS Rollouts e Checkpoint Rollback (AgentMctsStateMachine) nell'AgentLoopEngine per l'esplorazione sicura dei rami di codice",
+    "Implementare l'espansione HyDE (Hypothetical Document Embeddings) nella Query Transformation del RAG 2.0",
+    "Estendere il GraphRagAstSymbolIndexer per l'indicizzazione ricorsiva dell'albero AST (C#, TypeScript, Python)",
+    "Implementare la decodifica vincolata a schema JSON per garantire la conformita' dei tool call con Ollama",
+    "Aggiungere la ricerca vettoriale nella memoria episodica dello storico sessioni (SqliteQdrantEpisodicMemoryService)"
   ]
 }
-
-
