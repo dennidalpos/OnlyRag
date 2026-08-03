@@ -170,4 +170,80 @@ describe("CodingSection", () => {
       expect(screen.getByText("Cartella di progetto rimossa.")).toBeInTheDocument();
     });
   });
+
+  it("triggers multi-agent orchestration inline when a complex task is submitted", async () => {
+    const user = userEvent.setup();
+    mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: "C:\\Projects\\App",
+          isAuthorized: true,
+          canRead: true,
+          canWrite: true,
+          fileCount: 5,
+          lastVerifiedAt: "2026-07-24T12:00:00Z"
+        }
+      },
+      {
+        path: "/api/workspace/files",
+        method: "GET",
+        response: []
+      },
+      {
+        path: "/api/agent/orchestrate",
+        method: "POST",
+        response: {
+          orchestrationId: "orch_test_123",
+          overallGoal: "Crea modulo autenticazione con test",
+          isCompleted: false,
+          hasFailed: false,
+          subtasks: [
+            {
+              subtaskId: "sub_planner",
+              role: "Planner Agent",
+              goal: "Analisi requisiti",
+              dependsOnSubtaskIds: [],
+              status: "Running"
+            }
+          ],
+          messages: [
+            {
+              messageId: "msg_1",
+              senderRole: "Orchestrator",
+              recipientRole: "Planner Agent",
+              messageText: "Inizializzato flusso multi-agente",
+              sentAtUtc: new Date().toISOString()
+            }
+          ],
+          startedAtUtc: new Date().toISOString()
+        }
+      },
+      {
+        path: "/api/agent/run-stream",
+        method: "POST",
+        response: 'data: {"type":"final_response","content":"Modulo creato!"}\n\ndata: [DONE]\n\n'
+      }
+    ]);
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText(/Inserisci l'obiettivo o la domanda/i);
+    await user.type(promptInput, "Crea modulo autenticazione con test unitari");
+
+    const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Orchestrazione Avanzata Multi-Agenti")).toBeInTheDocument();
+      expect(screen.getByText("orch_test_123")).toBeInTheDocument();
+      expect(screen.getByText("Planner Agent")).toBeInTheDocument();
+    });
+  });
 });

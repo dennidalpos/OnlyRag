@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { RefObject } from "react";
 import { AgentToolCallCard } from "./AgentToolCallCard";
+import { MultiAgentOrchestrationCard } from "./MultiAgentOrchestrationCard";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { ReasoningTraceVisualizer } from "./ReasoningTraceVisualizer";
 import type { CodingMessage } from "./useCodingSectionController";
@@ -92,6 +93,9 @@ export function CodingMessageList({
               {/* AGENT EVENTS RENDERING & REASONING TRACE */}
               {msg.sender === "assistant" || (msg.agentEvents && msg.agentEvents.length > 0) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {msg.orchestrationStatus && (
+                    <MultiAgentOrchestrationCard status={msg.orchestrationStatus} />
+                  )}
                   {msg.agentEvents && msg.agentEvents.length > 0 && (
                     <ReasoningTraceVisualizer
                       events={msg.agentEvents}

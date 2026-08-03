@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentStepEvent, OllamaModel } from "../../api";
+import type { MultiAgentOrchestrationStatus } from "../../apiClient";
 import type { FileAction } from "./CodingSection.types";
 import { useAgentStreamHandler } from "./useAgentStreamHandler";
 import { useSmartIntentRouter } from "./useSmartIntentRouter";
@@ -15,6 +16,7 @@ export type CodingMessage = {
   attachedFile?: string;
   isStreaming?: boolean;
   agentEvents?: AgentStepEvent[];
+  orchestrationStatus?: MultiAgentOrchestrationStatus | null;
 };
 
 export type UseCodingSectionControllerOptions = {

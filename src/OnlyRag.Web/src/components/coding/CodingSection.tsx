@@ -2,7 +2,6 @@ import type { OllamaModel } from "../../api";
 import { CodingMessageList } from "./CodingMessageList";
 import { CodingPromptBar } from "./CodingPromptBar";
 import { CodingToolbar } from "./CodingToolbar";
-import { MultiAgentSection } from "./MultiAgentSection";
 import { AttachedFileEditorModal, DiffViewerModal, WorkspaceFilePickerModal } from "./CodingSection.views";
 import { useCodingSectionController } from "./useCodingSectionController";
 
@@ -54,9 +53,6 @@ export function CodingSection({
           {ctrl.error}
         </div>
       )}
-
-      {/* MULTI AGENT ORCHESTRATION */}
-      <MultiAgentSection />
 
       {/* CHAT MESSAGES CONTAINER */}
       <CodingMessageList

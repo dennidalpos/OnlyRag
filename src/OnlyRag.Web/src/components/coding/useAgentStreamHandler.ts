@@ -6,6 +6,10 @@ import {
   type AgentStepEvent,
   type ApproveToolCallRequest
 } from "../../api";
+import {
+  getMultiAgentOrchestrationStatus,
+  startMultiAgentOrchestration
+} from "../../apiClient";
 import type { WorkspaceFileItem } from "../../apiTypes";
 import type { CodingMessage } from "./useCodingSectionController";
 import type { FileAction } from "./CodingSection.types";
@@ -171,6 +175,48 @@ export function useAgentStreamHandler({
     setIsGenerating(true);
     setError(null);
 
+    let orchPollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const lowerText = textToSend.toLowerCase();
+    const isMultiAgentGoal =
+      lowerText.includes("crea modulo") ||
+      lowerText.includes("implementa") ||
+      lowerText.includes("orchestra") ||
+      lowerText.includes("multi agent") ||
+      lowerText.includes("progetto") ||
+      lowerText.includes("pipeline") ||
+      lowerText.includes("architettura") ||
+      lowerText.length > 180;
+
+    if (isMultiAgentGoal) {
+      try {
+        const initialStatus = await startMultiAgentOrchestration(textToSend);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, orchestrationStatus: initialStatus } : msg
+          )
+        );
+
+        orchPollInterval = setInterval(async () => {
+          try {
+            const updated = await getMultiAgentOrchestrationStatus(initialStatus.orchestrationId);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId ? { ...msg, orchestrationStatus: updated } : msg
+              )
+            );
+            if (updated.isCompleted || updated.hasFailed) {
+              if (orchPollInterval) clearInterval(orchPollInterval);
+            }
+          } catch {
+            // Ignora errori temporanei di polling
+          }
+        }, 1200);
+      } catch {
+        // Ignora eventuale fallimento di avvio orchestrazione secondaria
+      }
+    }
+
     try {
       await apiAgentStreamRequest(
         "/api/agent/run-stream",
@@ -314,6 +360,7 @@ export function useAgentStreamHandler({
         )
       );
     } finally {
+      if (orchPollInterval) clearInterval(orchPollInterval);
       setIsGenerating(false);
     }
   }

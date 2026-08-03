@@ -275,9 +275,26 @@
   color: #fca5a5;
 }
 
+.feedback-banner--warning {
+  border-color: #f59e0b;
+  background: #451a03;
+  color: #fde047;
+}
+
 .feedback-banner--spaced {
   margin-bottom: 16px;
 }
+
+.settings-tab-warning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 
 .settings-list div {
   display: flex;
