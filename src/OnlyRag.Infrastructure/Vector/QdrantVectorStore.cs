@@ -186,8 +186,13 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             return;
         }
 
+        CollectionInfo info = await client.GetCollectionInfoAsync(collection, cancellationToken);
+        ulong count = info.PointsCount;
+        HnswConfigDiff hnswConfig = QdrantHnswTuner.BuildHnswConfigDiff(count);
+
         await client.UpdateCollectionAsync(
             collection,
+            hnswConfig: hnswConfig,
             cancellationToken: cancellationToken);
     }
 
@@ -277,6 +282,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         await client.CreateCollectionAsync(
             collection,
             new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
+            hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
             quantizationConfig: quantizationConfig,
             cancellationToken: cancellationToken);
     }

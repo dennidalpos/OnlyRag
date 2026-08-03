@@ -92,6 +92,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ITranslationRepository, SqliteTranslationRepository>();
         services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
+        services.AddSingleton<IAesBackupService, AesBackupService>();
         return services;
     }
 
@@ -138,6 +139,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<BackgroundTaskManager>();
         services.AddSingleton<ISubagentRunner, SubagentRunner>();
         services.AddSingleton<WorkspaceToolExecutor>();
+        services.AddSingleton<OnlyRag.Core.Mcp.IMcpClientService, OnlyRag.Api.Mcp.McpClientService>();
         services.AddTransient<AgentLoopEngine>();
         return services;
     }
@@ -168,6 +170,8 @@ internal static class InProcessBackendServiceRegistration
     private static IServiceCollection AddOnlyRagSettingsAndDiagnosticsServices(this IServiceCollection services)
     {
         services.AddSingleton<IOllamaSettingsService, OllamaSettingsService>();
+        services.AddSingleton<OllamaQueryEmbeddingCache>();
+        services.AddSingleton<IOllamaLoadBalancer, OllamaLoadBalancer>();
         services.AddSingleton<IPerformanceSettingsService, PerformanceSettingsService>();
         services.AddSingleton<PdfExportSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingSettingsStore>();
