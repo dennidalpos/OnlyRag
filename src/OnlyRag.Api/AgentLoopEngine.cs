@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -6,6 +7,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
 using OnlyRag.Infrastructure.Logging;
+using OnlyRag.Infrastructure.Storage;
 
 namespace OnlyRag.Api;
 
@@ -25,6 +27,7 @@ internal sealed class AgentLoopEngine
     private readonly WorkspaceSnapshotCheckpointManager? checkpointManager;
     private readonly IAstDependencyGraphService? astGraphService;
     private readonly ILoggingService? logger;
+    private readonly IAgentRunStateRepository? runStateRepository;
 
     private readonly ConcurrentDictionary<string, (AgentToolCall Call, TaskCompletionSource<bool> Tcs)> pendingApprovals = new();
 
@@ -38,7 +41,8 @@ internal sealed class AgentLoopEngine
         OnlyRag.Infrastructure.Agent.Memory.IAgentSkillAutoLearner? skillAutoLearner = null,
         WorkspaceSnapshotCheckpointManager? checkpointManager = null,
         IAstDependencyGraphService? astGraphService = null,
-        ILoggingService? logger = null)
+        ILoggingService? logger = null,
+        IAgentRunStateRepository? runStateRepository = null)
     {
         this.ollamaClient = ollamaClient;
         this.settingsService = settingsService;
@@ -50,6 +54,7 @@ internal sealed class AgentLoopEngine
         this.checkpointManager = checkpointManager;
         this.astGraphService = astGraphService;
         this.logger = logger;
+        this.runStateRepository = runStateRepository;
     }
 
 
@@ -136,6 +141,47 @@ internal sealed class AgentLoopEngine
             new("user", enrichedGoal)
         };
 
+        PersistentAgentRunStateMachine? durableStateMachine = null;
+        string runId = request.ResumeRunId?.Trim() ?? Guid.NewGuid().ToString("N");
+        if (runStateRepository is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(request.ResumeRunId))
+            {
+                AgentRunSnapshot? resumed = await runStateRepository.GetAsync(runId, cancellationToken);
+                if (resumed is null || resumed.Phase is AgentRunPhase.Completed or AgentRunPhase.Failed or AgentRunPhase.Cancelled)
+                {
+                    yield return new AgentStepEvent("error", "The requested agent run cannot be resumed.", RunId: runId);
+                    yield break;
+                }
+
+                if (resumed.Messages.Count == 1)
+                {
+                    List<OllamaChatMessage>? restoredMessages = JsonSerializer.Deserialize<List<OllamaChatMessage>>(resumed.Messages[0]);
+                    if (restoredMessages is { Count: > 0 }) messages = restoredMessages;
+                }
+
+                model = resumed.Model ?? model;
+                workspaceRoot = resumed.WorkspaceRoot;
+                durableStateMachine = new PersistentAgentRunStateMachine(resumed);
+            }
+            else
+            {
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                AgentRunBudget budget = new(
+                    MaxToolCalls: request.MaxToolCalls is > 0 ? request.MaxToolCalls.Value : DefaultMaxIterations,
+                    MaxEstimatedTokens: request.MaxEstimatedTokens is > 0 ? request.MaxEstimatedTokens.Value : 60_000,
+                    MaxDuration: request.MaxDurationSeconds is > 0 ? TimeSpan.FromSeconds(request.MaxDurationSeconds.Value) : null);
+                AgentRunSnapshot created = new(
+                    runId, request.Goal, request.Mode ?? "write", model, workspaceRoot, AgentRunPhase.Plan, budget,
+                    ToolCallsUsed: 0, EstimatedTokensUsed: 0, now, now, LastError: null, FinalResponse: null,
+                    Messages: [JsonSerializer.Serialize(messages)],
+                    CompletionCriteria: NormalizeCompletionCriteria(request.CompletionCriteria));
+                await runStateRepository.CreateAsync(created, cancellationToken);
+                durableStateMachine = new PersistentAgentRunStateMachine(created);
+                await AppendTraceAsync(runId, 0, "run_started", created.Phase, decision: request.Goal, cancellationToken: cancellationToken);
+            }
+        }
+
         if (skillRepository != null && !string.IsNullOrWhiteSpace(request.Goal))
         {
             try
@@ -158,7 +204,8 @@ internal sealed class AgentLoopEngine
             }
         }
 
-        yield return new AgentStepEvent("thought", $"[Agent Engine SOTA] Starting goal processing in '{request.Mode}' mode with model '{model}'. Loading memory and executing...");
+        yield return new AgentStepEvent("state_changed", "Agent run is planning the next verified action.", RunId: runId, Phase: durableStateMachine?.Snapshot.Phase);
+        yield return new AgentStepEvent("thought", $"[Agent Engine] Starting goal processing in '{request.Mode}' mode with model '{model}'.", RunId: runId, Phase: durableStateMachine?.Snapshot.Phase);
 
         int maxIterations = (request.MaxIterations.HasValue && request.MaxIterations.Value > 0) ? request.MaxIterations.Value : DefaultMaxIterations;
         var failedToolSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -186,6 +233,13 @@ internal sealed class AgentLoopEngine
         {
             iteration++;
             cancellationToken.ThrowIfCancellationRequested();
+            durableStateMachine?.EnsureWithinTimeBudget(DateTimeOffset.UtcNow);
+
+            if (durableStateMachine?.Snapshot.Phase == AgentRunPhase.Plan)
+            {
+                await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Act, "Selected the next action.", messages, cancellationToken);
+                yield return new AgentStepEvent("state_changed", "Agent run is selecting an action.", RunId: runId, Phase: AgentRunPhase.Act);
+            }
 
             memoryManager.PruneHistory(messages);
 
@@ -196,6 +250,7 @@ internal sealed class AgentLoopEngine
 
             var responseSb = new StringBuilder();
             string? streamError = null;
+            Stopwatch modelResponseStopwatch = Stopwatch.StartNew();
 
             int maxStreamRetries = 2;
             for (int streamAttempt = 1; streamAttempt <= maxStreamRetries; streamAttempt++)
@@ -302,12 +357,22 @@ internal sealed class AgentLoopEngine
             }
 
             string responseText = responseSb.ToString();
+            modelResponseStopwatch.Stop();
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 string errEmpty = "The LLM model returned no content in the response.";
                 logger?.LogWarning("AgentEngine", errEmpty);
                 yield return new AgentStepEvent("error", errEmpty);
                 yield break;
+            }
+
+            if (durableStateMachine is not null)
+            {
+                durableStateMachine.ConsumeEstimatedTokens(PersistentAgentRunStateMachine.EstimateTokens(responseText), DateTimeOffset.UtcNow);
+                await SaveProgressAsync(durableStateMachine, messages, cancellationToken);
+                await AppendTraceAsync(runId, iteration, "model_response", durableStateMachine.Snapshot.Phase,
+                    observation: responseText, estimatedTokens: durableStateMachine.Snapshot.EstimatedTokensUsed,
+                    latencyMs: modelResponseStopwatch.Elapsed.TotalMilliseconds, cancellationToken: cancellationToken);
             }
 
             messages.Add(new("assistant", responseText));
@@ -331,6 +396,32 @@ internal sealed class AgentLoopEngine
 
                 logger?.LogInfo("AgentEngine", $"[AGENT LOOP COMPLETE] No tools called. Final response generated at step {iteration}.");
 
+                if (durableStateMachine is not null)
+                {
+                    if (!durableStateMachine.CanFinalize())
+                    {
+                        IReadOnlyList<AgentCompletionCriterion> pending = durableStateMachine.GetPendingRequiredCriteria();
+                        string requirement = string.Join("; ", pending.Select(criterion => $"{criterion.Id}: {criterion.Description}"));
+                        if (durableStateMachine.Snapshot.Phase == AgentRunPhase.Act)
+                        {
+                            await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Recover, "Completion was requested without required verification.", messages, cancellationToken);
+                            await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Plan, "Plan the outstanding verification.", messages, cancellationToken);
+                        }
+                        messages.Add(new("user", $"[COMPLETION BLOCKED] Do not provide a final answer yet. The runtime has not observed successful verification for: {requirement}. Run the required verification command/tool and resolve failures before concluding."));
+                        yield return new AgentStepEvent("state_changed", "Completion blocked until all required runtime verifications pass.", RunId: runId, Phase: durableStateMachine.Snapshot.Phase);
+                        continue;
+                    }
+
+                    if (durableStateMachine.Snapshot.Phase == AgentRunPhase.Act)
+                    {
+                        await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Finalize, "All required completion criteria passed.", messages, cancellationToken);
+                    }
+                    durableStateMachine.SetOutcome(responseText, null, DateTimeOffset.UtcNow);
+                    await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Completed, "Final response recorded.", messages, cancellationToken);
+                    await AppendTraceAsync(runId, iteration, "run_completed", AgentRunPhase.Completed,
+                        observation: responseText, outcome: "Completed", cancellationToken: cancellationToken);
+                }
+
                 if (episodicMemoryService != null && !string.IsNullOrWhiteSpace(request.Goal))
                 {
                     try
@@ -347,7 +438,7 @@ internal sealed class AgentLoopEngine
                     catch { }
                 }
 
-                yield return new AgentStepEvent("final_response", responseText);
+                yield return new AgentStepEvent("final_response", responseText, RunId: runId, Phase: AgentRunPhase.Completed);
                 yield break;
             }
 
@@ -360,6 +451,15 @@ internal sealed class AgentLoopEngine
             }
 
             var resultsList = new List<AgentToolResult>();
+
+            if (durableStateMachine is not null)
+            {
+                foreach (AgentToolCall _ in toolCalls)
+                {
+                    durableStateMachine.ConsumeToolCall(DateTimeOffset.UtcNow);
+                }
+                await SaveProgressAsync(durableStateMachine, messages, cancellationToken);
+            }
 
             if (toolCalls.Count > 1 && toolCalls.All(AgentToolCallParser.IsReadOnlyTool))
             {
@@ -421,8 +521,15 @@ internal sealed class AgentLoopEngine
 
                 var parallelResults = await Task.WhenAll(parallelTasks);
 
-                foreach (var res in parallelResults)
+                for (int parallelIndex = 0; parallelIndex < parallelResults.Length; parallelIndex++)
                 {
+                    AgentToolResult res = parallelResults[parallelIndex];
+                    if (durableStateMachine is not null)
+                    {
+                        durableStateMachine.RecordVerification(toolCalls[parallelIndex], res, DateTimeOffset.UtcNow);
+                        await AppendTraceAsync(runId, iteration, "tool_result", durableStateMachine.Snapshot.Phase,
+                            toolCall: toolCalls[parallelIndex], result: res, evidence: res.Success ? res.Output : null, cancellationToken: cancellationToken);
+                    }
                     yield return new AgentStepEvent("tool_result", ToolResult: res);
                     resultsList.Add(res);
                     if (res.Success && res.ToolName == "reflect_step")
@@ -564,6 +671,13 @@ internal sealed class AgentLoopEngine
 
                     var result = await toolTask;
 
+                    if (durableStateMachine is not null)
+                    {
+                        durableStateMachine.RecordVerification(toolCall, result, DateTimeOffset.UtcNow);
+                        await AppendTraceAsync(runId, iteration, "tool_result", durableStateMachine.Snapshot.Phase,
+                            toolCall: toolCall, result: result, evidence: result.Success ? result.Output : null, cancellationToken: cancellationToken);
+                    }
+
                     bool isCompilationError = !result.Success &&
                         (!string.IsNullOrEmpty(result.Error) && (result.Error.Contains("error CS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("TS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("Build failed", StringComparison.OrdinalIgnoreCase)));
 
@@ -693,6 +807,30 @@ internal sealed class AgentLoopEngine
 
             accumulatedToolResults.AddRange(resultsList);
 
+            if (durableStateMachine is not null)
+            {
+                bool anyFailure = resultsList.Any(result => !result.Success);
+                if (durableStateMachine.Snapshot.Phase == AgentRunPhase.Act)
+                {
+                    await TransitionAndPersistAsync(
+                        durableStateMachine,
+                        anyFailure ? AgentRunPhase.Recover : AgentRunPhase.Observe,
+                        anyFailure ? "A tool failed and recovery is required." : "Tool observations were recorded.",
+                        messages,
+                        cancellationToken);
+                }
+
+                if (anyFailure && durableStateMachine.Snapshot.Phase == AgentRunPhase.Recover)
+                {
+                    await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Plan, "Recovery plan required.", messages, cancellationToken);
+                }
+                else if (!anyFailure && durableStateMachine.Snapshot.Phase == AgentRunPhase.Observe)
+                {
+                    await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Verify, "Observations require verification.", messages, cancellationToken);
+                    await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Plan, "Verification completed; planning next action.", messages, cancellationToken);
+                }
+            }
+
             if (batchMsgSb.Length > 0)
             {
                 string batchText = batchMsgSb.ToString().TrimEnd();
@@ -702,6 +840,11 @@ internal sealed class AgentLoopEngine
                 }
                 messages.Add(new("user", batchText));
             }
+
+            if (durableStateMachine is not null)
+            {
+                await SaveProgressAsync(durableStateMachine, messages, cancellationToken);
+            }
         }
 
         _ = skillAutoLearner?.ExtractAndSaveSkillAsync(request.Goal, accumulatedToolResults, cancellationToken);
@@ -709,8 +852,97 @@ internal sealed class AgentLoopEngine
         if (maxIterations > 0 && iteration >= maxIterations)
         {
             logger?.LogWarning("AgentEngine", $"[AGENT LOOP END] Reached maximum iteration limit of {maxIterations}.");
-            yield return new AgentStepEvent("final_response", $"Reached the maximum agent iteration limit ({maxIterations} steps).");
+            if (durableStateMachine is not null)
+            {
+                durableStateMachine.SetOutcome(null, "Iteration budget exceeded.", DateTimeOffset.UtcNow);
+                if (durableStateMachine.Snapshot.Phase is not (AgentRunPhase.Completed or AgentRunPhase.Failed or AgentRunPhase.Cancelled))
+                {
+                    await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Failed, "Iteration budget exceeded.", messages, cancellationToken);
+                }
+                await AppendTraceAsync(runId, iteration, "run_failed", durableStateMachine.Snapshot.Phase,
+                    error: "Iteration budget exceeded.", outcome: "Failed", cancellationToken: cancellationToken);
+            }
+            yield return new AgentStepEvent("final_response", $"Reached the maximum agent iteration limit ({maxIterations} steps).", RunId: runId, Phase: AgentRunPhase.Failed);
         }
+    }
+
+    private async Task TransitionAndPersistAsync(
+        PersistentAgentRunStateMachine stateMachine,
+        AgentRunPhase nextPhase,
+        string reason,
+        IReadOnlyList<OllamaChatMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        if (runStateRepository is null) return;
+        AgentRunTransition transition = stateMachine.TransitionTo(nextPhase, reason, DateTimeOffset.UtcNow);
+        stateMachine.ReplaceMessages([JsonSerializer.Serialize(messages)], DateTimeOffset.UtcNow);
+        await runStateRepository.AppendTransitionAsync(transition, cancellationToken);
+        await runStateRepository.SaveAsync(stateMachine.Snapshot, cancellationToken);
+    }
+
+    private async Task SaveProgressAsync(
+        PersistentAgentRunStateMachine stateMachine,
+        IReadOnlyList<OllamaChatMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        if (runStateRepository is null) return;
+        stateMachine.ReplaceMessages([JsonSerializer.Serialize(messages)], DateTimeOffset.UtcNow);
+        await runStateRepository.SaveAsync(stateMachine.Snapshot, cancellationToken);
+    }
+
+    private Task AppendTraceAsync(
+        string runId,
+        int step,
+        string eventType,
+        AgentRunPhase phase,
+        string? decision = null,
+        AgentToolCall? toolCall = null,
+        AgentToolResult? result = null,
+        string? observation = null,
+        int? estimatedTokens = null,
+        double? latencyMs = null,
+        string? evidence = null,
+        string? error = null,
+        string? outcome = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (runStateRepository is null) return Task.CompletedTask;
+        return runStateRepository.AppendTraceEventAsync(new AgentRunTraceEvent(
+            0, runId, step, eventType, DateTimeOffset.UtcNow, phase, decision,
+            toolCall?.ToolName, toolCall?.CallId, result?.Success, observation,
+            error ?? result?.Error, estimatedTokens, null, latencyMs, evidence, outcome), cancellationToken);
+    }
+
+    private static IReadOnlyList<AgentCompletionCriterion> NormalizeCompletionCriteria(IReadOnlyList<AgentCompletionCriterion>? criteria)
+    {
+        if (criteria is null || criteria.Count == 0)
+        {
+            return
+            [
+                new AgentCompletionCriterion(
+                    "automated-verification",
+                    "Run a successful build, test, lint, typecheck, or release gate command relevant to the goal.",
+                    AgentCompletionVerificationKind.Command,
+                    "run_command")
+            ];
+        }
+
+        var normalized = new List<AgentCompletionCriterion>();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (AgentCompletionCriterion criterion in criteria)
+        {
+            if (string.IsNullOrWhiteSpace(criterion.Id) || string.IsNullOrWhiteSpace(criterion.Description) || string.IsNullOrWhiteSpace(criterion.ExpectedToolName))
+            {
+                throw new ArgumentException("Each completion criterion requires an id, description, and expected tool name.");
+            }
+            if (!ids.Add(criterion.Id)) throw new ArgumentException($"Duplicate completion criterion id '{criterion.Id}'.");
+            if (criterion.VerificationKind == AgentCompletionVerificationKind.Command && !string.Equals(criterion.ExpectedToolName, "run_command", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Command completion criterion '{criterion.Id}' must use run_command.");
+            }
+            normalized.Add(criterion with { Id = criterion.Id.Trim(), Description = criterion.Description.Trim(), ExpectedToolName = criterion.ExpectedToolName.Trim(), ExpectedCommand = criterion.ExpectedCommand?.Trim() });
+        }
+        return normalized;
     }
 
     internal static AgentToolCall? TryExtractToolCall(string text, ILoggingService? logger = null)
@@ -765,14 +997,13 @@ internal sealed class AgentLoopEngine
             Operating mode: {{modeLabel}} — {{modeDescription}}
             {{approvalNote}}
 
-            ## ReAct Reasoning Cycle
+            ## Persistent execution state machine
 
-            Follow this strict cycle for every action:
-            1. THINK — Reason about the goal, current state, and what information you need.
-            2. ACT — Call one or more tools using the JSON format below.
-            3. OBSERVE — Read the tool results carefully.
-            4. REFLECT — Update your understanding; register key facts with reflect_step.
-            5. REPEAT or ANSWER — Continue until the goal is fully achieved, then produce a final Markdown summary.
+            The runtime owns the lifecycle: PLAN → ACT → OBSERVE → VERIFY → PLAN,
+            with RECOVER on failure and FINALIZE → COMPLETED only when work is done.
+            You propose a plan or action; never claim an action, verification, or completion
+            that has not been observed by the runtime. State, budgets, and conversation
+            history are persisted and can be resumed after a restart.
 
             ## Available Tools
 

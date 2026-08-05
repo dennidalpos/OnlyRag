@@ -42,6 +42,10 @@ flowchart TD
     AD --> AE["User reviews/corrects units and exports TXT/MD/HTML/DOCX/PDF"]
 
     J --> AF["Jobs: poll queue, pause/resume/cancel/delete local jobs"]
+    J --> AI["Coding: start or resume a persistent agent run"]
+    AI --> AJ["SQLite records run snapshot, phase transitions, budgets, and conversation state"]
+    AJ --> AK["PLAN → ACT → OBSERVE → VERIFY; failures go through RECOVER"]
+    AK --> AL["FINALIZE → COMPLETED, or resume an interrupted non-terminal run"]
     J --> AG["Confirmed exit or reset request"]
     AG --> AH["Save available UI work, cancel active jobs, stop child processes/Qdrant, dispose backend"]
 ```
@@ -67,6 +71,29 @@ Ingestion extracts text, optional OCR adds text for scanned/image content, embed
 generated through Ollama, and vector data is stored in Qdrant. Search and chat use selected
 document scopes with hybrid SQLite FTS plus vector retrieval. Translation jobs generate editable
 page-based units and exports.
+
+## Agent runs
+
+Coding-agent runs are durable SQLite records. The runtime, rather than the model prompt, enforces
+the `Plan`, `Act`, `Observe`, `Verify`, `Recover`, and `Finalize` phases. It persists the LLM
+conversation snapshot and phase transitions after each action cycle, applies tool-call, estimated-token,
+and wall-clock budgets, and exposes `GET /api/agent/runs/{runId}` plus
+`GET /api/agent/runs/resumable` for recovery after an application restart. A new streaming request can
+pass `resumeRunId` to continue a non-terminal run.
+
+Every new run also persists typed completion criteria and runtime-observed verification evidence.
+`FINALIZE` and `COMPLETED` are blocked until every required criterion has a successful matching tool
+result. Command criteria may require an exact `run_command`; when omitted, the default criterion
+accepts only a successful build, test, lint, typecheck, or release-gate command. Model claims and
+`reflect_step` output are never treated as completion evidence.
+
+## Agent evaluation traces
+
+Every run appends immutable events to `agent_run_trace_events`: goal decision, phase, model response
+latency, tool result, observations, errors, token usage, evidence and terminal outcome. Events are
+available from `GET /api/agent/runs/{runId}/trace`. The committed
+[`agent-evaluation.dataset.json`](agent-evaluation.dataset.json) defines repeatable real development
+tasks and expected limits for success, regressions, duration and step count.
 
 ## Shutdown
 

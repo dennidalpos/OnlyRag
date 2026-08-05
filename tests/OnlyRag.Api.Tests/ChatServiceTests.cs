@@ -54,6 +54,33 @@ public sealed class ChatServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_WithDocuments_RejectsUncitedUnsupportedClaims()
+    {
+        FakeOllamaClient ollama = new("gemma3:4b", "Il codice e XYZ-999.");
+        StaticRetrievalService retrieval = new(CreateSearchResponse("Manuale.pdf", "Codice ABC-123 nel contratto."));
+        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository(), new StubOllamaSettingsService());
+
+        ChatResponse response = await service.SendAsync(new ChatRequest("Quale codice?", "gemma3:4b", true, [10], null));
+
+        Assert.False(response.Grounding!.IsGrounded);
+        Assert.Contains("cannot provide", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(response.Notices, notice => notice.Code == "grounding_verification_failed");
+    }
+
+    [Fact]
+    public async Task SendAsync_WithDocuments_AcceptsClaimSupportedByValidCitation()
+    {
+        FakeOllamaClient ollama = new("gemma3:4b", "Il codice ABC-123 e nel contratto. **(Source: Manuale.pdf, p. 2)**");
+        StaticRetrievalService retrieval = new(CreateSearchResponse("Manuale.pdf", "Codice ABC-123 nel contratto."));
+        ChatService service = new(ollama, retrieval, new InMemoryChatHistoryRepository(), new StubOllamaSettingsService());
+
+        ChatResponse response = await service.SendAsync(new ChatRequest("Quale codice?", "gemma3:4b", true, [10], null));
+
+        Assert.True(response.Grounding!.IsGrounded);
+        Assert.Equal("Il codice ABC-123 e nel contratto. **(Source: Manuale.pdf, p. 2)**", response.Answer);
+    }
+
+    [Fact]
     public async Task SendAsync_WithDocuments_DoesNotPutWholeDocumentsInPrompt()
     {
         const string wholeDocumentText = "DOCUMENTO INTERO DA NON INVIARE AL MODELLO";

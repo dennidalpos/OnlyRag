@@ -18,7 +18,39 @@ public sealed record OllamaSettings(
 
 public sealed record IngestionSettings(
     int ChunkSizeTokens,
-    int OverlapTokens);
+    int OverlapTokens,
+    ArchiveExtractionLimits? Archive = null);
+
+public sealed record ArchiveExtractionLimits(
+    int MaxFileCount,
+    long MaxTotalUncompressedBytes,
+    long MaxFileUncompressedBytes,
+    int MaxDirectoryDepth)
+{
+    public const int DefaultMaxFileCount = 1_000;
+    public const long DefaultMaxTotalUncompressedBytes = 2L * 1024 * 1024 * 1024;
+    public const long DefaultMaxFileUncompressedBytes = 200L * 1024 * 1024;
+    public const int DefaultMaxDirectoryDepth = 16;
+
+    public static ArchiveExtractionLimits Default { get; } = new(
+        DefaultMaxFileCount,
+        DefaultMaxTotalUncompressedBytes,
+        DefaultMaxFileUncompressedBytes,
+        DefaultMaxDirectoryDepth);
+
+    public static ArchiveExtractionLimits Normalize(ArchiveExtractionLimits? value)
+    {
+        value ??= Default;
+        int maxFileCount = Math.Clamp(value.MaxFileCount, 1, 100_000);
+        long maxFileBytes = Math.Clamp(value.MaxFileUncompressedBytes, 1L, 2L * 1024 * 1024 * 1024);
+        long maxTotalBytes = Math.Clamp(
+            value.MaxTotalUncompressedBytes,
+            maxFileBytes,
+            20L * 1024 * 1024 * 1024);
+        int maxDepth = Math.Clamp(value.MaxDirectoryDepth, 0, 64);
+        return new ArchiveExtractionLimits(maxFileCount, maxTotalBytes, maxFileBytes, maxDepth);
+    }
+}
 
 public enum AppLogLevel
 {

@@ -13,7 +13,20 @@ public sealed record ChatResponse(
     string Answer,
     bool UsedDocuments,
     IReadOnlyList<ChatSource> Sources,
-    IReadOnlyList<ChatNotice> Notices);
+    IReadOnlyList<ChatNotice> Notices,
+    GroundingVerification? Grounding = null);
+
+public sealed record GroundingVerification(
+    bool IsGrounded,
+    bool HasConflicts,
+    string? RefusalReason,
+    IReadOnlyList<GroundingClaim> Claims);
+
+public sealed record GroundingClaim(
+    string Text,
+    bool IsSupported,
+    IReadOnlyList<long> SourceChunkIds,
+    string? Reason = null);
 
 public sealed record ChatStreamChunkEvent(
     string EventType,

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Security.Cryptography;
+using System.IO.Compression;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using A = DocumentFormat.OpenXml.Drawing;
@@ -15,6 +16,84 @@ namespace OnlyRag.Infrastructure.Tests;
 
 public sealed partial class DocumentIngestionServiceTests
 {
+    [Fact]
+    public async Task IngestAsync_ZipIndexesSupportedEntriesWithArchiveProvenanceAndResumes()
+    {
+        using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
+        string archivePath = Path.Combine(tempStorage.Paths.DocumentOriginalsDirectory, "bundle.zip");
+        Directory.CreateDirectory(tempStorage.Paths.DocumentOriginalsDirectory);
+        await using (FileStream stream = new(archivePath, FileMode.CreateNew))
+        {
+            using ZipArchive archive = new(stream, ZipArchiveMode.Create, leaveOpen: true);
+            ZipArchiveEntry first = archive.CreateEntry("folder/first.txt");
+            await using (StreamWriter writer = new(first.Open(), Encoding.UTF8))
+            {
+                await writer.WriteAsync("first archived fact");
+            }
+
+            ZipArchiveEntry unsupported = archive.CreateEntry("image.bin");
+            await using (StreamWriter writer = new(unsupported.Open(), Encoding.UTF8))
+            {
+                await writer.WriteAsync("ignored");
+            }
+
+            ZipArchiveEntry second = archive.CreateEntry("second.md");
+            await using (StreamWriter writer = new(second.Open(), Encoding.UTF8))
+            {
+                await writer.WriteAsync("second archived fact");
+            }
+
+            ZipArchiveEntry duplicate = archive.CreateEntry("folder/first.txt");
+            await using (StreamWriter writer = new(duplicate.Open(), Encoding.UTF8))
+            {
+                await writer.WriteAsync("duplicate archived fact");
+            }
+        }
+
+        ImportedDocument document = await tempStorage.CreateBinaryDocumentAsync(
+            "bundle.zip",
+            await File.ReadAllBytesAsync(archivePath));
+        DocumentIngestionService service = tempStorage.CreateIngestionService();
+        List<DocumentIngestionProgress> progress = [];
+
+        DocumentIngestionResult result = await service.IngestAsync(
+            document,
+            checkpoint: null,
+            (item, _) =>
+            {
+                progress.Add(item);
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(2, result.PageCount);
+        Assert.Equal(2, result.ChunkCount);
+        IReadOnlyList<string> pages = await tempStorage.ReadPageTextsAsync(document.Id);
+        Assert.Contains(pages, page => page.Contains("folder/first.txt", StringComparison.Ordinal));
+        Assert.Contains(pages, page => page.Contains("second.md", StringComparison.Ordinal));
+        Assert.DoesNotContain(pages, page => page.Contains("image.bin", StringComparison.Ordinal));
+        Assert.Equal(4, progress.Count);
+        Assert.Equal(5, progress[^1].Checkpoint.NextBlock);
+
+        IReadOnlyList<ArchiveManifestEntry> manifest = await tempStorage.ArchiveManifest.ListAsync(document.Id);
+        Assert.Equal(4, manifest.Count);
+        Assert.Equal(
+            [ArchiveManifestStatus.Indexed, ArchiveManifestStatus.Skipped, ArchiveManifestStatus.Indexed, ArchiveManifestStatus.Duplicate],
+            manifest.Select(entry => entry.Status).ToArray());
+        Assert.All(manifest, entry => Assert.False(string.IsNullOrWhiteSpace(entry.ContentSha256)));
+        Assert.Equal(1, manifest[0].PageCount);
+        Assert.Equal(1, manifest[2].ChunkCount);
+
+        DocumentIngestionResult resumed = await service.IngestAsync(
+            document,
+            progress[1].Checkpoint,
+            (_, _) => Task.CompletedTask);
+
+        Assert.Equal(result.PageCount, resumed.PageCount);
+        Assert.Equal(result.ChunkCount, resumed.ChunkCount);
+        Assert.Equal(2, await tempStorage.ReadChunkCountAsync(document.Id));
+        Assert.Equal(4, (await tempStorage.ArchiveManifest.ListAsync(document.Id)).Count);
+    }
+
     [Fact]
     public void Chunker_PreservesOverlapBetweenChunks()
     {

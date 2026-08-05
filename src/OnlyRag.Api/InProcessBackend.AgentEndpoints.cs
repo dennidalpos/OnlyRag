@@ -71,6 +71,53 @@ public static partial class InProcessBackend
             return Results.Ok(new { Success = success });
         });
 
+        app.MapGet("/api/agent/runs/{runId}", async (
+            string runId,
+            IAgentRunStateRepository runStateRepository,
+            CancellationToken cancellationToken) =>
+        {
+            AgentRunSnapshot? run = await runStateRepository.GetAsync(runId, cancellationToken);
+            return run is null ? Results.NotFound() : Results.Ok(run);
+        });
+
+        app.MapGet("/api/agent/runs/resumable", async (
+            IAgentRunStateRepository runStateRepository,
+            CancellationToken cancellationToken) =>
+        {
+            IReadOnlyList<AgentRunSnapshot> runs = await runStateRepository.GetResumableAsync(cancellationToken);
+            return Results.Ok(runs);
+        });
+
+        app.MapGet("/api/agent/runs/{runId}/trace", async (
+            string runId,
+            IAgentRunStateRepository runStateRepository,
+            CancellationToken cancellationToken) =>
+        {
+            return Results.Ok(await runStateRepository.ListTraceEventsAsync(runId, cancellationToken));
+        });
+
+        app.MapGet("/api/agent/runs/{runId}/evaluation", async (
+            string runId,
+            IAgentRunStateRepository runStateRepository,
+            CancellationToken cancellationToken) =>
+        {
+            AgentRunSnapshot? run = await runStateRepository.GetAsync(runId, cancellationToken);
+            if (run is null) return Results.NotFound();
+            IReadOnlyList<AgentRunTraceEvent> trace = await runStateRepository.ListTraceEventsAsync(runId, cancellationToken);
+            AgentRunEvaluationSummary summary = new(
+                runId,
+                run.Phase == AgentRunPhase.Completed,
+                run.Phase is AgentRunPhase.Failed or AgentRunPhase.Cancelled,
+                run.UpdatedAtUtc - run.StartedAtUtc,
+                trace.Select(item => item.Step).DefaultIfEmpty(0).Max(),
+                run.ToolCallsUsed,
+                trace.Count(item => !string.IsNullOrWhiteSpace(item.Error) || item.Success is false),
+                run.EstimatedTokensUsed,
+                trace.Where(item => item.EventType == "model_response" && item.LatencyMs is not null).Sum(item => item.LatencyMs ?? 0),
+                DateTimeOffset.UtcNow);
+            return Results.Ok(summary);
+        });
+
         // Multi-Agent Orchestration
         app.MapPost("/api/agent/orchestrate", async (
             MultiAgentOrchestrationRequest request,

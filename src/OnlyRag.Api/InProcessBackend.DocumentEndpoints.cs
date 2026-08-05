@@ -30,6 +30,26 @@ public static partial class InProcessBackend
             return document is null ? CreateNotFoundProblem("Document") : Results.Ok(document);
         });
 
+        app.MapGet("/api/documents/{id:long}/archive-manifest", async (
+            long id,
+            IDocumentLibraryService documents,
+            IArchiveManifestRepository archiveManifest,
+            CancellationToken cancellationToken) =>
+        {
+            ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
+            if (document is null)
+            {
+                return CreateNotFoundProblem("Document");
+            }
+
+            if (document.FileExtension?.ToLowerInvariant() is not ".zip" and not ".tar" and not ".7z")
+            {
+                return Results.Ok(Array.Empty<ArchiveManifestEntry>());
+            }
+
+            return Results.Ok(await archiveManifest.ListAsync(id, cancellationToken));
+        });
+
         app.MapDelete("/api/documents/{id:long}", async (
             long id,
             IDocumentLibraryService documents,

@@ -25,6 +25,7 @@ public sealed partial class DocumentIngestionServiceTests
             ConnectionFactory = new LocalSqliteConnectionFactory(Descriptor);
             Documents = new SqliteDocumentRepository(ConnectionFactory);
             Settings = new SqliteSettingsRepository(ConnectionFactory);
+            ArchiveManifest = new SqliteArchiveManifestRepository(ConnectionFactory);
         }
 
         public string Root { get; }
@@ -38,6 +39,8 @@ public sealed partial class DocumentIngestionServiceTests
         public SqliteDocumentRepository Documents { get; }
 
         public SqliteSettingsRepository Settings { get; }
+
+        public SqliteArchiveManifestRepository ArchiveManifest { get; }
 
         public static async Task<TempStorage> CreateInitializedAsync()
         {
@@ -55,7 +58,8 @@ public sealed partial class DocumentIngestionServiceTests
                 Documents,
                 Settings,
                 new DocumentTextChunker(),
-                new OfficeOpenXmlTextExtractor());
+                new OfficeOpenXmlTextExtractor(),
+                archiveManifestRepository: ArchiveManifest);
         }
 
         public async Task<ImportedDocument> CreateDocumentAsync(string fileName, string content)

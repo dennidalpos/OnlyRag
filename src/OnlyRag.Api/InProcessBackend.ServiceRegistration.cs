@@ -93,6 +93,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ITranslationRepository, SqliteTranslationRepository>();
         services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
+        services.AddSingleton<IAgentRunStateRepository, SqliteAgentRunStateRepository>();
         services.AddSingleton<IAesBackupService, AesBackupService>();
         services.AddSingleton<ISqliteMaintenanceService, SqliteMaintenanceService>();
         services.AddHostedService<SqliteMaintenanceBackgroundService>();
@@ -156,8 +157,10 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<TranslationExportService>();
         services.AddSingleton<OnlyRag.Core.IChatReportExportService, OnlyRag.Infrastructure.Export.ChatReportExportService>();
         services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
+        services.AddSingleton<IArchiveManifestRepository, SqliteArchiveManifestRepository>();
         services.AddSingleton<LocalDocumentStorageGuard>();
         services.AddSingleton<IngestionSettingsStore>();
+        services.AddSingleton<ArchiveExtractionService>();
         services.AddSingleton<DocumentTextChunker>();
         services.AddSingleton<OfficeOpenXmlTextExtractor>();
         services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();

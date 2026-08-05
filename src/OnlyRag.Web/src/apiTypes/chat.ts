@@ -28,6 +28,21 @@ export type ChatResponse = {
   usedDocuments: boolean;
   sources: ChatSource[];
   notices: ChatNotice[];
+  grounding?: GroundingVerification | null;
+};
+
+export type GroundingVerification = {
+  isGrounded: boolean;
+  hasConflicts: boolean;
+  refusalReason?: string | null;
+  claims: GroundingClaim[];
+};
+
+export type GroundingClaim = {
+  text: string;
+  isSupported: boolean;
+  sourceChunkIds: number[];
+  reason?: string | null;
 };
 
 export type ChatStreamChunkEvent = {

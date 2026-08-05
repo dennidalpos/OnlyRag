@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "tasks": [
+    { "id": "fix-compilation-error", "goal": "Correggi un errore di compilazione e verifica la soluzione.", "requiredCriteria": ["dotnet build"], "successSignals": ["Completed", "build passed"], "maxSteps": 12, "maxDurationSeconds": 600 },
+    { "id": "add-tested-api-contract", "goal": "Aggiungi un contratto API con test e mantieni la compatibilita' TypeScript.", "requiredCriteria": ["dotnet test", "npm test"], "successSignals": ["Completed", "tests passed"], "maxSteps": 20, "maxDurationSeconds": 900 },
+    { "id": "diagnose-without-mutation", "goal": "Analizza una regressione e riporta causa, evidenza e limiti senza modificare file.", "requiredCriteria": ["evidence"], "successSignals": ["Completed", "evidence"], "maxSteps": 10, "maxDurationSeconds": 480 }
+  ]
+}

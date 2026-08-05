@@ -81,7 +81,13 @@ export const performanceProfilePresets: Record<Exclude<PerformanceProfile, "auto
 
 export const emptyIngestionSettings: IngestionSettings = {
   chunkSizeTokens: 800,
-  overlapTokens: 120
+  overlapTokens: 120,
+  archive: {
+    maxFileCount: 1000,
+    maxTotalUncompressedBytes: 2 * 1024 * 1024 * 1024,
+    maxFileUncompressedBytes: 200 * 1024 * 1024,
+    maxDirectoryDepth: 16
+  }
 };
 
 export const emptyOcrProcessingSettings: OcrProcessingSettings = {

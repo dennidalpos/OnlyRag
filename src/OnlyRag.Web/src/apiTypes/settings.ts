@@ -49,6 +49,14 @@ export type PdfExportSettings = {
 export type IngestionSettings = {
   chunkSizeTokens: number;
   overlapTokens: number;
+  archive: ArchiveExtractionLimits;
+};
+
+export type ArchiveExtractionLimits = {
+  maxFileCount: number;
+  maxTotalUncompressedBytes: number;
+  maxFileUncompressedBytes: number;
+  maxDirectoryDepth: number;
 };
 
 export type OcrProcessingSettings = {

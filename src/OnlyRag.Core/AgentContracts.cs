@@ -21,7 +21,12 @@ public sealed record AgentRunRequest(
     string? Mode = "write",
     string? WorkspaceRoot = null,
     bool AutoApproveCommands = false,
-    int? MaxIterations = null);
+    int? MaxIterations = null,
+    string? ResumeRunId = null,
+    int? MaxToolCalls = null,
+    int? MaxEstimatedTokens = null,
+    int? MaxDurationSeconds = null,
+    IReadOnlyList<AgentCompletionCriterion>? CompletionCriteria = null);
 
 public sealed record AgentStepEvent(
     string Type,
@@ -31,7 +36,9 @@ public sealed record AgentStepEvent(
     string? TaskId = null,
     IReadOnlyList<AgentToolCall>? BatchToolCalls = null,
     string? PlanMarkdown = null,
-    string? SubagentRole = null);
+    string? SubagentRole = null,
+    string? RunId = null,
+    AgentRunPhase? Phase = null);
 
 public sealed record BackgroundTaskInfo(
     string TaskId,

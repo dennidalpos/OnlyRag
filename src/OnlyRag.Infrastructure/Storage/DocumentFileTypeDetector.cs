@@ -20,6 +20,9 @@ public static class DocumentFileTypeDetector
             ".txt" => "text/plain",
             ".webp" => "image/webp",
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".7z" => "application/x-7z-compressed",
+            ".tar" => "application/x-tar",
+            ".zip" => "application/zip",
             _ => "application/octet-stream"
         };
     }

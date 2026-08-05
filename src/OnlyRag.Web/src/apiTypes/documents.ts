@@ -27,6 +27,30 @@ export type ImportedDocument = {
   collectionName?: string;
 };
 
+export type ArchiveManifestStatus =
+  | "Pending"
+  | "Processing"
+  | "Indexed"
+  | "Skipped"
+  | "Duplicate"
+  | "Failed";
+
+export type ArchiveManifestEntry = {
+  id: number;
+  containerDocumentId: number;
+  entryIndex: number;
+  relativePath: string;
+  declaredSizeBytes: number;
+  uncompressedSizeBytes: number;
+  contentSha256: string | null;
+  status: ArchiveManifestStatus;
+  error: string | null;
+  pageCount: number;
+  chunkCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type DocumentEmbeddingStatus = {
   documentId: number;
   state: string;

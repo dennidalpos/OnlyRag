@@ -13,7 +13,7 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
     private const string DuplicateImportMessage = "Documento gia presente. Import annullato senza copiare un duplicato.";
     private const string ImportedAndQueuedMessage = "Documento importato e messo in coda.";
     private const string SupportedFormatsDescription =
-        "TXT, MD, MARKDOWN, CSV, PDF, PNG, JPG, JPEG, BMP, GIF, TIFF, WEBP, DOCX, XLSX, PPTX";
+        "TXT, MD, MARKDOWN, CSV, PDF, PNG, JPG, JPEG, BMP, GIF, TIFF, WEBP, DOCX, XLSX, PPTX, ZIP, TAR, 7Z";
 
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.Ordinal)
     {
@@ -32,7 +32,10 @@ public sealed class LocalDocumentLibraryService : IDocumentLibraryService
         ".webp",
         ".docx",
         ".xlsx",
-        ".pptx"
+        ".pptx",
+        ".zip",
+        ".tar",
+        ".7z"
     };
 
     private readonly LocalSqliteStoreDescriptor descriptor;

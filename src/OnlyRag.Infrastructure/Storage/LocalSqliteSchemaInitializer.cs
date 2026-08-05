@@ -5,7 +5,7 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteSchemaInitializer
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 9;
     private const string FtsUnavailableNote = "SQLite FTS5 is unavailable in the active SQLite provider; keyword search is disabled.";
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -138,6 +138,36 @@ public sealed class LocalSqliteSchemaInitializer
         if (currentVersion == 3)
         {
             await MigrateFromV3ToV4Async(connection, cancellationToken);
+            currentVersion = 4;
+        }
+
+        if (currentVersion == 4)
+        {
+            await MigrateFromV4ToV5Async(connection, cancellationToken);
+            currentVersion = 5;
+        }
+
+        if (currentVersion == 5)
+        {
+            await MigrateFromV5ToV6Async(connection, cancellationToken);
+            currentVersion = 6;
+        }
+
+        if (currentVersion == 6)
+        {
+            await MigrateFromV6ToV7Async(connection, cancellationToken);
+            currentVersion = 7;
+        }
+
+        if (currentVersion == 7)
+        {
+            await MigrateFromV7ToV8Async(connection, cancellationToken);
+            currentVersion = 8;
+        }
+
+        if (currentVersion == 8)
+        {
+            await MigrateFromV8ToV9Async(connection, cancellationToken);
             return new SchemaInspection("Current", null);
         }
 
@@ -237,7 +267,7 @@ public sealed class LocalSqliteSchemaInitializer
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             await using SqliteCommand pragmaCmd = connection.CreateCommand();
-            pragmaCmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+            pragmaCmd.CommandText = "PRAGMA user_version = 3;";
             await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
         }
         catch
@@ -284,7 +314,7 @@ public sealed class LocalSqliteSchemaInitializer
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             await using SqliteCommand pragmaCmd = connection.CreateCommand();
-            pragmaCmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+            pragmaCmd.CommandText = "PRAGMA user_version = 4;";
             await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
         }
         catch
@@ -292,6 +322,202 @@ public sealed class LocalSqliteSchemaInitializer
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private static async Task MigrateFromV4ToV5Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS archive_manifest_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    container_document_id INTEGER NOT NULL,
+                    entry_index INTEGER NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    declared_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    uncompressed_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    content_sha256 TEXT NULL,
+                    status TEXT NOT NULL DEFAULT 'Pending',
+                    error TEXT NULL,
+                    page_count INTEGER NOT NULL DEFAULT 0,
+                    chunk_count INTEGER NOT NULL DEFAULT 0,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (container_document_id) REFERENCES documents(id) ON DELETE CASCADE,
+                    UNIQUE (container_document_id, entry_index)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_archive_manifest_document ON archive_manifest_entries(container_document_id, entry_index);
+                CREATE INDEX IF NOT EXISTS idx_archive_manifest_path ON archive_manifest_entries(container_document_id, relative_path);
+                """;
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = "PRAGMA user_version = 5;";
+            await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateFromV5ToV6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                ALTER TABLE archive_manifest_entries RENAME TO archive_manifest_entries_v5;
+
+                CREATE TABLE archive_manifest_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    container_document_id INTEGER NOT NULL,
+                    entry_index INTEGER NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    declared_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    uncompressed_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    content_sha256 TEXT NULL,
+                    status TEXT NOT NULL DEFAULT 'Pending',
+                    error TEXT NULL,
+                    page_count INTEGER NOT NULL DEFAULT 0,
+                    chunk_count INTEGER NOT NULL DEFAULT 0,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (container_document_id) REFERENCES documents(id) ON DELETE CASCADE,
+                    UNIQUE (container_document_id, entry_index)
+                );
+
+                INSERT INTO archive_manifest_entries (
+                    id, container_document_id, entry_index, relative_path, declared_size_bytes,
+                    uncompressed_size_bytes, content_sha256, status, error, page_count, chunk_count,
+                    created_at_utc, updated_at_utc)
+                SELECT id, container_document_id, entry_index, relative_path, declared_size_bytes,
+                    uncompressed_size_bytes, content_sha256, status, error, page_count, chunk_count,
+                    created_at_utc, updated_at_utc
+                FROM archive_manifest_entries_v5;
+
+                DROP TABLE archive_manifest_entries_v5;
+                CREATE INDEX idx_archive_manifest_document ON archive_manifest_entries(container_document_id, entry_index);
+                CREATE INDEX idx_archive_manifest_path ON archive_manifest_entries(container_document_id, relative_path);
+                """;
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = "PRAGMA user_version = 6;";
+            await pragmaCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateFromV6ToV7Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                CREATE TABLE agent_runs (
+                    run_id TEXT PRIMARY KEY,
+                    goal TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    model TEXT NULL,
+                    workspace_root TEXT NOT NULL,
+                    phase TEXT NOT NULL,
+                    budget_json TEXT NOT NULL,
+                    tool_calls_used INTEGER NOT NULL DEFAULT 0,
+                    estimated_tokens_used INTEGER NOT NULL DEFAULT 0,
+                    started_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    last_error TEXT NULL,
+                    final_response TEXT NULL,
+                    messages_json TEXT NOT NULL DEFAULT '[]'
+                );
+                CREATE TABLE agent_run_transitions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    from_phase TEXT NOT NULL,
+                    to_phase TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    occurred_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX idx_agent_runs_phase_updated ON agent_runs(phase, updated_at_utc DESC);
+                CREATE INDEX idx_agent_run_transitions_run ON agent_run_transitions(run_id, id);
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCommand = connection.CreateCommand();
+            pragmaCommand.CommandText = "PRAGMA user_version = 7;";
+            await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateFromV7ToV8Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                ALTER TABLE agent_runs ADD COLUMN completion_criteria_json TEXT NOT NULL DEFAULT '[]';
+                ALTER TABLE agent_runs ADD COLUMN completion_verifications_json TEXT NOT NULL DEFAULT '[]';
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCommand = connection.CreateCommand();
+            pragmaCommand.CommandText = "PRAGMA user_version = 8;";
+            await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateFromV8ToV9Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                CREATE TABLE agent_run_trace_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, step INTEGER NOT NULL,
+                    event_type TEXT NOT NULL, occurred_at_utc TEXT NOT NULL, phase TEXT NOT NULL,
+                    decision TEXT NULL, tool_name TEXT NULL, tool_call_id TEXT NULL, success INTEGER NULL,
+                    observation TEXT NULL, error TEXT NULL, estimated_tokens INTEGER NULL, tool_calls_used INTEGER NULL,
+                    latency_ms REAL NULL, evidence TEXT NULL, outcome TEXT NULL,
+                    FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX idx_agent_run_trace_events_run ON agent_run_trace_events(run_id, id);
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCommand = connection.CreateCommand();
+            pragmaCommand.CommandText = "PRAGMA user_version = 9;";
+            await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
 
     private sealed record SchemaInspection(string Status, string? TechnicalNote);
@@ -378,6 +604,10 @@ public sealed class LocalSqliteSchemaInitializer
             && await TableExistsAsync(connection, "document_graph_edges", cancellationToken)
             && await TableExistsAsync(connection, "agent_episodic_memories", cancellationToken)
             && await TableExistsAsync(connection, "agent_skills", cancellationToken)
+            && await TableExistsAsync(connection, "agent_runs", cancellationToken)
+            && await TableExistsAsync(connection, "agent_run_transitions", cancellationToken)
+            && await TableExistsAsync(connection, "agent_run_trace_events", cancellationToken)
+            && await TableExistsAsync(connection, "archive_manifest_entries", cancellationToken)
             && !await TableExistsAsync(connection, "schema_migrations", cancellationToken);
     }
 
@@ -455,6 +685,24 @@ public sealed class LocalSqliteSchemaInitializer
                 updated_at_utc TEXT NOT NULL,
                 FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
                 UNIQUE (document_id, page_number)
+            );
+
+            CREATE TABLE archive_manifest_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                container_document_id INTEGER NOT NULL,
+                entry_index INTEGER NOT NULL,
+                relative_path TEXT NOT NULL,
+                declared_size_bytes INTEGER NOT NULL DEFAULT 0,
+                uncompressed_size_bytes INTEGER NOT NULL DEFAULT 0,
+                content_sha256 TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'Pending',
+                error TEXT NULL,
+                page_count INTEGER NOT NULL DEFAULT 0,
+                chunk_count INTEGER NOT NULL DEFAULT 0,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                FOREIGN KEY (container_document_id) REFERENCES documents(id) ON DELETE CASCADE,
+                UNIQUE (container_document_id, entry_index)
             );
 
             CREATE TABLE chunks (
@@ -666,10 +914,50 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
+            CREATE TABLE agent_runs (
+                run_id TEXT PRIMARY KEY,
+                goal TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                model TEXT NULL,
+                workspace_root TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                budget_json TEXT NOT NULL,
+                tool_calls_used INTEGER NOT NULL DEFAULT 0,
+                estimated_tokens_used INTEGER NOT NULL DEFAULT 0,
+                started_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                last_error TEXT NULL,
+                final_response TEXT NULL,
+                messages_json TEXT NOT NULL DEFAULT '[]',
+                completion_criteria_json TEXT NOT NULL DEFAULT '[]',
+                completion_verifications_json TEXT NOT NULL DEFAULT '[]'
+            );
+
+            CREATE TABLE agent_run_transitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                from_phase TEXT NOT NULL,
+                to_phase TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                occurred_at_utc TEXT NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE agent_run_trace_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, step INTEGER NOT NULL,
+                event_type TEXT NOT NULL, occurred_at_utc TEXT NOT NULL, phase TEXT NOT NULL,
+                decision TEXT NULL, tool_name TEXT NULL, tool_call_id TEXT NULL, success INTEGER NULL,
+                observation TEXT NULL, error TEXT NULL, estimated_tokens INTEGER NULL, tool_calls_used INTEGER NULL,
+                latency_ms REAL NULL, evidence TEXT NULL, outcome TEXT NULL,
+                FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+            );
+
             CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
             CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
             CREATE INDEX idx_document_pages_document ON document_pages(document_id);
             CREATE INDEX idx_document_pages_ocr ON document_pages(document_id, ocr_status, page_number);
+            CREATE INDEX idx_archive_manifest_document ON archive_manifest_entries(container_document_id, entry_index);
+            CREATE INDEX idx_archive_manifest_path ON archive_manifest_entries(container_document_id, relative_path);
             CREATE INDEX idx_chunks_document ON chunks(document_id);
             CREATE INDEX idx_chunks_page ON chunks(document_page_id);
             CREATE INDEX idx_chunks_document_ordinal ON chunks(document_id, chunk_index);
@@ -697,10 +985,13 @@ public sealed class LocalSqliteSchemaInitializer
             CREATE INDEX idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
             CREATE INDEX idx_agent_skills_category ON agent_skills(category);
             CREATE INDEX idx_agent_skills_created ON agent_skills(created_at_utc DESC);
+            CREATE INDEX idx_agent_runs_phase_updated ON agent_runs(phase, updated_at_utc DESC);
+            CREATE INDEX idx_agent_run_transitions_run ON agent_run_transitions(run_id, id);
+            CREATE INDEX idx_agent_run_trace_events_run ON agent_run_trace_events(run_id, id);
             CREATE INDEX idx_documents_original_path ON documents(original_path);
             {{ftsSql}}
 
-            PRAGMA user_version = 4;
+            PRAGMA user_version = 9;
             """;
     }
 

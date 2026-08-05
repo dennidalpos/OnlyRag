@@ -29,7 +29,7 @@ OnlyRag is a local-first Windows desktop app combining:
 2. **React/Vite Web UI** ([`src/OnlyRag.Web`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Web)): Modern single-page app interface executing inside WebView2.
 3. **In-Process Backend API** ([`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api)): ASP.NET Core Minimal API hosted in-process inside the WPF app.
 4. **Core Contracts** ([`src/OnlyRag.Core`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Core)): Shared DTOs, interfaces, and settings models.
-5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v2), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
+5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v6), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
 6. **Worker Queue** ([`src/OnlyRag.Worker`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Worker)): In-process task queue for asynchronous background jobs.
 
 
@@ -39,6 +39,30 @@ OnlyRag is a local-first Windows desktop app combining:
 - **Image Models Directory**: `%LOCALAPPDATA%\OnlyRag\models\images`.
 - **Installed Target Path**: `%LOCALAPPDATA%\Programs\OnlyRag`.
 - **PowerShell Version**: PowerShell 7 (`pwsh`). Run commands from the repository root.
+
+Archive ingestion is implemented for ZIP, TAR, and 7Z. `ArchiveExtractionService` validates
+entry paths and decompressed-size limits while streaming entries; supported text, OpenXML, and
+text-based PDF entries become pages of the container document. SQLite schema v6 persists one
+`archive_manifest_entries` row per archive entry with provenance, declared/actual size, SHA-256,
+status, error, and page/chunk counts. Repeated paths are retained as `Duplicate` entries and are
+not indexed twice. The manifest is available through
+`GET /api/documents/{id}/archive-manifest`. Image entries are currently skipped; archive-image OCR
+is tracked in `PROJECT_STATUS.json`.
+
+The coding agent persists durable runs in SQLite schema v8. `agent_runs` stores the goal,
+conversation snapshot, current state, time/token/tool budgets, typed completion criteria, and
+runtime-observed verification evidence; `agent_run_transitions` records
+the validated lifecycle (`Plan`, `Act`, `Observe`, `Verify`, `Recover`, `Finalize`). Resume a
+non-terminal run by passing `resumeRunId` to `POST /api/agent/run-stream`; inspect recovery state
+with `GET /api/agent/runs/{runId}` or `GET /api/agent/runs/resumable`.
+
+The runtime refuses `Finalize` and `Completed` unless every required completion criterion has a
+positive matching tool result. LLM prose and `reflect_step` messages are not verification evidence.
+
+SQLite schema v9 adds append-only `agent_run_trace_events` for evaluation. It records model and
+tool latency, decisions, observations, errors, token/tool cost, evidence and outcome. Inspect a run
+with `GET /api/agent/runs/{runId}/trace`; the reproducible task dataset is
+`docs/agent-evaluation.dataset.json`.
 
 ### Code Maintenance & Quality Commands
 ```powershell

@@ -96,9 +96,22 @@ internal sealed class ChatService
         int? configuredChatNumCtx = (await settingsService.GetAsync(cancellationToken)).ChatNumCtx;
         int chatNumCtx = configuredChatNumCtx ?? DefaultChatNumCtx;
         string answer = await ollamaClient.GenerateChatAsync(model, promptMessages, chatNumCtx, cancellationToken: cancellationToken);
+        GroundingVerification? grounding = null;
+        if (useDocuments && !isChatter)
+        {
+            (answer, grounding) = GroundingVerifier.Verify(answer, sources);
+            if (!grounding.IsGrounded)
+            {
+                notices.Add(new ChatNotice("grounding_verification_failed", grounding.RefusalReason ?? "Answer is not supported by retrieved evidence."));
+            }
+            if (grounding.HasConflicts)
+            {
+                notices.Add(new ChatNotice("grounding_conflicting_evidence", "Retrieved excerpts contain conflicting evidence; review cited sources."));
+            }
+        }
         await PersistTurnAsync(conversationId, model, message, answer, sources, cancellationToken);
 
-        return new ChatResponse(conversationId, model, answer, useDocuments, sources, notices);
+        return new ChatResponse(conversationId, model, answer, useDocuments, sources, notices, grounding);
     }
 
     public async IAsyncEnumerable<ChatStreamChunkEvent> SendStreamAsync(
@@ -158,7 +171,10 @@ internal sealed class ChatService
             }
         }
 
-        yield return new ChatStreamChunkEvent("meta", conversationId, model, null, sources, notices);
+        if (!useDocuments || isChatter)
+        {
+            yield return new ChatStreamChunkEvent("meta", conversationId, model, null, sources, notices);
+        }
 
         IReadOnlyList<OllamaChatMessage> promptMessages = BuildPromptMessages(
             message,
@@ -173,10 +189,27 @@ internal sealed class ChatService
         await foreach (string chunk in ollamaClient.GenerateChatStreamAsync(model, promptMessages, chatNumCtx, cancellationToken: cancellationToken))
         {
             fullAnswer.Append(chunk);
-            yield return new ChatStreamChunkEvent("chunk", conversationId, model, chunk);
+            if (!useDocuments || isChatter)
+            {
+                yield return new ChatStreamChunkEvent("chunk", conversationId, model, chunk);
+            }
         }
 
         string answerText = fullAnswer.ToString();
+        if (useDocuments && !isChatter)
+        {
+            (answerText, GroundingVerification grounding) = GroundingVerifier.Verify(answerText, sources);
+            if (!grounding.IsGrounded)
+            {
+                notices.Add(new ChatNotice("grounding_verification_failed", grounding.RefusalReason ?? "Answer is not supported by retrieved evidence."));
+            }
+            if (grounding.HasConflicts)
+            {
+                notices.Add(new ChatNotice("grounding_conflicting_evidence", "Retrieved excerpts contain conflicting evidence; review cited sources."));
+            }
+            yield return new ChatStreamChunkEvent("meta", conversationId, model, null, sources, notices);
+            yield return new ChatStreamChunkEvent("chunk", conversationId, model, answerText);
+        }
         await PersistTurnAsync(conversationId, model, message, answerText, sources, cancellationToken);
         yield return new ChatStreamChunkEvent("done", conversationId, model);
     }

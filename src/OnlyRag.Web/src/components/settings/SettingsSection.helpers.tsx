@@ -112,7 +112,13 @@ export function normalizeIngestionSettings(settings: IngestionSettings): Ingesti
   const chunkSizeTokens = clampNumber(Number(settings.chunkSizeTokens), 100, 4000);
   return {
     chunkSizeTokens,
-    overlapTokens: clampNumber(Number(settings.overlapTokens), 0, Math.min(1000, Math.floor(chunkSizeTokens / 2)))
+    overlapTokens: clampNumber(Number(settings.overlapTokens), 0, Math.min(1000, Math.floor(chunkSizeTokens / 2))),
+    archive: {
+      maxFileCount: clampNumber(Number(settings.archive?.maxFileCount), 1, 100000),
+      maxTotalUncompressedBytes: clampNumber(Number(settings.archive?.maxTotalUncompressedBytes), 1, 20 * 1024 * 1024 * 1024),
+      maxFileUncompressedBytes: clampNumber(Number(settings.archive?.maxFileUncompressedBytes), 1, 2 * 1024 * 1024 * 1024),
+      maxDirectoryDepth: clampNumber(Number(settings.archive?.maxDirectoryDepth), 0, 64)
+    }
   };
 }
 

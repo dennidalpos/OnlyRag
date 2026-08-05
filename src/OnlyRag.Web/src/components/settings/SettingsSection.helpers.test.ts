@@ -34,9 +34,24 @@ describe("SettingsSection helpers", () => {
   });
 
   it("clamps ingestion and context recommendations to supported ranges", () => {
-    expect(buildIngestionSettingsPayload({ chunkSizeTokens: 80, overlapTokens: 500 })).toEqual({
+    expect(buildIngestionSettingsPayload({
+      chunkSizeTokens: 80,
+      overlapTokens: 500,
+      archive: {
+        maxFileCount: 0,
+        maxTotalUncompressedBytes: 0,
+        maxFileUncompressedBytes: 0,
+        maxDirectoryDepth: -1
+      }
+    })).toEqual({
       chunkSizeTokens: 100,
-      overlapTokens: 50
+      overlapTokens: 50,
+      archive: {
+        maxFileCount: 1,
+        maxTotalUncompressedBytes: 1,
+        maxFileUncompressedBytes: 1,
+        maxDirectoryDepth: 0
+      }
     });
     expect(buildEmbeddingRecommendations(8192)).toEqual({
       embeddingNumCtx: 8192,

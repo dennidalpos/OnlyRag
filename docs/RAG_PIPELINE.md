@@ -30,6 +30,23 @@ Il sistema di chunking genera una gerarchia **Parent-Child**:
 
 I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite v2 sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage).
 
+### Sicurezza archivi
+
+La configurazione di ingestione include limiti persistenti per il numero di file, la dimensione
+decompressa totale e per singolo file, e la profondita' delle directory. Il servizio
+`ArchiveExtractionService` legge ZIP, TAR e 7Z senza estrarre in una directory controllata
+dall'archivio: convalida ogni percorso (nessun path assoluto o traversal) e consegna il contenuto
+in streaming al chiamante. I limiti vengono verificati sui byte effettivamente letti, così
+proteggono anche da archive bomb con metadati falsificati. L'importazione accetta gli archivi come
+documenti contenitore; gli elementi TXT/MD/CSV, Office Open XML e PDF vengono indicizzati come
+pagine dello stesso documento, con il percorso dell'elemento conservato nella provenienza testuale.
+Il manifest SQLite `archive_manifest_entries` è collegato al documento contenitore e registra
+indice, percorso, dimensioni dichiarate/reali, SHA-256, stato, errore e conteggi di pagine/chunk.
+Il percorso è univoco nel contenitore, quindi gli elementi ripetuti vengono drenati in sicurezza e
+marcati come duplicati senza essere indicizzati due volte. Il checkpoint è per elemento e gli
+elementi non supportati avanzano senza entrare nel contesto. Il manifest è consultabile tramite
+`GET /api/documents/{id}/archive-manifest`.
+
 ---
 
 ## 2. Vettorizzazione & Storage Vettoriale
@@ -60,3 +77,11 @@ Il recupero è orchestrato da [`HybridRetrievalService`](../src/OnlyRag.Infrastr
 ```powershell
 pwsh .\scripts\Evaluate-Retrieval.ps1 -DatasetPath .\docs\retrieval-evaluation.sample.json
 ```
+
+## Grounding obbligatorio
+
+Quando la chat usa documenti, gli estratti recuperati vengono prima sintetizzati nel prompt e la
+risposta finale passa sempre da una verifica runtime. Ogni paragrafo fattuale deve includere una
+citazione `Source: NomeDocumento` valida e condividere termini significativi con lo snippet citato.
+Le risposte non supportate vengono sostituite da un’astensione esplicita; le evidenze con negazioni
+opposte e termini condivisi producono il notice `grounding_conflicting_evidence`.

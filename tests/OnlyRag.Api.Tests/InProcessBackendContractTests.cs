@@ -189,6 +189,7 @@ public sealed partial class InProcessBackendTests
         AssertTypeScriptContractMatchesDto<OcrProvisionStatus>(apiSource, "OcrProvisionStatus");
         AssertTypeScriptContractMatchesDto<OcrStartupAnalysisResponse>(apiSource, "OcrStartupAnalysis");
         AssertTypeScriptContractMatchesDto<ImportedDocument>(apiSource, "ImportedDocument");
+        AssertTypeScriptContractMatchesDto<ArchiveManifestEntry>(apiSource, "ArchiveManifestEntry");
         AssertTypeScriptContractMatchesDto<DocumentEmbeddingStatusResponse>(apiSource, "DocumentEmbeddingStatus");
         AssertTypeScriptContractMatchesDto<DocumentOcrStatusResponse>(apiSource, "DocumentOcrStatus");
         AssertTypeScriptContractMatchesDto<DocumentSearchResult>(apiSource, "DocumentSearchResult");
@@ -232,6 +233,7 @@ public sealed partial class InProcessBackendTests
         AssertTypeScriptUnionMatchesEnum<DocumentStatus>(apiSource, "DocumentStatus");
         AssertTypeScriptUnionMatchesEnum<JobStatus>(apiSource, "JobStatus");
         AssertTypeScriptUnionMatchesEnum<PhaseState>(apiSource, "PhaseState");
+        AssertTypeScriptUnionMatchesEnum<ArchiveManifestStatus>(apiSource, "ArchiveManifestStatus");
     }
 
     private static async Task AssertProblemAsync(

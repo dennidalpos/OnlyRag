@@ -384,7 +384,9 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
         Assert.NotNull(saved);
         Assert.NotNull(current);
-        Assert.Equal(new IngestionSettings(100, 50), saved);
+        Assert.Equal(100, saved.ChunkSizeTokens);
+        Assert.Equal(50, saved.OverlapTokens);
+        Assert.Equal(ArchiveExtractionLimits.Default, saved.Archive);
         Assert.Equal(saved, current);
     }
 

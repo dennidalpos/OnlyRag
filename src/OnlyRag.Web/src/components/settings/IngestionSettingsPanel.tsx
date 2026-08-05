@@ -23,11 +23,11 @@ export function IngestionSettingsPanel() {
 
   function handleSelectPreset(preset: UnifiedPresetLevel) {
     if (preset === "basso") {
-      setIngestionFormState({ chunkSizeTokens: 400, overlapTokens: 60 });
+      setIngestionFormState((current) => ({ ...current, chunkSizeTokens: 400, overlapTokens: 60 }));
     } else if (preset === "medio") {
-      setIngestionFormState({ chunkSizeTokens: 800, overlapTokens: 120 });
+      setIngestionFormState((current) => ({ ...current, chunkSizeTokens: 800, overlapTokens: 120 }));
     } else if (preset === "alto") {
-      setIngestionFormState({ chunkSizeTokens: 1600, overlapTokens: 240 });
+      setIngestionFormState((current) => ({ ...current, chunkSizeTokens: 1600, overlapTokens: 240 }));
     }
   }
 
@@ -67,11 +67,40 @@ export function IngestionSettingsPanel() {
                 setIngestionFormState((current) => {
                   const nextChunkSize = value;
                   return {
+                    ...current,
                     chunkSizeTokens: nextChunkSize,
                     overlapTokens: Math.min(current.overlapTokens, Math.min(1000, Math.floor(nextChunkSize / 2)))
                   };
                 })
               }
+            />
+            <SettingsRangeField
+              id="archive-max-files"
+              label="File massimi per archivio"
+              tooltip="Limite di protezione contro archivi con un numero eccessivo di file."
+              min={1}
+              max={100000}
+              step={100}
+              value={ingestionFormState.archive.maxFileCount}
+              formatValue={(value) => value.toLocaleString("it-IT")}
+              onChange={(value) => setIngestionFormState((current) => ({
+                ...current,
+                archive: { ...current.archive, maxFileCount: value }
+              }))}
+            />
+            <SettingsRangeField
+              id="archive-max-depth"
+              label="Profondita' cartelle archivio"
+              tooltip="Profondita' massima dei percorsi estratti; protegge da strutture annidate anomale."
+              min={0}
+              max={64}
+              step={1}
+              value={ingestionFormState.archive.maxDirectoryDepth}
+              formatValue={(value) => `${value} livelli`}
+              onChange={(value) => setIngestionFormState((current) => ({
+                ...current,
+                archive: { ...current.archive, maxDirectoryDepth: value }
+              }))}
             />
             <SettingsRangeField
               id="ingestion-overlap"

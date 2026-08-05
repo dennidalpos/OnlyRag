@@ -64,6 +64,8 @@ public sealed partial class LocalSqliteStorageTests
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "machine_translated_text"));
         Assert.True(await tempStorage.ColumnExistsAsync("translation_units", "layout_metadata_json"));
         Assert.True(await tempStorage.IndexExistsAsync("ux_documents_sha256_not_null"));
+        Assert.True(await tempStorage.TableExistsAsync("archive_manifest_entries"));
+        Assert.True(await tempStorage.IndexExistsAsync("idx_archive_manifest_path"));
     }
 
     [Fact]
