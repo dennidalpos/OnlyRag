@@ -58,6 +58,7 @@ export function createOcrProvisionStatus(overrides: Partial<OcrProvisionStatus> 
     severity: "info",
     canRetry: false,
     selectedRuntime: null,
+    isAutomaticRepair: false,
     ...overrides
   };
 }

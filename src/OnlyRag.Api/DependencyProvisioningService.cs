@@ -33,6 +33,7 @@ public sealed class DependencyProvisioningService
     private bool ocrProvisionCancelRequested;
     private DateTimeOffset ocrProvisionDeadlineUtc;
     private DateTimeOffset? ocrProvisionStartedAtUtc;
+    private bool ocrAutomaticRepairAttempted;
 
     public DependencyProvisioningService(ILocalProcessLauncher processLauncher)
         : this(processLauncher, ResolveExecutable, ocrProvisionTimeout: DefaultOcrProvisionTimeout)
@@ -154,6 +155,15 @@ public sealed class DependencyProvisioningService
         }
 
         OcrRuntimeEnvironmentDiagnostic environmentDiagnostic = new OcrRuntimeEnvironment(ResolveOcrInstallRoot()).Inspect();
+        if (IsRepairableEnvironment(environmentDiagnostic)
+            && TryStartAutomaticOcrRepair(environmentDiagnostic).Started)
+        {
+            lock (syncRoot)
+            {
+                return lastOcrProvisionStatus;
+            }
+        }
+
         string message = environmentDiagnostic.State switch
         {
             "corrupt" or "incomplete" => "Runtime OCR locale incompleto o danneggiato. Usa Ripara OCR per ricrearlo in sicurezza.",
@@ -181,6 +191,31 @@ public sealed class DependencyProvisioningService
 
     public DependencyActionResponse StartOcrProvision(string? runtimeTarget = null)
     {
+        return StartOcrProvision(runtimeTarget, isAutomaticRepair: false);
+    }
+
+    private DependencyActionResponse TryStartAutomaticOcrRepair(OcrRuntimeEnvironmentDiagnostic environmentDiagnostic)
+    {
+        if (!OperatingSystem.IsWindows() || !IsRepairableEnvironment(environmentDiagnostic))
+        {
+            return new DependencyActionResponse(false, "OCR automatic repair is not applicable.");
+        }
+
+        lock (syncRoot)
+        {
+            if (ocrAutomaticRepairAttempted)
+            {
+                return new DependencyActionResponse(false, "OCR automatic repair was already attempted in this session.");
+            }
+
+            ocrAutomaticRepairAttempted = true;
+        }
+
+        return StartOcrProvision(OcrProvisionRuntimeResolver.AutoTarget, isAutomaticRepair: true);
+    }
+
+    private DependencyActionResponse StartOcrProvision(string? runtimeTarget, bool isAutomaticRepair)
+    {
         string normalizedTarget = OcrProvisionRuntimeResolver.NormalizeTarget(runtimeTarget);
         lock (syncRoot)
         {
@@ -194,7 +229,9 @@ public sealed class DependencyProvisioningService
             lastOcrProvisionStatus = new OcrProvisionStatus(
                 false,
                 true,
-                $"OCR configuration started. Preparation may take several minutes and is automatically stopped after {FormatTimeout(ocrProvisionTimeout)}.",
+                isAutomaticRepair
+                    ? $"Automatic OCR repair started. Preparation may take several minutes and is automatically stopped after {FormatTimeout(ocrProvisionTimeout)}."
+                    : $"OCR configuration started. Preparation may take several minutes and is automatically stopped after {FormatTimeout(ocrProvisionTimeout)}.",
                 null,
                 normalizedTarget,
                 "resolving",
@@ -208,16 +245,17 @@ public sealed class DependencyProvisioningService
                 CalculateProgressPercent(1),
                 "running",
                 false,
-                null);
+                null,
+                isAutomaticRepair);
             ocrProvisionCancellation?.Dispose();
             ocrProvisionCancellation = new CancellationTokenSource(ocrProvisionTimeout);
             ocrProvisionCancelRequested = false;
             ocrProvisionDeadlineUtc = DateTimeOffset.UtcNow.Add(ocrProvisionTimeout);
             CancellationToken token = ocrProvisionCancellation.Token;
-            ocrProvisionTask = Task.Run(() => ProvisionOcrAsync(normalizedTarget, token));
+            ocrProvisionTask = Task.Run(() => ProvisionOcrAsync(normalizedTarget, isAutomaticRepair, token));
         }
 
-        return new DependencyActionResponse(true, "OCR configuration started.");
+        return new DependencyActionResponse(true, isAutomaticRepair ? "Automatic OCR repair started." : "OCR configuration started.");
     }
 
     public DependencyActionResponse CancelOcrProvision()
@@ -243,7 +281,7 @@ public sealed class DependencyProvisioningService
         return new DependencyActionResponse(true, "OCR configuration cancellation requested.");
     }
 
-    private async Task ProvisionOcrAsync(string runtimeTarget, CancellationToken cancellationToken)
+    private async Task ProvisionOcrAsync(string runtimeTarget, bool isAutomaticRepair, CancellationToken cancellationToken)
     {
         try
         {
@@ -361,7 +399,8 @@ public sealed class DependencyProvisioningService
                 ProgressPercent: 100,
                 Severity: "success",
                 CanRetry: false,
-                SelectedRuntime: runtime.ResolvedRuntime));
+                SelectedRuntime: runtime.ResolvedRuntime,
+                IsAutomaticRepair: isAutomaticRepair));
         }
         catch (OperationCanceledException)
         {
@@ -382,7 +421,8 @@ public sealed class DependencyProvisioningService
                 ProgressPercent: 0,
                 Severity: "warning",
                 CanRetry: true,
-                SelectedRuntime: null));
+                SelectedRuntime: null,
+                IsAutomaticRepair: isAutomaticRepair));
         }
         catch (Exception ex)
         {
@@ -404,7 +444,8 @@ public sealed class DependencyProvisioningService
                 ProgressPercent: 0,
                 Severity: "error",
                 CanRetry: true,
-                SelectedRuntime: null));
+                SelectedRuntime: null,
+                IsAutomaticRepair: isAutomaticRepair));
         }
         finally
         {
@@ -590,7 +631,19 @@ public sealed class DependencyProvisioningService
             CalculateProgressPercent(stepIndex),
             "running",
             false,
-            resolvedRuntime);
+            resolvedRuntime,
+            IsAutomaticRepair: IsAutomaticRepairInProgress());
+
+    private bool IsAutomaticRepairInProgress()
+    {
+        lock (syncRoot)
+        {
+            return lastOcrProvisionStatus.IsAutomaticRepair;
+        }
+    }
+
+    private static bool IsRepairableEnvironment(OcrRuntimeEnvironmentDiagnostic environmentDiagnostic) =>
+        environmentDiagnostic.State is "corrupt" or "incomplete";
 
     private static bool IsTerminalProvisionStatus(OcrProvisionStatus status) =>
         !status.IsRunning

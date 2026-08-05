@@ -195,6 +195,88 @@ public sealed partial class InProcessBackendTests
         }
     }
 
+    [Fact]
+    public async Task DependencyOcrProvision_AutomaticallyRepairsCorruptRuntimeOnlyOncePerSession()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), "OnlyRag.OcrAutoRepair.Tests", Guid.NewGuid().ToString("N"));
+        string scriptsRoot = Path.Combine(root, "scripts");
+        string installRoot = Path.Combine(root, "ocr-python");
+        Directory.CreateDirectory(Path.Combine(installRoot, ".venv", "Scripts"));
+        File.WriteAllText(Path.Combine(installRoot, ".venv", "Scripts", "python.exe"), string.Empty);
+        Directory.CreateDirectory(scriptsRoot);
+        File.WriteAllText(Path.Combine(scriptsRoot, "paddle_ocr_bridge.py"), "# test bridge");
+        File.WriteAllText(Path.Combine(scriptsRoot, "requirements-cpu.txt"), "# test requirements");
+
+        TaskCompletionSource pipStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource cancellationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeProcessLauncher processLauncher = new()
+        {
+            RunAsyncHandler = async (_, arguments, _, cancellationToken) =>
+            {
+                if (arguments.Contains("--version"))
+                {
+                    return new LocalProcessResult(0, "Python 3.13.0", string.Empty);
+                }
+
+                if (arguments.Contains("pip") && arguments.Contains("install"))
+                {
+                    pipStarted.TrySetResult();
+                    try
+                    {
+                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancellationObserved.TrySetResult();
+                        throw;
+                    }
+                }
+
+                return new LocalProcessResult(0, string.Empty, string.Empty);
+            }
+        };
+        DependencyProvisioningService dependencies = new(
+            processLauncher,
+            executableName => string.Equals(executableName, "python", StringComparison.OrdinalIgnoreCase)
+                ? "python.exe"
+                : null,
+            ocrScriptsRootOverride: scriptsRoot,
+            ocrInstallRootOverride: installRoot,
+            ocrProvisionTimeout: TimeSpan.FromMinutes(5));
+
+        try
+        {
+            OcrProvisionStatus status = await dependencies.GetOcrStatusAsync(
+                new UnavailableOcrEngine(),
+                new OcrGpuCapabilityService(processLauncher),
+                CancellationToken.None);
+
+            Assert.True(status.IsRunning);
+            Assert.True(status.IsAutomaticRepair);
+            await pipStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Single(processLauncher.StartedProcesses, process => process.ArgumentList.Contains("venv"));
+
+            Assert.True(dependencies.CancelOcrProvision().Started);
+            await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForProvisionToStopAsync(dependencies, processLauncher);
+            await dependencies.GetOcrStatusAsync(new UnavailableOcrEngine(), new OcrGpuCapabilityService(processLauncher), CancellationToken.None);
+
+            Assert.Single(processLauncher.StartedProcesses, process => process.ArgumentList.Contains("venv"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static async Task WaitForProvisionToStopAsync(
         DependencyProvisioningService dependencies,
         ILocalProcessLauncher processLauncher)

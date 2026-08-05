@@ -1,7 +1,5 @@
 {
   "todos": [
-    "P0 OCR: implementare autoriparazione del runtime in background, con un solo tentativo automatico per sessione, timeout, annullamento, avanzamento osservabile e fallback esplicito all'azione manuale",
-    "P0 OCR: aggiungere test unitari, integrazione e UI per creazione, corruzione, riparazione, timeout, annullamento e fallback dell'ambiente virtuale OCR",
     "P1 Ingestione: definire i limiti configurabili e implementare l'estrazione streaming sicura di ZIP, TAR e 7Z, con difese da path traversal, archive bomb, eccesso di file, dimensione e profondita'",
     "P1 Ingestione: implementare la coda batch con avanzamento per file, annullamento, ripresa e risultato aggregato",
     "P1 Ingestione: integrare gli elementi estratti nell'importazione, deduplicazione e indicizzazione RAG, preservando provenienza, stato e risultato di ogni elemento",

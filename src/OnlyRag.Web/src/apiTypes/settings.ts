@@ -173,6 +173,7 @@ export type OcrProvisionStatus = {
   severity: string;
   canRetry: boolean;
   selectedRuntime: string | null;
+  isAutomaticRepair: boolean;
 };
 
 export type OcrStartupAnalysis = {
@@ -235,4 +236,3 @@ export type RerankerModelInfo = {
   isDownloading: boolean;
   downloadError: string | null;
 };
-

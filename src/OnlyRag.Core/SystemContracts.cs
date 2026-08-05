@@ -105,7 +105,8 @@ public sealed record OcrProvisionStatus(
     int ProgressPercent = 0,
     string Severity = "info",
     bool CanRetry = false,
-    string? SelectedRuntime = null);
+    string? SelectedRuntime = null,
+    bool IsAutomaticRepair = false);
 
 public sealed record OcrStartupAnalysisResponse(
     bool ShouldPrompt,

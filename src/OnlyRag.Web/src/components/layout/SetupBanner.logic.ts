@@ -37,7 +37,7 @@ export function detectSetupIssues(
   if (ocrProvisionStatus?.isRunning) {
     issues.push({
       key: "ocr",
-      title: "Configurazione OCR in corso",
+      title: ocrProvisionStatus.isAutomaticRepair ? "Riparazione automatica OCR in corso" : "Configurazione OCR in corso",
       detail: ocrProvisionStatus.message,
       tone: "running",
       badge: ocrProvisionStatus.resolvedRuntime,
@@ -48,7 +48,9 @@ export function detectSetupIssues(
   } else if (ocrProvisionStatus && isFailedOcrProvisionStatus(ocrProvisionStatus)) {
     issues.push({
       key: "ocr",
-      title: ocrProvisionStatus.resolvedRuntime === "cancelled"
+      title: ocrProvisionStatus.isAutomaticRepair
+        ? "Riparazione automatica OCR non completata"
+        : ocrProvisionStatus.resolvedRuntime === "cancelled"
         ? "Configurazione OCR annullata"
         : "Configurazione OCR non completata",
       detail: ocrProvisionStatus.message,

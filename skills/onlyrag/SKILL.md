@@ -74,6 +74,11 @@ pwsh .\scripts\Build-Web.ps1
 dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 ```
 
+OCR runtime recovery is session-safe: querying the OCR dependency status automatically starts at
+most one background repair for an incomplete or corrupt private environment. Progress, timeout,
+cancellation, and failure remain observable through the dependency status endpoint; after a failed
+attempt the UI exposes explicit manual repair without retry loops.
+
 ### Development Mode (Vite Dev Server + WPF Shell)
 In Terminal 1:
 ```powershell

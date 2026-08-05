@@ -36,10 +36,12 @@ runtime stamp is published. The previous environment is retained until publicati
 cancelled, timed-out, or failed installation leaves the last working environment untouched.
 
 Diagnostics classify the local environment as `missing`, `incomplete`, `corrupt`, or `ready`
-without exposing Python command output or local paths to the UI. The dependency status endpoint
-keeps progress, the selected runtime, a safe user-facing error, and a retry action. Use **Install
-OCR** (or **Repair OCR**) to rebuild an incomplete or corrupt runtime; the action may be cancelled
-from Diagnostics and has a 45-minute application timeout.
+without exposing Python command output or local paths to the UI. For an `incomplete` or `corrupt`
+environment, the dependency status endpoint starts one background repair attempt per application
+session. Its progress, selected runtime, timeout and cancellation state are observable in the UI.
+The attempt uses the same 45-minute timeout and transactional staging as manual provisioning. If
+it is cancelled, times out, or fails, automatic retries stop for that session and the UI exposes
+**Repair OCR** as the explicit fallback. Missing environments still require **Install OCR**.
 
 ## Verification
 
