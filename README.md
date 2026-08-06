@@ -225,6 +225,7 @@ commands recreate required ignored outputs.
 - [Application flow](docs/APP_FLOW.md)
 - [Scripts](scripts/README.md)
 - [Brand assets](docs/BRAND_ASSETS.md)
+- [Agent engine](docs/AGENT_ENGINE.md)
 - [RAG pipeline](docs/RAG_PIPELINE.md)
 - [OCR pipeline](docs/OCR_PIPELINE.md)
 - [Image generation](docs/IMAGE_GENERATION.md)
@@ -232,4 +233,5 @@ commands recreate required ignored outputs.
 - [Translation pipeline](docs/TRANSLATION_PIPELINE.md)
 - [Signing](docs/SIGNING.md)
 - [Packaging](packaging/README.md)
+- [Tech elevation plan](TECH_ELEVATION_PLAN.md)
 - [Operational tracker](PROJECT_STATUS.json)

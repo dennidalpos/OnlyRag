@@ -75,8 +75,32 @@
     {
       "id": "TASK-010",
       "priority": "P5",
+      "category": "Performance",
+      "title": "Batch Embedding e Vector Store Index Caching",
+      "description": "Raggruppare i vettori in batch gRPC (64-128 elementi) durante l'indicizzazione su Qdrant e ottimizzare l'index caching.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-011",
+      "priority": "P5",
+      "category": "Performance",
+      "title": "Gestione Memoria VRAM ONNX DirectML (VramMemoryManager)",
+      "description": "Implementare VramMemoryManager per allocare e disallocare esplicitamente le sessioni ONNX DirectML inattive e prevenire frammentazione VRAM.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-012",
+      "priority": "P5",
+      "category": "Performance",
+      "title": "Frontend Web Workers per Markdown Parsing e Syntax Highlighting",
+      "description": "Spostare il parsing dei file Markdown e l'evidenziazione della sintassi (rehype-highlight) in un Web Worker dedicato.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-013",
+      "priority": "P5",
       "category": "Verification & Release",
-      "title": "Verification Gate e Benchmark Prestazionali",
+      "title": "Verification Gate e Benchmark Prestazionali Lifecycle",
       "description": "Eseguire Invoke-Gate.ps1, effettuare benchmark di latenza RAG/RAM e verificare il ciclo di vita installer con Test-InstallerRelease.ps1.",
       "status": "pending"
     }

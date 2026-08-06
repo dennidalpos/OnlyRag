@@ -28,7 +28,7 @@ Il sistema di chunking genera una gerarchia **Parent-Child**:
 - **Child Chunks (~150 token)**: Indicizzati in SQLite FTS5 e vettorizzati su Qdrant per il matching ad alta risoluzione.
 - **Parent Chunks (~1000 token / paragrafo completo)**: Conservati nel database SQLite per preservare il contesto informativo ampio.
 
-I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite corrente (versione 9) sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage).
+I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite corrente (versione 11) sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage). Lo schema include anche le tabelle `document_graph_nodes` e `document_graph_edges` per l'indicizzazione delle relazioni di grafo tra concetti e sezioni documentali.
 
 ### Sicurezza archivi
 

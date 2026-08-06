@@ -20,6 +20,7 @@ current technical and operational documentation. Do not use these pages as chang
 
 ## Feature Pipelines
 
+- [Agent engine](AGENT_ENGINE.md): autonomous agent engine architecture, phase machine, subagent DAG orchestrator, memory system, and endpoints.
 - [RAG pipeline](RAG_PIPELINE.md): ingestion, embeddings, Qdrant indexing, hybrid search, and chat
   grounding.
 - [OCR pipeline](OCR_PIPELINE.md): PaddleOCR bridge, runtime manifest, CPU/GPU selection, and
@@ -37,6 +38,7 @@ current technical and operational documentation. Do not use these pages as chang
 ## Tracked Files
 
 - [Operational tracker](../PROJECT_STATUS.json)
+- [Tech elevation plan](../TECH_ELEVATION_PLAN.md)
 - [Solution file](../OnlyRag.sln)
 - [CI workflow](../.github/workflows/ci.yml)
 - [OCR catalog workflow](../.github/workflows/ocr-runtime-catalog.yml)
