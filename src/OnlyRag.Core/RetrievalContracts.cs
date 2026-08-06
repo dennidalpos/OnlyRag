@@ -75,5 +75,6 @@ public sealed record RagLatencyMetrics(
     double Fts5SearchMs,
     double ReRankingMs,
     double TotalMs,
-    double AverageCragScore = 0.0);
+    double AverageCragScore = 0.0,
+    double P99Ms = 0.0);
 

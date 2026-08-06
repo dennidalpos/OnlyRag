@@ -34,10 +34,28 @@ public record RetrievalBenchmarkReport(
     IReadOnlyList<RetrievalBenchmarkCaseResult> Cases,
     RagLatencyMetrics? AverageLatency = null);
 
+public record ConcurrencyBenchmarkReport(
+    DateTimeOffset EvaluatedAtUtc,
+    int ConcurrentClients,
+    int TotalRequests,
+    int SuccessfulRequests,
+    int FaultedRequests,
+    double ThroughputRps,
+    double AverageLatencyMs,
+    double P95LatencyMs,
+    double P99LatencyMs,
+    double FaultToleranceRate);
+
 public interface IRetrievalBenchmarkReportService
 {
     Task<RetrievalBenchmarkReport> EvaluateBenchmarkAsync(
         IReadOnlyList<RetrievalBenchmarkTestCase> testCases,
         int defaultTopK = 5,
+        CancellationToken cancellationToken = default);
+
+    Task<ConcurrencyBenchmarkReport> EvaluateConcurrencyAndFaultToleranceAsync(
+        IReadOnlyList<RetrievalBenchmarkTestCase> testCases,
+        int concurrencyLevel = 10,
+        bool simulateNetworkFaults = false,
         CancellationToken cancellationToken = default);
 }

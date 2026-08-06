@@ -85,7 +85,24 @@ public static class ImageModelCatalog
             DefaultSteps: 30,
             DefaultGuidance: 5.0,
             Scheduler: "Euler",
-            CompatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM.")
+            CompatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM."),
+        new(
+            "lcm-sdxl-int8-onnx",
+            "LCM SDXL INT8 Quantized ONNX",
+            "Profilo quantizzato INT8 ultra-leggero ottimizzato per CPU ed GPU entry-level con consumo di memoria ridotto.",
+            "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
+            "OpenRAIL++",
+            4_000_000_000,
+            RequiredSdxlSnapshotFiles,
+            string.Empty,
+            IsBuiltIn: true,
+            ModelType: "SDXL LCM INT8 ONNX",
+            ModelProfile: "lcm-sdxl-int8",
+            SupportedResolutions: ["512x512", "1024x1024"],
+            DefaultSteps: 4,
+            DefaultGuidance: 1.0,
+            Scheduler: "LCM with trailing timestep spacing",
+            CompatibilityNotes: "Quantizzazione dinamica INT8 attiva per ottimizzare il throughput su CPU ed GPU entry-level.")
     ];
 
     public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;

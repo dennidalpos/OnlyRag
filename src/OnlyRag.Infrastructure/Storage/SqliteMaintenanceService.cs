@@ -113,7 +113,20 @@ public sealed class SqliteMaintenanceService : ISqliteMaintenanceService
                 }
             }
 
-            // 3. Run Incremental Vacuum and full Vacuum
+            // 3. Cleanup orphaned chunks without parent documents if tables exist
+            await using (SqliteCommand orphanCmd = connection.CreateCommand())
+            {
+                orphanCmd.CommandText = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('documents', 'document_chunks');";
+                var tableCount = await orphanCmd.ExecuteScalarAsync(cancellationToken);
+                if (tableCount is long c && c == 2)
+                {
+                    await using SqliteCommand deleteCmd = connection.CreateCommand();
+                    deleteCmd.CommandText = "DELETE FROM document_chunks WHERE document_id NOT IN (SELECT id FROM documents);";
+                    await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+            }
+
+            // 4. Run Incremental Vacuum and full Vacuum
             await using (SqliteCommand incVacCmd = connection.CreateCommand())
             {
                 incVacCmd.CommandText = "PRAGMA incremental_vacuum;";

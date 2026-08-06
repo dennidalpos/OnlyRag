@@ -69,8 +69,12 @@ if (-not (Test-Path -LiteralPath $qdrantExe -PathType Leaf)) {
 
 Write-Host "Verifying payload binary integrity (SHA256)..." -ForegroundColor Cyan
 if (Test-Path -LiteralPath $qdrantExe -PathType Leaf) {
+    $qdrantItem = Get-Item -LiteralPath $qdrantExe
+    if ($qdrantItem.Length -le 0) {
+        throw "Qdrant sidecar binary '$qdrantExe' is empty (0 bytes)."
+    }
     $qdrantHash = (Get-FileHash -LiteralPath $qdrantExe -Algorithm SHA256).Hash
-    Write-Host "  Qdrant SHA256: $qdrantHash" -ForegroundColor Gray
+    Write-Host "  Qdrant SHA256: $qdrantHash ($($qdrantItem.Length) bytes)" -ForegroundColor Gray
 }
 
 $ocrPayloadDir = Join-Path $repoRoot "packaging\ocr\payload"
@@ -98,6 +102,34 @@ Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot
 )
 
 Test-OnlyRagPublishPayload -Path $publishDir
+
+Write-Host "Auditing binary signatures and generating release installer-manifest.json..." -ForegroundColor Cyan
+$manifestFiles = @()
+Get-ChildItem -LiteralPath $publishDir -File -Recurse | ForEach-Object {
+    $relativePath = [System.IO.Path]::GetRelativePath($publishDir, $_.FullName)
+    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    $sig = Get-AuthenticodeSignature -FilePath $_.FullName
+    $manifestFiles += [ordered]@{
+        path = $relativePath
+        sizeBytes = $_.Length
+        sha256 = $hash
+        signatureStatus = $sig.Status.ToString()
+        signer = $sig.SignerCertificate?.Subject
+    }
+}
+
+$manifest = [ordered]@{
+    version = $Version
+    runtimeIdentifier = $RuntimeIdentifier
+    generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    fileCount = $manifestFiles.Count
+    files = $manifestFiles
+}
+
+$manifestPath = Join-Path $installerDir "installer-manifest.json"
+$manifestJson = $manifest | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson, [System.Text.Encoding]::UTF8)
+Write-Host "Installer manifest written: $manifestPath ($($manifestFiles.Count) files audited)" -ForegroundColor Gray
 
 $makensis = Get-OnlyRagNsisCompiler -RequestedPath $NsisCompiler
 if (-not $makensis) {

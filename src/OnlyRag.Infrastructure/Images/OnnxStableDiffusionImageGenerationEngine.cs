@@ -32,12 +32,43 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         }
     }
 
+    public async Task WarmupAsync(string modelDirectory, bool preferGpu, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(modelDirectory) || !Directory.Exists(modelDirectory))
+        {
+            return;
+        }
+
+        await pipelineSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            OnnxExecutionProvider provider = preferGpu ? CreateDirectMlProvider() : CreateCpuProvider();
+            string providerName = preferGpu ? DirectMlProvider : CpuProvider;
+            ModelType modelType = ModelType.Base;
+            await GetOrCreatePipelineAsync(modelDirectory, provider, providerName, modelType);
+            lock (gate)
+            {
+                isInitialized = true;
+                activeExecutionProvider = providerName;
+            }
+        }
+        catch
+        {
+            // Ignore optional warmup failure
+        }
+        finally
+        {
+            pipelineSemaphore.Release();
+        }
+    }
+
     public async Task<ImageGenerationEngineResult> GenerateAsync(
         ImageGenerationRequest request,
         string modelDirectory,
         bool preferGpu,
         CancellationToken cancellationToken = default)
     {
+        bool isInt8 = IsInt8QuantizedModel(request.ModelId);
         if (preferGpu)
         {
             try
@@ -45,7 +76,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
                 ImageGenerationEngineResult directMl = await GenerateWithProviderAsync(
                     request,
                     modelDirectory,
-                    CreateDirectMlProvider(),
+                    CreateDirectMlProvider(isInt8),
                     DirectMlProvider,
                     fallbackReason: null,
                     cancellationToken);
@@ -66,7 +97,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
                     ImageGenerationEngineResult cpuFallbackResult = await GenerateWithProviderAsync(
                         request,
                         modelDirectory,
-                        CreateCpuProvider(),
+                        CreateCpuProvider(isInt8),
                         CpuProvider,
                         fallbackReason: reason,
                         cancellationToken);
@@ -89,7 +120,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             ImageGenerationEngineResult result = await GenerateWithProviderAsync(
                 request,
                 modelDirectory,
-                CreateCpuProvider(),
+                CreateCpuProvider(isInt8),
                 CpuProvider,
                 fallbackReason: null,
                 cancellationToken);
@@ -235,9 +266,14 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             : negativePrompt.Trim();
     }
 
+    public static bool IsInt8QuantizedModel(string? modelId)
+    {
+        return ContainsAny(modelId ?? string.Empty, ["int8", "quantized", "q8"]);
+    }
+
     public static ModelType ResolveModelType(string? modelId)
     {
-        return ContainsAny(modelId ?? string.Empty, ["turbo", "lcm"])
+        return ContainsAny(modelId ?? string.Empty, ["turbo", "lcm", "int8"])
             ? ModelType.Turbo
             : ModelType.Base;
     }
@@ -266,34 +302,41 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
         return terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static OnnxExecutionProvider CreateDirectMlProvider()
+    private static OnnxExecutionProvider CreateDirectMlProvider(bool isInt8 = false)
     {
         return new OnnxExecutionProvider(DirectMlProvider, _ =>
         {
-            SessionOptions options = CreateBaseSessionOptions();
+            SessionOptions options = CreateBaseSessionOptions(isInt8);
             options.AppendExecutionProvider_DML(0);
             return options;
         });
     }
 
-    private static OnnxExecutionProvider CreateCpuProvider()
+    private static OnnxExecutionProvider CreateCpuProvider(bool isInt8 = false)
     {
         return new OnnxExecutionProvider(CpuProvider, _ =>
         {
-            SessionOptions options = CreateBaseSessionOptions();
+            SessionOptions options = CreateBaseSessionOptions(isInt8);
             options.AppendExecutionProvider_CPU(0);
             return options;
         });
     }
 
-    private static SessionOptions CreateBaseSessionOptions()
+    private static SessionOptions CreateBaseSessionOptions(bool isInt8 = false)
     {
-        return new SessionOptions
+        SessionOptions options = new()
         {
             EnableMemoryPattern = false,
             ExecutionMode = ExecutionMode.ORT_SEQUENTIAL,
             GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
         };
+
+        if (isInt8)
+        {
+            options.IntraOpNumThreads = Math.Clamp(Environment.ProcessorCount, 1, 8);
+        }
+
+        return options;
     }
 
     private void SetStatus(string provider, string? reason)

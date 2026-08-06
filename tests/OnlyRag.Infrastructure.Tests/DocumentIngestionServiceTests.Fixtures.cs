@@ -52,13 +52,14 @@ public sealed partial class DocumentIngestionServiceTests
             return storage;
         }
 
-        public DocumentIngestionService CreateIngestionService()
+        public DocumentIngestionService CreateIngestionService(OnlyRag.Infrastructure.Ocr.IOcrEngine? ocrEngine = null)
         {
             return new DocumentIngestionService(
                 Documents,
                 Settings,
                 new DocumentTextChunker(),
                 new OfficeOpenXmlTextExtractor(),
+                ocrEngine: ocrEngine,
                 archiveManifestRepository: ArchiveManifest);
         }
 

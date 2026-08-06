@@ -1,4 +1,3 @@
-
 using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -39,6 +38,22 @@ public static partial class InProcessBackend
                 settings.OllamaBaseUrl,
                 runtime.StartedAtUtc,
                 performance.EffectiveProfile == PerformanceProfileNames.Eco));
+        });
+
+        app.MapGet("/api/sync/lan/discover", async (
+            ILanSyncService syncService,
+            CancellationToken cancellationToken) =>
+        {
+            var nodes = await syncService.DiscoverLanNodesAsync(cancellationToken);
+            return Results.Ok(nodes);
+        });
+
+        app.MapPost("/api/sync/lan/announce", async (
+            ILanSyncService syncService,
+            CancellationToken cancellationToken) =>
+        {
+            await syncService.AnnounceNodeBeaconAsync(cancellationToken);
+            return Results.Ok(new { Success = true });
         });
 
         app.MapGet("/api/app/storage-status", async (ILocalStorageService storage, CancellationToken cancellationToken) =>

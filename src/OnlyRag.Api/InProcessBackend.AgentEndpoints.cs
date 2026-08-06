@@ -118,6 +118,16 @@ public static partial class InProcessBackend
             return Results.Ok(summary);
         });
 
+        app.MapGet("/api/agent/policy-audit", async (
+            OnlyRag.Infrastructure.Storage.SqlitePolicyAuditRepository auditRepository,
+            [FromQuery] int? limit,
+            CancellationToken cancellationToken) =>
+        {
+            int maxItems = limit is > 0 ? Math.Min(limit.Value, 100) : 50;
+            IReadOnlyList<AuditLogRecord> logs = await auditRepository.GetAuditLogsAsync(maxItems, cancellationToken);
+            return Results.Ok(logs);
+        });
+
         // Multi-Agent Orchestration
         app.MapPost("/api/agent/orchestrate", async (
             MultiAgentOrchestrationRequest request,

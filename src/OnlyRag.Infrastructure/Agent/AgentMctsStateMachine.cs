@@ -15,10 +15,14 @@ public sealed class AgentMctsNode
     public string? CheckpointId { get; set; }
     public bool IsTerminal { get; set; }
 
-    public AgentMctsNode(string actionSignature, AgentMctsNode? parent = null)
+    public AgentMctsNode(string actionSignature, AgentMctsNode? parent = null, string? nodeId = null)
     {
         ActionSignature = actionSignature;
         Parent = parent;
+        if (!string.IsNullOrWhiteSpace(nodeId))
+        {
+            NodeId = nodeId;
+        }
     }
 
     public double MeanReward => VisitCount > 0 ? TotalReward / VisitCount : 0;
@@ -30,6 +34,22 @@ public sealed class AgentMctsNode
         return MeanReward + explorationConstant * Math.Sqrt(Math.Log(parentVisits) / VisitCount);
     }
 }
+
+public sealed record AgentMctsNodeSnapshotDto(
+    string NodeId,
+    string? ParentId,
+    string ActionSignature,
+    string? OutputSnippet,
+    double VisitCount,
+    double TotalReward,
+    double ReflectionScore,
+    string? CheckpointId,
+    bool IsTerminal,
+    List<string> ChildIds);
+
+public sealed record AgentMctsTreeSnapshotDto(
+    string ActiveNodeId,
+    List<AgentMctsNodeSnapshotDto> Nodes);
 
 /// <summary>
 /// Tree-of-Thought (ToT) Monte Carlo Tree Search (MCTS) state machine for agent action selection,
@@ -49,6 +69,89 @@ public sealed class AgentMctsStateMachine
         this.checkpointManager = checkpointManager;
         this.rootNode = new AgentMctsNode($"Goal:{initialGoal}");
         this.currentActiveNode = this.rootNode;
+    }
+
+    private AgentMctsStateMachine(WorkspaceSnapshotCheckpointManager checkpointManager, AgentMctsNode rootNode)
+    {
+        this.checkpointManager = checkpointManager;
+        this.rootNode = rootNode;
+        this.currentActiveNode = rootNode;
+    }
+
+    public string ToSnapshotJson()
+    {
+        List<AgentMctsNodeSnapshotDto> nodeDtos = new();
+        CollectNodesRecursive(rootNode, nodeDtos);
+        var snapshot = new AgentMctsTreeSnapshotDto(currentActiveNode.NodeId, nodeDtos);
+        return System.Text.Json.JsonSerializer.Serialize(snapshot);
+    }
+
+    private static void CollectNodesRecursive(AgentMctsNode node, List<AgentMctsNodeSnapshotDto> list)
+    {
+        list.Add(new AgentMctsNodeSnapshotDto(
+            node.NodeId,
+            node.Parent?.NodeId,
+            node.ActionSignature,
+            node.OutputSnippet,
+            node.VisitCount,
+            node.TotalReward,
+            node.ReflectionScore,
+            node.CheckpointId,
+            node.IsTerminal,
+            node.Children.Select(c => c.NodeId).ToList()));
+
+        foreach (var child in node.Children)
+        {
+            CollectNodesRecursive(child, list);
+        }
+    }
+
+    public static AgentMctsStateMachine FromSnapshotJson(WorkspaceSnapshotCheckpointManager checkpointManager, string json)
+    {
+        var snapshot = System.Text.Json.JsonSerializer.Deserialize<AgentMctsTreeSnapshotDto>(json);
+        if (snapshot == null || snapshot.Nodes.Count == 0)
+        {
+            throw new InvalidOperationException("Invalid MCTS snapshot JSON.");
+        }
+
+        var nodeDtoMap = snapshot.Nodes.ToDictionary(n => n.NodeId);
+        var rootDto = snapshot.Nodes.FirstOrDefault(n => n.ParentId == null) ?? snapshot.Nodes[0];
+
+        var instances = new Dictionary<string, AgentMctsNode>();
+
+        AgentMctsNode BuildNode(AgentMctsNodeSnapshotDto dto, AgentMctsNode? parent)
+        {
+            var node = new AgentMctsNode(dto.ActionSignature, parent, dto.NodeId)
+            {
+                OutputSnippet = dto.OutputSnippet,
+                VisitCount = dto.VisitCount,
+                TotalReward = dto.TotalReward,
+                ReflectionScore = dto.ReflectionScore,
+                CheckpointId = dto.CheckpointId,
+                IsTerminal = dto.IsTerminal
+            };
+            instances[dto.NodeId] = node;
+
+            foreach (var childId in dto.ChildIds)
+            {
+                if (nodeDtoMap.TryGetValue(childId, out var childDto))
+                {
+                    var childNode = BuildNode(childDto, node);
+                    node.Children.Add(childNode);
+                }
+            }
+
+            return node;
+        }
+
+        var rootNode = BuildNode(rootDto, null);
+        var machine = new AgentMctsStateMachine(checkpointManager, rootNode);
+        if (instances.TryGetValue(snapshot.ActiveNodeId, out var active))
+        {
+            machine.currentActiveNode = active;
+        }
+
+        return machine;
     }
 
     /// <summary>
@@ -180,6 +283,84 @@ public sealed class AgentMctsStateMachine
             currentActiveNode = currentActiveNode.Parent;
         }
         return currentActiveNode;
+    }
+
+    /// <summary>
+    /// Computes a pre-execution candidate action heuristic score based on safety and operation type.
+    /// </summary>
+    public static double EvaluateCandidateActionHeuristic(string toolName, string argumentsJson)
+    {
+        double score = 0.5; // Baseline heuristic score
+
+        // Read-only tools have low risk and high exploration value
+        if (toolName.Equals("read_file", StringComparison.OrdinalIgnoreCase) ||
+            toolName.Equals("list_dir", StringComparison.OrdinalIgnoreCase) ||
+            toolName.Equals("grep_search", StringComparison.OrdinalIgnoreCase) ||
+            toolName.Equals("git_diff_inspect", StringComparison.OrdinalIgnoreCase) ||
+            toolName.Equals("query_retrieval_index", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.3;
+        }
+        // Planning and reflection tools align with SOTA agent execution phases
+        else if (toolName.Equals("plan_task", StringComparison.OrdinalIgnoreCase) ||
+                 toolName.Equals("reflect_step", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.4;
+        }
+        // AST structural refactoring and diff patch tools are targeted modifications
+        else if (toolName.Equals("ast_structural_refactor", StringComparison.OrdinalIgnoreCase) ||
+                 toolName.Equals("apply_diff_patch", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.2;
+        }
+        // Code mutation tools are higher risk, moderate default score
+        else if (toolName.Equals("write_file", StringComparison.OrdinalIgnoreCase) ||
+                 toolName.Equals("replace_file_content", StringComparison.OrdinalIgnoreCase) ||
+                 toolName.Equals("multi_replace_file_content", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.1;
+        }
+        // Direct command execution requires validation
+        else if (toolName.Equals("run_command", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.15;
+        }
+
+        return Math.Clamp(score, 0.0, 1.0);
+    }
+
+    /// <summary>
+    /// Selects the optimal non-terminal candidate child under current active node using Upper Confidence Bound for Trees (UCT).
+    /// </summary>
+    public AgentMctsNode? SelectBestCandidateChild()
+    {
+        var validChildren = currentActiveNode.Children.Where(c => !c.IsTerminal).ToList();
+        if (validChildren.Count == 0) return null;
+
+        AgentMctsNode bestChild = validChildren[0];
+        double bestUct = double.MinValue;
+
+        foreach (var child in validChildren)
+        {
+            double uct = child.CalculateUct();
+            if (uct > bestUct)
+            {
+                bestUct = uct;
+                bestChild = child;
+            }
+        }
+
+        return bestChild;
+    }
+
+    /// <summary>
+    /// Prunes a failed candidate branch, flags it terminal, and reverts active position to parent node.
+    /// </summary>
+    public AgentMctsNode PruneAndRollbackActiveBranch()
+    {
+        currentActiveNode.IsTerminal = true;
+        currentActiveNode.ReflectionScore = 0.0;
+        return NavigateToParent();
     }
 }
 

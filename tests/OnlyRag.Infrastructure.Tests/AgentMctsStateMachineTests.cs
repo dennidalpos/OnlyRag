@@ -82,4 +82,40 @@ public class AgentMctsStateMachineTests
             }
         }
     }
+
+    [Fact]
+    public void MctsStateMachine_SelectsBestCandidateChildAndEvaluatesHeuristics()
+    {
+        var checkpointManager = new WorkspaceSnapshotCheckpointManager();
+        var stateMachine = new AgentMctsStateMachine(checkpointManager, "Test goal");
+
+        double readHeuristic = AgentMctsStateMachine.EvaluateCandidateActionHeuristic("read_file", "{}");
+        double planHeuristic = AgentMctsStateMachine.EvaluateCandidateActionHeuristic("plan_task", "{}");
+        double writeHeuristic = AgentMctsStateMachine.EvaluateCandidateActionHeuristic("write_file", "{}");
+
+        Assert.True(readHeuristic > writeHeuristic);
+        Assert.True(planHeuristic > writeHeuristic);
+
+        var child1 = stateMachine.Expand(stateMachine.Root, "read_file:src/A.cs");
+        var child2 = stateMachine.Expand(stateMachine.Root, "write_file:src/B.cs");
+
+        var bestCandidate = stateMachine.SelectBestCandidateChild();
+        Assert.NotNull(bestCandidate);
+        Assert.Equal(child1, bestCandidate);
+    }
+
+    [Fact]
+    public void MctsStateMachine_PrunesAndRollsBackActiveBranch()
+    {
+        var checkpointManager = new WorkspaceSnapshotCheckpointManager();
+        var stateMachine = new AgentMctsStateMachine(checkpointManager, "Test goal");
+
+        var active = stateMachine.ExpandAndNavigate("run_command:dotnet build");
+        Assert.Equal(active, stateMachine.CurrentActiveNode);
+
+        var parent = stateMachine.PruneAndRollbackActiveBranch();
+        Assert.True(active.IsTerminal);
+        Assert.Equal(stateMachine.Root, parent);
+        Assert.Equal(stateMachine.Root, stateMachine.CurrentActiveNode);
+    }
 }

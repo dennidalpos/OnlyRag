@@ -14,4 +14,6 @@ public interface IReRankerService
         string query,
         IReadOnlyList<ReRankCandidate> candidates,
         CancellationToken cancellationToken = default);
+
+    Task WarmupAsync(CancellationToken cancellationToken = default);
 }

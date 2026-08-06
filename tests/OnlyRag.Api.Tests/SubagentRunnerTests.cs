@@ -89,6 +89,47 @@ public sealed class SubagentRunnerTests
         }
     }
 
+    [Fact]
+    public async Task InvokeSubagentAsync_ParsesSubagentDagDependencies_AndExecutesInOrder()
+    {
+        var services = new ServiceCollection();
+        var mockOllama = new TestOllamaClient();
+        services.AddSingleton<IOllamaClient>(mockOllama);
+        services.AddSingleton<IOllamaSettingsService>(new FakeOllamaSettingsService());
+        services.AddSingleton<BackgroundTaskManager>();
+        services.AddSingleton<ISubagentRunner, SubagentRunner>();
+        services.AddSingleton<WorkspaceToolExecutor>();
+        services.AddTransient<AgentLoopEngine>();
+
+        var provider = services.BuildServiceProvider();
+        var runner = provider.GetRequiredService<ISubagentRunner>();
+
+        string tempDir = Path.Combine(Path.GetTempPath(), "OnlyRagSubagentDagTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(new
+            {
+                subagents = new object[]
+                {
+                    new { role = "Researcher", prompt = "Analyze API architecture.", max_iterations = 2 },
+                    new { role = "Refactorer", prompt = "Refactor endpoints based on research.", dependsOn = new[] { "Researcher" }, max_iterations = 2 }
+                }
+            }));
+
+            var result = await runner.InvokeSubagentAsync("call_sub_dag", "invoke_subagent", doc.RootElement, tempDir);
+
+            Assert.True(result.Success);
+            Assert.Contains("Researcher", result.Output);
+            Assert.Contains("Refactorer", result.Output);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
     private sealed class TestOllamaClient : IOllamaClient
     {
         public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

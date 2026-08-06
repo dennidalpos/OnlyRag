@@ -28,6 +28,7 @@ internal sealed class AgentLoopEngine
     private readonly IAstDependencyGraphService? astGraphService;
     private readonly ILoggingService? logger;
     private readonly IAgentRunStateRepository? runStateRepository;
+    private readonly IAgentMctsCheckpointRepository? mctsCheckpointRepository;
 
     private readonly ConcurrentDictionary<string, (AgentToolCall Call, TaskCompletionSource<bool> Tcs)> pendingApprovals = new();
 
@@ -42,7 +43,8 @@ internal sealed class AgentLoopEngine
         WorkspaceSnapshotCheckpointManager? checkpointManager = null,
         IAstDependencyGraphService? astGraphService = null,
         ILoggingService? logger = null,
-        IAgentRunStateRepository? runStateRepository = null)
+        IAgentRunStateRepository? runStateRepository = null,
+        IAgentMctsCheckpointRepository? mctsCheckpointRepository = null)
     {
         this.ollamaClient = ollamaClient;
         this.settingsService = settingsService;
@@ -55,6 +57,7 @@ internal sealed class AgentLoopEngine
         this.astGraphService = astGraphService;
         this.logger = logger;
         this.runStateRepository = runStateRepository;
+        this.mctsCheckpointRepository = mctsCheckpointRepository;
     }
 
 
@@ -97,9 +100,27 @@ internal sealed class AgentLoopEngine
         }
 
         var memoryManager = new AgentMemoryManager(logger);
-        var mctsMachine = checkpointManager != null ? new AgentMctsStateMachine(checkpointManager, request.Goal) : null;
-        if (mctsMachine != null)
+        AgentMctsStateMachine? mctsMachine = null;
+        if (checkpointManager != null)
         {
+            if (!string.IsNullOrWhiteSpace(request.ResumeRunId) && mctsCheckpointRepository != null)
+            {
+                var existingCheckpoint = await mctsCheckpointRepository.GetLatestCheckpointAsync(request.ResumeRunId, cancellationToken);
+                if (existingCheckpoint != null && !string.IsNullOrWhiteSpace(existingCheckpoint.TreeStateJson))
+                {
+                    try
+                    {
+                        mctsMachine = AgentMctsStateMachine.FromSnapshotJson(checkpointManager, existingCheckpoint.TreeStateJson);
+                        logger?.LogInfo("AgentEngine", $"[MCTS TREE-OF-THOUGHT RESTORED] Session MCTS trajectory restored from checkpoint step {existingCheckpoint.StepNumber}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning("AgentEngine", $"[MCTS RESTORE FALLBACK] Failed to restore MCTS trajectory: {ex.Message}");
+                    }
+                }
+            }
+
+            mctsMachine ??= new AgentMctsStateMachine(checkpointManager, request.Goal);
             logger?.LogInfo("AgentEngine", "[MCTS TREE-OF-THOUGHT ENGINE INITIALIZED] Active state tracking & candidate branch selection enabled.");
         }
 
@@ -682,6 +703,15 @@ internal sealed class AgentLoopEngine
                         (!string.IsNullOrEmpty(result.Error) && (result.Error.Contains("error CS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("TS", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("Build failed", StringComparison.OrdinalIgnoreCase)));
 
                     mctsMachine?.EvaluateAndBackpropagateCurrent(result.Success, isCompilationError);
+                    if (mctsMachine != null && mctsCheckpointRepository != null && !string.IsNullOrWhiteSpace(runId))
+                    {
+                        await mctsCheckpointRepository.SaveCheckpointAsync(
+                            runId,
+                            iteration,
+                            mctsMachine.CurrentActiveNode.NodeId,
+                            mctsMachine.ToSnapshotJson(),
+                            cancellationToken);
+                    }
 
                     if (!result.Success && checkpoint != null && checkpointManager != null)
                     {
@@ -1026,7 +1056,7 @@ internal sealed class AgentLoopEngine
             | reflect_step | stepId, status, learnings | Record key facts after a completed action |
             | manage_task | action, taskId? | List/status/kill background tasks |
             | ast_structural_refactor | operation, targetSymbol, newSymbolName?, relativePath | AST-level symbol refactoring |
-            | invoke_subagent | role, prompt, subagents?[{role, prompt}] | Spawn specialized sub-agents to execute sub-tasks concurrently |
+            | invoke_subagent | role, prompt, subagents?[{role, prompt, dependsOn?}] | Spawn specialized sub-agents concurrently or in a DAG dependency graph with automatic parent-child context propagation |
 
             ## Tool Call Format
 

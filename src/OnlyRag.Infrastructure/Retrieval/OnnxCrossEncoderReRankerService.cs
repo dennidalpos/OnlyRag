@@ -62,6 +62,25 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
         }
     }
 
+    public Task WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() =>
+        {
+            (InferenceSession? currentSession, XlmRobertaTokenizer? currentVocab) = GetOrInitialize();
+            if (currentSession != null && currentVocab != null)
+            {
+                try
+                {
+                    ComputeCrossScoresBatched(currentSession, currentVocab, "warmup query", [new ReRankCandidate(0, "warmup content candidate")]);
+                }
+                catch
+                {
+                    // Ignore dry-run warmup exception
+                }
+            }
+        }, cancellationToken);
+    }
+
     private (InferenceSession?, XlmRobertaTokenizer?) GetOrInitialize()
     {
         lock (sessionLock)

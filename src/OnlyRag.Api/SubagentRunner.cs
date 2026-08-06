@@ -48,24 +48,75 @@ public sealed class SubagentRunner : ISubagentRunner
 
         logger?.LogInfo("SubagentRunner", $"[SUBAGENT ORCHESTRATOR] Launching {subagentRequests.Count} subagent(s) at nesting depth {currentDepth + 1}.");
 
-        var tasks = subagentRequests.Select(async spec =>
+        var executionMap = new Dictionary<string, SubagentExecutionResult>(StringComparer.OrdinalIgnoreCase);
+        var completedRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var remainingSpecs = new List<SubagentSpec>(subagentRequests);
+        var allResults = new List<SubagentExecutionResult>();
+
+        while (remainingSpecs.Count > 0)
         {
-            return await RunSingleSubagentAsync(spec, workspaceRoot, currentDepth + 1, onStep, cancellationToken);
-        }).ToList();
+            // Select subagents whose dependencies have all completed
+            var readyBatch = remainingSpecs
+                .Where(s => s.DependsOn.Count == 0 || s.DependsOn.All(dep => completedRoles.Contains(dep)))
+                .ToList();
 
-        var results = await Task.WhenAll(tasks);
+            if (readyBatch.Count == 0)
+            {
+                // Unresolvable dependency or cycle detected; fallback to execute remaining concurrently
+                logger?.LogWarning("SubagentRunner", "[SUBAGENT DAG WARNING] Unresolved dependency or cycle detected in subagent DAG. Executing remaining subagents concurrently.");
+                readyBatch = remainingSpecs.ToList();
+            }
 
-        bool allSucceeded = results.All(r => r.Success);
+            foreach (var s in readyBatch) remainingSpecs.Remove(s);
+
+            var batchTasks = readyBatch.Select(async spec =>
+            {
+                // Inject parent outputs into prompt if dependent on previous subagents
+                string enrichedPrompt = spec.Prompt;
+                if (spec.DependsOn.Count > 0)
+                {
+                    var parentOutputs = new StringBuilder("\n\n### [PARENT SUBAGENT CONTEXT INJECTION]\n");
+                    foreach (var depRole in spec.DependsOn)
+                    {
+                        if (executionMap.TryGetValue(depRole, out var parentRes))
+                        {
+                            parentOutputs.AppendLine($"#### Output from parent subagent [{depRole}]:");
+                            parentOutputs.AppendLine(parentRes.Output);
+                            if (parentRes.KeyFacts.Count > 0)
+                            {
+                                parentOutputs.AppendLine($"Key Facts: {string.Join("; ", parentRes.KeyFacts)}");
+                            }
+                            parentOutputs.AppendLine();
+                        }
+                    }
+                    enrichedPrompt += parentOutputs.ToString();
+                }
+
+                var specToRun = spec with { Prompt = enrichedPrompt };
+                return await RunSingleSubagentAsync(specToRun, workspaceRoot, currentDepth + 1, onStep, cancellationToken);
+            }).ToList();
+
+            var batchResults = await Task.WhenAll(batchTasks);
+
+            foreach (var res in batchResults)
+            {
+                executionMap[res.Role] = res;
+                completedRoles.Add(res.Role);
+                allResults.Add(res);
+            }
+        }
+
+        bool allSucceeded = allResults.All(r => r.Success);
         var combinedOutput = new StringBuilder();
 
-        foreach (var res in results)
+        foreach (var res in allResults)
         {
             if (combinedOutput.Length > 0) combinedOutput.AppendLine("\n" + new string('-', 40) + "\n");
             combinedOutput.AppendLine(res.Output);
         }
 
         string resultOutput = combinedOutput.ToString();
-        string? resultError = allSucceeded ? null : string.Join("; ", results.Where(r => !r.Success).Select(r => r.Error));
+        string? resultError = allSucceeded ? null : string.Join("; ", allResults.Where(r => !r.Success).Select(r => r.Error));
 
         return new AgentToolResult(
             callId,
@@ -123,7 +174,7 @@ public sealed class SubagentRunner : ISubagentRunner
                     "[SUBAGENT ROLE DIRECTIVE - RESEARCH & EXPLORATION]\nYou are a specialized read-only research subagent. Focus on codebase search, ripgrep inspection, documentation review, and web search. Do NOT modify workspace code files.",
                 var r when r.Contains("refactor") || r.Contains("clean") =>
                     "[SUBAGENT ROLE DIRECTIVE - REFACTOR & CLEANUP]\nYou are a code refactoring subagent. Focus on eliminating technical debt, simplifying complex methods, preserving existing public API contracts, and ensuring clean AST symbol renaming.",
-                var r when r.Contains("verifier") || r.Contains("verifier") || r.Contains("test") || r.Contains("audit") =>
+                var r when r.Contains("verifier") || r.Contains("test") =>
                     "[SUBAGENT ROLE DIRECTIVE - VERIFIER & TESTER]\nYou are a QA verification subagent. Focus on running build scripts, unit tests, static linter checks, and validating overall code health.",
                 _ => $"[SUBAGENT ROLE DIRECTIVE - {spec.Role.ToUpperInvariant()}]\nYou are an autonomous subagent focused on this specific sub-goal. Execute the necessary actions and produce a clear report of results."
             };
@@ -244,8 +295,9 @@ public sealed class SubagentRunner : ISubagentRunner
         string? model = GetStringProp(elem, "model", "Model");
         string? workspace = GetStringProp(elem, "workspace", "Workspace", "mode", "Mode");
         int maxIter = GetIntProp(elem, "max_iterations", "maxIterations", "MaxIterations") ?? DefaultSubagentMaxIterations;
+        var dependsOn = GetStringListProp(elem, "dependsOn", "depends_on", "DependsOn");
 
-        return new SubagentSpec(role, prompt, model, maxIter, workspace);
+        return new SubagentSpec(role, prompt, model, maxIter, workspace, dependsOn);
     }
 
     private static string? GetStringProp(JsonElement elem, params string[] props)
@@ -260,6 +312,34 @@ public sealed class SubagentRunner : ISubagentRunner
         return null;
     }
 
+    private static IReadOnlyList<string> GetStringListProp(JsonElement elem, params string[] props)
+    {
+        var list = new List<string>();
+        foreach (var prop in props)
+        {
+            if (elem.TryGetProperty(prop, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in val.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                        {
+                            list.Add(item.GetString()!.Trim());
+                        }
+                    }
+                    if (list.Count > 0) return list;
+                }
+                else if (val.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(val.GetString()))
+                {
+                    list.Add(val.GetString()!.Trim());
+                    return list;
+                }
+            }
+        }
+        return list;
+    }
+
     private static int? GetIntProp(JsonElement elem, params string[] props)
     {
         foreach (var prop in props)
@@ -272,5 +352,8 @@ public sealed class SubagentRunner : ISubagentRunner
         return null;
     }
 
-    private record SubagentSpec(string Role, string Prompt, string? Model, int MaxIterations, string? Workspace = null);
+    private record SubagentSpec(string Role, string Prompt, string? Model, int MaxIterations, string? Workspace = null, IReadOnlyList<string>? DependsOn = null)
+    {
+        public IReadOnlyList<string> DependsOn { get; init; } = DependsOn ?? Array.Empty<string>();
+    }
 }

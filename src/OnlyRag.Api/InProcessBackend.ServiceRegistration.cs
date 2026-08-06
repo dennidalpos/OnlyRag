@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Api.Services;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
 using OnlyRag.Infrastructure.Export;
@@ -94,6 +95,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IGeneratedImageRepository, SqliteGeneratedImageRepository>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IAgentRunStateRepository, SqliteAgentRunStateRepository>();
+        services.AddSingleton<SqlitePolicyAuditRepository>();
         services.AddSingleton<IAesBackupService, AesBackupService>();
         services.AddSingleton<ISqliteMaintenanceService, SqliteMaintenanceService>();
         services.AddHostedService<SqliteMaintenanceBackgroundService>();
@@ -134,11 +136,18 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IAgentSkillRepository, SqliteAgentSkillRepository>();
         services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
         services.AddSingleton<ISubagentReportCacheRepository, SqliteSubagentReportCacheRepository>();
+        services.AddSingleton<IAgentMctsCheckpointRepository, SqliteAgentMctsCheckpointRepository>();
+        services.AddSingleton<IAgentQueryIntentRouter, AgentQueryIntentRouter>();
+        services.AddSingleton<IAgentVerificationEngine, AgentVerificationEngine>();
         services.AddSingleton<IMultiAgentOrchestratorService, MultiAgentOrchestratorService>();
+        services.AddSingleton<ILanSyncService, OnlyRag.Infrastructure.Sync.LanSyncService>();
+        services.AddHostedService<SyncBackgroundWorkerService>();
         services.AddSingleton<IWorkspaceVectorIndexerService, WorkspaceVectorIndexerService>();
         services.AddSingleton<IAstDependencyGraphService, AstDependencyGraphService>();
         services.AddSingleton<IGraphRagAstSymbolIndexer, GraphRagAstSymbolIndexer>();
         services.AddSingleton<WorkspaceSnapshotCheckpointManager>();
+        services.AddSingleton<OnlyRag.Infrastructure.Agent.Memory.EpisodicMemoryIndexer>();
+        services.AddSingleton<IAgentExecutionPolicyService, AgentExecutionPolicyService>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<IRetrievalBenchmarkReportService, RetrievalBenchmarkReportService>();
         services.AddSingleton<ChatService>();
@@ -158,6 +167,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<OnlyRag.Core.IChatReportExportService, OnlyRag.Infrastructure.Export.ChatReportExportService>();
         services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
         services.AddSingleton<IArchiveManifestRepository, SqliteArchiveManifestRepository>();
+        services.AddSingleton<IBatchIngestionQueueService, BatchIngestionQueueService>();
         services.AddSingleton<LocalDocumentStorageGuard>();
         services.AddSingleton<IngestionSettingsStore>();
         services.AddSingleton<ArchiveExtractionService>();
@@ -202,7 +212,7 @@ internal static class InProcessBackendServiceRegistration
     {
         services.AddSingleton<ImageModelCatalogStore>();
         services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
-        services.AddSingleton(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
+        services.AddSingleton<IImageGenerationEngine>(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
         services.AddSingleton<ImageGenerationService>();
         services.AddHttpClient<ImageModelManager>(client =>
         {
@@ -220,6 +230,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ILocalJobHandler, OllamaModelPullJobHandler>();
         services.AddSingleton<RunningJobCancellationRegistry>();
         services.AddHostedService<LocalJobWorkerService>();
+        services.AddHostedService<Services.OnnxModelWarmupBackgroundService>();
         return services;
     }
 }

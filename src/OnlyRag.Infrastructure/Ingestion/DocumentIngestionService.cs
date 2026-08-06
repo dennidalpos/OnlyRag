@@ -27,6 +27,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
     private readonly LocalSqliteStoreDescriptor? descriptor;
     private readonly Retrieval.Graph.IEntityGraphExtractor? graphExtractor;
     private readonly Retrieval.Graph.IGraphRetrievalService? graphService;
+    private readonly SemaphoreSlim ocrConcurrencySemaphore = new(Math.Clamp(Environment.ProcessorCount / 2, 1, 4), Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
 
     public DocumentIngestionService(
         IDocumentRepository documents,
@@ -341,7 +342,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             return string.IsNullOrWhiteSpace(text) ? [] : [new ArchiveEntryText(text, string.Empty)];
         }
 
-        if (extension is not ".docx" and not ".xlsx" and not ".pptx" and not ".pdf")
+        if (extension is not ".docx" and not ".xlsx" and not ".pptx" and not ".pdf"
+            and not ".png" and not ".jpg" and not ".jpeg" and not ".bmp" and not ".gif" and not ".tif" and not ".tiff" and not ".webp")
         {
             return [];
         }
@@ -354,6 +356,12 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             await using (FileStream destination = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
                 await content.CopyToAsync(destination, cancellationToken);
+            }
+
+            if (extension is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tif" or ".tiff" or ".webp")
+            {
+                string ocrText = await PerformOcrForImagePathAsync(temporaryPath, cancellationToken);
+                return string.IsNullOrWhiteSpace(ocrText) ? [] : [new ArchiveEntryText(ocrText.Trim(), " | immagine OCR")];
             }
 
             if (extension is ".docx" or ".xlsx" or ".pptx")
@@ -824,6 +832,87 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             result.AverageConfidence,
             boxesJson,
             OcrError: null);
+    }
+
+    private async Task<string> PerformOcrForImagePathAsync(string imagePath, CancellationToken cancellationToken)
+    {
+        await ocrConcurrencySemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+            if (!availability.IsConfigured)
+            {
+                return string.Empty;
+            }
+
+            OcrPipelineOptions ocrOptions = await LoadOcrOptionsAsync(languageOverride: null, cancellationToken);
+            string outputDirectory = descriptor?.Paths.DocumentRendersDirectory
+                ?? Path.Combine(Path.GetTempPath(), "OnlyRag", "ocr-renders");
+
+            OcrPagePreparation preparation = await ocrEngine.PreparePageAsync(
+                new OcrPagePreparationRequest(
+                    imagePath,
+                    "image",
+                    1,
+                    outputDirectory,
+                    ocrEngine.PreprocessVersion,
+                    ocrOptions.Settings),
+                cancellationToken);
+
+            string cacheKey = OcrCacheKey.Create(
+                preparation.PageHash,
+                ocrEngine.EngineName,
+                availability.EngineVersion,
+                ocrOptions.Language,
+                ocrEngine.PreprocessVersion,
+                ocrOptions.Settings.ToCacheSignature());
+
+            if (ocrCache is not null)
+            {
+                OcrCacheEntry? cached = await ocrCache.GetAsync(cacheKey, cancellationToken);
+                if (cached is not null)
+                {
+                    return cached.Text;
+                }
+            }
+
+            OcrPageResult result = await ocrRetryPolicy.ExecuteAsync(
+                token => ocrEngine.RecognizeAsync(
+                    new OcrRecognitionRequest(preparation.PreparedImagePath, ocrOptions.Language, ocrOptions.Settings),
+                    token),
+                ocrOptions,
+                cancellationToken);
+
+            if (ocrCache is not null && !string.IsNullOrWhiteSpace(result.Text))
+            {
+                string boxesJson = JsonSerializer.Serialize(result.Boxes);
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                await ocrCache.UpsertAsync(
+                    new OcrCacheEntry(
+                        cacheKey,
+                        preparation.PageHash,
+                        result.EngineName,
+                        availability.EngineVersion,
+                        result.Language,
+                        ocrEngine.PreprocessVersion,
+                        result.Text,
+                        boxesJson,
+                        result.AverageConfidence,
+                        now,
+                        now),
+                    cancellationToken);
+            }
+
+            return result.Text ?? string.Empty;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return string.Empty;
+        }
+        finally
+        {
+            ocrConcurrencySemaphore.Release();
+        }
     }
 
     private async Task<OcrPipelineOptions> LoadOcrOptionsAsync(

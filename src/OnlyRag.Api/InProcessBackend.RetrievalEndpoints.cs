@@ -191,5 +191,43 @@ public static partial class InProcessBackend
             var report = await benchmarkService.EvaluateBenchmarkAsync(testCases, 5, cancellationToken);
             return Results.Ok(report);
         });
+
+        app.MapPost("/api/rag/benchmark/concurrency", async (
+            int? concurrency,
+            bool? simulateFaults,
+            IRetrievalBenchmarkReportService benchmarkService,
+            IDocumentRepository documentRepository,
+            CancellationToken cancellationToken) =>
+        {
+            var docs = await documentRepository.ListAsync(cancellationToken);
+            var indexedDocs = docs.Where(d => d.Status == DocumentStatus.Indexed).ToList();
+
+            var testCases = new List<RetrievalBenchmarkTestCase>();
+            foreach (var doc in indexedDocs.Take(10))
+            {
+                testCases.Add(new RetrievalBenchmarkTestCase(
+                    $"concur_bench_{doc.Id}",
+                    doc.OriginalFileName,
+                    [1],
+                    [doc.Id],
+                    TopK: 5));
+            }
+
+            if (testCases.Count == 0)
+            {
+                for (int i = 1; i <= 10; i++)
+                {
+                    testCases.Add(new RetrievalBenchmarkTestCase($"concur_sample_{i}", $"Concurrency search query test {i}", [1], null, TopK: 5));
+                }
+            }
+
+            var report = await benchmarkService.EvaluateConcurrencyAndFaultToleranceAsync(
+                testCases,
+                concurrency ?? 10,
+                simulateFaults ?? false,
+                cancellationToken);
+
+            return Results.Ok(report);
+        });
     }
 }

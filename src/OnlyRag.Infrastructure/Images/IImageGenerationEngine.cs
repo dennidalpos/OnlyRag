@@ -11,6 +11,11 @@ public interface IImageGenerationEngine
         string modelDirectory,
         bool preferGpu,
         CancellationToken cancellationToken = default);
+
+    Task WarmupAsync(
+        string modelDirectory,
+        bool preferGpu,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 public sealed record ImageGenerationEngineStatus(

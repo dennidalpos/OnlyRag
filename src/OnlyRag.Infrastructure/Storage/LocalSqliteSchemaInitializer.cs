@@ -5,7 +5,7 @@ namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteSchemaInitializer
 {
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 11;
     private const string FtsUnavailableNote = "SQLite FTS5 is unavailable in the active SQLite provider; keyword search is disabled.";
 
     private readonly LocalSqliteStoreDescriptor descriptor;
@@ -168,6 +168,18 @@ public sealed class LocalSqliteSchemaInitializer
         if (currentVersion == 8)
         {
             await MigrateFromV8ToV9Async(connection, cancellationToken);
+            currentVersion = 9;
+        }
+
+        if (currentVersion == 9)
+        {
+            await MigrateFromV9ToV10Async(connection, cancellationToken);
+            currentVersion = 10;
+        }
+
+        if (currentVersion == 10)
+        {
+            await MigrateFromV10ToV11Async(connection, cancellationToken);
             return new SchemaInspection("Current", null);
         }
 
@@ -520,6 +532,65 @@ public sealed class LocalSqliteSchemaInitializer
         catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
 
+    private static async Task MigrateFromV9ToV10Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS agent_policy_audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    call_id TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    allowed INTEGER NOT NULL,
+                    workspace_root TEXT NOT NULL,
+                    arguments_json TEXT NOT NULL,
+                    output_or_error TEXT NULL,
+                    timestamp_utc TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_agent_policy_audit_logs_call ON agent_policy_audit_logs(call_id);
+                CREATE INDEX IF NOT EXISTS idx_agent_policy_audit_logs_timestamp ON agent_policy_audit_logs(timestamp_utc DESC);
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCommand = connection.CreateCommand();
+            pragmaCommand.CommandText = "PRAGMA user_version = 10;";
+            await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { await transaction.RollbackAsync(cancellationToken); throw; }
+    }
+
+    private static async Task MigrateFromV10ToV11Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS agent_mcts_checkpoints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    step_number INTEGER NOT NULL,
+                    active_node_id TEXT NOT NULL,
+                    tree_state_json TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_agent_mcts_checkpoints_run ON agent_mcts_checkpoints(run_id, step_number DESC);
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await using SqliteCommand pragmaCommand = connection.CreateCommand();
+            pragmaCommand.CommandText = "PRAGMA user_version = 11;";
+            await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { await transaction.RollbackAsync(cancellationToken); throw; }
+    }
+
     private sealed record SchemaInspection(string Status, string? TechnicalNote);
 
     private static async Task<int> GetUserVersionAsync(
@@ -539,6 +610,8 @@ public sealed class LocalSqliteSchemaInitializer
     {
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+
+
         command.AddParameter("$name", tableName);
         object? value = await command.ExecuteScalarAsync(cancellationToken);
         return value is not null;
@@ -591,6 +664,16 @@ public sealed class LocalSqliteSchemaInitializer
         return BuildStatus(CurrentSchemaVersion, textSearchBackend, schemaTechnicalNote: schemaTechnicalNote);
     }
 
+    private static async Task<bool> HasAnyUserTablesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1;";
+        object? value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is not null;
+    }
+
     private static async Task<bool> HasCurrentFreshSchemaAsync(
         SqliteConnection connection,
         int currentVersion,
@@ -608,17 +691,8 @@ public sealed class LocalSqliteSchemaInitializer
             && await TableExistsAsync(connection, "agent_run_transitions", cancellationToken)
             && await TableExistsAsync(connection, "agent_run_trace_events", cancellationToken)
             && await TableExistsAsync(connection, "archive_manifest_entries", cancellationToken)
+            && await TableExistsAsync(connection, "agent_policy_audit_logs", cancellationToken)
             && !await TableExistsAsync(connection, "schema_migrations", cancellationToken);
-    }
-
-    private static async Task<bool> HasAnyUserTablesAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken)
-    {
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1;";
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is not null;
     }
 
     private static async Task ApplyFreshSchemaAsync(
@@ -952,6 +1026,29 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE agent_policy_audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                allowed INTEGER NOT NULL,
+                workspace_root TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                output_or_error TEXT NULL,
+                timestamp_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE agent_mcts_checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                step_number INTEGER NOT NULL,
+                active_node_id TEXT NOT NULL,
+                tree_state_json TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+            );
+            CREATE INDEX idx_agent_mcts_checkpoints_run ON agent_mcts_checkpoints(run_id, step_number DESC);
+
             CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
             CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
             CREATE INDEX idx_document_pages_document ON document_pages(document_id);
@@ -991,7 +1088,7 @@ public sealed class LocalSqliteSchemaInitializer
             CREATE INDEX idx_documents_original_path ON documents(original_path);
             {{ftsSql}}
 
-            PRAGMA user_version = 9;
+            PRAGMA user_version = 11;
             """;
     }
 

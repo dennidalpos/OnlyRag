@@ -97,6 +97,11 @@ public sealed partial class InProcessBackendTests
         Assert.Equal(
             OnnxStack.StableDiffusion.Enums.ModelType.Turbo,
             OnnxStableDiffusionImageGenerationEngine.ResolveModelType("lcm-sdxl-olive-onnx"));
+        Assert.Equal(
+            OnnxStack.StableDiffusion.Enums.ModelType.Turbo,
+            OnnxStableDiffusionImageGenerationEngine.ResolveModelType("lcm-sdxl-int8-onnx"));
+        Assert.True(OnnxStableDiffusionImageGenerationEngine.IsInt8QuantizedModel("lcm-sdxl-int8-onnx"));
+        Assert.False(OnnxStableDiffusionImageGenerationEngine.IsInt8QuantizedModel("sdxl-base-1.0-onnx"));
     }
 
     [Fact]

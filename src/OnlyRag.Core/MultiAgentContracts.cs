@@ -51,3 +51,18 @@ public interface IMultiAgentOrchestratorService
         string orchestrationId,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record CriticEvaluationResult(
+    bool Approved,
+    float Score,
+    string Feedback,
+    IReadOnlyList<string> IdentifiedDefects,
+    DateTimeOffset EvaluatedAtUtc);
+
+public sealed record MultiAgentRoleConfig(
+    string Role,
+    string Specialty,
+    int TokenBudget,
+    int ToolCallBudget,
+    IReadOnlyList<string> PermittedTools);
+

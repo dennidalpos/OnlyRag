@@ -1,30 +1,84 @@
 {
   "todos": [
-    "P0 Retrieval: correggere il context assembly affinché passi al modello il ParentContent risolto, preservi documento/pagine/chunk/provenienza e separi gli snippet di ranking dal contesto di risposta.",
-    "P0 Sicurezza agentica: introdurre policy centralizzata per tool e comandi con allowlist/denylist, workspace sandbox, limiti di durata/output/risorse, classificazione del rischio, approval obbligatoria, audit append-only e verifica post-esecuzione.",
-    "P0 Sicurezza agentica: rimuovere l'esecuzione implicita di comandi e mutazioni; applicare la policy a tool batch, subagent, background task, ripresa run e endpoint MCP.",
-    "P0 Integrazione: aggiungere test end-to-end per i P0 completati (completion gate agentico, trace/evaluation, grounding, context assembly e policy tool) ed eseguire il gate Release.",
-    "P1 Agent planning: sostituire il piano libero con un piano tipizzato e vincolante, con dipendenze, precondizioni, postcondizioni, output attesi, stato verificato, retry, rollback e blocco esplicito.",
-    "P1 Agent verification: aggiungere verificatori deterministici per file modificati, patch, build, test, lint, stato Git e criteri di accettazione; impedire la finalizzazione quando una verifica richiesta manca o fallisce.",
-    "P1 Ragionamento: introdurre router adattivo dell'intento che scelga risposta diretta, retrieval, decomposizione, confronto, estrazione o azione e imponga il piano minimo adeguato.",
-    "P1 Retrieval: calibrare confidence e policy CRAG con benchmark; usare copertura, diversità, conflitto e freshness per decidere accept, reformulate, broaden o abstain.",
-    "P1 Retrieval: completare query decomposition, multi-query e HyDE con budget, deduplicazione, attribuzione alla sotto-query e ablation su Recall@K, MRR, nDCG, groundedness e latenza.",
-    "P1 Retrieval: rendere il reranking configurabile e misurabile con fallback esplicito, score comparabili, inferenza ONNX batch, cutoff adattivo e test multilingua/composizionali.",
-    "P1 Context: implementare context packing a budget token con deduplicazione, MMR/diversità, ordinamento per evidenza, gestione conflitti e citazioni stabili senza troncamenti distruttivi.",
-    "P1 Memoria: rifondare memoria episodica e skill memory con schema versionato, affidabilità, timestamp, outcome verificato, scope, privacy, deduplicazione, TTL/decadimento e hybrid rank fusion.",
-    "P1 Multi-agent: sostituire l'orchestratore placeholder con DAG eseguibile di ruoli specializzati, contratti input/output, budget e isolamento per ruolo, cancellazione, handoff verificati, critic indipendente e sintesi con provenienza.",
-    "P1 Resilienza: unificare job queue e agent run state in storage persistente con idempotenza, checkpoint semantici, retry classificati, backoff, cancellation, recovery e cleanup artefatti; coprire crash/restart end-to-end.",
-    "P1 Osservabilità: aggiungere dashboard e API diagnostiche per retrieval, grounding, trace agentici, tool failure, costi, saturazione Ollama/Qdrant, correlation id e motivi di abstention.",
-    "P1 Ingestione: implementare coda batch persistente con avanzamento per file, annullamento, ripresa, idempotenza e risultato aggregato.",
-    "P1 Ingestione: completare test API/end-to-end per archivi, deduplicazione di contenitore/elemento, batch, annullamento e ripresa.",
-    "P1 Ingestione: includere immagini estratte da ZIP, TAR e 7Z nel flusso OCR con provenienza, stato, errore e conteggi manifest.",
-    "P2 Qualità: rimuovere placeholder, catch silenziosi, codice morto e nomenclatura legacy nelle aree agent/RAG; imporre analyzer e regole anti-regressione.",
-    "P2 Benchmark: costruire suite offline riproducibile per task agentici, retrieval, citazioni, conflitti, tool use e failure recovery, con gate automatico locale/CI.",
-    "P2 Sincronizzazione: progettare e documentare protocollo LAN per pairing/autenticazione, identificativi dispositivo, consenso esplicito, modello di minaccia e gestione sicura chiavi.",
-    "P2 Sincronizzazione: implementare pairing, persistenza locale dei dispositivi autorizzati e revoca sicura.",
-    "P2 Sincronizzazione: implementare snapshot consistenti SQLite/Qdrant con cifratura AES-256, trasferimento incrementale, integrità, ripresa dopo interruzione e cleanup sicuro degli artefatti temporanei.",
-    "P2 Sincronizzazione: implementare rilevazione/risoluzione conflitti e ripristino verificato.",
-    "P2 Sincronizzazione: aggiungere UI e diagnostica per pairing, trasferimenti, conflitti, ripristino e revoca.",
-    "P2 Sincronizzazione: aggiungere test unitari, integrazione ed end-to-end per pairing, cifratura, conflitti, ripresa, ripristino e revoca; aggiornare documentazione e skill operative."
+    {
+      "id": "TASK-001",
+      "priority": "P1",
+      "category": "Data Layer",
+      "title": "Migrazione Data Layer a EF Core 10 e FluentMigrator",
+      "description": "Sostituire la gestione manuale ADO.NET in OnlyRag.Infrastructure con EF Core 10 per entita fortemente tipizzate.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-002",
+      "priority": "P1",
+      "category": "Data Layer",
+      "title": "Migrazioni SQLite non distruttive e WAL Tuning",
+      "description": "Sostituire il reset distruttivo di LocalSqliteSchemaInitializer.cs con migrazioni incrementali e attivare PRAGMA WAL.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-003",
+      "priority": "P2",
+      "category": "AI Framework",
+      "title": "Adozione di Microsoft.Extensions.AI",
+      "description": "Sostituire OllamaClient.cs con l'astrazione standard Microsoft.Extensions.AI (IChatClient, IEmbeddingGenerator).",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-004",
+      "priority": "P2",
+      "category": "Real-Time API",
+      "title": "Streaming SignalR Hubs per LLM e Job",
+      "description": "Implementare SignalR Hubs in OnlyRag.Api e collegare @microsoft/signalr in React per token streaming e live progress.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-005",
+      "priority": "P3",
+      "category": "OCR & ML Engine",
+      "title": "Engine OCR Nativo C# DirectML (Eliminazione Python)",
+      "description": "Sostituire il subprocess Python PaddleOCR con binding C# nativo ONNX DirectML per rimuovere la dipendenza da Python 3.x.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-006",
+      "priority": "P3",
+      "category": "Ingestion Pipeline",
+      "title": "Pipeline di Ingestion basata su System.Threading.Channels",
+      "description": "Riscrivere DocumentIngestionJobHandler.cs con pattern Producer-Consumer asincrono a basso consumo RAM.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-007",
+      "priority": "P4",
+      "category": "Security",
+      "title": "Crittografia SQLite a Riposo con SQLCipher",
+      "description": "Integrare SQLitePCLRaw.bundle_e_sqlcipher per la crittografia trasparente AES-256 del database locale.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-008",
+      "priority": "P4",
+      "category": "API Bridge",
+      "title": "Client API TypeScript tipizzato da OpenAPI",
+      "description": "Generare i contratti API TypeScript nel frontend da OpenAPI usando @hey-api/openapi-ts.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-009",
+      "priority": "P4",
+      "category": "Security",
+      "title": "Lockdown API e Sanitizzazione Percorsi",
+      "description": "Rafforzare l'isolamento del server Kestrel loopback con secret header e convalida in SafeDocumentPath.cs.",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-010",
+      "priority": "P5",
+      "category": "Verification & Release",
+      "title": "Verification Gate e Benchmark Prestazionali",
+      "description": "Eseguire Invoke-Gate.ps1, effettuare benchmark di latenza RAG/RAM e verificare il ciclo di vita installer con Test-InstallerRelease.ps1.",
+      "status": "pending"
+    }
   ]
 }

@@ -96,3 +96,84 @@ public sealed record AgentSkillRecord(
     string SolutionTemplate,
     DateTimeOffset CreatedAtUtc);
 
+public enum AgentIntentKind
+{
+    DirectAnswer,
+    Retrieval,
+    Decomposition,
+    Comparison,
+    Extraction,
+    Action
+}
+
+public enum AgentStepStatus
+{
+    Pending,
+    InProgress,
+    Verified,
+    Failed,
+    Skipped
+}
+
+public sealed record AgentPrecondition(
+    string Kind,
+    string Value,
+    string Description);
+
+public sealed record AgentPostcondition(
+    string Kind,
+    string Value,
+    string Description);
+
+public sealed record AgentRollbackAction(
+    string ActionName,
+    string TargetPath,
+    string Directives);
+
+public sealed record AgentTaskStep(
+    string StepId,
+    string Description,
+    IReadOnlyList<AgentPrecondition> Preconditions,
+    IReadOnlyList<AgentPostcondition> Postconditions,
+    string? ExpectedToolName,
+    string? ExpectedCommand,
+    AgentStepStatus Status,
+    DateTimeOffset? VerifiedAtUtc = null,
+    AgentRollbackAction? Rollback = null);
+
+public sealed record AgentTypedPlan(
+    string PlanId,
+    string Goal,
+    AgentIntentKind InitialIntent,
+    IReadOnlyList<AgentTaskStep> Steps,
+    IReadOnlyList<AgentCompletionCriterion> MandatoryVerifications,
+    bool IsBinding = true);
+
+public sealed record AgentVerificationEvidence(
+    string VerificationId,
+    string CriterionId,
+    string Kind,
+    string ToolCallId,
+    string ToolName,
+    string? Command,
+    bool Passed,
+    string Details,
+    DateTimeOffset VerifiedAtUtc);
+
+public sealed record AgentQueryIntentResult(
+    AgentIntentKind Intent,
+    string Rationale,
+    bool RequiresPlan,
+    AgentTypedPlan? MinimumPlan,
+    float Confidence);
+
+public sealed record AgentMctsCheckpoint(
+    long Id,
+    string RunId,
+    int StepNumber,
+    string ActiveNodeId,
+    string TreeStateJson,
+    DateTimeOffset CreatedAtUtc);
+
+
+

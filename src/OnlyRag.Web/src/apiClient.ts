@@ -20,6 +20,18 @@ export type ApiRequestOptions = RequestInit & {
   retryOnStatusCodes?: number[];
 };
 
+export type AgentPolicyAuditRecord = {
+  id: number;
+  callId: string;
+  toolName: string;
+  riskLevel: string;
+  allowed: boolean;
+  workspaceRoot: string;
+  argumentsJson: string;
+  outputOrError?: string | null;
+  timestampUtc: string;
+};
+
 export type HardwareMetricsResponse = {
   cpuUsagePercentage: number;
   memoryAvailableMB: number;
@@ -336,6 +348,17 @@ export async function runRagBenchmark(): Promise<import("./apiTypes/search").Ret
   return apiRequest<import("./apiTypes/search").RetrievalBenchmarkReport>("/api/rag/benchmark/run", {
     method: "POST"
   });
+}
+
+export async function runConcurrencyBenchmark(concurrency: number = 10, simulateFaults: boolean = true): Promise<import("./apiTypes/search").ConcurrencyBenchmarkReport> {
+  const query = new URLSearchParams({ concurrency: concurrency.toString(), simulateFaults: simulateFaults.toString() }).toString();
+  return apiRequest<import("./apiTypes/search").ConcurrencyBenchmarkReport>(`/api/rag/benchmark/concurrency?${query}`, {
+    method: "POST"
+  });
+}
+
+export async function getAgentPolicyAuditLogs(limit: number = 50): Promise<AgentPolicyAuditRecord[]> {
+  return apiRequest<AgentPolicyAuditRecord[]>(`/api/agent/policy-audit?limit=${limit}`);
 }
 
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {

@@ -17,6 +17,7 @@ public sealed class WorkspaceToolExecutor
     };
 
     private readonly List<IToolHandler> handlers;
+    private readonly IAgentExecutionPolicyService? policyService;
     private readonly ILoggingService? logger;
 
     public WorkspaceToolExecutor(
@@ -27,8 +28,10 @@ public sealed class WorkspaceToolExecutor
         ISubagentRunner? subagentRunner = null,
         IWorkspaceVectorIndexerService? vectorIndexer = null,
         IAstDependencyGraphService? astGraphService = null,
+        IAgentExecutionPolicyService? policyService = null,
         ILoggingService? logger = null)
     {
+        this.policyService = policyService;
         this.logger = logger;
         this.handlers = new List<IToolHandler>
         {
@@ -50,6 +53,18 @@ public sealed class WorkspaceToolExecutor
         CancellationToken cancellationToken = default)
     {
         logger?.LogTrace("AgentEngine", $"[TOOL EXEC START] Tool: '{toolName}', CallID: '{callId}', Args: {argumentsJson}");
+
+        ToolExecutionContext context = new(callId, toolName, argumentsJson, workspaceRoot);
+        if (policyService != null)
+        {
+            AgentPolicyDecision decision = await policyService.EvaluateAsync(context, cancellationToken);
+            if (!decision.Allowed)
+            {
+                string err = $"Policy violation ({decision.RiskLevel}): {decision.DenialReason}";
+                logger?.LogWarning("AgentEngine", $"[POLICY DENIED] Tool: '{toolName}', CallID: '{callId}', Reason: {err}");
+                return new AgentToolResult(callId, toolName, false, string.Empty, err);
+            }
+        }
 
         bool requiresWorkspace = IsWorkspaceFolderRequired(toolName);
         if (requiresWorkspace && (string.IsNullOrWhiteSpace(workspaceRoot) || !Directory.Exists(workspaceRoot)))
@@ -79,6 +94,11 @@ public sealed class WorkspaceToolExecutor
             }
 
             AgentToolResult result = await handler.ExecuteAsync(callId, toolName, root, workspaceRoot ?? string.Empty, onStep, cancellationToken);
+
+            if (policyService != null)
+            {
+                await policyService.PostExecutionVerifyAsync(context, result.Success, result.Output, result.Error, cancellationToken);
+            }
 
             if (result.Success)
             {

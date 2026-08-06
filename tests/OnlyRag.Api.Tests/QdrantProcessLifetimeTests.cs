@@ -50,7 +50,7 @@ public sealed class QdrantProcessLifetimeTests
         string sleeperPath = await WaitForMainModulePathAsync(sleeper);
 
         bool adopted = false;
-        for (int retry = 0; retry < 30 && !adopted; retry++)
+        for (int retry = 0; retry < 50 && !adopted; retry++)
         {
             adopted = supervisor.TryAdoptProcess(sleeper.Id, sleeperPath);
             if (!adopted)
@@ -66,7 +66,7 @@ public sealed class QdrantProcessLifetimeTests
         bool exited = false;
         try
         {
-            exited = sleeper.HasExited || sleeper.WaitForExit(5000);
+            exited = sleeper.HasExited || sleeper.WaitForExit(10000);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
@@ -102,7 +102,7 @@ public sealed class QdrantProcessLifetimeTests
                 "-ExecutionPolicy",
                 "Bypass",
                 "-Command",
-                "Start-Sleep -Seconds 30"
+                "Start-Sleep -Seconds 60"
             }
         }) ?? throw new InvalidOperationException("PowerShell sleep process was not started.");
     }

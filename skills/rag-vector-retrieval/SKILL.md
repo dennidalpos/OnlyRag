@@ -21,11 +21,11 @@ Supported formats:
 - **Plain Text / Structured Data**: `.txt`, `.md`, `.csv`
 - **PDF Documents**: Parsed with native text extraction; fallback to PaddleOCR runtime for scanned pages.
 - **Office OpenXML Formats**: `.docx`, `.xlsx`, `.pptx` (parsed natively without requiring MS Office installation). Note: Legacy formats (`.doc`, `.xls`, `.ppt`) are explicitly not supported.
-- **Archive ingestion**: `.zip`, `.tar`, `.7z` are validated and streamed by `ArchiveExtractionService`; TXT/MD/CSV, Office Open XML, and text-based PDF entries are indexed as pages of the archive document with entry-path provenance and per-entry checkpoints. The SQLite schema v6 table `archive_manifest_entries` stores one row per archive entry, including entry index/path, declared/actual sizes, SHA-256, status, error, and page/chunk counts. Repeated paths remain separate manifest rows and are marked `Duplicate` without being indexed twice. Unsupported entries are drained for limit accounting and marked `Skipped`; image-entry OCR is not implemented yet. The manifest is exposed through `GET /api/documents/{id}/archive-manifest`.
+- **Archive ingestion**: `.zip`, `.tar`, `.7z` are validated and streamed by `ArchiveExtractionService`; TXT/MD/CSV, Office Open XML, and text-based PDF entries are indexed as pages of the archive document with entry-path provenance and per-entry checkpoints. The SQLite table `archive_manifest_entries` stores one row per archive entry, including entry index/path, declared/actual sizes, SHA-256, status, error, and page/chunk counts. Repeated paths remain separate manifest rows and are marked `Duplicate` without being indexed twice. Unsupported entries are drained for limit accounting and marked `Skipped`; image-entry OCR is not implemented yet. The manifest is exposed through `GET /api/documents/{id}/archive-manifest`.
 
 Dual-Tier Chunking strategy:
 - **Child Chunks (~150 tokens)**: High-resolution chunks indexed in SQLite FTS5 and vectorized on Qdrant.
-- **Parent Chunks (~1000 tokens / paragraph)**: Broad contextual chunks preserved in the current SQLite schema v6 (`chunks` with `parent_chunk_id`).
+- **Parent Chunks (~1000 tokens / paragraph)**: Broad contextual chunks preserved in the SQLite database (`chunks` with `parent_chunk_id`).
 
 ## 3. Next-Gen 6-Stage Retrieval Pipeline
 

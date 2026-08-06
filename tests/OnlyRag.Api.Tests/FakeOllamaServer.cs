@@ -162,7 +162,7 @@ internal sealed class FakeOllamaServer : IAsyncDisposable
     {
         string answer = body.Contains("ONLYRAG_TRANSLATION_UNIT", StringComparison.Ordinal)
             ? $"Translated: {ExtractTranslationSource(body)}"
-            : "Il documento indica il protocollo ZETA-777.";
+            : "Il documento indica il protocollo ZETA-777. (Source: populated-workflow.txt)";
         return new
         {
             done = true,

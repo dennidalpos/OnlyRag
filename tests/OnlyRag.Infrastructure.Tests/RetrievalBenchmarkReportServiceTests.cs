@@ -44,4 +44,24 @@ public class RetrievalBenchmarkReportServiceTests
         Assert.Equal("tc_1", report.Cases[0].Id);
         Assert.Equal(1, report.Cases[0].FirstRelevantRank);
     }
+
+    [Fact]
+    public async Task EvaluateConcurrencyAndFaultToleranceAsync_RunsConcurrentWorkload()
+    {
+        var mockService = new MockHybridRetrievalService();
+        var benchmarkService = new RetrievalBenchmarkReportService(mockService);
+
+        var testCases = Enumerable.Range(1, 20)
+            .Select(i => new RetrievalBenchmarkTestCase($"tc_{i}", $"Query {i}", new long[] { 101 }, null, 5))
+            .ToList();
+
+        var report = await benchmarkService.EvaluateConcurrencyAndFaultToleranceAsync(testCases, concurrencyLevel: 5, simulateNetworkFaults: true);
+
+        Assert.NotNull(report);
+        Assert.Equal(20, report.TotalRequests);
+        Assert.Equal(5, report.ConcurrentClients);
+        Assert.True(report.ThroughputRps >= 0);
+        Assert.True(report.FaultedRequests > 0);
+        Assert.True(report.SuccessfulRequests > 0);
+    }
 }

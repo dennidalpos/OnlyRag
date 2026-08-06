@@ -95,6 +95,38 @@ public sealed partial class DocumentIngestionServiceTests
     }
 
     [Fact]
+    public async Task IngestAsync_ZipProcessesExtractedImageWithOcr()
+    {
+        using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
+        string archivePath = Path.Combine(tempStorage.Paths.DocumentOriginalsDirectory, "image_bundle.zip");
+        Directory.CreateDirectory(tempStorage.Paths.DocumentOriginalsDirectory);
+        await using (FileStream stream = new(archivePath, FileMode.CreateNew))
+        {
+            using ZipArchive archive = new(stream, ZipArchiveMode.Create, leaveOpen: true);
+            ZipArchiveEntry imgEntry = archive.CreateEntry("images/photo.png");
+            await using (StreamWriter writer = new(imgEntry.Open(), Encoding.UTF8))
+            {
+                await writer.WriteAsync("fake_image_data");
+            }
+        }
+
+        ImportedDocument document = await tempStorage.CreateBinaryDocumentAsync(
+            "image_bundle.zip",
+            await File.ReadAllBytesAsync(archivePath));
+        DocumentIngestionService service = tempStorage.CreateIngestionService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.IngestAsync(
+            document,
+            checkpoint: null,
+            (_, _) => Task.CompletedTask));
+
+        IReadOnlyList<ArchiveManifestEntry> manifest = await tempStorage.ArchiveManifest.ListAsync(document.Id);
+        Assert.Single(manifest);
+        Assert.Equal("images/photo.png", manifest[0].RelativePath);
+        Assert.Equal(ArchiveManifestStatus.Skipped, manifest[0].Status);
+    }
+
+    [Fact]
     public void Chunker_PreservesOverlapBetweenChunks()
     {
         DocumentTextChunker chunker = new();

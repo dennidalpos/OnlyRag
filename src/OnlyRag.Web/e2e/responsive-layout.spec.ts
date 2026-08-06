@@ -114,7 +114,7 @@ async function fulfillApiResponse(route: Route) {
     return;
   }
 
-  if (path.endsWith("/models") || path.endsWith("/documents") || path.endsWith("/languages") || path.startsWith("/api/jobs")) {
+  if (path.endsWith("/models") || path.endsWith("/documents") || path.endsWith("/languages") || path.startsWith("/api/jobs") || path.startsWith("/api/agent")) {
     await fulfillJson(route, []);
     return;
   }

@@ -131,9 +131,29 @@ function Test-InstallerSignature {
 
     $signature = Get-AuthenticodeSignature -FilePath $Path
     $status = if ($signature.Status -eq "Valid") { "pass" } elseif ($RequireValidSignature) { "fail" } else { "warn" }
-    Add-Check -Id "signing-status" -Status $status -Message "Signature status: $($signature.Status)." -Data @{
+    Add-Check -Id "signing-status" -Status $status -Message "Installer signature status: $($signature.Status)." -Data @{
         signer = $signature.SignerCertificate?.Subject
         statusMessage = $signature.StatusMessage
+    }
+
+    $installerFolder = [System.IO.Path]::GetDirectoryName($Path)
+    $manifestPath = Join-Path $installerFolder "installer-manifest.json"
+    if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
+        try {
+            $manifestText = [System.IO.File]::ReadAllText($manifestPath)
+            $manifest = ConvertFrom-Json $manifestText
+            Add-Check -Id "installer-manifest-audit" -Status "pass" -Message "Release installer-manifest.json verified ($($manifest.fileCount) binaries audited)." -Data @{
+                version = $manifest.version
+                fileCount = $manifest.fileCount
+                generatedAtUtc = $manifest.generatedAtUtc
+            }
+        }
+        catch {
+            Add-Check -Id "installer-manifest-audit" -Status "warn" -Message "installer-manifest.json present but invalid: $_"
+        }
+    }
+    else {
+        Add-Check -Id "installer-manifest-audit" -Status "warn" -Message "installer-manifest.json not found in installer directory."
     }
 }
 

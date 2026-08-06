@@ -29,7 +29,7 @@ OnlyRag is a local-first Windows desktop app combining:
 2. **React/Vite Web UI** ([`src/OnlyRag.Web`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Web)): Modern single-page app interface executing inside WebView2.
 3. **In-Process Backend API** ([`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api)): ASP.NET Core Minimal API hosted in-process inside the WPF app.
 4. **Core Contracts** ([`src/OnlyRag.Core`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Core)): Shared DTOs, interfaces, and settings models.
-5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v6), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
+5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v9), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
 6. **Worker Queue** ([`src/OnlyRag.Worker`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Worker)): In-process task queue for asynchronous background jobs.
 
 
@@ -42,14 +42,13 @@ OnlyRag is a local-first Windows desktop app combining:
 
 Archive ingestion is implemented for ZIP, TAR, and 7Z. `ArchiveExtractionService` validates
 entry paths and decompressed-size limits while streaming entries; supported text, OpenXML, and
-text-based PDF entries become pages of the container document. SQLite schema v6 persists one
+text-based PDF entries become pages of the container document. The SQLite schema persists one
 `archive_manifest_entries` row per archive entry with provenance, declared/actual size, SHA-256,
 status, error, and page/chunk counts. Repeated paths are retained as `Duplicate` entries and are
 not indexed twice. The manifest is available through
-`GET /api/documents/{id}/archive-manifest`. Image entries are currently skipped; archive-image OCR
-is tracked in `PROJECT_STATUS.json`.
+`GET /api/documents/{id}/archive-manifest`. Image entries (.png, .jpg, .jpeg, .bmp, .gif, .tif, .tiff, .webp) are processed automatically via OCR and indexed into the container document.
 
-The coding agent persists durable runs in SQLite schema v8. `agent_runs` stores the goal,
+The coding agent persists durable runs in SQLite. `agent_runs` stores the goal,
 conversation snapshot, current state, time/token/tool budgets, typed completion criteria, and
 runtime-observed verification evidence; `agent_run_transitions` records
 the validated lifecycle (`Plan`, `Act`, `Observe`, `Verify`, `Recover`, `Finalize`). Resume a
@@ -59,7 +58,7 @@ with `GET /api/agent/runs/{runId}` or `GET /api/agent/runs/resumable`.
 The runtime refuses `Finalize` and `Completed` unless every required completion criterion has a
 positive matching tool result. LLM prose and `reflect_step` messages are not verification evidence.
 
-SQLite schema v9 adds append-only `agent_run_trace_events` for evaluation. It records model and
+Append-only `agent_run_trace_events` support evaluation. It records model and
 tool latency, decisions, observations, errors, token/tool cost, evidence and outcome. Inspect a run
 with `GET /api/agent/runs/{runId}/trace`; the reproducible task dataset is
 `docs/agent-evaluation.dataset.json`.
@@ -83,6 +82,7 @@ The repository includes porting skills checked into `skills/`:
 - [`skills/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop, SQLite.
 - [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright.
 - [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, Heuristic Re-ranking, CRAG evaluation.
+- [`skills/autonomous-agent-engine`](file:///d:/GITHUB/OnlyRag/skills/autonomous-agent-engine/SKILL.md): MCTS Tree-of-Thought, Plan-Act-Observe-Verify state machine, Episodic memory, Subagent DAG.
 - [`skills/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skills/onnx-directml-image-gen/SKILL.md): ONNX DirectML GPU / CPU fallback, SDXL/LCM models, SHA256 integrity, Canvas editor.
 - [`skills/windows-packaging-signing`](file:///d:/GITHUB/OnlyRag/skills/windows-packaging-signing/SKILL.md): NSIS packaging, signtool.exe signing, prerequisite testing, installer release lifecycle.
 - [`skills/code-maintenance-automation`](file:///d:/GITHUB/OnlyRag/skills/code-maintenance-automation/SKILL.md): Automated code formatting, static linting, and testing workflows.

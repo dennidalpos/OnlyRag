@@ -7,6 +7,7 @@ export type RagLatencyMetrics = {
   reRankingMs: number;
   totalMs: number;
   averageCragScore?: number;
+  p99Ms?: number;
 };
 
 export type DocumentSearchRequest = {
@@ -82,4 +83,17 @@ export type RetrievalBenchmarkReport = {
   ndcgAtK: number;
   cases: RetrievalBenchmarkCaseResult[];
   averageLatency?: RagLatencyMetrics | null;
+};
+
+export type ConcurrencyBenchmarkReport = {
+  evaluatedAtUtc: string;
+  concurrentClients: number;
+  totalRequests: number;
+  successfulRequests: number;
+  faultedRequests: number;
+  throughputRps: number;
+  averageLatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+  faultToleranceRate: number;
 };

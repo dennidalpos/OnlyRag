@@ -8,6 +8,7 @@ public enum CragAction
 {
     Accept,
     Reformulate,
+    Broaden,
     Abstain
 }
 

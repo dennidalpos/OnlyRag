@@ -79,6 +79,8 @@ public sealed class HeuristicReRankerService : IReRankerService
         return Task.FromResult(sorted);
     }
 
+    public Task WarmupAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     private static List<string> GetBigrams(List<string> tokens)
     {
         List<string> bigrams = [];

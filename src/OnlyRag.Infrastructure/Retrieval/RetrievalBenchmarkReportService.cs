@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Retrieval;
@@ -103,6 +104,9 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
         double avgNdcg = results.Average(r => r.NdcgAtK);
 
         var validLatencies = results.Select(r => r.Latency).Where(l => l is not null).Cast<RagLatencyMetrics>().ToList();
+        double p99Value = validLatencies.Count > 0
+            ? Math.Round(validLatencies.Select(l => l.TotalMs).OrderBy(v => v).ElementAt(Math.Clamp((int)(validLatencies.Count * 0.99), 0, validLatencies.Count - 1)), 2)
+            : 0.0;
         RagLatencyMetrics? avgLatency = validLatencies.Count > 0
             ? new RagLatencyMetrics(
                 Math.Round(validLatencies.Average(l => l.QueryEmbeddingMs), 2),
@@ -110,7 +114,8 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
                 Math.Round(validLatencies.Average(l => l.Fts5SearchMs), 2),
                 Math.Round(validLatencies.Average(l => l.ReRankingMs), 2),
                 Math.Round(validLatencies.Average(l => l.TotalMs), 2),
-                Math.Round(validLatencies.Average(l => l.AverageCragScore), 4))
+                Math.Round(validLatencies.Average(l => l.AverageCragScore), 4),
+                p99Value)
             : null;
 
         return new RetrievalBenchmarkReport(
@@ -123,5 +128,82 @@ public sealed class RetrievalBenchmarkReportService : IRetrievalBenchmarkReportS
             Math.Round(avgNdcg, 4),
             results,
             avgLatency);
+    }
+
+    public async Task<ConcurrencyBenchmarkReport> EvaluateConcurrencyAndFaultToleranceAsync(
+        IReadOnlyList<RetrievalBenchmarkTestCase> testCases,
+        int concurrencyLevel = 10,
+        bool simulateNetworkFaults = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(testCases);
+        if (testCases.Count == 0)
+        {
+            throw new ArgumentException("Benchmark testCases collection cannot be empty.", nameof(testCases));
+        }
+
+        concurrencyLevel = Math.Clamp(concurrencyLevel, 1, 100);
+        var latencies = new System.Collections.Concurrent.ConcurrentBag<double>();
+        int successCount = 0;
+        int faultCount = 0;
+
+        var sw = Stopwatch.StartNew();
+        using var semaphore = new SemaphoreSlim(concurrencyLevel);
+
+        var tasks = testCases.Select(async (testCase, index) =>
+        {
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var itemSw = Stopwatch.StartNew();
+
+                if (simulateNetworkFaults && index % 5 == 0)
+                {
+                    // Inject artificial fault simulation
+                    Interlocked.Increment(ref faultCount);
+                    return;
+                }
+
+                var request = new DocumentSearchRequest(testCase.Query, (testCase.DocumentIds ?? []).ToList(), testCase.TopK ?? 5);
+                var response = await retrievalService.SearchAsync(request, cancellationToken).ConfigureAwait(false);
+                itemSw.Stop();
+
+                latencies.Add(itemSw.Elapsed.TotalMilliseconds);
+                Interlocked.Increment(ref successCount);
+            }
+            catch
+            {
+                Interlocked.Increment(ref faultCount);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+        sw.Stop();
+
+        int totalRequests = testCases.Count;
+        double totalSeconds = Math.Max(sw.Elapsed.TotalSeconds, 0.001);
+        double throughputRps = Math.Round(totalRequests / totalSeconds, 2);
+
+        var sortedLatencies = latencies.OrderBy(l => l).ToList();
+        double avgLatency = sortedLatencies.Count > 0 ? Math.Round(sortedLatencies.Average(), 2) : 0.0;
+        double p95Latency = sortedLatencies.Count > 0 ? Math.Round(sortedLatencies[Math.Clamp((int)(sortedLatencies.Count * 0.95), 0, sortedLatencies.Count - 1)], 2) : 0.0;
+        double p99Latency = sortedLatencies.Count > 0 ? Math.Round(sortedLatencies[Math.Clamp((int)(sortedLatencies.Count * 0.99), 0, sortedLatencies.Count - 1)], 2) : 0.0;
+        double faultToleranceRate = totalRequests > 0 ? Math.Round((double)successCount / totalRequests, 4) : 0.0;
+
+        return new ConcurrencyBenchmarkReport(
+            DateTimeOffset.UtcNow,
+            concurrencyLevel,
+            totalRequests,
+            successCount,
+            faultCount,
+            throughputRps,
+            avgLatency,
+            p95Latency,
+            p99Latency,
+            faultToleranceRate);
     }
 }

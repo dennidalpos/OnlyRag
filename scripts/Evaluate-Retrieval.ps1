@@ -1,6 +1,7 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$DatasetPath,
+    [string]$DatasetPath = "docs\retrieval-evaluation.sample.json",
+
+    [switch]$GenerateSyntheticDataset,
 
     [string]$OutputPath = "artifacts\retrieval-evaluation\report.json",
 
@@ -132,6 +133,38 @@ function Measure-Case {
         keywordBackend = $Response.keywordBackend
         vectorBackend = $Response.vectorBackend
     }
+}
+
+if ($GenerateSyntheticDataset) {
+    Write-Host "Generazione dataset sintetico di valutazione RAG in corso..." -ForegroundColor Cyan
+    $syntheticDirectory = Split-Path -Parent $DatasetPath
+    if (-not [string]::IsNullOrWhiteSpace($syntheticDirectory) -and -not (Test-Path -LiteralPath $syntheticDirectory)) {
+        New-Item -ItemType Directory -Path $syntheticDirectory -Force | Out-Null
+    }
+
+    $sampleCases = @(
+        [ordered]@{
+            id = "synth_case_1"
+            query = "Quali sono i requisiti di sistema e la versione .NET di OnlyRag?"
+            documentIds = @(1)
+            expectedChunkIds = @(101, 102)
+        },
+        [ordered]@{
+            id = "synth_case_2"
+            query = "Come viene effettuata la valutazione CRAG Self-Corrective RAG?"
+            documentIds = @(1)
+            expectedChunkIds = @(201)
+        }
+    )
+
+    $syntheticDataset = [ordered]@{
+        name = "Synthetic Auto-Generated Evaluation Set"
+        topK = $TopK
+        cases = $sampleCases
+    }
+
+    $syntheticDataset | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $DatasetPath -Encoding utf8
+    Write-Host "Dataset sintetico generato con successo: $DatasetPath" -ForegroundColor Green
 }
 
 $dataset = Read-JsonFile -Path $DatasetPath
