@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Api.Services;
@@ -13,7 +14,10 @@ using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Retrieval.Graph;
 using OnlyRag.Infrastructure.Agent.Memory;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Storage.EF;
+using OnlyRag.Infrastructure.Storage.Security;
 using OnlyRag.Infrastructure.Vector;
+using OnlyRag.Infrastructure.Vram;
 using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
@@ -63,6 +67,7 @@ internal static class InProcessBackendServiceRegistration
             });
         });
 
+        services.AddOpenApi();
         return services;
     }
 
@@ -85,7 +90,13 @@ internal static class InProcessBackendServiceRegistration
 
     private static IServiceCollection AddOnlyRagStorageServices(this IServiceCollection services)
     {
+        services.AddSingleton<ISqliteKeyProvider, WindowsCredentialManagerSqliteKeyProvider>();
         services.AddSingleton<ISqliteConnectionFactory, LocalSqliteConnectionFactory>();
+        services.AddDbContext<OnlyRagDbContext>((sp, opts) =>
+        {
+            var descriptor = sp.GetRequiredService<InProcessBackendDescriptor>();
+            opts.UseSqlite($"Data Source={descriptor.StoragePaths.DatabasePath}");
+        });
         services.AddSingleton<LocalSqliteSchemaInitializer>();
         services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();
         services.AddSingleton<IDocumentRepository, SqliteDocumentRepository>();
@@ -97,6 +108,8 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<IAgentRunStateRepository, SqliteAgentRunStateRepository>();
         services.AddSingleton<SqlitePolicyAuditRepository>();
         services.AddSingleton<IAesBackupService, AesBackupService>();
+        services.AddSingleton<ICloudApiKeyVault, WindowsCredentialManagerCloudKeyVault>();
+        services.AddSingleton<ICloudLlmClientFactory, CloudLlmClientFactory>();
         services.AddSingleton<ISqliteMaintenanceService, SqliteMaintenanceService>();
         services.AddHostedService<SqliteMaintenanceBackgroundService>();
         return services;
@@ -173,6 +186,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ArchiveExtractionService>();
         services.AddSingleton<DocumentTextChunker>();
         services.AddSingleton<OfficeOpenXmlTextExtractor>();
+        services.AddSingleton<IStreamingDocumentIngestionPipeline, StreamingDocumentIngestionPipeline>();
         services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();
         return services;
     }
@@ -181,7 +195,8 @@ internal static class InProcessBackendServiceRegistration
     {
         services.AddSingleton<IOcrCacheRepository, SqliteOcrCacheRepository>();
         services.AddSingleton<OcrSettingsStore>();
-        services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
+        services.AddSingleton<IOcrEngine, OnnxDirectMlOcrEngine>();
+        services.AddSingleton<PaddleOcrEngine>();
         services.AddSingleton<OcrRetryPolicy>();
         services.AddSingleton<OcrStartupAnalysisService>();
         services.AddSingleton<OcrGpuCapabilityService>();
@@ -203,6 +218,40 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<DiagnosticsProbeCacheService>();
         services.AddSingleton<SystemTelemetryService>();
         services.AddHttpClient<IOllamaClient, OllamaClient>();
+        services.AddSignalR();
+
+        services.AddTransient<Microsoft.Extensions.AI.IChatClient>(sp =>
+        {
+            var settingsService = sp.GetRequiredService<IOllamaSettingsService>();
+            var loggerFactory = sp.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
+            var settings = settingsService.GetAsync().GetAwaiter().GetResult();
+            var endpoint = string.IsNullOrWhiteSpace(settings.OllamaBaseUrl) ? "http://127.0.0.1:11434" : settings.OllamaBaseUrl;
+            var model = string.IsNullOrWhiteSpace(settings.DefaultChatModel) ? "llama3" : settings.DefaultChatModel;
+            var client = new Microsoft.Extensions.AI.OllamaChatClient(endpoint, model);
+            if (loggerFactory is not null)
+            {
+                return new Microsoft.Extensions.AI.LoggingChatClient(client, loggerFactory.CreateLogger("Microsoft.Extensions.AI.OllamaChatClient"));
+            }
+            return client;
+        });
+
+        services.AddTransient<Microsoft.Extensions.AI.IEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>>>(sp =>
+        {
+            var settingsService = sp.GetRequiredService<IOllamaSettingsService>();
+            var loggerFactory = sp.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
+            var settings = settingsService.GetAsync().GetAwaiter().GetResult();
+            var endpoint = string.IsNullOrWhiteSpace(settings.OllamaBaseUrl) ? "http://127.0.0.1:11434" : settings.OllamaBaseUrl;
+            var model = string.IsNullOrWhiteSpace(settings.DefaultEmbeddingModel) ? "nomic-embed-text" : settings.DefaultEmbeddingModel;
+            var generator = new Microsoft.Extensions.AI.OllamaEmbeddingGenerator(endpoint, model);
+            if (loggerFactory is not null)
+            {
+                return new Microsoft.Extensions.AI.LoggingEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>>(generator, loggerFactory.CreateLogger("Microsoft.Extensions.AI.OllamaEmbeddingGenerator"));
+            }
+            return generator;
+        });
+
+        services.AddSingleton<IStreamingEmbeddingGenerator, MicrosoftExtensionsAiEmbeddingGeneratorAdapter>();
+
         return services;
     }
 
@@ -210,9 +259,10 @@ internal static class InProcessBackendServiceRegistration
         this IServiceCollection services,
         InProcessBackendOptions options)
     {
+        services.AddSingleton<IVramMemoryManager, VramMemoryManager>();
         services.AddSingleton<ImageModelCatalogStore>();
         services.AddSingleton<IImageGenerationSettingsService, ImageGenerationSettingsService>();
-        services.AddSingleton<IImageGenerationEngine>(options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine());
+        services.AddSingleton<IImageGenerationEngine>(sp => options.ImageGenerationEngine ?? new OnnxStableDiffusionImageGenerationEngine(sp.GetService<IVramMemoryManager>()));
         services.AddSingleton<ImageGenerationService>();
         services.AddHttpClient<ImageModelManager>(client =>
         {
@@ -223,6 +273,7 @@ internal static class InProcessBackendServiceRegistration
 
     private static IServiceCollection AddOnlyRagJobServices(this IServiceCollection services)
     {
+        services.AddSingleton<Worker.IJobProgressNotifier, SignalRJobProgressNotifier>();
         services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         services.AddSingleton<ILocalJobHandler, DocumentIngestionJobHandler>();
         services.AddSingleton<ILocalJobHandler, DocumentEmbeddingJobHandler>();

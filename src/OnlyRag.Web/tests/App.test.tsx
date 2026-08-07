@@ -57,7 +57,7 @@ describe("App initial setup", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("link", { name: "Salta al contenuto principale" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Salta al contenuto principale" })).toHaveAttribute(
       "href",
       "#main-workspace"
     );

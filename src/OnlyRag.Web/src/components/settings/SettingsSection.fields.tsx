@@ -264,7 +264,7 @@ export function SettingsFieldLabel({ text, tooltip }: { text: string; tooltip?: 
   return (
     <span className="ocr-field-label">
       <span>{text}</span>
-      {tooltip && <InfoTip label={`Informazioni su ${text}`}>{tooltip}</InfoTip>}
+      {tooltip && <InfoTip label={`Informazioni su ${text}`} tooltip={tooltip}>{tooltip}</InfoTip>}
     </span>
   );
 }

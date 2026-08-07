@@ -12,6 +12,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
     private const string DirectMlProvider = "DirectML";
     private const string CpuProvider = "CPU";
 
+    private readonly IVramMemoryManager? vramMemoryManager;
     private readonly object gate = new();
     private readonly SemaphoreSlim pipelineSemaphore = new(1, 1);
     private string activeExecutionProvider = DirectMlProvider;
@@ -23,6 +24,11 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
     private string? cachedModelDirectory;
     private string? cachedProviderName;
     private ModelType? cachedModelType;
+
+    public OnnxStableDiffusionImageGenerationEngine(IVramMemoryManager? vramMemoryManager = null)
+    {
+        this.vramMemoryManager = vramMemoryManager;
+    }
 
     public ImageGenerationEngineStatus GetStatus()
     {
@@ -204,6 +210,8 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
             cachedModelDirectory = modelDirectory;
             cachedProviderName = providerName;
             cachedModelType = modelType;
+
+            vramMemoryManager?.RegisterSession("OnnxStableDiffusionImageGenerationEngine", () => InvalidateCachedPipelineAsync().GetAwaiter().GetResult());
         }
 
         return cachedPipeline!;
@@ -221,6 +229,7 @@ public sealed class OnnxStableDiffusionImageGenerationEngine : IImageGenerationE
                 cachedModelDirectory = null;
                 cachedProviderName = null;
                 cachedModelType = null;
+                vramMemoryManager?.UnregisterSession("OnnxStableDiffusionImageGenerationEngine");
             }
         }
         finally

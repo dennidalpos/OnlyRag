@@ -15,6 +15,7 @@ import { useState } from "react";
 import type { AgentStepEvent } from "../../api";
 import { PlanChecklistVisualizer } from "./PlanChecklistVisualizer";
 import { UnifiedDiffViewer } from "./UnifiedDiffViewer";
+import { InfoTip } from "../common/InfoTip";
 
 type AgentToolCallCardProps = {
   event: AgentStepEvent;
@@ -154,6 +155,9 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
                 >
                   <Check size={14} /> Approva
                 </button>
+                <InfoTip label="Conferma richiesta">
+                  Questa azione richiede conferma. Controlla i parametri prima di procedere.
+                </InfoTip>
                 <button
                   type="button"
                   className="button button--small"

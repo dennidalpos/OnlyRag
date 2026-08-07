@@ -10,6 +10,7 @@ import {
   shouldSurfaceRefreshFailure
 } from "../../pollingStatus";
 import { ProgressBar } from "../common/ProgressBar";
+import { useJobProgress } from "../../context/SignalRContext";
 
 const statusLabels: Record<JobStatus, string> = {
   Pending: "In attesa",
@@ -68,6 +69,21 @@ export function JobsSection({ onJobsChanged }: JobsSectionProps) {
       applyJobsRefreshFailure(jobsRefreshErrorMessage);
     }
   }
+
+  useJobProgress(
+    () => {
+      void refreshJobs();
+      onJobsChanged?.();
+    },
+    () => {
+      void refreshJobs();
+      onJobsChanged?.();
+    },
+    () => {
+      void refreshJobs();
+      onJobsChanged?.();
+    }
+  );
 
   useEffect(() => {
     let isCancelled = false;

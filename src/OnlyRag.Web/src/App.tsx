@@ -1,21 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { resolveBackendErrorMessage } from "./api";
 import { AppHeader } from "./components/layout/AppHeader";
-import { ChatSection } from "./components/chat/ChatSection";
-import { CodingSection } from "./components/coding/CodingSection";
-import { DocumentsSection } from "./components/documents/DocumentsSection";
-import { ImagesSection } from "./components/images/ImagesSection";
 import { JobsDrawer } from "./components/layout/JobsDrawer";
 import { SectionId, Sidebar } from "./components/layout/Sidebar";
-import { SettingsSection } from "./components/settings/SettingsSection";
 import { SetupBanner } from "./components/layout/SetupBanner";
-import { TranslationSection } from "./components/translation/TranslationSection";
 import { CommandPaletteModal } from "./components/layout/CommandPaletteModal";
 import { GlobalDropzoneOverlay } from "./components/documents/GlobalDropzoneOverlay";
+import { SkeletonSection } from "./components/common/SkeletonSection";
 import { QueryProvider } from "./context/QueryProvider";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { useAppSetup } from "./hooks/useAppSetup";
 import { formatLastRefresh, shouldSurfaceRefreshFailure } from "./pollingStatus";
+
+const ChatSection = lazy(() => import("./components/chat/ChatSection").then(m => ({ default: m.ChatSection })));
+const CodingSection = lazy(() => import("./components/coding/CodingSection").then(m => ({ default: m.CodingSection })));
+const DocumentsSection = lazy(() => import("./components/documents/DocumentsSection").then(m => ({ default: m.DocumentsSection })));
+const ImagesSection = lazy(() => import("./components/images/ImagesSection").then(m => ({ default: m.ImagesSection })));
+const TranslationSection = lazy(() => import("./components/translation/TranslationSection").then(m => ({ default: m.TranslationSection })));
+const SettingsSection = lazy(() => import("./components/settings/SettingsSection").then(m => ({ default: m.SettingsSection })));
 
 export type { BackendStatus } from "./hooks/useAppSetup";
 
@@ -30,12 +32,19 @@ const sectionLabels: Record<SectionId, string> = {
 
 export function AppContent() {
   const { theme } = useTheme();
-  const [activeSection, setActiveSection] = useState<SectionId>("coding");
+  const [activeSection, setActiveSection] = useState<SectionId>(
+    () => (new URLSearchParams(window.location.search).get("section") as SectionId) || "coding"
+  );
   const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const setup = useAppSetup();
+
+  const handleSectionChange = useCallback((section: SectionId) => {
+    setActiveSection(section);
+    setIsJobsDrawerOpen(false);
+  }, []);
 
   function notifyDocumentLibraryChanged() {
     setDocumentLibraryVersion((current) => current + 1);
@@ -44,42 +53,37 @@ export function AppContent() {
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey || event.metaKey) {
-        if (event.key.toLowerCase() === "k") {
+        const key = event.key.toLowerCase();
+        const code = event.code;
+        if (key === "k" || code === "KeyK") {
           event.preventDefault();
           setIsCommandPaletteOpen((prev) => !prev);
           return;
         }
-        switch (event.key) {
-          case "1":
-            event.preventDefault();
-            setActiveSection("chat");
-            setIsJobsDrawerOpen(false);
-            break;
-          case "2":
-            event.preventDefault();
-            setActiveSection("coding");
-            setIsJobsDrawerOpen(false);
-            break;
-          case "3":
-            event.preventDefault();
-            setActiveSection("documents");
-            setIsJobsDrawerOpen(false);
-            break;
-          case "4":
-            event.preventDefault();
-            setActiveSection("translation");
-            setIsJobsDrawerOpen(false);
-            break;
-          case "5":
-            event.preventDefault();
-            setActiveSection("images");
-            setIsJobsDrawerOpen(false);
-            break;
-          case "6":
-            event.preventDefault();
-            setActiveSection("settings");
-            setIsJobsDrawerOpen(false);
-            break;
+        if (key === "1" || code === "Digit1" || code === "Numpad1") {
+          event.preventDefault();
+          setActiveSection("chat");
+          setIsJobsDrawerOpen(false);
+        } else if (key === "2" || code === "Digit2" || code === "Numpad2") {
+          event.preventDefault();
+          setActiveSection("coding");
+          setIsJobsDrawerOpen(false);
+        } else if (key === "3" || code === "Digit3" || code === "Numpad3") {
+          event.preventDefault();
+          setActiveSection("documents");
+          setIsJobsDrawerOpen(false);
+        } else if (key === "4" || code === "Digit4" || code === "Numpad4") {
+          event.preventDefault();
+          setActiveSection("translation");
+          setIsJobsDrawerOpen(false);
+        } else if (key === "5" || code === "Digit5" || code === "Numpad5") {
+          event.preventDefault();
+          setActiveSection("images");
+          setIsJobsDrawerOpen(false);
+        } else if (key === "6" || code === "Digit6" || code === "Numpad6") {
+          event.preventDefault();
+          setActiveSection("settings");
+          setIsJobsDrawerOpen(false);
         }
       }
     }
@@ -109,10 +113,7 @@ export function AppContent() {
       <Sidebar
         activeSection={activeSection}
         sections={sectionLabels}
-        onSectionChange={(section) => {
-          setActiveSection(section);
-          setIsJobsDrawerOpen(false);
-        }}
+        onSectionChange={handleSectionChange}
         activeJobCount={parseInt(setup.backendStatus.jobsValue, 10) || 0}
         diagnostics={setup.diagnostics}
       />
@@ -161,38 +162,40 @@ export function AppContent() {
               isActive={activeSection === "chat"}
             />
           </div>
-          {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
-          {activeSection === "images" && <ImagesSection />}
-          {activeSection === "translation" && (
-            <TranslationSection
-              models={setup.ollamaModels}
-              defaultModel={setup.ollamaSettings?.defaultTranslationModel ?? null}
-              ollamaStatus={setup.ollamaStatus}
-              loadError={setup.ollamaLoadError}
-            />
-          )}
-          <div hidden={activeSection !== "coding"} className="coding-section-wrapper">
-            <CodingSection
-              models={setup.ollamaModels}
-              defaultModel={setup.ollamaSettings?.defaultCodingModel ?? setup.ollamaSettings?.defaultChatModel ?? null}
-              loadError={setup.ollamaLoadError}
-              isActive={activeSection === "coding"}
-            />
-          </div>
-          {activeSection === "settings" && (
-            <SettingsSection
-              settings={setup.ollamaSettings}
-              status={setup.ollamaStatus}
-              models={setup.ollamaModels}
-              initialDiagnostics={setup.diagnostics}
-              loadError={setup.ollamaLoadError}
-              onDataChanged={async () => {
-                await setup.backendQuery.refetch();
-                await setup.ollamaQuery.refetch();
-                await setup.diagnosticsQuery.refetch().catch(() => {});
-              }}
-            />
-          )}
+          <Suspense fallback={<SkeletonSection />}>
+            {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
+            {activeSection === "images" && <ImagesSection />}
+            {activeSection === "translation" && (
+              <TranslationSection
+                models={setup.ollamaModels}
+                defaultModel={setup.ollamaSettings?.defaultTranslationModel ?? null}
+                ollamaStatus={setup.ollamaStatus}
+                loadError={setup.ollamaLoadError}
+              />
+            )}
+            <div hidden={activeSection !== "coding"} className="coding-section-wrapper">
+              <CodingSection
+                models={setup.ollamaModels}
+                defaultModel={setup.ollamaSettings?.defaultCodingModel ?? setup.ollamaSettings?.defaultChatModel ?? null}
+                loadError={setup.ollamaLoadError}
+                isActive={activeSection === "coding"}
+              />
+            </div>
+            {activeSection === "settings" && (
+              <SettingsSection
+                settings={setup.ollamaSettings}
+                status={setup.ollamaStatus}
+                models={setup.ollamaModels}
+                initialDiagnostics={setup.diagnostics}
+                loadError={setup.ollamaLoadError}
+                onDataChanged={async () => {
+                  await setup.backendQuery.refetch();
+                  await setup.ollamaQuery.refetch();
+                  await setup.diagnosticsQuery.refetch().catch(() => {});
+                }}
+              />
+            )}
+          </Suspense>
         </section>
       </main>
       <JobsDrawer
@@ -213,11 +216,15 @@ export function AppContent() {
 }
 
 
+import { SignalRProvider } from "./context/SignalRContext";
+
 export default function App() {
   return (
     <QueryProvider>
       <ThemeProvider>
-        <AppContent />
+        <SignalRProvider>
+          <AppContent />
+        </SignalRProvider>
       </ThemeProvider>
     </QueryProvider>
   );

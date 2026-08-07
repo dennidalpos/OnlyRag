@@ -95,7 +95,7 @@ export const GlobalDropzoneOverlay: React.FC<GlobalDropzoneOverlayProps> = ({ on
         </div>
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}>Rilascia i documenti qui</h2>
         <p style={{ color: "#94a3b8", fontSize: "0.95rem", maxWidth: "420px", margin: 0 }}>
-          I file verranno importati nell'archivio RAG. Potrai scegliere la modalita' OCR (Automatica, Force OCR o Estrazione Diretta) prima dell'elaborazione.
+          I file verranno importati. Potrai scegliere la modalità OCR prima dell'elaborazione.
         </p>
         <div style={{ display: "flex", gap: "8px", color: "#38bdf8", fontSize: "0.82rem", fontWeight: 600 }}>
           <FileText size={16} /> PDF, DOCX, XLSX, PPTX, TXT, MD, PNG, JPG...

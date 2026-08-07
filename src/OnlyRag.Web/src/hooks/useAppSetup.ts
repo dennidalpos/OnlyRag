@@ -139,17 +139,16 @@ export function useAppSetup() {
     async function load() {
       initialSetupCheckInProgressRef.current = true;
       try {
-        await backendQuery.refetch();
-        if (isCancelled) return;
-
-        await ollamaQuery.refetch();
-        if (isCancelled) return;
-
-        const [diagnosticsResult] = await Promise.all([
+        const [_, __, diagnosticsResult] = await Promise.all([
+          backendQuery.refetch(),
+          ollamaQuery.refetch(),
           diagnosticsQuery.refetch().then((res) => res.data ?? null).catch(() => null),
           ocrStartupPrompt.refresh()
         ]);
-        if (!isCancelled && diagnosticsResult?.ocrGpuCapability.isUsable) {
+
+        if (isCancelled) return;
+
+        if (diagnosticsResult?.ocrGpuCapability.isUsable) {
           await autoEnableOcrGpu().catch(() => {});
         }
         if (!isCancelled) {

@@ -49,20 +49,39 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
         try
         {
             await documents.SetStatusAsync(document.Id, DocumentStatus.Processing, job.Id, lastError: null, cancellationToken);
-            DocumentIngestionResult result = await ingestion.IngestAsync(
-                document,
-                checkpoint,
-                async (progress, token) =>
+            var channel = System.Threading.Channels.Channel.CreateBounded<DocumentIngestionProgress>(
+                new System.Threading.Channels.BoundedChannelOptions(100)
+                {
+                    FullMode = System.Threading.Channels.BoundedChannelFullMode.Wait,
+                    SingleReader = true,
+                    SingleWriter = true
+                });
+
+            var consumerTask = Task.Run(async () =>
+            {
+                await foreach (var progress in channel.Reader.ReadAllAsync(cancellationToken))
                 {
                     string checkpointJson = JsonSerializer.Serialize(progress.Checkpoint);
                     await queue.SaveCheckpointAsync(
                         job.Id,
                         new LocalJobCheckpoint(progress.ProgressPercent, progress.CurrentStep, checkpointJson),
-                        token);
+                        cancellationToken);
+                }
+            }, cancellationToken);
+
+            DocumentIngestionResult result = await ingestion.IngestAsync(
+                document,
+                checkpoint,
+                async (progress, token) =>
+                {
+                    await channel.Writer.WriteAsync(progress, token);
                 },
                 payload.ForceOcr,
                 payload.OcrLanguage,
                 cancellationToken);
+
+            channel.Writer.Complete();
+            await consumerTask;
 
             DocumentIngestionCheckpoint completedCheckpoint = new(
                 Version: 1,

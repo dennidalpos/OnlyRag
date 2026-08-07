@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Storage;
@@ -36,7 +37,17 @@ public sealed class LocalSqliteSchemaInitializer
 
             if (inspection.Status == "Current")
             {
-                return BuildStatus(existingVersion, existingTextSearchBackend);
+                await EnsureEfCoreModelConfiguredAsync(cancellationToken);
+                return BuildStatus(CurrentSchemaVersion, existingTextSearchBackend);
+            }
+
+            // Attempt non-destructive incremental migration to current schema version
+            bool migratedSuccessfully = await TryNonDestructiveMigrationAsync(existingConnection, cancellationToken);
+            if (migratedSuccessfully)
+            {
+                int newVersion = await GetUserVersionAsync(existingConnection, cancellationToken);
+                await EnsureEfCoreModelConfiguredAsync(cancellationToken);
+                return BuildStatus(newVersion, existingTextSearchBackend);
             }
 
             resetReason = inspection.TechnicalNote ?? "Il database locale non corrisponde allo schema fresh corrente.";
@@ -201,6 +212,33 @@ public sealed class LocalSqliteSchemaInitializer
         return new SchemaInspection(
             "ResetRequired",
             "Il database locale e vuoto o non contiene lo schema fresh corrente.");
+    }
+
+    private static async Task<bool> TryNonDestructiveMigrationAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            int version = await GetUserVersionAsync(connection, cancellationToken);
+            if (version < 2 || version > CurrentSchemaVersion)
+            {
+                return false;
+            }
+
+            if (version == 2) { await MigrateFromV2ToV3Async(connection, cancellationToken); version = 3; }
+            if (version == 3) { await MigrateFromV3ToV4Async(connection, cancellationToken); version = 4; }
+            if (version == 4) { await MigrateFromV4ToV5Async(connection, cancellationToken); version = 5; }
+            if (version == 5) { await MigrateFromV5ToV6Async(connection, cancellationToken); version = 6; }
+            if (version == 6) { await MigrateFromV6ToV7Async(connection, cancellationToken); version = 7; }
+            if (version == 7) { await MigrateFromV7ToV8Async(connection, cancellationToken); version = 8; }
+            if (version == 8) { await MigrateFromV8ToV9Async(connection, cancellationToken); version = 9; }
+            if (version == 9) { await MigrateFromV9ToV10Async(connection, cancellationToken); version = 10; }
+            if (version == 10) { await MigrateFromV10ToV11Async(connection, cancellationToken); version = 11; }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task MigrateFromV2ToV3Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -661,7 +699,16 @@ public sealed class LocalSqliteSchemaInitializer
         await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         SqliteTextSearchBackend textSearchBackend = await DetectTextSearchBackendAsync(connection, cancellationToken);
         await ApplyFreshSchemaAsync(connection, textSearchBackend, cancellationToken);
+        await EnsureEfCoreModelConfiguredAsync(cancellationToken);
         return BuildStatus(CurrentSchemaVersion, textSearchBackend, schemaTechnicalNote: schemaTechnicalNote);
+    }
+
+    private async Task EnsureEfCoreModelConfiguredAsync(CancellationToken cancellationToken)
+    {
+        var optionsBuilder = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<EF.OnlyRagDbContext>();
+        optionsBuilder.UseSqlite($"Data Source={descriptor.Paths.DatabasePath}");
+        await using EF.OnlyRagDbContext dbContext = new(optionsBuilder.Options);
+        _ = dbContext.Model;
     }
 
     private static async Task<bool> HasAnyUserTablesAsync(

@@ -30,9 +30,13 @@ export function CodingSection({
         onSelectModel={ctrl.setSelectedModel}
         workspaceConfig={ctrl.workspaceConfig}
         workspaceFilesCount={ctrl.workspaceFiles.length}
+        singleFiles={ctrl.singleFiles}
         onPickFolder={() => void ctrl.handlePickWindowsFolder()}
         onClearFolder={() => void ctrl.handleClearWorkspaceFolder()}
         onOpenFilePicker={() => ctrl.setIsWorkspaceFilePickerOpen(true)}
+        onAddSingleFiles={() => void ctrl.handleAddSingleFiles()}
+        onRemoveSingleFile={ctrl.handleRemoveSingleFile}
+        onClearSingleFiles={ctrl.handleClearSingleFiles}
       />
 
       {/* FEEDBACK BANNERS */}

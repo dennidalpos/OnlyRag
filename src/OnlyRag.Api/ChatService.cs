@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
+using OnlyRag.Api.Hubs;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Retrieval;
@@ -20,17 +22,20 @@ internal sealed class ChatService
     private readonly IHybridRetrievalService retrieval;
     private readonly IChatHistoryRepository chatHistory;
     private readonly IOllamaSettingsService settingsService;
+    private readonly IHubContext<ChatStreamHub, IChatStreamClient>? chatHubContext;
 
     public ChatService(
         IOllamaClient ollamaClient,
         IHybridRetrievalService retrieval,
         IChatHistoryRepository chatHistory,
-        IOllamaSettingsService settingsService)
+        IOllamaSettingsService settingsService,
+        IHubContext<ChatStreamHub, IChatStreamClient>? chatHubContext = null)
     {
         this.ollamaClient = ollamaClient;
         this.retrieval = retrieval;
         this.chatHistory = chatHistory;
         this.settingsService = settingsService;
+        this.chatHubContext = chatHubContext;
     }
 
     public async Task<ChatResponse> SendAsync(
@@ -189,6 +194,11 @@ internal sealed class ChatService
         await foreach (string chunk in ollamaClient.GenerateChatStreamAsync(model, promptMessages, chatNumCtx, cancellationToken: cancellationToken))
         {
             fullAnswer.Append(chunk);
+            if (chatHubContext != null)
+            {
+                await chatHubContext.Clients.Group(conversationId).ReceiveToken(chunk);
+                await chatHubContext.Clients.All.ReceiveToken(chunk);
+            }
             if (!useDocuments || isChatter)
             {
                 yield return new ChatStreamChunkEvent("chunk", conversationId, model, chunk);
@@ -211,6 +221,11 @@ internal sealed class ChatService
             yield return new ChatStreamChunkEvent("chunk", conversationId, model, answerText);
         }
         await PersistTurnAsync(conversationId, model, message, answerText, sources, cancellationToken);
+        if (chatHubContext != null)
+        {
+            await chatHubContext.Clients.Group(conversationId).StreamCompleted(conversationId);
+            await chatHubContext.Clients.All.StreamCompleted(conversationId);
+        }
         yield return new ChatStreamChunkEvent("done", conversationId, model);
     }
 

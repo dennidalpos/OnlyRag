@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { DiagnosticsResponse } from "../../api";
 import {
   formatTelemetryBytes,
@@ -97,7 +98,7 @@ const sectionShortcuts: Record<SectionId, string> = {
   settings: "Ctrl+6"
 };
 
-export function Sidebar({
+export const Sidebar = memo(function SidebarComponent({
   activeSection,
   sections,
   onSectionChange,
@@ -136,9 +137,9 @@ export function Sidebar({
       <SidebarMetrics diagnostics={diagnostics} />
     </aside>
   );
-}
+});
 
-function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | null }) {
+const SidebarMetrics = memo(function SidebarMetricsComponent({ diagnostics }: { diagnostics: DiagnosticsResponse | null }) {
   if (!diagnostics) {
     return (
       <section className="sidebar-metrics" aria-label="Metriche sistema">
@@ -197,7 +198,7 @@ function SidebarMetrics({ diagnostics }: { diagnostics: DiagnosticsResponse | nu
       </div>
     </section>
   );
-}
+});
 
 function MetricRow({
   label,

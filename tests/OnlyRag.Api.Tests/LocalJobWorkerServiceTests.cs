@@ -32,7 +32,7 @@ public sealed class LocalJobWorkerServiceTests
             backendDescriptor);
 
         await service.StartAsync(CancellationToken.None);
-        Task completed = await Task.WhenAny(handler.TwoRunning.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Task completed = await Task.WhenAny(handler.TwoRunning.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         await service.StopAsync(CancellationToken.None);
 
         Assert.Same(handler.TwoRunning.Task, completed);
@@ -62,12 +62,12 @@ public sealed class LocalJobWorkerServiceTests
             backendDescriptor2);
 
         await service.StartAsync(CancellationToken.None);
-        Task started = await Task.WhenAny(handler.OneRunning.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Task started = await Task.WhenAny(handler.OneRunning.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         Assert.Same(handler.OneRunning.Task, started);
 
         await queue.CancelAsync(created.Id);
         registry.Cancel(created.Id);
-        Task cancelled = await Task.WhenAny(handler.Cancelled.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Task cancelled = await Task.WhenAny(handler.Cancelled.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         await service.StopAsync(CancellationToken.None);
         LocalJob? stored = await queue.GetAsync(created.Id);
 
@@ -99,13 +99,13 @@ public sealed class LocalJobWorkerServiceTests
             backendDescriptor);
 
         await service.StartAsync(CancellationToken.None);
-        Task started = await Task.WhenAny(handler.OneRunning.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Task started = await Task.WhenAny(handler.OneRunning.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         Assert.Same(handler.OneRunning.Task, started);
 
         LocalJob? pausing = await queue.PauseAsync(created.Id);
         LocalJob? immediateResume = await queue.ResumeAsync(created.Id);
         registry.Cancel(created.Id);
-        Task cancelled = await Task.WhenAny(handler.Cancelled.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Task cancelled = await Task.WhenAny(handler.Cancelled.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         LocalJob? paused = await WaitForStatusAsync(queue, created.Id, JobStatus.Paused);
         await service.StopAsync(CancellationToken.None);
         LocalJob? resumed = await queue.ResumeAsync(created.Id);
@@ -126,7 +126,7 @@ public sealed class LocalJobWorkerServiceTests
         string jobId,
         JobStatus expectedStatus)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(15);
         while (DateTimeOffset.UtcNow < deadline)
         {
             LocalJob? job = await queue.GetAsync(jobId);

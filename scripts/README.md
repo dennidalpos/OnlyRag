@@ -14,7 +14,14 @@ pwsh .\scripts\Bootstrap-Prerequisites.ps1
 Application readiness check:
 
 ```powershell
+# Fast gate check (preflight, typecheck, lint, build, manifest checks)
+pwsh .\scripts\Invoke-Gate.ps1 -Fast
+
+# Full release verification gate with tests
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+
+# Gate with full security vulnerability audits
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeAudits
 ```
 
 Local build and start:
@@ -56,11 +63,11 @@ pwsh .\scripts\Clean.ps1
 |---|---|---|---|---|---|---|---|
 | Format code | `scripts\Format-Code.ps1` | Format .NET C# solution and Web frontend (Prettier). | Routine development, pre-commit formatting. | Manual. | PowerShell 7, .NET 10 SDK, Node/npm. | Formatted source code. | Supports `-CheckOnly` for verification without mutating files. |
 | Lint code | `scripts\Lint-Code.ps1` | Run ESLint, TypeScript typecheck, and .NET analyzer checks. | Code quality verification. | Manual. | PowerShell 7, .NET 10 SDK, Node/npm. | Console analysis report. | Fails on any lint or type error. |
-| Test code | `scripts\Test-Code.ps1` | Run full Vitest frontend component tests and .NET xUnit solution tests. | Automated test execution. | Manual. | PowerShell 7, .NET 10 SDK, Node/npm. | Test output & pass/fail status. | Supports `-IncludeE2e` to run Playwright E2E suite. |
+| Test code | `scripts\Test-Code.ps1` | Run Vitest frontend component tests and .NET xUnit solution tests. | Automated test execution. | Manual. | PowerShell 7, .NET 10 SDK, Node/npm. | Test output & pass/fail status. | Defaults to fast unit tests and compact AI summary. Supports `-Fast`, `-IncludeIntegration`, `-IncludeE2e`, and `-VerboseOutput`. |
 | Bootstrap prerequisites | `scripts\Bootstrap-Prerequisites.ps1` | Verify Windows development prerequisites, restore .NET packages, install web dependencies, check optional local endpoints, prepare integrated image model storage, and prepare optional OCR runtime. | Fresh checkout setup or dependency repair. | Manual. | Windows, PowerShell 7, .NET 10 SDK; Node/npm unless `-SkipNode`; optional Python/Ollama/LibreOffice. | `%LOCALAPPDATA%\OnlyRag`, `%LOCALAPPDATA%\OnlyRag\models\images`, restored packages, `src\OnlyRag.Web\node_modules`, optional OCR env. | Use `-SkipImageGenerationCheck` to skip image model storage checks. Does not build, package, sign, install, deploy, or release. |
 | Build web UI | `scripts\Build-Web.ps1` | Install web dependencies when needed and run the Vite production build. | Before desktop build or when frontend changes. | `Build-App.ps1`, `Invoke-Gate.ps1`, `Build-Installer.ps1`. | Node/npm matching `src\OnlyRag.Web\package.json`. | `src\OnlyRag.Web\dist`. | `-SkipInstallWhenUpToDate` avoids dependency install when `node_modules` is current. |
 | Build app | `scripts\Build-App.ps1` | Build web assets, prepare Qdrant payload when missing, restore .NET unless skipped, and build the desktop app for `win-x64` by default. | Local desktop build. | `Invoke-Gate.ps1`. | .NET 10 SDK; Node/npm unless `-SkipWebBuild` is safe; network access when Qdrant payload is missing. | Web `dist`, Qdrant payload, runtime-specific .NET `bin` outputs. | Use `-SkipWebBuild` only after `src\OnlyRag.Web\dist\index.html` exists. |
-| Repository gate | `scripts\Invoke-Gate.ps1` | Run the canonical verification gate. | Before handoff, release candidate work, or CI parity checks. | CI workflow. | Windows, PowerShell 7, .NET 10 SDK, Node/npm; NSIS only with `-IncludeInstaller`. | Console gate summary, restored dependencies, build outputs, optional installer. | `-ContinueOnError` keeps independent checks running for diagnostics. |
+| Repository gate | `scripts\Invoke-Gate.ps1` | Run the canonical verification gate. | Before handoff, release candidate work, or CI parity checks. | CI workflow. | Windows, PowerShell 7, .NET 10 SDK, Node/npm; NSIS only with `-IncludeInstaller`. | Console gate summary, restored dependencies, build outputs, optional installer. | Supports `-Fast` (or `-SkipTests`/`-SkipAudits`) for rapid local iteration, `-VerboseOutput` for detailed logs, `-IncludeAudits`, and `-ContinueOnError`. |
 | Build installer | `scripts\Build-Installer.ps1` | Build web assets, prepare Qdrant, publish self-contained `win-x64` app, verify native runtime payloads, and compile the NSIS installer. | Packaging candidate build. | `Invoke-Gate.ps1 -IncludeInstaller`, `Sign-Release.ps1`. | .NET 10 SDK, Node/npm, NSIS 3.x, installer brand assets; network access when Qdrant payload is missing. | `packaging\qdrant\payload`, `artifacts\publish\OnlyRag\win-x64`, `artifacts\installer\*.exe`. | Fails if DirectML/ONNX Runtime native files are missing. `-SigningCertificateThumbprint` signs the installer during build; unsigned output is not release-ready. |
 | Sign release | `scripts\Sign-Release.ps1` | Build, sign, and non-invasively verify a release installer. | Release candidate signing. | Manual. | NSIS 3.x, Windows SDK `signtool.exe`, trusted certificate. | Signed installer under `artifacts\installer`; release evidence unless skipped. | PFX input must be outside the repository. Temporarily imported certificates are removed unless `-KeepImportedCertificate` is supplied. |
 | Test installer release | `scripts\Test-InstallerRelease.ps1` | Produce installer evidence and optionally run install/launch/uninstall lifecycle. | Release verification. | `Sign-Release.ps1` in non-lifecycle mode unless skipped. | Built installer; clean Windows profile or verification machine for `-RunInstallLifecycle`. | `artifacts\release-verification\*.json` plus installer logs. | Non-lifecycle mode is non-invasive. `-RequireSigned` fails invalid signatures. |

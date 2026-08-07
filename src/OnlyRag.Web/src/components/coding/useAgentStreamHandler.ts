@@ -42,7 +42,13 @@ export function useAgentStreamHandler({
   const [messages, setMessages] = useState<CodingMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [promptInput, setPromptInput] = useState("");
+  const [promptInput, setPromptInputState] = useState("");
+  const promptInputRef = useRef("");
+
+  function setPromptInput(val: string) {
+    promptInputRef.current = val;
+    setPromptInputState(val);
+  }
 
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -371,6 +377,7 @@ export function useAgentStreamHandler({
     isGenerating,
     error,
     promptInput,
+    promptInputRef,
     setPromptInput,
     chatContainerRef,
     handleCancelGeneration,

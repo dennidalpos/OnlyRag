@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using OnlyRag.Core;
@@ -9,7 +10,9 @@ namespace OnlyRag.Infrastructure.Vector;
 
 public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
 {
+    private const int MaxGrpcBatchSize = 128;
     private readonly QdrantSettingsStore settingsStore;
+    private readonly ConcurrentDictionary<string, bool> _knownCollections = new(StringComparer.OrdinalIgnoreCase);
     private QdrantClient? _cachedClient;
     private QdrantSettings? _cachedSettings;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -50,8 +53,10 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
 
     public async Task VerifyAvailabilityAsync(CancellationToken cancellationToken = default)
     {
-        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-        await client.HealthAsync(cancellationToken);
+        await ExecuteWithRetryAsync(async client =>
+        {
+            await client.HealthAsync(cancellationToken);
+        }, cancellationToken);
     }
 
     public async Task UpsertChunkAsync(
@@ -78,8 +83,6 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             .Where(c => c.Vector.Count > 0 && !string.IsNullOrWhiteSpace(c.Model) && !string.IsNullOrWhiteSpace(c.ContentHash))
             .GroupBy(c => BuildCollectionName(c.Model, c.Vector.Count));
 
-        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-
         foreach (var group in groups)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -87,33 +90,41 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             int dimensions = group.First().Vector.Count;
 
             QdrantQuantizationMode mode = _cachedSettings?.QuantizationMode ?? QdrantQuantizationMode.ScalarSQ8;
-            await EnsureCollectionAsync(client, collection, dimensions, mode, cancellationToken);
 
-            var uniqueChunks = group
-                .GroupBy(c => c.ContentHash)
-                .Select(g => g.First())
-                .ToList();
-
-            var points = uniqueChunks.Select(c =>
+            await ExecuteWithRetryAsync(async client =>
             {
-                ulong pointId = checked((ulong)c.ChunkId);
-                PointStruct point = new()
+                await EnsureCollectionAsync(client, collection, dimensions, mode, cancellationToken);
+
+                var uniqueChunks = group
+                    .GroupBy(c => c.ContentHash)
+                    .Select(g => g.First())
+                    .ToList();
+
+                var points = uniqueChunks.Select(c =>
                 {
-                    Id = new PointId { Num = pointId },
-                    Vectors = c.Vector.ToArray()
-                };
-                point.Payload["chunk_id"] = c.ChunkId;
-                point.Payload["document_id"] = c.DocumentId;
-                point.Payload["chunk_index"] = c.ChunkIndex;
-                point.Payload["model"] = c.Model;
-                point.Payload["content_hash"] = c.ContentHash;
-                return point;
-            }).ToList();
+                    ulong pointId = checked((ulong)c.ChunkId);
+                    PointStruct point = new()
+                    {
+                        Id = new PointId { Num = pointId },
+                        Vectors = c.Vector.ToArray()
+                    };
+                    point.Payload["chunk_id"] = c.ChunkId;
+                    point.Payload["document_id"] = c.DocumentId;
+                    point.Payload["chunk_index"] = c.ChunkIndex;
+                    point.Payload["model"] = c.Model;
+                    point.Payload["content_hash"] = c.ContentHash;
+                    return point;
+                }).ToList();
 
-            if (points.Count > 0)
-            {
-                await client.UpsertAsync(collection, points, cancellationToken: cancellationToken);
-            }
+                if (points.Count > 0)
+                {
+                    for (int i = 0; i < points.Count; i += MaxGrpcBatchSize)
+                    {
+                        var batch = points.Skip(i).Take(MaxGrpcBatchSize).ToList();
+                        await client.UpsertAsync(collection, batch, cancellationToken: cancellationToken);
+                    }
+                }
+            }, cancellationToken);
         }
     }
 
@@ -131,30 +142,37 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         }
 
         string collection = BuildCollectionName(model, queryVector.Count);
-        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-        if (!await client.CollectionExistsAsync(collection, cancellationToken))
+
+        return await ExecuteWithRetryAsync(async client =>
         {
-            throw new InvalidOperationException($"Collection Qdrant mancante: {collection}. Ricostruire gli embedding.");
-        }
+            if (!_knownCollections.ContainsKey(collection))
+            {
+                if (!await client.CollectionExistsAsync(collection, cancellationToken))
+                {
+                    throw new InvalidOperationException($"Collection Qdrant mancante: {collection}. Ricostruire gli embedding.");
+                }
+                _knownCollections[collection] = true;
+            }
 
-        long[] filteredDocumentIds = documentIds.Where(id => id > 0).Distinct().ToArray();
-        Filter filter = new() { Must = { Match("document_id", filteredDocumentIds) } };
-        IReadOnlyList<ScoredPoint> points = await client.SearchAsync(
-            collection,
-            queryVector.ToArray(),
-            filter: filter,
-            limit: (ulong)Math.Max(1, limit),
-            payloadSelector: new WithPayloadSelector { Enable = true },
-            vectorsSelector: new WithVectorsSelector { Enable = false },
-            cancellationToken: cancellationToken);
+            long[] filteredDocumentIds = documentIds.Where(id => id > 0).Distinct().ToArray();
+            Filter filter = new() { Must = { Match("document_id", filteredDocumentIds) } };
+            IReadOnlyList<ScoredPoint> points = await client.SearchAsync(
+                collection,
+                queryVector.ToArray(),
+                filter: filter,
+                limit: (ulong)Math.Max(1, limit),
+                payloadSelector: new WithPayloadSelector { Enable = true },
+                vectorsSelector: new WithVectorsSelector { Enable = false },
+                cancellationToken: cancellationToken);
 
-        return points
-            .Select(point => new VectorSearchResult(
-                ToInt64(point.Id),
-                ReadLongPayload(point, "document_id"),
-                (int)ReadLongPayload(point, "chunk_index"),
-                point.Score))
-            .ToArray();
+            return (IReadOnlyList<VectorSearchResult>)points
+                .Select(point => new VectorSearchResult(
+                    ToInt64(point.Id),
+                    ReadLongPayload(point, "document_id"),
+                    (int)ReadLongPayload(point, "chunk_index"),
+                    point.Score))
+                .ToArray();
+        }, cancellationToken);
     }
 
     public async Task DeleteDocumentAsync(
@@ -164,14 +182,16 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         string collection = BuildCollectionName(model, dimensions);
-        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-        if (!await client.CollectionExistsAsync(collection, cancellationToken))
+        await ExecuteWithRetryAsync(async client =>
         {
-            return;
-        }
+            if (!await client.CollectionExistsAsync(collection, cancellationToken))
+            {
+                return;
+            }
 
-        Filter filter = new() { Must = { Match("document_id", documentId) } };
-        await client.DeleteAsync(collection, filter, cancellationToken: cancellationToken);
+            Filter filter = new() { Must = { Match("document_id", documentId) } };
+            await client.DeleteAsync(collection, filter, cancellationToken: cancellationToken);
+        }, cancellationToken);
     }
 
     public async Task OptimizeCollectionAsync(
@@ -180,20 +200,94 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         string collection = BuildCollectionName(model, dimensions);
-        QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
-        if (!await client.CollectionExistsAsync(collection, cancellationToken))
+        await ExecuteWithRetryAsync(async client =>
         {
-            return;
+            if (!await client.CollectionExistsAsync(collection, cancellationToken))
+            {
+                return;
+            }
+
+            CollectionInfo info = await client.GetCollectionInfoAsync(collection, cancellationToken);
+            ulong count = info.PointsCount;
+            HnswConfigDiff hnswConfig = QdrantHnswTuner.BuildHnswConfigDiff(count);
+
+            await client.UpdateCollectionAsync(
+                collection,
+                hnswConfig: hnswConfig,
+                cancellationToken: cancellationToken);
+        }, cancellationToken);
+    }
+
+    public async Task InvalidateCachedClientAsync(CancellationToken cancellationToken = default)
+    {
+        await _clientLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_cachedClient != null)
+            {
+                _cachedClient.Dispose();
+                _cachedClient = null;
+                _cachedSettings = null;
+            }
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
+    private async Task ExecuteWithRetryAsync(Func<QdrantClient, Task> operation, CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
+            try
+            {
+                await operation(client);
+                return;
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsTransientGrpcException(ex))
+            {
+                await InvalidateCachedClientAsync(cancellationToken);
+                await Task.Delay(100 * attempt, cancellationToken);
+            }
+        }
+    }
+
+    private async Task<T> ExecuteWithRetryAsync<T>(Func<QdrantClient, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            QdrantClient client = await GetOrCreateClientAsync(cancellationToken);
+            try
+            {
+                return await operation(client);
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsTransientGrpcException(ex))
+            {
+                await InvalidateCachedClientAsync(cancellationToken);
+                await Task.Delay(100 * attempt, cancellationToken);
+            }
         }
 
-        CollectionInfo info = await client.GetCollectionInfoAsync(collection, cancellationToken);
-        ulong count = info.PointsCount;
-        HnswConfigDiff hnswConfig = QdrantHnswTuner.BuildHnswConfigDiff(count);
+        throw new InvalidOperationException("Unreachable retry state.");
+    }
 
-        await client.UpdateCollectionAsync(
-            collection,
-            hnswConfig: hnswConfig,
-            cancellationToken: cancellationToken);
+    private static bool IsTransientGrpcException(Exception ex)
+    {
+        if (ex is Grpc.Core.RpcException rpcEx)
+        {
+            return rpcEx.StatusCode is Grpc.Core.StatusCode.Unavailable
+                or Grpc.Core.StatusCode.DeadlineExceeded
+                or Grpc.Core.StatusCode.Internal
+                or Grpc.Core.StatusCode.Unknown;
+        }
+
+        return ex is System.Net.Sockets.SocketException or System.IO.IOException or TimeoutException;
     }
 
     private async Task<QdrantClient> GetOrCreateClientAsync(CancellationToken cancellationToken)
@@ -246,15 +340,21 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         }
     }
 
-    private static async Task EnsureCollectionAsync(
+    private async Task EnsureCollectionAsync(
         QdrantClient client,
         string collection,
         int dimensions,
         QdrantQuantizationMode quantizationMode,
         CancellationToken cancellationToken)
     {
+        if (_knownCollections.TryGetValue(collection, out bool known) && known)
+        {
+            return;
+        }
+
         if (await client.CollectionExistsAsync(collection, cancellationToken))
         {
+            _knownCollections[collection] = true;
             return;
         }
 
@@ -285,6 +385,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
             quantizationConfig: quantizationConfig,
             cancellationToken: cancellationToken);
+        _knownCollections[collection] = true;
     }
 
     private static long ToInt64(PointId pointId)

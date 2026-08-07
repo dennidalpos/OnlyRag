@@ -5,6 +5,7 @@ import { IngestionSettingsPanel } from "./IngestionSettingsPanel";
 import { LoggingSettingsPanel } from "./LoggingSettingsPanel";
 import { ModelManagementPanel } from "./ModelManagementPanel";
 import { OllamaConnectionPanel } from "./OllamaConnectionPanel";
+import { CloudProviderPanel } from "./CloudProviderPanel";
 import { OcrEngineSettingsPanel } from "./OcrEngineSettingsPanel";
 import { PdfExportPanel } from "./PdfExportPanel";
 import { PerformanceSettingsPanel } from "./PerformanceSettingsPanel";
@@ -12,6 +13,7 @@ import { RerankerModelPanel } from "./RerankerModelPanel";
 import { ThemeSelectorPanel } from "./SettingsSection.fields";
 import { HardwareMonitorPanel } from "./HardwareMonitorPanel";
 import { RagBenchmarkPanel } from "./RagBenchmarkPanel";
+import { AlertCard, AlertCardVariant } from "../common/AlertCard";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 type SettingsTab = "all" | "theme" | "models" | "rag" | "ocr" | "diagnostics";
@@ -41,17 +43,21 @@ export function SettingsConfigurationAlerts() {
 
   const alerts: {
     id: string;
-    message: string;
+    variant: AlertCardVariant;
+    title: string;
+    detail?: string;
     actionLabel?: string;
     onAction?: () => void;
     isActionBusy?: boolean;
   }[] = [];
 
-  // 1. Ollama offline
+  // 1. Ollama offline (TASK-037 #3 & TASK-039)
   if (diagnostics && !diagnostics.ollamaIsReachable) {
     alerts.push({
       id: "ollama-offline",
-      message: "Connessione a Ollama non riuscita. Assicurati che Ollama sia in esecuzione localmente per caricare i modelli di Chat, Embedding, Traduzione e Coding.",
+      variant: "warning",
+      title: "Connessione a Ollama non riuscita.",
+      detail: "Assicurati che Ollama sia in esecuzione localmente per caricare i modelli di Chat, Embedding, Traduzione e Coding.",
       actionLabel: "Aggiorna stato",
       onAction: () => void refreshDiagnostics()
     });
@@ -61,41 +67,49 @@ export function SettingsConfigurationAlerts() {
   if (diagnostics && diagnostics.ollamaIsReachable && unavailableDefaults && unavailableDefaults.length > 0) {
     alerts.push({
       id: "models-unavailable",
-      message: `Alcuni modelli salvati come predefiniti non sono presenti in Ollama: ${unavailableDefaults.join(", ")}.`,
+      variant: "warning",
+      title: "Modelli predefiniti mancanti in Ollama.",
+      detail: `I seguenti modelli configurati non risultano presenti: ${unavailableDefaults.join(", ")}.`
     });
   }
 
-  // 3. Reranker not installed
+  // 3. Reranker not installed (TASK-037 #4 & TASK-039)
   const isRerankerDownloaded = rerankerModelInfo?.isDownloaded ?? false;
   const isRerankerDownloading = rerankerModelInfo?.isDownloading ?? false;
   if (rerankerModelInfo && !isRerankerDownloaded && !isRerankerDownloading) {
     alerts.push({
       id: "reranker-missing",
-      message: "Il modello ONNX Cross-Encoder (Re-Ranker) non è installato. La ri-classificazione avanzata dei risultati RAG utilizzerà un fallback euristico a precisione ridotta.",
-      actionLabel: "Scarica modello Re-Ranker",
+      variant: "warning",
+      title: "Modello di riclassificazione non installato. I risultati RAG saranno meno precisi.",
+      detail: "Senza il modello ONNX Cross-Encoder (Re-Ranker), la ricerca utilizzerà un fallback euristico.",
+      actionLabel: "Scarica Re-Ranker",
       onAction: () => void downloadRerankerModel(),
       isActionBusy: isBusy
     });
   }
 
-  // 4. OCR not configured
+  // 4. OCR not configured (TASK-039)
   const isOcrConfigured = diagnostics?.ocrIsConfigured ?? false;
   const isOcrRunning = ocrProvisionStatus?.isRunning ?? false;
   if (diagnostics && !isOcrConfigured && !isOcrRunning) {
     alerts.push({
       id: "ocr-missing",
-      message: "Runtime OCR locale non configurato o incompleto. L'estrazione di testo da immagini, file Office e PDF digitalizzati non sarà disponibile.",
+      variant: "warning",
+      title: "Runtime OCR locale non configurato.",
+      detail: "L'estrazione del testo da scansioni, PDF e file Office richiede il runtime OCR.",
       actionLabel: "Installa OCR",
       onAction: () => void configureOcrRuntime("auto"),
       isActionBusy: isBusy
     });
   }
 
-  // 5. LibreOffice PDF export not available
+  // 5. LibreOffice PDF export not available (TASK-039)
   if (pdfExportStatus && !pdfExportStatus.isAvailable) {
     alerts.push({
       id: "libreoffice-missing",
-      message: "LibreOffice non è configurato. L'esportazione dei documenti e delle traduzioni in formato PDF non è disponibile.",
+      variant: "warning",
+      title: "LibreOffice non configurato.",
+      detail: "L'esportazione dei documenti e delle traduzioni in formato PDF richiede LibreOffice.",
       actionLabel: "Scarica LibreOffice",
       onAction: () => void openLibreOfficeDownload()
     });
@@ -105,42 +119,34 @@ export function SettingsConfigurationAlerts() {
   if (diagnostics && diagnostics.qdrant.error) {
     alerts.push({
       id: "qdrant-error",
-      message: `Errore database vettoriale Qdrant: ${diagnostics.qdrant.error}`
+      variant: "error",
+      title: "Errore database vettoriale Qdrant.",
+      detail: diagnostics.qdrant.error
     });
   } else if (diagnostics && diagnostics.qdrant.warning) {
     alerts.push({
       id: "qdrant-warning",
-      message: `Avviso database vettoriale Qdrant: ${diagnostics.qdrant.warning}`
+      variant: "warning",
+      title: "Avviso database vettoriale Qdrant.",
+      detail: diagnostics.qdrant.warning
     });
   }
 
   if (alerts.length === 0) return null;
 
   return (
-    <div className="settings-alerts-container" style={{ display: "grid", gap: "12px", marginBottom: "20px" }}>
+    <div className="settings-alerts-container" style={{ display: "grid", gap: "10px", marginBottom: "20px" }}>
       {alerts.map((alert) => (
-        <div
+        <AlertCard
           key={alert.id}
-          className="feedback-banner feedback-banner--warning settings-feedback-alert"
-          role="alert"
-          style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}
-        >
-          <div style={{ flex: "1 1 500px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "16px" }}>⚠️</span>
-            <p style={{ margin: 0, fontSize: "13px", lineHeight: "1.4" }}>{alert.message}</p>
-          </div>
-          {alert.onAction && (
-            <button
-              type="button"
-              className="button-secondary"
-              style={{ minHeight: "30px", height: "30px", padding: "0 10px", fontSize: "12px", background: "rgba(245, 158, 11, 0.15)", borderColor: "#f59e0b", color: "#fde047" }}
-              onClick={alert.onAction}
-              disabled={alert.isActionBusy}
-            >
-              {alert.actionLabel}
-            </button>
-          )}
-        </div>
+          id={alert.id}
+          variant={alert.variant}
+          title={alert.title}
+          detail={alert.detail}
+          actionLabel={alert.actionLabel}
+          onAction={alert.onAction}
+          isActionBusy={alert.isActionBusy}
+        />
       ))}
     </div>
   );

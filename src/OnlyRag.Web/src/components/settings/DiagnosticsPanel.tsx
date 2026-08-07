@@ -188,7 +188,7 @@ export function DiagnosticsPanel() {
             className="button-secondary"
             onClick={() => void refreshDiagnostics()}
             disabled={isBusy}
-            title="Rilegge diagnostica locale, stato modelli e servizi."
+            aria-label="Rilegge diagnostica"
           >
             Aggiorna
           </button>
@@ -196,7 +196,7 @@ export function DiagnosticsPanel() {
             type="button"
             className="button-secondary"
             onClick={() => setShowLogViewer(true)}
-            title="Apre il visualizzatore log applicativi in tempo reale."
+            aria-label="Apre visualizzatore log"
           >
             🔍 Visualizza Log Live
           </button>

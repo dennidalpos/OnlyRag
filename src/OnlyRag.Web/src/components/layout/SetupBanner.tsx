@@ -77,11 +77,7 @@ export function SetupBanner({
           <p className="setup-banner__desc">
             {primaryIssue.detail}
           </p>
-          {primaryIssue.isRunning && (
-            <p className="setup-banner__desc setup-banner__desc--muted">
-              Aggiornamento automatico ogni 3 secondi...
-            </p>
-          )}
+
           {items.length > 1 && (
             <details className="setup-banner__details">
               <summary>Mostra tutti gli avvisi ({items.length})</summary>

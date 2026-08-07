@@ -64,13 +64,17 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
           </div>
         )}
 
-        {!isLoading && !preview && (
+        {!isLoading && (!preview || pages.length === 0) && (
           <div className="preview-modal__error" role="alert">
-            <p>Anteprima non disponibile. Il documento potrebbe non essere ancora stato indicizzato.</p>
+            <p>
+              {!preview
+                ? "Anteprima non disponibile. Il documento potrebbe essere in fase di elaborazione o non ancora indicizzato."
+                : "Nessuna pagina disponibile per questo documento."}
+            </p>
           </div>
         )}
 
-        {!isLoading && preview && (
+        {!isLoading && preview && pages.length > 0 && (
           <>
             {/* Metadata strip */}
             <div className="preview-meta-strip">
@@ -111,7 +115,7 @@ export function DocumentPreviewModal({ document, preview, isLoading, onClose, on
                   <PageContent page={currentPage} />
                 ) : (
                   <div className="preview-no-pages" role="status">
-                    <p>Nessuna pagina disponibile. Il documento potrebbe non essere ancora completamente indicizzato.</p>
+                    <p>Nessuna pagina disponibile per la selezione corrente.</p>
                   </div>
                 )}
               </div>

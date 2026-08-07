@@ -1,33 +1,93 @@
 using Microsoft.Data.Sqlite;
+using OnlyRag.Infrastructure.Storage.Security;
 
 namespace OnlyRag.Infrastructure.Storage;
 
 public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
 {
-    private readonly LocalSqliteStoreDescriptor descriptor;
+    private static bool isPclInitialized;
+    private static readonly object initLock = new();
 
-    public LocalSqliteConnectionFactory(LocalSqliteStoreDescriptor descriptor)
+    private readonly LocalSqliteStoreDescriptor descriptor;
+    private readonly ISqliteKeyProvider keyProvider;
+
+    public LocalSqliteConnectionFactory(
+        LocalSqliteStoreDescriptor descriptor,
+        ISqliteKeyProvider? keyProvider = null)
     {
         this.descriptor = descriptor;
+        this.keyProvider = keyProvider ?? new WindowsCredentialManagerSqliteKeyProvider();
+        EnsureInitialized();
+    }
+
+    private static void EnsureInitialized()
+    {
+        if (!isPclInitialized)
+        {
+            lock (initLock)
+            {
+                if (!isPclInitialized)
+                {
+                    SQLitePCL.raw.SetProvider(new SQLitePCL.SQLite3Provider_e_sqlcipher());
+                    SQLitePCL.Batteries_V2.Init();
+                    isPclInitialized = true;
+                }
+            }
+        }
     }
 
     public async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
         LocalRuntimeDirectoryPreparer.EnsureDirectory(descriptor.Paths.DataDirectory);
 
+        string dbKey = keyProvider.GetOrCreateDatabaseKey();
+
         SqliteConnectionStringBuilder connectionString = new()
         {
             DataSource = descriptor.Paths.DatabasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Default,
+            Password = dbKey,
             Pooling = false
         };
 
         SqliteConnection connection = new(connectionString.ToString());
-        await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using SqliteCommand testCmd = connection.CreateCommand();
+            testCmd.CommandText = "SELECT count(*) FROM sqlite_master;";
+            await testCmd.ExecuteScalarAsync(cancellationToken);
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 26 || ex.Message.Contains("not a database", StringComparison.OrdinalIgnoreCase))
+        {
+            await connection.DisposeAsync();
+
+            // Try opening as unencrypted and rekey to SQLCipher key
+            SqliteConnectionStringBuilder plainConnectionString = new()
+            {
+                DataSource = descriptor.Paths.DatabasePath,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                Cache = SqliteCacheMode.Default,
+                Pooling = false
+            };
+
+            await using (SqliteConnection plainConnection = new(plainConnectionString.ToString()))
+            {
+                await plainConnection.OpenAsync(cancellationToken);
+                await plainConnection.ExecuteNonQueryAsync($"PRAGMA rekey = '{dbKey.Replace("'", "''")}';", cancellationToken);
+            }
+
+            connection = new SqliteConnection(connectionString.ToString());
+            await connection.OpenAsync(cancellationToken);
+        }
+
         await connection.ExecuteNonQueryAsync("PRAGMA journal_mode = WAL;", cancellationToken);
         await connection.ExecuteNonQueryAsync("PRAGMA foreign_keys = ON;", cancellationToken);
         await connection.ExecuteNonQueryAsync("PRAGMA busy_timeout = 5000;", cancellationToken);
+        await connection.ExecuteNonQueryAsync("PRAGMA synchronous = NORMAL;", cancellationToken);
+        await connection.ExecuteNonQueryAsync("PRAGMA cache_size = -64000;", cancellationToken);
+        await connection.ExecuteNonQueryAsync("PRAGMA temp_store = MEMORY;", cancellationToken);
         return connection;
     }
 }

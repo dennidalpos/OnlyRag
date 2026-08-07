@@ -77,7 +77,8 @@ credentials.
 | Setup | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` |
 | Start desktop app | `dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug` |
 | Start Vite dev server | `Set-Location .\src\OnlyRag.Web; npm run dev` |
-| Check application readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Fast application readiness check | `pwsh .\scripts\Invoke-Gate.ps1 -Fast` |
+| Full application readiness check | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
 | Check package build readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` |
 | Frontend checks | `Set-Location .\src\OnlyRag.Web; npm run typecheck; npm run lint; npm run format:check; npm run test` |
 | .NET tests | `dotnet test .\OnlyRag.sln --configuration Release` |
@@ -90,15 +91,19 @@ credentials.
 
 ## Verification Gates
 
-Application readiness:
+Fast readiness gate (preflight, typecheck, lint, builds, manifest checks):
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Fast
+```
+
+Full application readiness:
 
 ```powershell
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
-The gate runs preflight checks, web dependency restore, .NET restore, npm production dependency
-audit, NuGet transitive vulnerability audit, frontend typecheck/lint/format/tests, .NET tests,
-installer prerequisite self-test, OCR runtime manifest checks, web build, and .NET build.
+The gate runs preflight checks, web dependency restore, .NET restore, frontend typecheck/lint/format/tests, .NET tests, installer prerequisite self-test, OCR runtime manifest checks, web build, and .NET build. (Use `-IncludeAudits` for npm/NuGet dependency vulnerability scanning, and `-VerboseOutput` for full un-truncated console logs). Test steps use compact output by default to prevent AI context saturation.
 
 Diagnostics mode:
 
@@ -109,13 +114,12 @@ pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -ContinueOnError
 Package build readiness:
 
 ```powershell
-pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller -IncludeRetrievalEval
 ```
 
-This requires NSIS 3.x and compiles the installer. It still does not prove production release
-readiness without signing and lifecycle verification.
+This requires NSIS 3.x and compiles the installer while running the automated retrieval evaluation benchmark. It still does not prove production release readiness without signing and lifecycle verification.
 
-CI runs `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` on `windows-latest`.
+CI runs `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeAudits` on `windows-latest`.
 
 ## Build And Package
 

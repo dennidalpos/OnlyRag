@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import {
   createAppStatus,
@@ -15,6 +15,11 @@ import {
   createOllamaStatus,
   createPerformanceSettings
 } from "../src/test/fixtures";
+
+afterEach(() => {
+  vi.useRealTimers();
+  localStorage.clear();
+});
 
 describe("App initial setup model residual checks", () => {
   it("treats non-placeholder default model values as configured on startup", async () => {

@@ -2,6 +2,7 @@ using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System.Text;
 using System.Text.Json;
+using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
@@ -9,6 +10,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 {
     private readonly RerankerModelManager modelManager;
     private readonly IReRankerService fallbackReRanker;
+    private readonly IVramMemoryManager? vramMemoryManager;
     private readonly object sessionLock = new();
 
     private InferenceSession? session;
@@ -18,10 +20,12 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
     public OnnxCrossEncoderReRankerService(
         RerankerModelManager modelManager,
-        HeuristicReRankerService? fallbackReRanker = null)
+        HeuristicReRankerService? fallbackReRanker = null,
+        IVramMemoryManager? vramMemoryManager = null)
     {
         this.modelManager = modelManager;
         this.fallbackReRanker = fallbackReRanker ?? new HeuristicReRankerService();
+        this.vramMemoryManager = vramMemoryManager;
     }
 
     public async Task<IReadOnlyList<ReRankResult>> ReRankAsync(
@@ -118,6 +122,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
 
                 session = new InferenceSession(modelPath, options);
                 isInitialized = true;
+                vramMemoryManager?.RegisterSession("OnnxCrossEncoderReRankerService", Dispose);
                 return (session, vocab);
             }
             catch
@@ -221,6 +226,7 @@ public sealed class OnnxCrossEncoderReRankerService : IReRankerService, IDisposa
     {
         lock (sessionLock)
         {
+            vramMemoryManager?.UnregisterSession("OnnxCrossEncoderReRankerService");
             session?.Dispose();
             session = null;
             vocab = null;

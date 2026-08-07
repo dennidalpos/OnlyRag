@@ -367,9 +367,29 @@
 }
 
 .image-text-layer--selected {
-  border-color: var(--primary);
-  background: rgba(79, 70, 229, 0.92);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 4px 14px rgba(79, 70, 229, 0.5);
+  border: 2px dashed #38bdf8;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4), 0 4px 18px rgba(56, 189, 248, 0.45);
+  z-index: 40;
+}
+
+.image-text-layer--selected::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: #38bdf8;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #0284c7;
+}
+
+.image-text-layer--dragging {
+  cursor: grabbing !important;
+  opacity: 0.9;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(56, 189, 248, 0.6);
 }
 
 .generated-image-preview--empty {

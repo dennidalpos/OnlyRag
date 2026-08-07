@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
@@ -22,6 +23,18 @@ public static partial class InProcessBackend
     {
         app.Use(async (context, next) =>
         {
+            IPAddress? remoteIp = context.Connection.RemoteIpAddress;
+            if (remoteIp != null && !IPAddress.IsLoopback(remoteIp))
+            {
+                await WriteProblemAsync(
+                    context,
+                    "Forbidden",
+                    "Access is restricted to local loopback connections.",
+                    StatusCodes.Status403Forbidden,
+                    "forbidden");
+                return;
+            }
+
             if (IsHealthRequest(context.Request) || !context.Request.Path.StartsWithSegments("/api"))
             {
                 await next();

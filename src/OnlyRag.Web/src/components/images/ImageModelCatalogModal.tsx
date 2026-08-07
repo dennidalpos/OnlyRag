@@ -8,6 +8,7 @@ import {
   type ImageModelUrlVerificationResponse
 } from "../../api";
 import { formatFileSize } from "../documents/DocumentsSection.formatting";
+import { InfoTip } from "../common/InfoTip";
 import { createEmptyModelDraft, modelTemplates, type ModelDraft } from "./imageTypes";
 
 type Props = {
@@ -192,14 +193,17 @@ export function ImageModelCatalogModal({
               </select>
             </label>
 
-            <label className="field-group checkbox-group" htmlFor="settings-prefer-gpu">
+            <label className="field-group checkbox-group" htmlFor="settings-prefer-gpu" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <input
                 id="settings-prefer-gpu"
                 type="checkbox"
                 checked={localSettings.preferGpu}
                 onChange={(e) => setLocalSettings({ ...localSettings, preferGpu: e.target.checked })}
               />
-              <span>Preferisci DirectML GPU (accelera l'inferenza su scheda grafica Windows)</span>
+              <span>Usa accelerazione GPU</span>
+              <InfoTip label="Spiegazione accelerazione GPU">
+                Utilizza DirectML per accelerare l'inferenza della generazione immagini sulla scheda grafica Windows.
+              </InfoTip>
             </label>
 
             {selectedModel && (

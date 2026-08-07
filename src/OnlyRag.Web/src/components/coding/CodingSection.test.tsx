@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { CodingSection } from "./CodingSection";
@@ -221,6 +221,35 @@ describe("CodingSection", () => {
         }
       },
       {
+        path: "/api/agent/orchestrate/orch_test_123",
+        method: "GET",
+        response: {
+          orchestrationId: "orch_test_123",
+          overallGoal: "Crea modulo autenticazione con test",
+          isCompleted: true,
+          hasFailed: false,
+          subtasks: [
+            {
+              subtaskId: "sub_planner",
+              role: "Planner Agent",
+              goal: "Analisi requisiti",
+              dependsOnSubtaskIds: [],
+              status: "Completed"
+            }
+          ],
+          messages: [
+            {
+              messageId: "msg_1",
+              senderRole: "Orchestrator",
+              recipientRole: "Planner Agent",
+              messageText: "Inizializzato flusso multi-agente",
+              sentAtUtc: new Date().toISOString()
+            }
+          ],
+          startedAtUtc: new Date().toISOString()
+        }
+      },
+      {
         path: "/api/agent/run-stream",
         method: "POST",
         response: 'data: {"type":"final_response","content":"Modulo creato!"}\n\ndata: [DONE]\n\n'
@@ -241,7 +270,7 @@ describe("CodingSection", () => {
     await user.click(sendBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("Orchestrazione Avanzata Multi-Agenti")).toBeInTheDocument();
+      expect(screen.getByText("Orchestrazione Multi-Agenti")).toBeInTheDocument();
       expect(screen.getByText("orch_test_123")).toBeInTheDocument();
       expect(screen.getByText("Planner Agent")).toBeInTheDocument();
     });

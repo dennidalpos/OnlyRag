@@ -2,11 +2,12 @@ import { useId } from "react";
 
 type InfoTipProps = {
   label: string;
-  children: string;
+  tooltip?: string;
+  children: React.ReactNode;
 };
 
 /** Keeps secondary guidance available without permanently expanding the layout. */
-export function InfoTip({ label, children }: InfoTipProps) {
+export function InfoTip({ label, tooltip, children }: InfoTipProps) {
   const descriptionId = useId();
 
   return (
@@ -16,7 +17,7 @@ export function InfoTip({ label, children }: InfoTipProps) {
         className="info-tip__trigger"
         aria-label="Informazioni aggiuntive"
         aria-describedby={descriptionId}
-        title={label}
+        title={tooltip ?? label}
       >
         i
       </button>

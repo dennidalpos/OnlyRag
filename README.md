@@ -104,7 +104,8 @@ Run from the repository root with PowerShell 7 unless the command explicitly cha
 | Setup dependencies | `pwsh .\scripts\Bootstrap-Prerequisites.ps1` |
 | Start desktop app | `dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug` |
 | Start Vite dev server | `Set-Location .\src\OnlyRag.Web; npm run dev` |
-| Check application readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Fast application readiness check | `pwsh .\scripts\Invoke-Gate.ps1 -Fast` |
+| Full application readiness check | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
 | Check package build readiness | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` |
 | Build web UI | `pwsh .\scripts\Build-Web.ps1` |
 | Build desktop app | `pwsh .\scripts\Build-App.ps1 -Configuration Release` |
@@ -131,16 +132,19 @@ dotnet test .\OnlyRag.sln --configuration Release
 
 ## Readiness Gates
 
-Application readiness:
+Fast readiness gate (preflight, typecheck, lint, builds, manifest checks):
+
+```powershell
+pwsh .\scripts\Invoke-Gate.ps1 -Fast
+```
+
+Full application readiness gate:
 
 ```powershell
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
-This gate runs preflight checks, web dependency restore, .NET restore, npm production dependency
-audit, NuGet transitive vulnerability audit, frontend typecheck/lint/format/tests, .NET tests,
-installer prerequisite self-test, OCR runtime manifest checks, web build, and .NET build. CI runs
-this same gate on `windows-latest`.
+This gate runs preflight checks, web dependency restore, .NET restore, frontend typecheck/lint/format/tests, .NET tests, installer prerequisite self-test, OCR runtime manifest checks, web build, and .NET build. (Test steps default to compact AI output; pass `-VerboseOutput` for full console logs, and `-IncludeAudits` for npm/NuGet dependency vulnerability scanning; CI runs `Invoke-Gate.ps1 -IncludeAudits` on `windows-latest`).
 
 Package build readiness:
 

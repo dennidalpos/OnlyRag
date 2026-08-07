@@ -19,6 +19,7 @@ import {
 
 afterEach(() => {
   vi.useRealTimers();
+  localStorage.clear();
 });
 
 describe("App OCR startup polling", () => {
@@ -128,12 +129,17 @@ describe("App OCR startup polling", () => {
     ]);
 
     render(<App />);
-    await flushPromises();
+    await act(async () => {
+      await flushPromises();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
-    await flushPromises();
+    await act(async () => {
+      await flushPromises();
+    });
+
     expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
-    expect(screen.getByText(/Aggiornamento automatico ogni 3 secondi/)).toBeInTheDocument();
+    expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3_000);

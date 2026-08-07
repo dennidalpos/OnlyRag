@@ -71,8 +71,14 @@ pwsh .\scripts\Format-Code.ps1
 # Static analysis and linting (TypeScript + ESLint + .NET analyzers)
 pwsh .\scripts\Lint-Code.ps1
 
-# Run full test suite (.NET xUnit + Vitest component tests)
-pwsh .\scripts\Test-Code.ps1
+# Run fast unit test suite with compact AI summary (.NET xUnit + Vitest unit tests)
+pwsh .\scripts\Test-Code.ps1 -Fast
+
+# Run full integration test suite with compact output
+pwsh .\scripts\Test-Code.ps1 -IncludeIntegration
+
+# Run test suite with full verbose developer output
+pwsh .\scripts\Test-Code.ps1 -VerboseOutput
 ```
 
 ## 5. Project Skills Inventory (`skills/`)
@@ -117,9 +123,13 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 
 ### Canonical Readiness Gate
 ```powershell
+# Fast gate check (recommended for rapid development & AI agent verification)
+pwsh .\scripts\Invoke-Gate.ps1 -Fast
+
+# Full release verification gate with tests
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
-Runs preflight checks, dependency audits, frontend typecheck/lint/format/tests, .NET unit/integration tests, OCR manifest checks, web build, and .NET build.
+Runs preflight checks, frontend typecheck/lint/format, OCR manifest checks, web build, and .NET build. Supports `-Fast` (or `-SkipTests`) to streamline local verification, and `-IncludeAudits` for package vulnerability audits.
 
 ### Packaging & Release Pipeline
 ```powershell
@@ -140,7 +150,11 @@ pwsh .\scripts\Clean.ps1
 
 ## 5. Development Guidelines & Rules
 
+- **Official Tracker**: Keep `PROJECT_STATUS.json` strictly updated at all times as the official project status and task tracker.
+- **Greenfield Mindset**: Treat the codebase as a brand-new application. Prefer modern C# 13 / .NET 10 / React 19 standards over legacy patterns or shims.
+- **Authorized Refactoring**: Full authorization to perform destructive code changes, modify business logic, and overhaul architecture to improve code cleanliness and structure.
+- **Zero Tech Debt**: Proactively remove legacy code, unused files, dead branches, and technical debt across the repository.
 - **Windows First**: Use PowerShell 7 (`pwsh`), cross-platform path APIs in code, and relative paths.
 - **Cleanliness**: Never check in generated assets (`dist`, `node_modules`, `bin`, `obj`, `artifacts`, `payload`).
 - **No Direct Secrets**: Store no certificates or credentials in the repo; use `.env.example` where applicable.
-- **Verification Requirement**: Never declare work complete without executing the canonical gate (`Invoke-Gate.ps1 -Configuration Release`).
+- **Verification Requirement**: Never declare work complete without executing the canonical gate (`Invoke-Gate.ps1 -Fast` or `Invoke-Gate.ps1 -Configuration Release`).

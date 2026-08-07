@@ -231,6 +231,28 @@ export function useImagesSectionController() {
           e.preventDefault();
           handleDeleteSelectedText();
         }
+      } else if (selectedTextId !== null && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        const step = e.shiftKey ? 2.5 : 0.5;
+        let dx = 0;
+        let dy = 0;
+        if (e.key === "ArrowLeft") dx = -step;
+        if (e.key === "ArrowRight") dx = step;
+        if (e.key === "ArrowUp") dy = -step;
+        if (e.key === "ArrowDown") dy = step;
+
+        pushEditState((prev) => ({
+          ...prev,
+          textLayers: prev.textLayers.map((layer) =>
+            layer.id === selectedTextId
+              ? {
+                  ...layer,
+                  x: Math.max(0, Math.min(95, layer.x + dx)),
+                  y: Math.max(0, Math.min(95, layer.y + dy))
+                }
+              : layer
+          )
+        }));
       }
     }
 

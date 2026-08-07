@@ -46,7 +46,10 @@ public sealed record QdrantStatusResponse(
     string? StorageDirectory,
     int? ProcessId,
     string? Warning,
-    string? Error);
+    string? Error,
+    bool AutoHealingActive = false,
+    int AutoHealRestartCount = 0,
+    DateTimeOffset? LastAutoHealedAtUtc = null);
 
 public enum QueryTransformationStrategy
 {

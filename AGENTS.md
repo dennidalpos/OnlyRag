@@ -1,84 +1,52 @@
-# AGENTS.md — Global Defaults
+# AGENTS.md — Instructions Summary
 
-## Priority
+## 1. Scope & Principles
+* **Priority Order:** User request > Specific `AGENTS.md` > Main `AGENTS.md`. In case of conflict, choose the safest, least invasive option and report it.
+* **Principles:**
+  * Greenfield mindset: build strictly for current requirements. No speculative abstractions, shims, or temporary code.
+  * Keep the repo clean, navigable, and domain-focused.
+  * Entrypoints must remain thin; put logic in domain modules.
 
-User request > repository/nested `AGENTS.md` > this file.
+## 2. Environment (Windows & PowerShell)
+* Primary dev environment: **Windows / PowerShell / UTF-8**.
+* Avoid Unix-only commands/paths (`/tmp`, `chmod`, `rm -rf`, `sed -i`).
+* Use cross-platform APIs (`pathlib`), quoted paths, and repository-relative paths.
 
-If instructions conflict, choose the least invasive safe option and mention it.
+## 3. Assessment & Working Tree
+* Read relevant `AGENTS.md` files and inspect affected areas.
+* Check git status (`git status --short`) before starting. Preserve pre-existing, unrelated work.
 
-## Environment
+## 4. Implementation Rules
+* **Architecture:** Preserve structure unless refactoring is required. Remove obsolete code completely—do not leave compatibility layers.
+* **Dependencies:** Prefer standard library or existing dependencies. Respect lockfiles; do not upgrade unrelated packages or change package managers without cause.
+* **Security:** Never expose, print, or commit secrets/tokens. Use `.env.example` and environment variables.
 
-Default: Windows + PowerShell.
+## 5. Repository Structure & Scripts
+* **Naming:** Use clear, domain-specific names. Avoid generic/catch-all folders or files (`misc/`, `temp/`, `utils.*`, `common.*`).
+* **Scripts:** Place scripts in standard locations (default: `scripts/`), executable from repo root, returning non-zero exit codes on failure.
 
-Prefer PowerShell-compatible commands, UTF-8, quoted paths, and cross-platform path APIs (`pathlib`, `path`). Do not assume Bash/WSL/GNU tools unless required by the project.
+## 6. Testing & Verification
+* Update/add tests for any behavior changes.
+* **Agent Fast Mode:** Automated tests run by AI must run in fast/summarized mode (concise output: PASS/FAIL + minimal stack trace). PowerShell test scripts must support both fast mode (default for agents) and full/manual mode (for debugging).
+* **Honesty:** Never claim a test, linter, or build was run if it was not.
 
-## General
+## 7. Documentation
+* Keep setup, usage, API, and architectural documentation synchronized with all code changes.
 
-Assume new projects are greenfield unless the repository indicates otherwise.
+## 8. PROJECT_STATUS.json
+* Strict active todo list (`{"todos": ["Task"]}`).
+* Add active tasks only; immediately remove completed, obsolete, or duplicate tasks. No changelogs, blockers, or notes.
 
-For greenfield:
-- No compatibility layers, migrations, shims, or legacy patterns unless requested.
-- Prefer current framework conventions and simple architectures.
+## 9. Final Verification
+* Run tests (fast mode), linters, formatters, type-checkers, and builds.
+* Review diff and `git status --short`. Clean up temporary files, logs, and stale references. Ensure `.gitignore` is updated.
+* **Forbidden Git Commands:** `git reset --hard`, `git clean`, force-push, or history rewriting.
 
-For existing projects:
-- Respect existing architecture.
-- Make the smallest safe, consistent change.
-
-Avoid unnecessary rewrites, dependency changes, API changes, or refactors.
-
-Only ask for clarification if the change risks data loss, security issues, irreversible actions, or major architectural decisions.
-
-## Editing
-
-Read only the files needed (including relevant `AGENTS.md`).
-
-Preserve user changes.
-
-Never use destructive Git commands (`reset --hard`, `clean`, force-push, history rewrite).
-
-## Quality
-
-When behavior changes, update/add tests if the project has them.
-
-Run relevant checks when practical (format, lint, typecheck, tests, build).
-
-Never claim checks were run if they were not.
-
-## Documentation & Synchronization
-
-Documentation in `docs/` and root `README.md` MUST be kept strictly synchronized with the codebase at all times.
-
-- Whenever code features, schemas, API endpoints, runtime models, script flows, or architectural components are modified or added, update the corresponding documentation files in `docs/` and root `README.md` immediately within the same task.
-- Remove or update obsolete, redundant, or misleading documentation references to prevent drift.
-- Ensure all technical diagrams, schema version references, and path listings accurately match the codebase implementation.
-
-## Skills & Discovery
-
-Future AI agents working on this repository MUST inspect, load, and follow the specialized development skills located in `skills/` and `skill/` whenever performing relevant tasks:
-
-- [`skills/onlyrag`](file:///d:/GITHUB/OnlyRag/skills/onlyrag/SKILL.md) / [`skill/onlyrag`](file:///d:/GITHUB/OnlyRag/skill/onlyrag/SKILL.md): Primary architecture, workflows, local data paths, and gate check.
-- [`skills/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skills/dotnet-wpf-minimal-api/SKILL.md) / [`skill/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skill/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop, SQLite.
-- [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md) / [`skill/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skill/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright.
-- [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md) / [`skill/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skill/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, Heuristic Re-ranking, CRAG evaluation.
-- [`skills/autonomous-agent-engine`](file:///d:/GITHUB/OnlyRag/skills/autonomous-agent-engine/SKILL.md) / [`skill/autonomous-agent-engine`](file:///d:/GITHUB/OnlyRag/skill/autonomous-agent-engine/SKILL.md): MCTS Tree-of-Thought, Plan-Act-Observe-Verify state machine, Episodic memory, Subagent DAG.
-- [`skills/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skills/onnx-directml-image-gen/SKILL.md) / [`skill/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skill/onnx-directml-image-gen/SKILL.md): ONNX DirectML GPU / CPU fallback, SDXL/LCM models, SHA256 integrity, Canvas editor.
-- [`skills/windows-packaging-signing`](file:///d:/GITHUB/OnlyRag/skills/windows-packaging-signing/SKILL.md) / [`skill/windows-packaging-signing`](file:///d:/GITHUB/OnlyRag/skill/windows-packaging-signing/SKILL.md): NSIS packaging, signtool.exe signing, prerequisite testing, installer release lifecycle.
-- [`skills/code-maintenance-automation`](file:///d:/GITHUB/OnlyRag/skills/code-maintenance-automation/SKILL.md) / [`skill/code-maintenance-automation`](file:///d:/GITHUB/OnlyRag/skill/code-maintenance-automation/SKILL.md): Automated code formatting (`Format-Code.ps1`), static linting (`Lint-Code.ps1`), and testing workflows (`Test-Code.ps1`).
-
-When performing tasks in any of these domain areas, agents MUST load the corresponding `SKILL.md` before writing code or making architectural decisions.
-
-## Security
-
-Never expose secrets.
-
-Use environment variables for configuration.
-
-Prefer existing dependencies or the standard library before adding new ones.
-
-## Final response
-
-For file changes, report:
-- files changed
-- what changed
-- checks run (or why not)
-- remaining limitations
+## 10. Final Response Format
+For implementation tasks, structure the response concisely into:
+1. **What changed:** Functional updates, structural improvements, removed code.
+2. **Files modified/deleted:** List of created, edited, or deleted files.
+3. **Checks run & results:** Real results for tests/lint/builds (or explicit reason if skipped).
+4. **Cleanliness status:** Confirmation that no temp/secret files remain.
+5. **Remaining limitations / risks:** Concrete risks only.
+6. **Next steps:** Immediate necessary follow-ups only.

@@ -18,6 +18,7 @@ internal static class InProcessBackendEndpointMapping
         app.MapAgentEndpoints();
         app.MapExportEndpoints();
         app.MapBackupEndpoints();
+        app.MapCloudLlmEndpoints();
         app.MapDatabaseEndpoints();
         app.MapLoggingEndpoints();
         return app;

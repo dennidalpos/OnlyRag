@@ -36,17 +36,29 @@ pwsh .\scripts\Lint-Code.ps1 -Configuration Release
 
 ### Automated Testing
 ```powershell
-# Run Vitest component tests and xUnit .NET tests
-pwsh .\scripts\Test-Code.ps1 -Configuration Release
+# Run fast Vitest unit tests and .NET unit tests (default compact AI summary)
+pwsh .\scripts\Test-Code.ps1 -Fast
+
+# Run full solution integration tests
+pwsh .\scripts\Test-Code.ps1 -IncludeIntegration
 
 # Include Playwright end-to-end specifications
-pwsh .\scripts\Test-Code.ps1 -Configuration Release -IncludeE2e
+pwsh .\scripts\Test-Code.ps1 -IncludeE2e
+
+# Run with full verbose console output (manual developer debugging)
+pwsh .\scripts\Test-Code.ps1 -VerboseOutput
 ```
 
 ### Canonical Gate Verification
 ```powershell
-# Full release verification gate
+# Fast verification gate (preflight, typecheck, lint, builds, manifest checks - recommended for AI)
+pwsh .\scripts\Invoke-Gate.ps1 -Fast
+
+# Full release verification gate with tests (compact AI output)
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
+
+# Release verification gate with verbose logs
+pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -VerboseOutput
 ```
 
 ## 3. Operational Best Practices

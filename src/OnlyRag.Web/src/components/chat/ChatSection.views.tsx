@@ -4,6 +4,8 @@ import { formatPageRange } from "./ChatSection.helpers";
 import { exportSessionAsJson, exportSessionAsMarkdown, triggerFileDownload, type ChatMessage } from "./ChatSection.storage";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { ModelSelectorDropdown } from "../common/ModelSelectorDropdown";
+import { AlertCard } from "../common/AlertCard";
+import { ProgressIndicator } from "../common/ProgressIndicator";
 
 export function ChatDocumentsPanel({
   documentsError,
@@ -266,14 +268,18 @@ export function ChatMainPanel({
 
       <div className="chat-status-stack">
         {!ollamaStatus?.isReachable && (
-          <div className="feedback-banner feedback-banner--error" role="alert">
-            {loadError ?? "Ollama è offline. Apri Ollama o correggi l'indirizzo in Impostazioni."}
-          </div>
+          <AlertCard
+            variant="error"
+            title="Ollama è offline."
+            detail={loadError ?? "Avvia Ollama o verifica l'indirizzo nelle impostazioni per caricare i modelli."}
+          />
         )}
         {ollamaStatus?.isReachable && models.length === 0 && (
-          <div className="feedback-banner feedback-banner--error" role="alert">
-            Nessun modello installato in Ollama. Installa almeno un modello prima di usare la chat.
-          </div>
+          <AlertCard
+            variant="warning"
+            title="Nessun modello configurato in Ollama."
+            detail="Scarica o abilita almeno un modello LLM da Ollama prima di inviare messaggi."
+          />
         )}
         {feedback && <div className="feedback-banner feedback-banner--error" role="alert">{feedback}</div>}
         {notices.length > 0 && (
@@ -352,11 +358,22 @@ export function ChatMainPanel({
           ))
         )}
         {isGenerating && (
-          <div className="chat-generating" role="status" aria-live="polite">
-            <span>Generazione in corso...</span>
-            <button className="button-secondary" type="button" onClick={onCancel}>
-              Annulla
-            </button>
+          <div style={{ margin: "8px 0" }} role="status" aria-live="polite">
+            <ProgressIndicator
+              isStreaming={true}
+              currentPhaseLabel="Elaborazione contesto RAG e generazione risposta..."
+              steps={[
+                { label: "Analisi prompt e ricerca vettoriale Qdrant", status: "completed" },
+                { label: "Ri-classificazione 2-stage (RRF + Re-Ranker ONNX)", status: "completed" },
+                { label: "Generazione streaming dal modello LLM", status: "in_progress" }
+              ]}
+              chunksUsedCount={selectedDocumentIds.length > 0 ? selectedDocumentIds.length : undefined}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+              <button className="button-secondary button-secondary--xs" type="button" onClick={onCancel} title="Interrompi l'elaborazione corrente">
+                Annulla elaborazione
+              </button>
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />

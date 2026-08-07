@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -8,6 +9,31 @@ type MarkdownRendererProps = {
 };
 
 export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
+  const [renderedContent, setRenderedContent] = useState(content);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.Worker && content.length > 2048) {
+      try {
+        const worker = new Worker(new URL("../../workers/markdownWorker.ts", import.meta.url), {
+          type: "module"
+        });
+        const requestId = Math.random().toString(36).substring(2);
+        worker.postMessage({ content, id: requestId });
+        worker.onmessage = (e: MessageEvent<{ id: string; processedContent: string }>) => {
+          if (e.data && e.data.id === requestId) {
+            setRenderedContent(e.data.processedContent);
+          }
+          worker.terminate();
+        };
+        return () => worker.terminate();
+      } catch {
+        setRenderedContent(content);
+      }
+    } else {
+      setRenderedContent(content);
+    }
+  }, [content]);
+
   return (
     <div className={`prose dark:prose-invert max-w-none text-inherit leading-relaxed ${className}`}>
       <ReactMarkdown
@@ -85,7 +111,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
           )
         }}
       >
-        {content}
+        {renderedContent}
       </ReactMarkdown>
     </div>
   );

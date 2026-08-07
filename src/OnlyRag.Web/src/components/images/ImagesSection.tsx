@@ -158,7 +158,6 @@ export function ImagesSection() {
                 onChange={(e) => ctrl.setArrowWidth(Number(e.target.value))}
                 title="Spessore linea (px)"
               />
-              <span className="editor-hint">💡 Trascina sull'immagine per inserire una freccia della lunghezza desiderata.</span>
               {ctrl.editState.arrowLayers.length > 0 && (
                 <button type="button" className="button-secondary" onClick={ctrl.handleClearArrows} title="Rimuovi tutte le frecce">
                   Rimuovi frecce ({ctrl.editState.arrowLayers.length})

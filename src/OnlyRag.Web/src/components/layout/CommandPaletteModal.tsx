@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, MessageSquare, Code, FileText, Languages, Image, Settings, Sparkles } from "lucide-react";
+import { Search, MessageSquare, Code, FileText, Languages, Image, Settings, Sparkles, Sun, Moon, Zap, Gem } from "lucide-react";
 import type { SectionId } from "./Sidebar";
 import { useModalFocusTrap } from "../common/useModalFocusTrap";
+import { useTheme, Theme } from "../../context/ThemeContext";
 
 type CommandPaletteModalProps = {
   isOpen: boolean;
@@ -12,23 +13,29 @@ type CommandPaletteModalProps = {
 type CommandItem = {
   id: string;
   label: string;
-  group: "Sezioni" | "Azioni Rapide";
+  group: "Sezioni" | "Azioni Rapide" | "Temi Visivi";
   sectionId?: SectionId;
+  themeId?: Theme;
   shortcut?: string;
   icon: React.ReactNode;
 };
 
-const commands: CommandItem[] = [
-  { id: "nav-chat", label: "Apri Chat & RAG Workspace", group: "Sezioni", sectionId: "chat", shortcut: "Ctrl+1", icon: <MessageSquare size={16} /> },
-  { id: "nav-coding", label: "Apri Coding & Subagent Studio", group: "Sezioni", sectionId: "coding", shortcut: "Ctrl+2", icon: <Code size={16} /> },
-  { id: "nav-documents", label: "Apri Gestione Documenti", group: "Sezioni", sectionId: "documents", shortcut: "Ctrl+3", icon: <FileText size={16} /> },
-  { id: "nav-translation", label: "Apri Traduttore Multilingua", group: "Sezioni", sectionId: "translation", shortcut: "Ctrl+4", icon: <Languages size={16} /> },
-  { id: "nav-images", label: "Apri Generazione Immagini DirectML", group: "Sezioni", sectionId: "images", shortcut: "Ctrl+5", icon: <Image size={16} /> },
-  { id: "nav-settings", label: "Apri Impostazioni di Sistema", group: "Sezioni", sectionId: "settings", shortcut: "Ctrl+6", icon: <Settings size={16} /> },
-  { id: "act-new-chat", label: "Nuova Conversazione Chat", group: "Azioni Rapide", sectionId: "chat", icon: <Sparkles size={16} /> }
+const baseCommands: CommandItem[] = [
+  { id: "nav-chat", label: "Chat & RAG", group: "Sezioni", sectionId: "chat", shortcut: "Ctrl+1", icon: <MessageSquare size={16} /> },
+  { id: "nav-coding", label: "Coding & Agenti", group: "Sezioni", sectionId: "coding", shortcut: "Ctrl+2", icon: <Code size={16} /> },
+  { id: "nav-documents", label: "Documenti", group: "Sezioni", sectionId: "documents", shortcut: "Ctrl+3", icon: <FileText size={16} /> },
+  { id: "nav-translation", label: "Traduzione", group: "Sezioni", sectionId: "translation", shortcut: "Ctrl+4", icon: <Languages size={16} /> },
+  { id: "nav-images", label: "Generazione Immagini", group: "Sezioni", sectionId: "images", shortcut: "Ctrl+5", icon: <Image size={16} /> },
+  { id: "nav-settings", label: "Impostazioni", group: "Sezioni", sectionId: "settings", shortcut: "Ctrl+6", icon: <Settings size={16} /> },
+  { id: "act-new-chat", label: "Nuova Chat", group: "Azioni Rapide", sectionId: "chat", icon: <Sparkles size={16} /> },
+  { id: "theme-dark", label: "Tema Scuro Midnight", group: "Temi Visivi", themeId: "dark", icon: <Moon size={16} /> },
+  { id: "theme-light", label: "Tema Chiaro Crisp", group: "Temi Visivi", themeId: "light", icon: <Sun size={16} /> },
+  { id: "theme-cyber", label: "Tema Cyberpunk Neon", group: "Temi Visivi", themeId: "cyber", icon: <Zap size={16} /> },
+  { id: "theme-emerald", label: "Tema Obsidian Emerald", group: "Temi Visivi", themeId: "emerald", icon: <Gem size={16} /> }
 ];
 
 export function CommandPaletteModal({ isOpen, onClose, onSelectSection }: CommandPaletteModalProps) {
+  const { setTheme } = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -43,11 +50,14 @@ export function CommandPaletteModal({ isOpen, onClose, onSelectSection }: Comman
 
   if (!isOpen) return null;
 
-  const filteredCommands = commands.filter((cmd) =>
+  const filteredCommands = baseCommands.filter((cmd) =>
     cmd.label.toLowerCase().includes(query.toLowerCase())
   );
 
   function handleSelect(cmd: CommandItem) {
+    if (cmd.themeId) {
+      setTheme(cmd.themeId);
+    }
     if (cmd.sectionId) {
       onSelectSection(cmd.sectionId);
     }
@@ -82,7 +92,7 @@ export function CommandPaletteModal({ isOpen, onClose, onSelectSection }: Comman
           <input
             type="text"
             className="command-palette-input"
-            placeholder="Cerca comando, sezione o modello... (Esc per chiudere)"
+            placeholder="Cerca comandi... (Esc)"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);

@@ -223,7 +223,7 @@ export function DefaultModelsPanel() {
             )}
             {unavailableDefaults.length > 0 && (
               <div className="panel-note panel-note--warning" role="alert">
-                <p>Alcuni modelli salvati non sono piu presenti in Ollama: {unavailableDefaults.join(", ")}.</p>
+                <p>Alcuni modelli salvati non sono più presenti in Ollama: {unavailableDefaults.join(", ")}.</p>
               </div>
             )}
             <div

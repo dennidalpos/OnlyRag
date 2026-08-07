@@ -1,4 +1,4 @@
-#requires -Version 7.0
+#requires -Version 5.1
 
 function Format-GateDuration {
     param(
@@ -62,7 +62,10 @@ function Invoke-GateStep {
         Write-Host "  $message" -ForegroundColor Red
 
         if (-not $ContinueOnError) {
-            throw
+            Write-GateSummary
+            Write-Host ""
+            Write-Host "Gate arrestato immediatamente al primo errore nel passaggio '$Name'." -ForegroundColor Red
+            exit 1
         }
     }
 }
@@ -158,3 +161,104 @@ function Get-JsonPropertyValue {
 
     return $property.Value
 }
+
+function Format-CompactTestSummary {
+    param(
+        [string]$OutputText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($OutputText)) {
+        return "Passed"
+    }
+
+    $lines = $OutputText -split "\r?\n"
+    
+    $dotnetMatch = $lines | Where-Object { $_ -match "(Passed|Failed)!\s+-\s+Failed:\s+(\d+),\s+Passed:\s+(\d+)" } | Select-Object -First 1
+    if ($dotnetMatch) {
+        return $dotnetMatch.Trim()
+    }
+
+    $vitestMatch = $lines | Where-Object { $_ -match "Tests\s+\d+\s+passed" -or $_ -match "Test Files\s+\d+\s+passed" } | Select-Object -First 5
+    if ($vitestMatch) {
+        return ($vitestMatch -join " | ").Trim()
+    }
+
+    return "Passed"
+}
+
+function Format-CompactTestFailure {
+    param(
+        [string]$OutputText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($OutputText)) {
+        return "Test run failed with unknown error."
+    }
+
+    $lines = $OutputText -split "\r?\n"
+    $relevantLines = New-Object System.Collections.Generic.List[string]
+
+    foreach ($line in $lines) {
+        if ($line -match "Failed\s+!|FAIL\s+|Error:|Exception:|Expected:|Received:|at\s+[A-Za-z0-9_.]+\(|AssertionError|\[FAIL\]") {
+            if ($line -notmatch "Determining projects to restore|Build completed|Restore completed") {
+                $relevantLines.Add($line.TrimEnd())
+            }
+        }
+    }
+
+    if ($relevantLines.Count -eq 0) {
+        $nonEmpty = $lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $relevantLines.AddRange(($nonEmpty | Select-Object -Last 15))
+    }
+
+    return ($relevantLines | Select-Object -First 25) -join "`n"
+}
+
+function Invoke-CompactTestCommand {
+    param(
+        [Parameter(Mandatory)]
+        [string]$TestType,
+
+        [Parameter(Mandatory)]
+        [scriptblock]$Action,
+
+        [switch]$VerboseOutput
+    )
+
+    if ($VerboseOutput) {
+        Write-Host "  [Verbose Mode] Executing $TestType..." -ForegroundColor Yellow
+        & $Action
+        return
+    }
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $global:LASTEXITCODE = 0
+    
+    $output = & {
+        try {
+            & $Action 2>&1
+        }
+        catch {
+            $_
+        }
+    } | Out-String
+
+    $stopwatch.Stop()
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+
+    if ($exitCode -eq 0) {
+        $summary = Format-CompactTestSummary -OutputText $output
+        $durationText = Format-GateDuration -Elapsed $stopwatch.Elapsed
+        Write-Host "  [PASS] $TestType ($durationText) - $summary" -ForegroundColor Green
+    }
+    else {
+        $durationText = Format-GateDuration -Elapsed $stopwatch.Elapsed
+        Write-Host "  [FAIL] $TestType ($durationText)" -ForegroundColor Red
+        $failureDetails = Format-CompactTestFailure -OutputText $output
+        Write-Host "--- Failure Traceback (Compact) ---" -ForegroundColor Red
+        Write-Host $failureDetails -ForegroundColor Red
+        Write-Host "----------------------------------" -ForegroundColor Red
+        throw "$TestType failed with exit code $exitCode."
+    }
+}
+

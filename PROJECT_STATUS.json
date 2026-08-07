@@ -1,107 +1,27 @@
 {
   "todos": [
     {
-      "id": "TASK-001",
+      "id": "TASK-045",
       "priority": "P1",
-      "category": "Data Layer",
-      "title": "Migrazione Data Layer a EF Core 10 e FluentMigrator",
-      "description": "Sostituire la gestione manuale ADO.NET in OnlyRag.Infrastructure con EF Core 10 per entita fortemente tipizzate.",
-      "status": "pending"
+      "category": "AI Framework & Integrations",
+      "title": "Integrazione Adapter LLM Remote Cloud (Azure OpenAI / Anthropic / Google Gemini)",
+      "description": "Espandere l'astrazione Microsoft.Extensions.AI del backend per supportare, in aggiunta ad Ollama locale, provider LLM/Embedding cloud remoti: (1) adattatori configurabili per Azure OpenAI, OpenAI, Anthropic Claude e Google Gemini, (2) gestione sicura delle chiavi API in Windows Credential Manager / ISqliteKeyProvider, (3) selettore dinamico nelle Impostazioni per commutare al volo tra provider locali e remoti in base alle esigenze di riservatezza dei dati.",
+      "status": "in_progress"
     },
     {
-      "id": "TASK-002",
-      "priority": "P1",
-      "category": "Data Layer",
-      "title": "Migrazioni SQLite non distruttive e WAL Tuning",
-      "description": "Sostituire il reset distruttivo di LocalSqliteSchemaInitializer.cs con migrazioni incrementali e attivare PRAGMA WAL.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-003",
+      "id": "TASK-046",
       "priority": "P2",
-      "category": "AI Framework",
-      "title": "Adozione di Microsoft.Extensions.AI",
-      "description": "Sostituire OllamaClient.cs con l'astrazione standard Microsoft.Extensions.AI (IChatClient, IEmbeddingGenerator).",
+      "category": "GraphRAG & UI Visualizer",
+      "title": "Visualizzatore Interattivo Grafo di Conoscenza GraphRAG (Knowledge Graph Canvas)",
+      "description": "Creare un componente visivo interattivo in React 19 per l'esplorazione del grafo di conoscenza GraphRAG: (1) rendering bidimensionale ad alte prestazioni di nodi ed archi caricati da document_graph_nodes e document_graph_edges, (2) filtri per tipo di entità, rilevanza e sezione documentale, (3) evidenziazione dinamica dei cammini di traversamento del grafo eseguiti da GraphRetrievalService durante le risposte RAG, (4) ispezione dettagliata delle proprietà di nodi e relazioni al click.",
       "status": "pending"
     },
     {
-      "id": "TASK-004",
-      "priority": "P2",
-      "category": "Real-Time API",
-      "title": "Streaming SignalR Hubs per LLM e Job",
-      "description": "Implementare SignalR Hubs in OnlyRag.Api e collegare @microsoft/signalr in React per token streaming e live progress.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-005",
+      "id": "TASK-048",
       "priority": "P3",
-      "category": "OCR & ML Engine",
-      "title": "Engine OCR Nativo C# DirectML (Eliminazione Python)",
-      "description": "Sostituire il subprocess Python PaddleOCR con binding C# nativo ONNX DirectML per rimuovere la dipendenza da Python 3.x.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-006",
-      "priority": "P3",
-      "category": "Ingestion Pipeline",
-      "title": "Pipeline di Ingestion basata su System.Threading.Channels",
-      "description": "Riscrivere DocumentIngestionJobHandler.cs con pattern Producer-Consumer asincrono a basso consumo RAM.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-007",
-      "priority": "P4",
-      "category": "Security",
-      "title": "Crittografia SQLite a Riposo con SQLCipher",
-      "description": "Integrare SQLitePCLRaw.bundle_e_sqlcipher per la crittografia trasparente AES-256 del database locale.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-008",
-      "priority": "P4",
-      "category": "API Bridge",
-      "title": "Client API TypeScript tipizzato da OpenAPI",
-      "description": "Generare i contratti API TypeScript nel frontend da OpenAPI usando @hey-api/openapi-ts.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-009",
-      "priority": "P4",
-      "category": "Security",
-      "title": "Lockdown API e Sanitizzazione Percorsi",
-      "description": "Rafforzare l'isolamento del server Kestrel loopback con secret header e convalida in SafeDocumentPath.cs.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-010",
-      "priority": "P5",
-      "category": "Performance",
-      "title": "Batch Embedding e Vector Store Index Caching",
-      "description": "Raggruppare i vettori in batch gRPC (64-128 elementi) durante l'indicizzazione su Qdrant e ottimizzare l'index caching.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-011",
-      "priority": "P5",
-      "category": "Performance",
-      "title": "Gestione Memoria VRAM ONNX DirectML (VramMemoryManager)",
-      "description": "Implementare VramMemoryManager per allocare e disallocare esplicitamente le sessioni ONNX DirectML inattive e prevenire frammentazione VRAM.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-012",
-      "priority": "P5",
-      "category": "Performance",
-      "title": "Frontend Web Workers per Markdown Parsing e Syntax Highlighting",
-      "description": "Spostare il parsing dei file Markdown e l'evidenziazione della sintassi (rehype-highlight) in un Web Worker dedicato.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-013",
-      "priority": "P5",
-      "category": "Verification & Release",
-      "title": "Verification Gate e Benchmark Prestazionali Lifecycle",
-      "description": "Eseguire Invoke-Gate.ps1, effettuare benchmark di latenza RAG/RAM e verificare il ciclo di vita installer con Test-InstallerRelease.ps1.",
+      "category": "Observability & Telemetry",
+      "title": "Telemetria Avanzata OpenTelemetry & Dashboard Metriche Prometheus/Grafana Local Export",
+      "description": "Integrare la telemetria standard OpenTelemetry su Kestrel API, SQLite, Qdrant ed Agent Engine: (1) esportatore di metriche OTLP/Prometheus locale abilitabile da configurazione, (2) tracciamento delle latenze dettagliate della ricerca 2-stage (Query Transformation, Qdrant HNSW, SQLite FTS5, Re-ranking ONNX), (3) monitoraggio continuo dei consumi di RAM/VRAM e rateo di completamento dei subagenti.",
       "status": "pending"
     }
   ]

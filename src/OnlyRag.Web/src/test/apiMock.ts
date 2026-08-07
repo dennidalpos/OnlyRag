@@ -37,7 +37,23 @@ export function mockApi(routes: MockApiRoute[]) {
     const body = init?.body;
     calls.push({ path, method, headers, body });
 
-    const route = routes.find(
+    const defaultRoutes: MockApiRoute[] = [
+      {
+        path: /\/hubs\/.*\/negotiate.*/,
+        method: "POST",
+        response: {
+          connectionId: "mock-connection-id",
+          availableTransports: [
+            { transport: "WebSockets", transferFormats: ["Text"] },
+            { transport: "ServerSentEvents", transferFormats: ["Text"] },
+            { transport: "LongPolling", transferFormats: ["Text"] }
+          ]
+        }
+      }
+    ];
+
+    const allRoutes = [...routes, ...defaultRoutes];
+    const route = allRoutes.find(
       (candidate) =>
         (candidate.method?.toUpperCase() ?? "GET") === method &&
         (typeof candidate.path === "string" ? candidate.path === path : candidate.path.test(path))

@@ -35,12 +35,6 @@ export function useCodingSectionController({
 
   const workspace = useWorkspaceManager();
 
-  const intentMeta = useSmartIntentRouter({
-    promptInput: workspace.selectedWorkspaceFile || "",
-    selectedWorkspaceFile: workspace.selectedWorkspaceFile,
-    attachedFileContent: workspace.attachedFileContent
-  });
-
   const agentStream = useAgentStreamHandler({
     selectedModel,
     operatingMode,
@@ -52,6 +46,12 @@ export function useCodingSectionController({
     handleApplyCodeToFileSilently: workspace.handleApplyCodeToFileSilently,
     handleDeleteWorkspaceFileSilently: workspace.handleDeleteWorkspaceFileSilently,
     setWorkspaceStatusMessage: workspace.setWorkspaceStatusMessage
+  });
+
+  const intentMeta = useSmartIntentRouter({
+    promptInput: agentStream.promptInput,
+    selectedWorkspaceFile: workspace.selectedWorkspaceFile,
+    attachedFileContent: workspace.attachedFileContent
   });
 
   useEffect(() => {
@@ -86,8 +86,15 @@ export function useCodingSectionController({
   }, [agentStream.messages, agentStream.isGenerating, isUserScrolledUp, agentStream.chatContainerRef]);
 
   async function handleSendMessage(overridePrompt?: string) {
-    const textToSend = overridePrompt ?? agentStream.promptInput;
+    let textToSend = overridePrompt ?? (agentStream.promptInput || agentStream.promptInputRef.current);
     if (!textToSend.trim() || agentStream.isGenerating) return;
+
+    if (workspace.singleFiles.length > 0) {
+      const filesContext = workspace.singleFiles
+        .map((f) => `--- FILE ALLEGATO: ${f.name} (${(f.sizeBytes / 1024).toFixed(1)} KB) ---\n${f.content}`)
+        .join("\n\n");
+      textToSend = `[CONTESTO FILE ALLEGATI AD-HOC:\n${filesContext}\n]\n\n${textToSend}`;
+    }
 
     if (intentMeta.recommendedOperatingMode !== operatingMode) {
       setOperatingMode(intentMeta.recommendedOperatingMode);
@@ -128,6 +135,7 @@ export function useCodingSectionController({
     setSelectedWorkspaceFile: workspace.setSelectedWorkspaceFile,
     attachedFileContent: workspace.attachedFileContent,
     setAttachedFileContent: workspace.setAttachedFileContent,
+    singleFiles: workspace.singleFiles,
     isWorkspaceFilePickerOpen: workspace.isWorkspaceFilePickerOpen,
     setIsWorkspaceFilePickerOpen: workspace.setIsWorkspaceFilePickerOpen,
     isAttachedFileEditorOpen: workspace.isAttachedFileEditorOpen,
@@ -155,6 +163,9 @@ export function useCodingSectionController({
     handleDeleteWorkspaceFile: workspace.handleDeleteWorkspaceFile,
     handleApproveAgentToolCall: agentStream.handleApproveAgentToolCall,
     handleExecuteWorkspaceCommand: handleExecuteWorkspaceCommandWrapper,
+    handleAddSingleFiles: workspace.handleAddSingleFiles,
+    handleRemoveSingleFile: workspace.handleRemoveSingleFile,
+    handleClearSingleFiles: workspace.handleClearSingleFiles,
     handleSendMessage
   };
 }

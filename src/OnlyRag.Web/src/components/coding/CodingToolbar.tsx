@@ -1,6 +1,7 @@
-import { Bot, FileCode, FolderOpen, FolderSearch, X } from "lucide-react";
+import { Bot, FileCode, FilePlus, FolderOpen, FolderSearch, X } from "lucide-react";
 import type { OllamaModel } from "../../api";
 import type { WorkspaceConfig } from "../../apiTypes";
+import type { SingleAnalysisFile } from "./useWorkspaceManager";
 
 type CodingToolbarProps = {
   models: OllamaModel[];
@@ -9,9 +10,13 @@ type CodingToolbarProps = {
   onSelectModel: (model: string) => void;
   workspaceConfig: WorkspaceConfig | null;
   workspaceFilesCount: number;
+  singleFiles?: SingleAnalysisFile[];
   onPickFolder: () => void;
   onClearFolder: () => void;
   onOpenFilePicker: () => void;
+  onAddSingleFiles?: () => void;
+  onRemoveSingleFile?: (id: string) => void;
+  onClearSingleFiles?: () => void;
 };
 
 export function CodingToolbar({
@@ -21,9 +26,13 @@ export function CodingToolbar({
   onSelectModel,
   workspaceConfig,
   workspaceFilesCount,
+  singleFiles = [],
   onPickFolder,
   onClearFolder,
-  onOpenFilePicker
+  onOpenFilePicker,
+  onAddSingleFiles,
+  onRemoveSingleFile,
+  onClearSingleFiles
 }: CodingToolbarProps) {
   return (
     <header className="coding-hub-toolbar">
@@ -74,6 +83,18 @@ export function CodingToolbar({
             <FolderSearch size={16} /> Sfoglia Cartella
           </button>
 
+          {onAddSingleFiles && (
+            <button
+              type="button"
+              className="button button--secondary button--small"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(56, 189, 248, 0.12)", borderColor: "#38bdf8", color: "#38bdf8" }}
+              onClick={onAddSingleFiles}
+              title="Aggiungi singoli file arbitrari per l'analisi senza selezionare una cartella di progetto"
+            >
+              <FilePlus size={16} /> Aggiungi File...
+            </button>
+          )}
+
           <div className="coding-model-group">
             <label htmlFor="coding-model-select" className="coding-model-label">
               Modello:
@@ -95,6 +116,52 @@ export function CodingToolbar({
           </div>
         </div>
       </div>
+
+      {/* Ad-hoc Single Files List Bar */}
+      {singleFiles.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "6px 12px", background: "#0f172a", borderRadius: 8, border: "1px solid #1e293b", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8" }}>File Analisi Ad-hoc ({singleFiles.length}):</span>
+          {singleFiles.map((file) => (
+            <div
+              key={file.id}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "2px 8px",
+                background: "rgba(56, 189, 248, 0.15)",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                borderRadius: 4,
+                fontSize: "0.78rem",
+                color: "#f8fafc"
+              }}
+            >
+              <FileCode size={13} style={{ color: "#38bdf8" }} />
+              <span style={{ fontFamily: "monospace" }}>{file.name}</span>
+              <span style={{ opacity: 0.6, fontSize: "0.72rem" }}>({(file.sizeBytes / 1024).toFixed(1)} KB)</span>
+              {onRemoveSingleFile && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveSingleFile(file.id)}
+                  style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                  title="Rimuovi file dalla sessione"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          ))}
+          {onClearSingleFiles && singleFiles.length > 1 && (
+            <button
+              type="button"
+              onClick={onClearSingleFiles}
+              style={{ fontSize: "0.72rem", color: "#ef4444", background: "none", border: "none", cursor: "pointer", marginLeft: "auto" }}
+            >
+              Rimuovi Tutti
+            </button>
+          )}
+        </div>
+      )}
     </header>
   );
 }

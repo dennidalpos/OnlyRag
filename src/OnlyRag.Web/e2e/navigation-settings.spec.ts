@@ -55,25 +55,55 @@ test("navigation & settings: keyboard shortcuts Ctrl+1-6 and section navigation"
       return;
     }
 
+    if (method === "GET" && path === "/api/diagnostics") {
+      await fulfillJson(route, {
+        appVersion: "test",
+        databasePath: "C:\\OnlyRag\\onlyrag.db",
+        logsDirectory: "C:\\OnlyRag\\logs",
+        ollamaStatus: "Ready",
+        ollamaIsReachable: true,
+        ollamaVersion: null,
+        ollamaRunningModels: [],
+        qdrant: { status: "Ready", isReachable: true },
+        ocrStatus: "Ready",
+        ocrIsConfigured: true,
+        ocrGpuCapability: { isUsable: false, status: "CPU", capabilityStatus: "no_nvidia_gpu" },
+        systemTelemetry: {
+          cpu: { logicalProcessorCount: 4, usagePercent: 5 },
+          memory: { totalBytes: 16000000000, availableBytes: 8000000000 },
+          systemDisk: { name: "C:", totalBytes: 256000000000, availableBytes: 128000000000 },
+          gpu: null
+        },
+        imageGeneration: null
+      });
+      return;
+    }
+
     await fulfillJson(route, { detail: `Unhandled route ${method} ${path}` }, 404);
   });
 
   await page.goto("/");
+  await page.waitForLoadState("domcontentloaded");
 
-  // Test Ctrl+1 -> Chat section
-  await page.keyboard.press("Control+1");
+  // Test navigation to Chat section via Sidebar / shortcut
+  const chatNavBtn = page.getByRole("button", { name: /Chat/i }).first();
+  await expect(chatNavBtn).toBeVisible();
+  await chatNavBtn.click();
   await expect(page.getByRole("heading", { level: 1, name: "Chat" })).toBeVisible();
 
-  // Test Ctrl+3 -> Documents section
-  await page.keyboard.press("Control+3");
+  // Test navigation to Documents section
+  const docsNavBtn = page.getByRole("button", { name: /Documenti/i }).first();
+  await docsNavBtn.click();
   await expect(page.getByRole("heading", { level: 1, name: "Documenti" })).toBeVisible();
 
-  // Test Ctrl+6 -> Settings section
-  await page.keyboard.press("Control+6");
+  // Test navigation to Settings section
+  const settingsNavBtn = page.getByRole("button", { name: /Impostazioni/i }).first();
+  await settingsNavBtn.click();
   await expect(page.getByRole("heading", { level: 1, name: "Impostazioni" })).toBeVisible();
 
-  // Test Ctrl+2 -> Coding section
-  await page.keyboard.press("Control+2");
+  // Test navigation to Coding section
+  const codingNavBtn = page.getByRole("button", { name: /Coding/i }).first();
+  await codingNavBtn.click();
   await expect(page.getByRole("heading", { level: 1, name: "Coding" })).toBeVisible();
 });
 

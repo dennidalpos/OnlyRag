@@ -56,6 +56,9 @@ public static partial class InProcessBackend
             return Results.Ok(new { Success = true });
         });
 
+        app.MapHub<OnlyRag.Api.Hubs.ChatStreamHub>("/hubs/chat");
+        app.MapHub<OnlyRag.Api.Hubs.JobProgressHub>("/hubs/jobs");
+
         app.MapGet("/api/app/storage-status", async (ILocalStorageService storage, CancellationToken cancellationToken) =>
             Results.Ok(await storage.GetStatusAsync(cancellationToken)));
 

@@ -35,7 +35,6 @@ export function OllamaConnectionPanel() {
                 id="ollama-url"
                 type="url"
                 value={formState.ollamaBaseUrl}
-                title={endpointTooltip}
                 aria-label="URL Ollama"
                 onChange={(event) =>
                   setFormState((current) => ({ ...current, ollamaBaseUrl: event.target.value }))
@@ -56,7 +55,7 @@ export function OllamaConnectionPanel() {
                     }))
                   }
                 />
-                <span title={endpointTooltip}>Considera attendibile questo endpoint Ollama non locale</span>
+                <span>Considera attendibile questo endpoint Ollama non locale</span>
               </label>
             )}
             <div className="settings-actions">

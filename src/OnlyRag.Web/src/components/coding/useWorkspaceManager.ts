@@ -15,11 +15,20 @@ import type {
   WriteWorkspaceFileResponse
 } from "../../apiTypes";
 
+export type SingleAnalysisFile = {
+  id: string;
+  name: string;
+  relativePath: string;
+  sizeBytes: number;
+  content: string;
+};
+
 export function useWorkspaceManager() {
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileItem[]>([]);
   const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<string | null>(null);
   const [attachedFileContent, setAttachedFileContent] = useState<string | null>(null);
+  const [singleFiles, setSingleFiles] = useState<SingleAnalysisFile[]>([]);
   const [isWorkspaceFilePickerOpen, setIsWorkspaceFilePickerOpen] = useState(false);
   const [isAttachedFileEditorOpen, setIsAttachedFileEditorOpen] = useState(false);
   const [workspaceStatusMessage, setWorkspaceStatusMessage] = useState<string | null>(null);
@@ -281,6 +290,63 @@ export function useWorkspaceManager() {
     }
   }
 
+  async function handleAddSingleFiles() {
+    try {
+      if ("showOpenFilePicker" in window) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fileHandles = await (window as any).showOpenFilePicker({
+          multiple: true
+        });
+        const newFiles: SingleAnalysisFile[] = await Promise.all(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          fileHandles.map(async (handle: any) => {
+            const file: File = await handle.getFile();
+            const content = await file.text();
+            return {
+              id: `single_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              name: file.name,
+              relativePath: file.name,
+              sizeBytes: file.size,
+              content
+            };
+          })
+        );
+        setSingleFiles((prev) => [...prev, ...newFiles]);
+        setWorkspaceStatusMessage(`${newFiles.length} file aggiunto/i per l'analisi ad-hoc.`);
+      } else {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.onchange = async () => {
+          if (!input.files || input.files.length === 0) return;
+          const filesArray = Array.from(input.files);
+          const loaded: SingleAnalysisFile[] = await Promise.all(
+            filesArray.map(async (file) => ({
+              id: `single_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              name: file.name,
+              relativePath: file.name,
+              sizeBytes: file.size,
+              content: await file.text()
+            }))
+          );
+          setSingleFiles((prev) => [...prev, ...loaded]);
+          setWorkspaceStatusMessage(`${loaded.length} file aggiunto/i per l'analisi ad-hoc.`);
+        };
+        input.click();
+      }
+    } catch {
+      // Dialogo annullato dall'utente
+    }
+  }
+
+  function handleRemoveSingleFile(id: string) {
+    setSingleFiles((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  function handleClearSingleFiles() {
+    setSingleFiles([]);
+  }
+
   return {
     workspaceConfig,
     workspaceFiles,
@@ -288,6 +354,8 @@ export function useWorkspaceManager() {
     setSelectedWorkspaceFile,
     attachedFileContent,
     setAttachedFileContent,
+    singleFiles,
+    setSingleFiles,
     isWorkspaceFilePickerOpen,
     setIsWorkspaceFilePickerOpen,
     isAttachedFileEditorOpen,
@@ -311,6 +379,9 @@ export function useWorkspaceManager() {
     handleApplyCodeToFile,
     handleRollbackFileContent,
     handleDeleteWorkspaceFile,
-    handleExecuteWorkspaceCommand
+    handleExecuteWorkspaceCommand,
+    handleAddSingleFiles,
+    handleRemoveSingleFile,
+    handleClearSingleFiles
   };
 }

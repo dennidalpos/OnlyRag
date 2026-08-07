@@ -19,12 +19,11 @@ import {
 
 afterEach(() => {
   vi.useRealTimers();
+  localStorage.clear();
 });
 
 describe("App initial setup OCR GPU residual checks", () => {
   it("auto-enables OCR GPU after startup wizard provisioning completes", async () => {
-    vi.useFakeTimers();
-
     const promptAnalysis = createOcrStartupAnalysis({
       shouldPrompt: true,
       isOcrConfigured: false,
@@ -100,9 +99,11 @@ describe("App initial setup OCR GPU residual checks", () => {
     ]);
 
     render(<App />);
-    await flushPromises();
 
-    fireEvent.click(screen.getByRole("button", { name: "Installa OCR GPU" }));
+    const installBtn = await screen.findByRole("button", { name: "Installa OCR GPU" });
+
+    vi.useFakeTimers();
+    fireEvent.click(installBtn);
     await flushPromises();
 
     await act(async () => {

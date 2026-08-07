@@ -150,7 +150,7 @@ export function ImageCanvasEditor({
           disabled={!canUndo}
           title="Annulla l'ultima modifica applicata (Ctrl+Z)"
         >
-          Annulla (Undo)
+          Annulla
         </button>
 
         <button
@@ -160,7 +160,7 @@ export function ImageCanvasEditor({
           disabled={!canRedo}
           title="Ripristina la modifica annullata (Ctrl+Y)"
         >
-          Ripristina (Redo)
+          Ripristina
         </button>
 
         {/* Mask Opacity Slider */}
@@ -271,7 +271,7 @@ export function ImageCanvasEditor({
               title="Annulla (Ctrl+Z)"
               style={{ padding: "3px 9px", fontSize: "0.76rem" }}
             >
-              ↩️ Undo
+              ↩️ Annulla
             </button>
             <button
               type="button"
@@ -281,7 +281,7 @@ export function ImageCanvasEditor({
               title="Ripristina (Ctrl+Y)"
               style={{ padding: "3px 9px", fontSize: "0.76rem" }}
             >
-              ↪️ Redo
+              ↪️ Ripristina
             </button>
             {hasEdits && (
               <button
@@ -390,27 +390,44 @@ export function ImageCanvasEditor({
           )}
 
           {/* Text Overlay Layers */}
-          {editState.textLayers.map((layer) => (
-            <button
-              className={layer.id === selectedTextId ? "image-text-layer image-text-layer--selected" : "image-text-layer"}
-              type="button"
-              style={{
-                left: `${Math.max(0, Math.min(95, layer.x))}%`,
-                top: `${Math.max(0, Math.min(95, layer.y))}%`,
-                color: layer.color,
-                fontSize: `${Math.max(12, layer.fontSize / 8)}px`,
-                opacity: maskOpacity
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                onTextPointerDown(event, layer);
-              }}
-              key={layer.id}
-              title="Fai clic e trascina per spostare il testo sul canvas, o modifica nel pannello testo"
-            >
-              {layer.text}
-            </button>
-          ))}
+          {editState.textLayers.map((layer) => {
+            const isSelected = layer.id === selectedTextId;
+            return (
+              <button
+                className={isSelected ? "image-text-layer image-text-layer--selected" : "image-text-layer"}
+                type="button"
+                style={{
+                  left: `${Math.max(0, Math.min(95, layer.x))}%`,
+                  top: `${Math.max(0, Math.min(95, layer.y))}%`,
+                  color: layer.color,
+                  fontSize: `${Math.max(12, layer.fontSize / 8)}px`,
+                  opacity: maskOpacity
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  try {
+                    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+                  } catch {
+                    // pointer capture unsupported or blocked
+                  }
+                  onTextPointerDown(event, layer);
+                }}
+                onPointerUp={(event) => {
+                  try {
+                    if ((event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId)) {
+                      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }}
+                key={layer.id}
+                title="Fai clic e trascina per spostare il testo sul canvas, usa le frecce della tastiera (con Shift per spostamenti ampi) o modifica nel pannello testo"
+              >
+                {layer.text}
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="generated-image-preview generated-image-preview--empty" role="status">

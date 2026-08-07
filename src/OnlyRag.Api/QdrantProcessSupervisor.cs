@@ -8,6 +8,17 @@ internal sealed class QdrantProcessSupervisor : IAsyncDisposable
     private readonly object processLock = new();
     private WindowsKillOnCloseProcessJob? processJob;
     private Process? startedProcess;
+    private int autoHealRestartCount;
+    private DateTimeOffset? lastAutoHealedAtUtc;
+
+    public int AutoHealRestartCount => Volatile.Read(ref autoHealRestartCount);
+    public DateTimeOffset? LastAutoHealedAtUtc => lastAutoHealedAtUtc;
+
+    public void RecordAutoHeal()
+    {
+        Interlocked.Increment(ref autoHealRestartCount);
+        lastAutoHealedAtUtc = DateTimeOffset.UtcNow;
+    }
 
     public bool IsOwnedProcess(int pid, string? expectedBinaryPath)
     {

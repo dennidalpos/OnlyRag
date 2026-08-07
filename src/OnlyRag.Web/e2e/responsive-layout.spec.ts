@@ -4,13 +4,22 @@ import { installBackendBridge, mockApiBaseUrl } from "./backendBridge";
 const apiBaseUrl = mockApiBaseUrl;
 const viewports = [320, 520, 700, 980] as const;
 const sections = [
-  ["Control+1", "Chat"],
-  ["Control+2", "Coding"],
-  ["Control+3", "Documenti"],
-  ["Control+4", "Traduzione"],
-  ["Control+5", "Immagini"],
-  ["Control+6", "Impostazioni"]
+  "Chat",
+  "Coding",
+  "Documenti",
+  "Traduzione",
+  "Immagini",
+  "Impostazioni"
 ] as const;
+
+const sectionKeys: Record<string, string> = {
+  Chat: "chat",
+  Coding: "coding",
+  Documenti: "documents",
+  Traduzione: "translation",
+  Immagini: "images",
+  Impostazioni: "settings"
+};
 
 test("responsive: every primary section fits widths from 320 to 980 px", async ({ page }, testInfo) => {
   await installBackendBridge(page, true);
@@ -18,10 +27,9 @@ test("responsive: every primary section fits widths from 320 to 980 px", async (
 
   for (const width of viewports) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
 
-    for (const [shortcut, heading] of sections) {
-      await page.keyboard.press(shortcut);
+    for (const heading of sections) {
+      await page.goto(`/?section=${sectionKeys[heading]}`);
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       const documentWidth = await page.locator("html").evaluate((element) => element.scrollWidth);
       expect(documentWidth).toBeLessThanOrEqual(width);

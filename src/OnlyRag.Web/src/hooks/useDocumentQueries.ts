@@ -7,8 +7,17 @@ import {
   type VectorBackendHealth
 } from "../api";
 import { fallbackOcrLanguages } from "../components/documents/DocumentsSection.controllerHelpers";
+import { useJobProgress } from "../context/SignalRContext";
 
 export function useDocumentListQuery() {
+  const invalidateDocuments = useInvalidateDocuments();
+
+  useJobProgress(
+    () => invalidateDocuments(),
+    () => invalidateDocuments(),
+    () => invalidateDocuments()
+  );
+
   return useQuery<ImportedDocument[], Error>({
     queryKey: ["documentsList"],
     queryFn: async () => {

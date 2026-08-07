@@ -1,0 +1,56 @@
+name: Release Installer & Sign Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-sign-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: src/OnlyRag.Web/package-lock.json
+
+      - name: Build Web and .NET Release Gate with Installer
+        shell: pwsh
+        run: .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller
+
+      - name: Sign Release Installer
+        shell: pwsh
+        env:
+          CERTIFICATE_THUMBPRINT: ${{ secrets.SIGNING_CERTIFICATE_THUMBPRINT }}
+        run: |
+          if ($env:CERTIFICATE_THUMBPRINT) {
+            .\scripts\Sign-Release.ps1 -CertificateThumbprint $env:CERTIFICATE_THUMBPRINT
+          } else {
+            Write-Host "No SIGNING_CERTIFICATE_THUMBPRINT secret provided. Skipping signing step."
+          }
+
+      - name: Test Installer Release Lifecycle
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path .\artifacts\installer\*.exe | Select-Object -First 1
+          if ($installer) {
+            .\scripts\Test-InstallerRelease.ps1 -InstallerPath $installer.FullName -RunInstallLifecycle
+          } else {
+            Write-Warning "No installer executable found in artifacts/installer."
+          }
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnlyRag-Installer-Release
+          path: |
+            artifacts/installer/*.exe
+            artifacts/reports/*

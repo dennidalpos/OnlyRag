@@ -24,4 +24,4 @@ jobs:
 
       - name: Run repository gate and security audits
         shell: pwsh
-        run: .\scripts\Invoke-Gate.ps1 -Configuration Release
+        run: .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeAudits

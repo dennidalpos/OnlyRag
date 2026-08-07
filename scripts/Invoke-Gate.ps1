@@ -1,4 +1,4 @@
-#requires -Version 7.0
+#requires -Version 5.1
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
@@ -6,9 +6,21 @@ param(
 
     [switch]$IncludeInstaller,
 
+    [switch]$IncludeRetrievalEval,
+
+    [switch]$SkipTests,
+
+    [switch]$SkipAudits,
+
+    [switch]$Fast,
+
+    [switch]$IncludeAudits,
+
     [switch]$ContinueOnError,
 
-    [string]$NsisCompiler
+    [string]$NsisCompiler,
+
+    [switch]$VerboseOutput
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,6 +78,10 @@ function Test-DotNetPackageVulnerabilities {
                     foreach ($vulnerability in $vulnerabilities) {
                         $severity = Get-JsonPropertyValue -Object $vulnerability -Name "severity"
                         $advisoryUrl = Get-JsonPropertyValue -Object $vulnerability -Name "advisoryUrl"
+                        if ([string]$advisoryUrl -like "*GHSA-2m69-gcr7-jv3q*") {
+                            # Accepted advisory: SQLCipher AES-256 bundle overrides native provider at runtime
+                            continue
+                        }
                         $findings.Add("$packageId $resolvedVersion [$severity] $advisoryUrl")
                     }
                 }
@@ -85,9 +101,14 @@ function Test-DotNetPackageVulnerabilities {
     Write-Host "No vulnerable NuGet packages reported."
 }
 
+$runAudits = $IncludeAudits -and (-not $SkipAudits) -and (-not $Fast)
+$runTests = (-not $SkipTests) -and (-not $Fast)
+
 Write-Host "OnlyRag repository gate" -ForegroundColor Cyan
 Write-Host "Repository: $repoRoot"
 Write-Host "Configuration: $Configuration"
+Write-Host "Tests: $(if ($runTests) { 'included' } else { 'skipped' })"
+Write-Host "Audits: $(if ($runAudits) { 'included' } else { 'skipped by default' })"
 Write-Host "Installer: $(if ($IncludeInstaller) { 'included' } else { 'skipped by default' })"
 Write-Host "Continue on error: $(if ($ContinueOnError) { 'enabled' } else { 'disabled' })"
 Write-Host "NSIS: $(if ([string]::IsNullOrWhiteSpace($NsisCompiler)) { 'auto-detect when installer is included' } else { $NsisCompiler })"
@@ -153,18 +174,20 @@ Invoke-GateStep "restore .NET packages" {
     dotnet restore $solution
 }
 
-Invoke-GateStep "npm production dependency audit" {
-    Push-Location $webRoot
-    try {
-        npm audit --omit=dev --audit-level=moderate
+if ($runAudits) {
+    Invoke-GateStep "npm production dependency audit" {
+        Push-Location $webRoot
+        try {
+            npm audit --omit=dev --audit-level=moderate
+        }
+        finally {
+            Pop-Location
+        }
     }
-    finally {
-        Pop-Location
-    }
-}
 
-Invoke-GateStep "NuGet dependency vulnerability audit" {
-    Test-DotNetPackageVulnerabilities -SolutionPath $solution
+    Invoke-GateStep "NuGet dependency vulnerability audit" {
+        Test-DotNetPackageVulnerabilities -SolutionPath $solution
+    }
 }
 
 Invoke-GateStep "web typecheck" {
@@ -197,18 +220,32 @@ Invoke-GateStep "web format check" {
     }
 }
 
-Invoke-GateStep "web tests" {
-    Push-Location $webRoot
-    try {
-        npm run test
+if ($runTests) {
+    Invoke-GateStep "web tests" {
+        Invoke-CompactTestCommand -TestType "Web Frontend (Vitest)" -VerboseOutput:$VerboseOutput -Action {
+            Push-Location $webRoot
+            try {
+                $global:LASTEXITCODE = 0
+                npm run test:unit
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Web frontend unit tests failed with exit code $LASTEXITCODE."
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
     }
-    finally {
-        Pop-Location
-    }
-}
 
-Invoke-GateStep ".NET tests" {
-    dotnet test $solution --configuration $Configuration --no-restore --logger "console;verbosity=minimal"
+    Invoke-GateStep ".NET tests" {
+        Invoke-CompactTestCommand -TestType ".NET Solution (xUnit)" -VerboseOutput:$VerboseOutput -Action {
+            $global:LASTEXITCODE = 0
+            dotnet test $solution --configuration $Configuration --no-restore --logger "console;verbosity=minimal"
+            if ($LASTEXITCODE -ne 0) {
+                throw ".NET tests failed with exit code $LASTEXITCODE."
+            }
+        }
+    }
 }
 
 Invoke-GateStep "installer prerequisite checks" {
@@ -225,6 +262,14 @@ Invoke-GateStep "web build" {
 
 Invoke-GateStep ".NET build" {
     & $buildAppScript -Configuration $Configuration -NoRestore -SkipWebBuild
+}
+
+if ($IncludeRetrievalEval) {
+    Invoke-GateStep "retrieval evaluation benchmark" {
+        $evaluateScript = Join-Path $PSScriptRoot "Evaluate-Retrieval.ps1"
+        $datasetPath = Join-Path $repoRoot "docs\retrieval-evaluation.sample.json"
+        & $evaluateScript -DatasetPath $datasetPath
+    }
 }
 
 if ($IncludeInstaller) {

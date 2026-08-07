@@ -36,6 +36,7 @@ public static partial class InProcessBackend
             options,
             WebViewCorsPolicy,
             ResolveAllowedCorsOrigins(options));
+        builder.Services.AddOpenApi();
 
         WebApplication app = builder.Build();
 
@@ -74,6 +75,7 @@ public static partial class InProcessBackend
         app.UseCors(WebViewCorsPolicy);
         UseSessionTokenAuthentication(app, sessionToken);
         app.MapOnlyRagFeatureEndpoints();
+        app.MapOpenApi();
 
         return app;
     }

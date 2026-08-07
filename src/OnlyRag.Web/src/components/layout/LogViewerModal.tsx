@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { apiRequest } from "../../api";
 import type { AppLogLevel, LogEntry } from "../../apiTypes/settings";
 
+import { ConfirmDialog } from "../common/ConfirmDialog";
+
 interface LogViewerModalProps {
   onClose: () => void;
   onLogsCleared?: () => void;
@@ -17,6 +19,7 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
   const [copied, setCopied] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -65,8 +68,8 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
     }
   }
 
-  async function handleClear() {
-    if (!window.confirm("Cancellare ed azzerare tutti i log dal sistema?")) return;
+  async function executeClearLogs() {
+    setShowConfirmClear(false);
     try {
       await apiRequest<{ success: boolean }>("/api/logs", { method: "DELETE" });
       setLogs([]);
@@ -268,7 +271,7 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
             </button>
             <button
               type="button"
-              onClick={() => void handleClear()}
+              onClick={() => setShowConfirmClear(true)}
               disabled={logs.length === 0}
               style={{
                 background: "#7f1d1d",
@@ -490,6 +493,17 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showConfirmClear}
+        title="Cancellazione Log"
+        message="Cancellare ed azzerare tutti i log dal sistema?"
+        confirmLabel="Svuota Log"
+        cancelLabel="Annulla"
+        variant="danger"
+        onConfirm={() => void executeClearLogs()}
+        onCancel={() => setShowConfirmClear(false)}
+      />
     </div>,
     document.body
   );

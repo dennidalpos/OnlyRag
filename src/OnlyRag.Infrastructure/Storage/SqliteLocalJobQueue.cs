@@ -16,16 +16,19 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
     private readonly ISqliteConnectionFactory connectionFactory;
     private readonly LocalJobQueueDescriptor descriptor;
+    private readonly IJobProgressNotifier? notifier;
     private readonly SemaphoreSlim _enqueueSignal = new(0);
 
     public SemaphoreSlim EnqueueSignal => _enqueueSignal;
 
     public SqliteLocalJobQueue(
         ISqliteConnectionFactory connectionFactory,
-        LocalJobQueueDescriptor descriptor)
+        LocalJobQueueDescriptor descriptor,
+        IJobProgressNotifier? notifier = null)
     {
         this.connectionFactory = connectionFactory;
         this.descriptor = descriptor;
+        this.notifier = notifier;
     }
 
     public async Task<LocalJob> CreateAsync(
@@ -85,7 +88,13 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
 
         _enqueueSignal.Release();
 
-        return (await GetAsync(id, cancellationToken))!;
+        LocalJob created = (await GetAsync(id, cancellationToken))!;
+        if (notifier is not null)
+        {
+            await notifier.NotifyProgressAsync(created.Id, created.Type, created.ProgressPercent, created.Status.ToString(), created.CurrentStep);
+        }
+
+        return created;
     }
 
     public async Task<IReadOnlyList<LocalJob>> ListAsync(
@@ -163,7 +172,13 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
 
-        return await GetAsync(connection, id, cancellationToken);
+        LocalJob? updated = await GetAsync(connection, id, cancellationToken);
+        if (updated is not null && notifier is not null)
+        {
+            await notifier.NotifyProgressAsync(updated.Id, updated.Type, updated.ProgressPercent, updated.Status.ToString(), updated.CurrentStep);
+        }
+
+        return updated;
     }
 
     public async Task<int> RecoverInterruptedJobsAsync(CancellationToken cancellationToken = default)
@@ -314,7 +329,20 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
 
-        return await GetAsync(connection, id, cancellationToken);
+        LocalJob? updated = await GetAsync(connection, id, cancellationToken);
+        if (updated is not null && notifier is not null)
+        {
+            if (updated.Status == JobStatus.Failed)
+            {
+                await notifier.NotifyFailedAsync(updated.Id, updated.Type, updated.Error ?? errorMessage);
+            }
+            else
+            {
+                await notifier.NotifyProgressAsync(updated.Id, updated.Type, updated.ProgressPercent, updated.Status.ToString(), updated.CurrentStep);
+            }
+        }
+
+        return updated;
     }
 
     public Task<LocalJob?> CancelAsync(string id, CancellationToken cancellationToken = default)
@@ -439,7 +467,20 @@ public sealed class SqliteLocalJobQueue : ILocalJobQueue
         command.AddParameter("$now", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
 
-        return await GetAsync(connection, id, cancellationToken);
+        LocalJob? updated = await GetAsync(connection, id, cancellationToken);
+        if (updated is not null && notifier is not null)
+        {
+            if (targetStatus == JobStatus.Completed)
+            {
+                await notifier.NotifyCompletedAsync(updated.Id, updated.Type);
+            }
+            else
+            {
+                await notifier.NotifyProgressAsync(updated.Id, updated.Type, updated.ProgressPercent, updated.Status.ToString(), updated.CurrentStep);
+            }
+        }
+
+        return updated;
     }
 
     private static async Task<LocalJob?> GetAsync(

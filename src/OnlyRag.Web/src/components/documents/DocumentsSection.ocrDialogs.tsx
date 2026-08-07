@@ -42,6 +42,7 @@ export function OcrChoiceDialog({
           value={selectedLanguage}
           onChange={setSelectedLanguage}
         />
+
         <div className="dialog-secondary-note">
           La scelta viene ricordata per il prossimo OCR.
           <InfoTip label="Dettagli sulla lingua OCR">La lingua selezionata viene usata per questo import e proposta alla prossima operazione OCR.</InfoTip>
@@ -55,7 +56,6 @@ export function OcrChoiceDialog({
           >
             <strong>Usa testo esistente</strong>
             <span>Legge il testo già incorporato nel file; usa OCR solo sulle pagine che lo richiedono.</span>
-            <em>Consigliato per documenti con testo digitale.</em>
           </button>
 
           <button
@@ -64,8 +64,7 @@ export function OcrChoiceDialog({
             onClick={() => onChoice("ForceAll", selectedLanguage)}
           >
             <strong>Rileggi tutto con OCR</strong>
-            <span>Tratta ogni pagina come immagine e applica OCR completo, anche se contiene già testo.</span>
-            <em>Consigliato per scansioni, documenti stampati o PDF protetti.</em>
+            <span>Tratta ogni pagina come immagine e applica OCR completo.</span>
           </button>
         </div>
 

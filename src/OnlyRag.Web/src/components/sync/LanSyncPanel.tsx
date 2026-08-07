@@ -9,17 +9,28 @@ export interface LanDevice {
   authorizedAtUtc: string;
 }
 
+const statusLabelIT: Record<string, string> = {
+  Authorized: "Autorizzato",
+  PairingRequested: "Richiesta in attesa",
+  Discovered: "Rilevato",
+  Revoked: "Revocato",
+  paired: "Abbinato",
+  pending: "In attesa",
+  rejected: "Rifiutato",
+  disconnected: "Disconnesso"
+};
+
 export const LanSyncPanel: React.FC = () => {
   const [devices, setDevices] = useState<LanDevice[]>([
     {
-      deviceId: 'dev_local',
-      deviceName: 'Questo Dispositivo',
-      ipAddress: '127.0.0.1',
-      status: 'Authorized',
+      deviceId: "dev_local",
+      deviceName: "Questo Dispositivo",
+      ipAddress: "127.0.0.1",
+      status: "Authorized",
       authorizedAtUtc: new Date().toISOString(),
     },
   ]);
-  const [pinCode, setPinCode] = useState('');
+  const [pinCode, setPinCode] = useState("");
   const [isPairing, setIsPairing] = useState(false);
 
   const handlePair = () => {
@@ -31,12 +42,12 @@ export const LanSyncPanel: React.FC = () => {
         {
           deviceId: `dev_${Date.now()}`,
           deviceName: `Dispositivo LAN (${pinCode})`,
-          ipAddress: '192.168.1.50',
-          status: 'Authorized',
+          ipAddress: "192.168.1.50",
+          status: "Authorized",
           authorizedAtUtc: new Date().toISOString(),
         },
       ]);
-      setPinCode('');
+      setPinCode("");
       setIsPairing(false);
     }, 800);
   };
@@ -49,8 +60,8 @@ export const LanSyncPanel: React.FC = () => {
             <Wifi className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Sincronizzazione LAN & Dispositivi Authorized</h3>
-            <p className="text-sm text-slate-400">Accoppiamento protetto e trasferimento encrypted AES-256 tra nodi locali</p>
+            <h3 className="font-semibold text-lg">Sincronizzazione LAN &amp; Dispositivi Autorizzati</h3>
+            <p className="text-sm text-slate-400">Accoppiamento protetto e trasferimento cifrato AES-256 tra nodi locali</p>
           </div>
         </div>
         <button
@@ -78,7 +89,7 @@ export const LanSyncPanel: React.FC = () => {
             disabled={isPairing || !pinCode.trim()}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
           >
-            {isPairing ? 'Accoppiamento...' : 'Avvia Pairing'}
+            {isPairing ? "Accoppiamento..." : "Avvia Accoppiamento"}
           </button>
         </div>
       </div>
@@ -89,7 +100,7 @@ export const LanSyncPanel: React.FC = () => {
           {devices.map((device) => (
             <div key={device.deviceId} className="p-3.5 flex items-center justify-between hover:bg-slate-800/40 transition">
               <div className="flex items-center gap-3">
-                {device.status === 'Authorized' ? (
+                {device.status === "Authorized" ? (
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 ) : (
                   <ShieldAlert className="w-5 h-5 text-amber-400" />
@@ -100,7 +111,7 @@ export const LanSyncPanel: React.FC = () => {
                 </div>
               </div>
               <span className="px-2 py-0.5 text-xs rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {device.status}
+                {statusLabelIT[device.status] ?? device.status}
               </span>
             </div>
           ))}

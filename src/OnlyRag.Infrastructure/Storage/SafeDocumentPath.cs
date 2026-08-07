@@ -48,6 +48,13 @@ public static class SafeDocumentPath
     public static string ResolveWithinRoot(string rootDirectory, string fileName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+        if (fileName.Contains('\0') || fileName.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) || fileName.Contains("::DATA", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Il nome file contiene sequenze non consentite.", nameof(fileName));
+        }
+
         string normalizedFileName = NormalizeFileName(fileName);
 
         string rootFullPath = EnsureTrailingSeparator(Path.GetFullPath(rootDirectory));
