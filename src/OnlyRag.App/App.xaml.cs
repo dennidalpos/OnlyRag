@@ -12,17 +12,28 @@ public partial class App : Application
     private bool terminatePeerProcessesOnExit;
     private bool isDisposingBackend;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         string? resetError = TryApplyPendingDataReset();
+        MainWindow mainWindow = new();
+        MainWindow = mainWindow;
+        mainWindow.Show();
+
+        _ = InitializeBackendAsync(mainWindow, resetError);
+    }
+
+    private async Task InitializeBackendAsync(MainWindow mainWindow, string? resetError)
+    {
         BackendWebSettings backendSettings = resetError is null
             ? await StartBackendAsync()
             : BackendWebSettings.Offline(resetError);
-        MainWindow mainWindow = new(backendSettings);
-        MainWindow = mainWindow;
-        mainWindow.Show();
+
+        await mainWindow.Dispatcher.InvokeAsync(async () =>
+        {
+            await mainWindow.InitializeBackendSettingsAsync(backendSettings);
+        });
     }
 
     private static string? TryApplyPendingDataReset()

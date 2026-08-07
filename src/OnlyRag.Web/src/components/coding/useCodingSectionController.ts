@@ -164,6 +164,7 @@ export function useCodingSectionController({
     handleApproveAgentToolCall: agentStream.handleApproveAgentToolCall,
     handleExecuteWorkspaceCommand: handleExecuteWorkspaceCommandWrapper,
     handleAddSingleFiles: workspace.handleAddSingleFiles,
+    handleImportFileList: workspace.handleImportFileList,
     handleRemoveSingleFile: workspace.handleRemoveSingleFile,
     handleClearSingleFiles: workspace.handleClearSingleFiles,
     handleSendMessage

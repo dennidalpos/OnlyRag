@@ -147,11 +147,10 @@ export function AdjustableModelContextBar({
         <span>Automatico</span>
       </label>
       <div className="model-context-bar__mode">
-        <span>{value == null ? "Gestita da Ollama" : "Configurazione manuale"}</span>
         <InfoTip label="Dettagli finestra di contesto">
           {value == null
-            ? "OnlyRag lascia a Ollama la scelta della finestra effettiva."
-            : "OnlyRag invia num_ctx a Ollama. Valori alti possono aumentare RAM o VRAM e ridurre l'offload GPU."}
+            ? "Ollama gestisce automaticamente la finestra di contesto."
+            : "Valori alti aumentano RAM/VRAM e riducono l'offload GPU."}
         </InfoTip>
       </div>
       {value != null && (
@@ -301,7 +300,9 @@ export function UnifiedPresetBar({
     <div className="unified-preset-bar">
       <div className="unified-preset-bar__header">
         <span className="unified-preset-bar__title">{title}</span>
-        {subtitle && <InfoTip label={`Informazioni su ${title}`}>{subtitle}</InfoTip>}
+        {subtitle && (
+          <InfoTip label={`Informazioni su ${title}`}>{subtitle}</InfoTip>
+        )}
       </div>
       <div className="unified-preset-bar__buttons" role="group" aria-label={title}>
         {options.map((opt) => {

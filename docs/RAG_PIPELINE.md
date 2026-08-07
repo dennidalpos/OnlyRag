@@ -22,7 +22,9 @@ flowchart TD
 
 ## 1. Indicizzazione & Dual-Tier Chunking (Parent-Child)
 
-I formati supportati per l'importazione diretta sono `.txt`, `.md`, `.csv`, `.pdf`, `.docx`, `.xlsx`, `.pptx` e immagini (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.tiff`). I formati legacy binari Office (`.doc`, `.xls`, `.ppt`) non sono supportati.
+I formati supportati per l'importazione diretta sono `.txt`, `.md`, `.csv`, `.pdf`, `.docx`, `.xlsx`, `.pptx` e immagini (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.tiff`).
+- **Office OpenXML (DOCX, XLSX, PPTX)**: Estrazione nativa del testo via `DocumentFormat.OpenXml` senza dipendenze esterne.
+- **Formati Binari Legacy Non Supportati**: I file binari Office obsoleti (`.doc`, `.xls`, `.ppt`) vengono rifiutati all'upload; occorre risalvarli nel formato OpenXML prima dell'importazione.
 
 Il sistema di chunking genera una gerarchia **Parent-Child**:
 - **Child Chunks (~150 token)**: Indicizzati in SQLite FTS5 e vettorizzati su Qdrant per il matching ad alta risoluzione.
@@ -30,7 +32,7 @@ Il sistema di chunking genera una gerarchia **Parent-Child**:
 
 La pipeline di ingestion supporta l'elaborazione ad alte prestazioni in streaming tramite l'architettura Producer-Consumer basata su `System.Threading.Channels` (`StreamingDocumentIngestionPipeline`), eliminando i picchi di memoria RAM e parallelizzando le fasi di **Parsing -> Chunking -> Embedding -> VectorStoreWriter**.
 
-I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite corrente (versione 11) sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage). Lo schema include anche le tabelle `document_graph_nodes` e `document_graph_edges` per l'indicizzazione delle relazioni di grafo tra concetti e sezioni documentali.
+I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite corrente (gestito tramite EF Core 10 `OnlyRagDbContext` / `LocalSqliteSchemaInitializer`) sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage). Lo schema include anche le tabelle `document_graph_nodes` e `document_graph_edges` per l'indicizzazione delle relazioni di grafo tra concetti e sezioni documentali.
 
 ### Sicurezza archivi
 

@@ -17,7 +17,6 @@ This skill provides comprehensive operational and architectural guidance for dev
 - **RAG Pipeline**: [docs/RAG_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/RAG_PIPELINE.md)
 - **OCR Pipeline**: [docs/OCR_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/OCR_PIPELINE.md)
 - **Image Generation**: [docs/IMAGE_GENERATION.md](file:///d:/GITHUB/OnlyRag/docs/IMAGE_GENERATION.md)
-- **Office Ingestion**: [docs/OFFICE_INGESTION.md](file:///d:/GITHUB/OnlyRag/docs/OFFICE_INGESTION.md)
 - **Translation Pipeline**: [docs/TRANSLATION_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/TRANSLATION_PIPELINE.md)
 - **Packaging**: [packaging/README.md](file:///d:/GITHUB/OnlyRag/packaging/README.md)
 - **Signing**: [docs/SIGNING.md](file:///d:/GITHUB/OnlyRag/docs/SIGNING.md)

@@ -339,6 +339,22 @@ export function useWorkspaceManager() {
     }
   }
 
+  async function handleImportFileList(files: FileList | File[]) {
+    if (!files || files.length === 0) return;
+    const filesArray = Array.from(files);
+    const loaded: SingleAnalysisFile[] = await Promise.all(
+      filesArray.map(async (file) => ({
+        id: `single_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        relativePath: file.name,
+        sizeBytes: file.size,
+        content: await file.text()
+      }))
+    );
+    setSingleFiles((prev) => [...prev, ...loaded]);
+    setWorkspaceStatusMessage(`${loaded.length} file inserito/i nella pipeline Coding.`);
+  }
+
   function handleRemoveSingleFile(id: string) {
     setSingleFiles((prev) => prev.filter((f) => f.id !== id));
   }
@@ -381,6 +397,7 @@ export function useWorkspaceManager() {
     handleDeleteWorkspaceFile,
     handleExecuteWorkspaceCommand,
     handleAddSingleFiles,
+    handleImportFileList,
     handleRemoveSingleFile,
     handleClearSingleFiles
   };

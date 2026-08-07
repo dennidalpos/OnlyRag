@@ -4,7 +4,7 @@
   "pythonMinimumVersion": "3.10.0",
   "pythonMaximumVersion": "3.13.x",
   "minimumFreeDiskBytes": 5368709120,
-  "lastVerifiedAt": "2026-06-13",
+  "lastVerifiedAt": "2026-08-07",
   "runtimeTargets": [
     {
       "target": "cpu",
@@ -91,12 +91,12 @@
     },
     {
       "name": "pillow",
-      "version": "12.2.0",
+      "version": "12.3.0",
       "importName": "PIL"
     },
     {
       "name": "pypdfium2",
-      "version": "5.8.0",
+      "version": "5.12.1",
       "importName": "pypdfium2"
     },
     {

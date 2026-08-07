@@ -17,15 +17,15 @@ OnlyRag is a local-first Windows desktop application with a WPF shell, a React/V
 
 ## Runtime Boundaries
 
-The WPF app starts the in-process backend and hosts the React UI inside WebView2. The frontend talks to the backend through the app bridge rather than exposing a public remote API. Debug builds can use a loopback Vite development server when `ONLYRAG_WEB_DEV_SERVER` is set to a loopback `http` or `https` URL.
+The WPF app starts the in-process backend and hosts the React UI inside WebView2. The frontend communicates with the backend through the app bridge or real-time ASP.NET Core SignalR WebSockets (`ChatStreamHub`, `JobProgressHub`) for token streaming and live job progress. Debug builds can use a loopback Vite development server when `ONLYRAG_WEB_DEV_SERVER` is set to a loopback `http` or `https` URL.
 
-Ollama and Cloud LLM providers (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek) execute model workloads. Ollama can run locally or on a trusted LAN endpoint. Qdrant can be bundled and managed locally by the app, with remote Qdrant configuration guarded by trust/TLS checks in settings. SQLite is the local system of record for documents, chunks, Knowledge Graph nodes/edges, settings, jobs, chat, translations, OCR cache, agent episodic memories, subagent report cache, and indexing metadata.
+LLM workloads are unified under `Microsoft.Extensions.AI` (`IChatClient`, `IEmbeddingGenerator`) supporting Ollama and Cloud LLM providers (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek, Google Gemini). Ollama can run locally or on a trusted LAN endpoint. Qdrant can be bundled and managed locally by the app, with remote Qdrant configuration guarded by trust/TLS checks in settings. SQLite managed via EF Core 10 (`OnlyRagDbContext`) and FTS5 extensions is the local system of record for documents, chunks, Knowledge Graph nodes/edges, settings, jobs, chat, translations, OCR cache, agent episodic memories, subagent report cache, and indexing metadata.
 
 ## Data And Processes
 
 User data lives under `%LOCALAPPDATA%\OnlyRag`. Installed app files live under `%LOCALAPPDATA%\Programs\OnlyRag` after installer installation.
 
-Long-running ingestion, OCR, embedding, and translation work is represented as local jobs. The UI polls job state and shows progress. Confirmed app exit cancels active local jobs, persists available UI work, and stops backend processes.
+Long-running ingestion, OCR, embedding, and translation work is executed as high-performance streaming jobs (`StreamingDocumentIngestionPipeline` using `System.Threading.Channels`). Real-time updates are pushed via SignalR hubs alongside REST polling fallback. Confirmed app exit cancels active local jobs, persists available UI work, and stops backend processes.
 
 ## Dependency Model
 

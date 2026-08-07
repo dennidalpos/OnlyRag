@@ -19,6 +19,19 @@ def package_version(name):
     try:
         return importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
+        if name in ("paddlepaddle", "paddlepaddle-gpu", "paddle"):
+            for candidate in ("paddlepaddle", "paddlepaddle-gpu", "paddlepaddle_gpu", "paddle"):
+                try:
+                    return importlib.metadata.version(candidate)
+                except importlib.metadata.PackageNotFoundError:
+                    continue
+            try:
+                import paddle
+                ver = getattr(paddle, "__version__", None)
+                if ver:
+                    return str(ver)
+            except Exception:
+                pass
         return "not-installed"
 
 
@@ -101,6 +114,7 @@ def check(args):
             "paddleocr": package_version("paddleocr"),
             "paddlepaddle": package_version("paddlepaddle"),
             "paddlepaddle-gpu": package_version("paddlepaddle-gpu"),
+            "paddle": package_version("paddle"),
             "pypdfium2": package_version("pypdfium2"),
             "Pillow": package_version("Pillow")
         }
@@ -329,6 +343,7 @@ def version(args):
             "paddleocr": package_version("paddleocr"),
             "paddlepaddle": package_version("paddlepaddle"),
             "paddlepaddle-gpu": package_version("paddlepaddle-gpu"),
+            "paddle": package_version("paddle"),
             "pypdfium2": package_version("pypdfium2"),
             "Pillow": package_version("Pillow")
         },

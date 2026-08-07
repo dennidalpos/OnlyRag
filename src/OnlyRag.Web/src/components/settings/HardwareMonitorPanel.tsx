@@ -79,12 +79,12 @@ export function HardwareMonitorPanel() {
 
       {metrics && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
-          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #f8fafc)", padding: "14px", borderRadius: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #64748b)", fontSize: "0.85rem" }}>
+          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #1e293b)", padding: "14px", borderRadius: "8px", border: "1px solid var(--color-border, #334155)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #94a3b8)", fontSize: "0.85rem" }}>
               <Cpu size={16} /> Carico CPU
             </div>
             <div style={{ fontSize: "1.4rem", fontWeight: 700, margin: "8px 0" }}>{metrics.cpuUsagePercentage}%</div>
-            <div style={{ height: "6px", width: "100%", background: "#e2e8f0", borderRadius: "3px", overflow: "hidden" }}>
+            <div style={{ height: "6px", width: "100%", background: "var(--color-bg-tertiary, #334155)", borderRadius: "3px", overflow: "hidden" }}>
               <div
                 style={{
                   height: "100%",
@@ -96,8 +96,8 @@ export function HardwareMonitorPanel() {
             </div>
           </div>
 
-          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #f8fafc)", padding: "14px", borderRadius: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #64748b)", fontSize: "0.85rem" }}>
+          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #1e293b)", padding: "14px", borderRadius: "8px", border: "1px solid var(--color-border, #334155)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #94a3b8)", fontSize: "0.85rem" }}>
               <HardDrive size={16} /> Memoria RAM
             </div>
             <div style={{ fontSize: "1.4rem", fontWeight: 700, margin: "8px 0" }}>
@@ -108,8 +108,8 @@ export function HardwareMonitorPanel() {
             </div>
           </div>
 
-          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #f8fafc)", padding: "14px", borderRadius: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #64748b)", fontSize: "0.85rem" }}>
+          <div className="telemetry-card" style={{ background: "var(--color-bg-secondary, #1e293b)", padding: "14px", borderRadius: "8px", border: "1px solid var(--color-border, #334155)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-text-secondary, #94a3b8)", fontSize: "0.85rem" }}>
               <Zap size={16} /> Alimentazione
             </div>
             <div style={{ fontSize: "1.2rem", fontWeight: 600, margin: "8px 0" }}>

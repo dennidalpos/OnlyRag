@@ -287,42 +287,43 @@ export const RagBenchmarkPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Detailed Test Cases Table */}
-          <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
-            <div className="border-b border-slate-800 bg-slate-900/60 px-4 py-3 text-xs font-semibold text-slate-300">
-              Dettaglio Caso di Test ({report.cases.length} valutati)
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900/40 text-slate-400">
-                  <tr>
-                    <th className="px-4 py-2">ID</th>
-                    <th className="px-4 py-2">Query</th>
-                    <th className="px-4 py-2">Recall@K</th>
-                    <th className="px-4 py-2">Rank</th>
-                    <th className="px-4 py-2">Embedding</th>
-                    <th className="px-4 py-2">Qdrant</th>
-                    <th className="px-4 py-2">Re-Rank</th>
-                    <th className="px-4 py-2">Totale</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50 text-slate-300">
-                  {report.cases.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-850/30 transition-colors">
-                      <td className="px-4 py-2 font-mono text-indigo-400">{c.id}</td>
-                      <td className="px-4 py-2 max-w-xs truncate">{c.query}</td>
-                      <td className="px-4 py-2 font-medium">{(c.recallAtK * 100).toFixed(0)}%</td>
-                      <td className="px-4 py-2">{c.firstRelevantRank ? `#${c.firstRelevantRank}` : "-"}</td>
-                      <td className="px-4 py-2">{c.latency?.queryEmbeddingMs ?? 0} ms</td>
-                      <td className="px-4 py-2">{c.latency?.qdrantSearchMs ?? 0} ms</td>
-                      <td className="px-4 py-2">{c.latency?.reRankingMs ?? 0} ms</td>
-                      <td className="px-4 py-2 font-semibold text-slate-100">{c.latency?.totalMs ?? 0} ms</td>
+          <details className="benchmark-details">
+            <summary className="benchmark-details__summary">
+              Dettaglio casi di test ({report.cases.length} valutati)
+            </summary>
+            <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40 mt-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/40 text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2">ID</th>
+                      <th className="px-4 py-2">Query</th>
+                      <th className="px-4 py-2">Recall@K</th>
+                      <th className="px-4 py-2">Rank</th>
+                      <th className="px-4 py-2">Embedding</th>
+                      <th className="px-4 py-2">Qdrant</th>
+                      <th className="px-4 py-2">Re-Rank</th>
+                      <th className="px-4 py-2">Totale</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-slate-300">
+                    {report.cases.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-850/30 transition-colors">
+                        <td className="px-4 py-2 font-mono text-indigo-400">{c.id}</td>
+                        <td className="px-4 py-2 max-w-xs truncate">{c.query}</td>
+                        <td className="px-4 py-2 font-medium">{(c.recallAtK * 100).toFixed(0)}%</td>
+                        <td className="px-4 py-2">{c.firstRelevantRank ? `#${c.firstRelevantRank}` : "-"}</td>
+                        <td className="px-4 py-2">{c.latency?.queryEmbeddingMs ?? 0} ms</td>
+                        <td className="px-4 py-2">{c.latency?.qdrantSearchMs ?? 0} ms</td>
+                        <td className="px-4 py-2">{c.latency?.reRankingMs ?? 0} ms</td>
+                        <td className="px-4 py-2 font-semibold text-slate-100">{c.latency?.totalMs ?? 0} ms</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          </details>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/20 p-8 text-center text-slate-400">

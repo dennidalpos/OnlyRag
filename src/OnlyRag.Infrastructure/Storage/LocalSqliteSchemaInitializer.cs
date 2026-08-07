@@ -41,7 +41,7 @@ public sealed class LocalSqliteSchemaInitializer
                 return BuildStatus(CurrentSchemaVersion, existingTextSearchBackend);
             }
 
-            // Attempt non-destructive incremental migration to current schema version
+            // Attempt non-destructive incremental migration to current schema version for valid versioned schemas (2..11)
             bool migratedSuccessfully = await TryNonDestructiveMigrationAsync(existingConnection, cancellationToken);
             if (migratedSuccessfully)
             {
@@ -773,7 +773,7 @@ public sealed class LocalSqliteSchemaInitializer
         string ftsSql = BuildChunkFtsTriggerSql(textSearchBackend);
 
         return $$"""
-            CREATE TABLE documents (
+            CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_uid TEXT NOT NULL UNIQUE,
                 original_file_name TEXT NOT NULL,
@@ -790,7 +790,7 @@ public sealed class LocalSqliteSchemaInitializer
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE document_pages (
+            CREATE TABLE IF NOT EXISTS document_pages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_id INTEGER NOT NULL,
                 page_number INTEGER NOT NULL,
@@ -810,7 +810,7 @@ public sealed class LocalSqliteSchemaInitializer
                 UNIQUE (document_id, page_number)
             );
 
-            CREATE TABLE archive_manifest_entries (
+            CREATE TABLE IF NOT EXISTS archive_manifest_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 container_document_id INTEGER NOT NULL,
                 entry_index INTEGER NOT NULL,
@@ -828,7 +828,7 @@ public sealed class LocalSqliteSchemaInitializer
                 UNIQUE (container_document_id, entry_index)
             );
 
-            CREATE TABLE chunks (
+            CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_id INTEGER NOT NULL,
                 document_page_id INTEGER NULL,
@@ -850,7 +850,7 @@ public sealed class LocalSqliteSchemaInitializer
                 UNIQUE (document_id, chunk_index)
             );
 
-            CREATE TABLE chunk_vector_index_status (
+            CREATE TABLE IF NOT EXISTS chunk_vector_index_status (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 chunk_id INTEGER NOT NULL,
                 model TEXT NOT NULL,
@@ -866,7 +866,7 @@ public sealed class LocalSqliteSchemaInitializer
                 UNIQUE (chunk_id, model)
             );
 
-            CREATE TABLE jobs (
+            CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY,
                 type TEXT NOT NULL,
                 status TEXT NOT NULL CHECK (status IN ({{SqliteStatusConstraints.JobStatusPredicate}})),
@@ -883,14 +883,14 @@ public sealed class LocalSqliteSchemaInitializer
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE chat_conversations (
+            CREATE TABLE IF NOT EXISTS chat_conversations (
                 conversation_id TEXT PRIMARY KEY,
                 title TEXT NULL,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE chat_messages (
+            CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 conversation_id TEXT NOT NULL,
                 role TEXT NOT NULL,
@@ -901,7 +901,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (conversation_id) REFERENCES chat_conversations(conversation_id) ON DELETE CASCADE
             );
 
-            CREATE TABLE translations (
+            CREATE TABLE IF NOT EXISTS translations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_id INTEGER NOT NULL,
                 source_language TEXT NOT NULL DEFAULT 'auto',
@@ -917,7 +917,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE translation_units (
+            CREATE TABLE IF NOT EXISTS translation_units (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 translation_id INTEGER NOT NULL,
                 document_page_id INTEGER NULL,
@@ -942,14 +942,14 @@ public sealed class LocalSqliteSchemaInitializer
                 UNIQUE (translation_id, unit_index)
             );
 
-            CREATE TABLE settings (
+            CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 value_type TEXT NOT NULL DEFAULT 'string',
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE generated_images (
+            CREATE TABLE IF NOT EXISTS generated_images (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 provider TEXT NOT NULL,
                 prompt TEXT NOT NULL,
@@ -967,7 +967,7 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE ocr_cache (
+            CREATE TABLE IF NOT EXISTS ocr_cache (
                 cache_key TEXT PRIMARY KEY,
                 page_hash TEXT NOT NULL,
                 engine_name TEXT NOT NULL,
@@ -981,7 +981,7 @@ public sealed class LocalSqliteSchemaInitializer
                 updated_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE document_graph_nodes (
+            CREATE TABLE IF NOT EXISTS document_graph_nodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 node_uid TEXT NOT NULL UNIQUE,
                 document_id INTEGER NULL,
@@ -993,7 +993,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE document_graph_edges (
+            CREATE TABLE IF NOT EXISTS document_graph_edges (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 edge_uid TEXT NOT NULL UNIQUE,
                 source_node_id INTEGER NOT NULL,
@@ -1006,7 +1006,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (target_node_id) REFERENCES document_graph_nodes(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE agent_episodic_memories (
+            CREATE TABLE IF NOT EXISTS agent_episodic_memories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT NOT NULL,
                 goal TEXT NOT NULL,
@@ -1016,7 +1016,7 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE agent_skills (
+            CREATE TABLE IF NOT EXISTS agent_skills (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 skill_id TEXT NOT NULL UNIQUE,
                 name TEXT NOT NULL,
@@ -1026,7 +1026,7 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE subagent_report_cache (
+            CREATE TABLE IF NOT EXISTS subagent_report_cache (
                 cache_key TEXT PRIMARY KEY,
                 role TEXT NOT NULL,
                 prompt_hash TEXT NOT NULL,
@@ -1037,7 +1037,7 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL
             );
 
-            CREATE TABLE agent_runs (
+            CREATE TABLE IF NOT EXISTS agent_runs (
                 run_id TEXT PRIMARY KEY,
                 goal TEXT NOT NULL,
                 mode TEXT NOT NULL,
@@ -1056,7 +1056,7 @@ public sealed class LocalSqliteSchemaInitializer
                 completion_verifications_json TEXT NOT NULL DEFAULT '[]'
             );
 
-            CREATE TABLE agent_run_transitions (
+            CREATE TABLE IF NOT EXISTS agent_run_transitions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
                 from_phase TEXT NOT NULL,
@@ -1066,7 +1066,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
             );
 
-            CREATE TABLE agent_run_trace_events (
+            CREATE TABLE IF NOT EXISTS agent_run_trace_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, step INTEGER NOT NULL,
                 event_type TEXT NOT NULL, occurred_at_utc TEXT NOT NULL, phase TEXT NOT NULL,
                 decision TEXT NULL, tool_name TEXT NULL, tool_call_id TEXT NULL, success INTEGER NULL,
@@ -1075,7 +1075,7 @@ public sealed class LocalSqliteSchemaInitializer
                 FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
             );
 
-            CREATE TABLE agent_policy_audit_logs (
+            CREATE TABLE IF NOT EXISTS agent_policy_audit_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 call_id TEXT NOT NULL,
                 tool_name TEXT NOT NULL,
@@ -1087,7 +1087,7 @@ public sealed class LocalSqliteSchemaInitializer
                 timestamp_utc TEXT NOT NULL
             );
 
-            CREATE TABLE agent_mcts_checkpoints (
+            CREATE TABLE IF NOT EXISTS agent_mcts_checkpoints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
                 step_number INTEGER NOT NULL,
@@ -1096,45 +1096,45 @@ public sealed class LocalSqliteSchemaInitializer
                 created_at_utc TEXT NOT NULL,
                 FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
             );
-            CREATE INDEX idx_agent_mcts_checkpoints_run ON agent_mcts_checkpoints(run_id, step_number DESC);
+            CREATE INDEX IF NOT EXISTS idx_agent_mcts_checkpoints_run ON agent_mcts_checkpoints(run_id, step_number DESC);
 
-            CREATE UNIQUE INDEX ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
-            CREATE INDEX idx_documents_status_created ON documents(status, created_at_utc DESC);
-            CREATE INDEX idx_document_pages_document ON document_pages(document_id);
-            CREATE INDEX idx_document_pages_ocr ON document_pages(document_id, ocr_status, page_number);
-            CREATE INDEX idx_archive_manifest_document ON archive_manifest_entries(container_document_id, entry_index);
-            CREATE INDEX idx_archive_manifest_path ON archive_manifest_entries(container_document_id, relative_path);
-            CREATE INDEX idx_chunks_document ON chunks(document_id);
-            CREATE INDEX idx_chunks_page ON chunks(document_page_id);
-            CREATE INDEX idx_chunks_document_ordinal ON chunks(document_id, chunk_index);
-            CREATE INDEX idx_chunks_content_hash ON chunks(content_hash);
-            CREATE INDEX idx_chunk_vector_index_status_chunk ON chunk_vector_index_status(chunk_id);
-            CREATE INDEX idx_chunk_vector_index_status_model_chunk ON chunk_vector_index_status(model, chunk_id);
-            CREATE INDEX idx_chunk_vector_index_status_content_hash ON chunk_vector_index_status(content_hash);
-            CREATE INDEX idx_chunk_vector_index_status_collection ON chunk_vector_index_status(qdrant_collection);
-            CREATE INDEX idx_jobs_status_priority ON jobs(status, priority DESC, created_at_utc);
-            CREATE INDEX idx_jobs_pending_due ON jobs(status, next_attempt_at_utc, priority DESC, created_at_utc);
-            CREATE INDEX idx_jobs_updated_at ON jobs(updated_at_utc);
-            CREATE INDEX idx_chat_messages_conversation ON chat_messages(conversation_id, id);
-            CREATE INDEX idx_translations_document ON translations(document_id, created_at_utc DESC);
-            CREATE INDEX idx_translations_job ON translations(job_id);
-            CREATE INDEX idx_translation_units_translation ON translation_units(translation_id, unit_index);
-            CREATE INDEX idx_translation_units_status ON translation_units(translation_id, status, unit_index);
-            CREATE INDEX idx_generated_images_created_at ON generated_images(created_at_utc DESC, id DESC);
-            CREATE INDEX idx_ocr_cache_lookup
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_sha256_not_null ON documents(sha256) WHERE sha256 IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_documents_status_created ON documents(status, created_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_document_pages_document ON document_pages(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_pages_ocr ON document_pages(document_id, ocr_status, page_number);
+            CREATE INDEX IF NOT EXISTS idx_archive_manifest_document ON archive_manifest_entries(container_document_id, entry_index);
+            CREATE INDEX IF NOT EXISTS idx_archive_manifest_path ON archive_manifest_entries(container_document_id, relative_path);
+            CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_page ON chunks(document_page_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_document_ordinal ON chunks(document_id, chunk_index);
+            CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_chunk ON chunk_vector_index_status(chunk_id);
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_model_chunk ON chunk_vector_index_status(model, chunk_id);
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_content_hash ON chunk_vector_index_status(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_chunk_vector_index_status_collection ON chunk_vector_index_status(qdrant_collection);
+            CREATE INDEX IF NOT EXISTS idx_jobs_status_priority ON jobs(status, priority DESC, created_at_utc);
+            CREATE INDEX IF NOT EXISTS idx_jobs_pending_due ON jobs(status, next_attempt_at_utc, priority DESC, created_at_utc);
+            CREATE INDEX IF NOT EXISTS idx_jobs_updated_at ON jobs(updated_at_utc);
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id, id);
+            CREATE INDEX IF NOT EXISTS idx_translations_document ON translations(document_id, created_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_translations_job ON translations(job_id);
+            CREATE INDEX IF NOT EXISTS idx_translation_units_translation ON translation_units(translation_id, unit_index);
+            CREATE INDEX IF NOT EXISTS idx_translation_units_status ON translation_units(translation_id, status, unit_index);
+            CREATE INDEX IF NOT EXISTS idx_generated_images_created_at ON generated_images(created_at_utc DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_ocr_cache_lookup
             ON ocr_cache(page_hash, engine_name, engine_version, language, preprocess_version);
-            CREATE INDEX idx_graph_nodes_name ON document_graph_nodes(name);
-            CREATE INDEX idx_graph_nodes_document ON document_graph_nodes(document_id);
-            CREATE INDEX idx_graph_edges_source ON document_graph_edges(source_node_id);
-            CREATE INDEX idx_graph_edges_target ON document_graph_edges(target_node_id);
-            CREATE INDEX idx_episodic_memories_session ON agent_episodic_memories(session_id);
-            CREATE INDEX idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
-            CREATE INDEX idx_agent_skills_category ON agent_skills(category);
-            CREATE INDEX idx_agent_skills_created ON agent_skills(created_at_utc DESC);
-            CREATE INDEX idx_agent_runs_phase_updated ON agent_runs(phase, updated_at_utc DESC);
-            CREATE INDEX idx_agent_run_transitions_run ON agent_run_transitions(run_id, id);
-            CREATE INDEX idx_agent_run_trace_events_run ON agent_run_trace_events(run_id, id);
-            CREATE INDEX idx_documents_original_path ON documents(original_path);
+            CREATE INDEX IF NOT EXISTS idx_graph_nodes_name ON document_graph_nodes(name);
+            CREATE INDEX IF NOT EXISTS idx_graph_nodes_document ON document_graph_nodes(document_id);
+            CREATE INDEX IF NOT EXISTS idx_graph_edges_source ON document_graph_edges(source_node_id);
+            CREATE INDEX IF NOT EXISTS idx_graph_edges_target ON document_graph_edges(target_node_id);
+            CREATE INDEX IF NOT EXISTS idx_episodic_memories_session ON agent_episodic_memories(session_id);
+            CREATE INDEX IF NOT EXISTS idx_episodic_memories_created ON agent_episodic_memories(created_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_agent_skills_category ON agent_skills(category);
+            CREATE INDEX IF NOT EXISTS idx_agent_skills_created ON agent_skills(created_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_agent_runs_phase_updated ON agent_runs(phase, updated_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_agent_run_transitions_run ON agent_run_transitions(run_id, id);
+            CREATE INDEX IF NOT EXISTS idx_agent_run_trace_events_run ON agent_run_trace_events(run_id, id);
+            CREATE INDEX IF NOT EXISTS idx_documents_original_path ON documents(original_path);
             {{ftsSql}}
 
             PRAGMA user_version = 11;

@@ -8,6 +8,12 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
+      onwarn(warning, defaultHandler) {
+        if (warning.code === "INVALID_ANNOTATION" && warning.message.includes("/*#__PURE__*/")) {
+          return;
+        }
+        defaultHandler(warning);
+      },
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {

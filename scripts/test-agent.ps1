@@ -37,7 +37,7 @@ function Invoke-DotnetTest {
         }
     }
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "FAIL — Test suite failed: $Project" -ForegroundColor Red
+        Write-Host "FAIL - Test suite failed: $Project" -ForegroundColor Red
         Write-Host "--- Failure Traceback ---" -ForegroundColor Red
         $startIdx = [Math]::Max(0, $buffer.Count - 15)
         for ($i = $startIdx; $i -lt $buffer.Count; $i++) {
@@ -53,11 +53,9 @@ function Invoke-VitestTest {
     Push-Location "$root\src\OnlyRag.Web"
     try {
         Write-Host "  Running Vitest (unit)..." -ForegroundColor Gray
-        $output = & npx vitest run --reporter=dot 2>&1 | Out-String
+        & npx vitest run --reporter=dot
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "FAIL — Vitest failed" -ForegroundColor Red
-            Write-Host "--- Failure Traceback ---" -ForegroundColor Red
-            Write-Host $output -ForegroundColor Red
+            Write-Host "FAIL - Vitest failed" -ForegroundColor Red
             $script:failed++
             return
         }
@@ -67,7 +65,7 @@ function Invoke-VitestTest {
             Write-Host "  Running Playwright (E2E)..." -ForegroundColor Gray
             $output = & npx playwright test --reporter=dot 2>&1 | Out-String
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "FAIL — Playwright E2E failed" -ForegroundColor Red
+                Write-Host "FAIL - Playwright E2E failed" -ForegroundColor Red
                 Write-Host "--- Failure Traceback ---" -ForegroundColor Red
                 Write-Host $output -ForegroundColor Red
                 $script:failed++
@@ -77,7 +75,7 @@ function Invoke-VitestTest {
         }
     }
     catch {
-        Write-Host "FAIL — Error running frontend tests: $_" -ForegroundColor Red
+        Write-Host "FAIL - Error running frontend tests: $_" -ForegroundColor Red
         $script:failed++
     }
     finally {
@@ -105,7 +103,7 @@ Write-Host "`n=== OnlyRag.Api.Tests ===" -ForegroundColor Cyan
 $fastFilter = 'FullyQualifiedName~OnlyRag.Api.Tests.EndToEndIntegration'
 
 if ($Full) {
-    Write-Host "(FULL mode — running all Api.Tests)" -ForegroundColor Yellow
+    Write-Host "(FULL mode - running all Api.Tests)" -ForegroundColor Yellow
     Invoke-DotnetTest "$root\tests\OnlyRag.Api.Tests\OnlyRag.Api.Tests.csproj"
 }
 else {
@@ -116,6 +114,6 @@ Write-Host ""
 if ($script:failed -eq 0) {
     Write-Host "ALL PASS" -ForegroundColor Green
 } else {
-    Write-Host "FAIL — $($script:failed) suite(s) failed" -ForegroundColor Red
+    Write-Host "FAIL - $($script:failed) suite(s) failed" -ForegroundColor Red
     exit 1
 }

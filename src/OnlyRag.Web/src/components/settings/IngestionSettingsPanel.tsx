@@ -48,7 +48,7 @@ export function IngestionSettingsPanel() {
           <div className="settings-form">
             <UnifiedPresetBar
               title="Preset Chunking"
-              subtitle="Configura la dimensione dei blocchi di testo per indicizzazione e vector search."
+              subtitle="Dimensione dei blocchi di testo per indicizzazione e ricerca vettoriale."
               allowedPresets={["basso", "medio", "alto", "custom"]}
               activePreset={activePreset}
               onSelectPreset={handleSelectPreset}

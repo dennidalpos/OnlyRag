@@ -275,4 +275,41 @@ describe("CodingSection", () => {
       expect(screen.getByText("Planner Agent")).toBeInTheDocument();
     });
   });
+
+  it("handles dropped files and processes them into coding pipeline", async () => {
+    mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: null,
+          isAuthorized: false,
+          canRead: false,
+          canWrite: false,
+          fileCount: 0,
+          lastVerifiedAt: null
+        }
+      }
+    ]);
+
+    const fakeFile = new File(["const x = 1;"], "test_script.js", { type: "text/javascript" });
+    const droppedFiles = [fakeFile] as unknown as FileList;
+    let handled = false;
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+        droppedFiles={droppedFiles}
+        onHandledDroppedFiles={() => {
+          handled = true;
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(handled).toBe(true);
+      expect(screen.getByText("1 file inserito/i nella pipeline Coding.")).toBeInTheDocument();
+    });
+  });
 });

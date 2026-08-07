@@ -82,15 +82,13 @@ export function DiagnosticsPanel() {
             {diagnostics.ollamaRunningModels && diagnostics.ollamaRunningModels.length > 0 && (
               <div className="panel-note">
                 <p>
-                  Modelli caricati: {diagnostics.ollamaRunningModels.map((model) => {
-                    const context = model.contextLength
-                      ? `${model.contextLength.toLocaleString("it-IT")} ctx`
-                      : "ctx n/d";
-                    const vram = model.sizeVram
-                      ? `${Math.round(model.sizeVram / 1024 / 1024).toLocaleString("it-IT")} MB VRAM`
-                      : "VRAM n/d";
-                    return `${model.name} (${context}, ${vram})`;
-                  }).join("; ")}. Per dettagli esegui ollama ps.
+                  <strong>Modelli caricati ({diagnostics.ollamaRunningModels.length}):</strong>{" "}
+                  {diagnostics.ollamaRunningModels.map((model) => {
+                    const info: string[] = [];
+                    if (model.contextLength) info.push(`${model.contextLength.toLocaleString("it-IT")} ctx`);
+                    if (model.sizeVram) info.push(`${Math.round(model.sizeVram / 1024 / 1024)} MB VRAM`);
+                    return info.length > 0 ? `${model.name} (${info.join(", ")})` : model.name;
+                  }).join(", ")}
                 </p>
               </div>
             )}

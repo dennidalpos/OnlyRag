@@ -431,8 +431,8 @@ export function AgentToolCallCard({ event, onApprove }: AgentToolCallCardProps) 
         <div style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "0.84rem", color: "#fecaca", overflowWrap: "anywhere", wordBreak: "break-word" }}>
           {event.content}
         </div>
-        <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#94a3b8" }}>
-          ℹ️ Consulta la sezione <strong>Impostazioni &gt; Sistema di Log &amp; Diagnostic Debug</strong> per l'analisi dettagliata.
+        <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#64748b" }}>
+          Consulta <strong>Impostazioni › Log &amp; Diagnostica</strong> per i dettagli.
         </div>
       </div>
     );

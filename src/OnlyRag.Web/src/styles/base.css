@@ -284,6 +284,40 @@ button:disabled {
   transform: translate(-50%, 0);
 }
 
+/* Collapsible benchmark details table */
+.benchmark-details {
+  margin-top: 8px;
+}
+
+.benchmark-details__summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  padding: 6px 0;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition-fast);
+}
+
+.benchmark-details__summary:hover {
+  color: #94a3b8;
+}
+
+.benchmark-details__summary::before {
+  content: "▶";
+  font-size: 0.65rem;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.benchmark-details[open] .benchmark-details__summary::before {
+  transform: rotate(90deg);
+}
+
 button.button-secondary,
 button.button--secondary {
   background: var(--bg-sidebar-card);

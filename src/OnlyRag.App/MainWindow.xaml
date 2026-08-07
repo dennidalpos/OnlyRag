@@ -12,17 +12,44 @@
         MinWidth="900"
         Icon="Assets/OnlyRag.ico"
         WindowStartupLocation="CenterScreen"
-        Background="#F5F7FA">
-    <Grid Background="#F5F7FA">
+        Background="#0F172A">
+    <Grid Background="#0F172A">
         <wv2:WebView2 x:Name="MainWebView" />
+
+        <Border x:Name="LoadingPanel"
+                Visibility="Visible"
+                Background="#0F172A"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="⚡ OnlyRag"
+                           FontSize="32"
+                           FontWeight="Bold"
+                           Foreground="#38BDF8"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,16" />
+                <ProgressBar IsIndeterminate="True"
+                             Width="240"
+                             Height="6"
+                             Foreground="#38BDF8"
+                             Background="#1E293B"
+                             BorderThickness="0"
+                             Margin="0,0,0,16" />
+                <TextBlock x:Name="LoadingStatusText"
+                           Text="Avvio del server backend in corso..."
+                           FontSize="14"
+                           Foreground="#94A3B8"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
 
         <Border x:Name="StartupErrorPanel"
                 Visibility="Collapsed"
                 MaxWidth="560"
                 Padding="28"
-                BorderBrush="#D5DBE5"
+                BorderBrush="#334155"
                 BorderThickness="1"
-                Background="#FFFFFF"
+                Background="#1E293B"
                 CornerRadius="8"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
@@ -30,13 +57,13 @@
                 <TextBlock x:Name="StartupErrorTitle"
                            FontSize="22"
                            FontWeight="SemiBold"
-                           Foreground="#172033"
+                           Foreground="#F8FAFC"
                            TextWrapping="Wrap" />
                 <TextBlock x:Name="StartupErrorMessage"
                            Margin="0,12,0,0"
                            FontSize="14"
                            LineHeight="21"
-                           Foreground="#4A5568"
+                           Foreground="#94A3B8"
                            TextWrapping="Wrap" />
             </StackPanel>
         </Border>

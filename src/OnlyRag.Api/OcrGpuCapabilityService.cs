@@ -93,10 +93,14 @@ public sealed class OcrGpuCapabilityService
         if (!availability.IsConfigured)
         {
             string blockReason = availability.Message ?? "The GPU OCR runtime is not usable.";
+            bool isRepairable = IsRepairableOcrRuntimeIssue(blockReason);
+            string coherentReason = isRepairable
+                ? blockReason
+                : FormatNotConfiguredReason(blockReason, runtime.ResolvedRuntime, packageVersions);
             return new OcrGpuCapabilityResponse(
                 false,
-                IsRepairableOcrRuntimeIssue(blockReason) ? "OCR runtime to repair" : "CUDA runtime unusable",
-                blockReason,
+                isRepairable ? "OCR runtime to repair" : "CUDA runtime unusable",
+                coherentReason,
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -113,7 +117,7 @@ public sealed class OcrGpuCapabilityService
             return new OcrGpuCapabilityResponse(
                 false,
                 "PaddlePaddle runtime without CUDA",
-                "The installed OCR runtime does not support CUDA. Open Settings > Diagnostics and press Install GPU OCR to install the NVIDIA GPU runtime, or use CPU OCR.",
+                FormatNoCudaSupportReason(runtime.ResolvedRuntime, packageVersions),
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -127,10 +131,14 @@ public sealed class OcrGpuCapabilityService
 
         if (availability.CudaDeviceCount is int count && count < 1)
         {
+            string gpuName = runtime.NvidiaName ?? "the detected NVIDIA GPU";
             return new OcrGpuCapabilityResponse(
                 false,
                 "CUDA sees no GPUs",
-                "PaddlePaddle does not detect CUDA devices.",
+                $"PaddlePaddle ({runtime.ResolvedRuntime}) does not detect any CUDA devices. "
+                + $"{gpuName} is visible to Windows but CUDA is not accessible — "
+                + "the NVIDIA driver may need to be reinstalled or the system restarted. "
+                + "No system CUDA Toolkit is required: the CUDA runtime is bundled in the GPU wheel.",
                 runtime.Detail,
                 availability.EngineVersion,
                 runtime.NvidiaName,
@@ -177,6 +185,47 @@ public sealed class OcrGpuCapabilityService
     private static bool IsRepairableOcrRuntimeIssue(string message)
     {
         return message.StartsWith("Local OCR runtime incomplete or damaged.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatNoCudaSupportReason(
+        string resolvedRuntime,
+        IReadOnlyDictionary<string, string> packageVersions)
+    {
+        string installedPackage = packageVersions.TryGetValue("paddlepaddle-gpu", out string? gpuVer)
+            && !string.IsNullOrWhiteSpace(gpuVer) && gpuVer != "not-installed"
+                ? $"paddlepaddle-gpu {gpuVer}"
+                : packageVersions.TryGetValue("paddlepaddle", out string? cpuVer)
+                    && !string.IsNullOrWhiteSpace(cpuVer) && cpuVer != "not-installed"
+                        ? $"paddlepaddle {cpuVer} (CPU build)"
+                        : packageVersions.TryGetValue("paddle", out string? padVer)
+                            && !string.IsNullOrWhiteSpace(padVer) && padVer != "not-installed"
+                                ? $"paddlepaddle {padVer} (CPU build)"
+                                : "a paddlepaddle package";
+        return $"The installed OCR runtime ({resolvedRuntime}) does not support CUDA: {installedPackage} is installed "
+            + "but it was not compiled with CUDA. "
+            + "Open Settings \u003e Diagnostics and press Install GPU OCR to replace it with the NVIDIA GPU build, or switch to CPU OCR.";
+    }
+
+    private static string FormatNotConfiguredReason(
+        string rawBridgeMessage,
+        string resolvedRuntime,
+        IReadOnlyDictionary<string, string> packageVersions)
+    {
+        string? installedPackage = packageVersions.TryGetValue("paddlepaddle-gpu", out string? gpuVer)
+            && !string.IsNullOrWhiteSpace(gpuVer) && gpuVer != "not-installed"
+                ? $"paddlepaddle-gpu {gpuVer}"
+                : packageVersions.TryGetValue("paddlepaddle", out string? cpuVer)
+                    && !string.IsNullOrWhiteSpace(cpuVer) && cpuVer != "not-installed"
+                        ? $"paddlepaddle {cpuVer}"
+                        : packageVersions.TryGetValue("paddle", out string? padVer)
+                            && !string.IsNullOrWhiteSpace(padVer) && padVer != "not-installed"
+                                ? $"paddlepaddle {padVer}"
+                                : null;
+        string packageClause = installedPackage is not null
+            ? $" (installed: {installedPackage})"
+            : string.Empty;
+        return $"GPU OCR runtime ({resolvedRuntime}) is not usable{packageClause}. {rawBridgeMessage}"
+            .TrimEnd('.')  + '.';
     }
 
     private async Task<NvidiaHardwareProbe> DetectNvidiaHardwareAsync(CancellationToken cancellationToken)

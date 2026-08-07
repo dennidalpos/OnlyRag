@@ -57,7 +57,7 @@ export function SettingsConfigurationAlerts() {
       id: "ollama-offline",
       variant: "warning",
       title: "Connessione a Ollama non riuscita.",
-      detail: "Assicurati che Ollama sia in esecuzione localmente per caricare i modelli di Chat, Embedding, Traduzione e Coding.",
+      detail: "Verifica che Ollama sia in esecuzione per usare chat, embedding, traduzione e coding.",
       actionLabel: "Aggiorna stato",
       onAction: () => void refreshDiagnostics()
     });
@@ -69,7 +69,7 @@ export function SettingsConfigurationAlerts() {
       id: "models-unavailable",
       variant: "warning",
       title: "Modelli predefiniti mancanti in Ollama.",
-      detail: `I seguenti modelli configurati non risultano presenti: ${unavailableDefaults.join(", ")}.`
+      detail: `Modelli configurati non presenti in Ollama: ${unavailableDefaults.join(", ")}.`
     });
   }
 
@@ -81,7 +81,7 @@ export function SettingsConfigurationAlerts() {
       id: "reranker-missing",
       variant: "warning",
       title: "Modello di riclassificazione non installato. I risultati RAG saranno meno precisi.",
-      detail: "Senza il modello ONNX Cross-Encoder (Re-Ranker), la ricerca utilizzerà un fallback euristico.",
+      detail: "Senza il Re-Ranker ONNX la ricerca usa un fallback euristico meno preciso.",
       actionLabel: "Scarica Re-Ranker",
       onAction: () => void downloadRerankerModel(),
       isActionBusy: isBusy
@@ -96,7 +96,7 @@ export function SettingsConfigurationAlerts() {
       id: "ocr-missing",
       variant: "warning",
       title: "Runtime OCR locale non configurato.",
-      detail: "L'estrazione del testo da scansioni, PDF e file Office richiede il runtime OCR.",
+      detail: "Il runtime OCR è richiesto per estrarre testo da scansioni, PDF e file Office.",
       actionLabel: "Installa OCR",
       onAction: () => void configureOcrRuntime("auto"),
       isActionBusy: isBusy
@@ -109,7 +109,7 @@ export function SettingsConfigurationAlerts() {
       id: "libreoffice-missing",
       variant: "warning",
       title: "LibreOffice non configurato.",
-      detail: "L'esportazione dei documenti e delle traduzioni in formato PDF richiede LibreOffice.",
+      detail: "LibreOffice è necessario per esportare documenti e traduzioni in PDF.",
       actionLabel: "Scarica LibreOffice",
       onAction: () => void openLibreOfficeDownload()
     });

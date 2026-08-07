@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { OllamaModel } from "../../api";
 import { CodingMessageList } from "./CodingMessageList";
 import { CodingPromptBar } from "./CodingPromptBar";
@@ -10,15 +11,26 @@ type CodingSectionProps = {
   defaultModel: string | null;
   loadError?: string | null;
   isActive?: boolean;
+  droppedFiles?: FileList | null;
+  onHandledDroppedFiles?: () => void;
 };
 
 export function CodingSection({
   models,
   defaultModel,
   loadError = null,
-  isActive: _isActive = true
+  isActive: _isActive = true,
+  droppedFiles,
+  onHandledDroppedFiles
 }: CodingSectionProps) {
   const ctrl = useCodingSectionController({ models, defaultModel });
+
+  useEffect(() => {
+    if (droppedFiles && droppedFiles.length > 0) {
+      void ctrl.handleImportFileList(droppedFiles);
+      onHandledDroppedFiles?.();
+    }
+  }, [droppedFiles, ctrl, onHandledDroppedFiles]);
 
   return (
     <section className="coding-section" aria-label="Coding e Vibe Hub">

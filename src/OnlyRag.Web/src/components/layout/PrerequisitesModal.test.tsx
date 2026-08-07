@@ -1,0 +1,90 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { PrerequisitesModal } from "./PrerequisitesModal";
+import type { OcrProvisionStatus } from "../../api";
+
+describe("PrerequisitesModal", () => {
+  it("does not render when isOpen is false", () => {
+    render(
+      <PrerequisitesModal
+        isOpen={false}
+        onClose={vi.fn()}
+        ocrAnalysis={null}
+        ocrProvisionStatus={null}
+        isConfiguring={false}
+        onConfigureOcr={vi.fn()}
+        onCancelOcr={vi.fn()}
+      />
+    );
+
+    ariaExpectNull();
+  });
+
+  function ariaExpectNull() {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  }
+
+  it("renders correctly when open and displays status & progress", () => {
+    const status: OcrProvisionStatus = {
+      isConfigured: false,
+      isRunning: true,
+      message: "Installazione componenti OCR in corso...",
+      lastError: null,
+      runtimeTarget: "auto",
+      resolvedRuntime: "cpu",
+      runtimeDetail: "Installazione wheel PaddlePaddle...",
+      startedAtUtc: new Date().toISOString(),
+      updatedAtUtc: new Date().toISOString(),
+      stepKey: "paddle-install",
+      stepLabel: "Installazione PaddleOCR",
+      stepIndex: 6,
+      stepCount: 8,
+      progressPercent: 75,
+      severity: "running",
+      canRetry: false,
+      selectedRuntime: null,
+      isAutomaticRepair: false
+    };
+
+    render(
+      <PrerequisitesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        ocrAnalysis={null}
+        ocrProvisionStatus={status}
+        isConfiguring={true}
+        onConfigureOcr={vi.fn()}
+        onCancelOcr={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/Installazione PaddleOCR/i)).toBeInTheDocument();
+    expect(screen.getByText(/Passo 6\/8 \(75%\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByText("Annulla Operazione")).toBeInTheDocument();
+  });
+
+  it("triggers configuration when start button is clicked", async () => {
+    const user = userEvent.setup();
+    const handleConfigure = vi.fn();
+
+    render(
+      <PrerequisitesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        ocrAnalysis={null}
+        ocrProvisionStatus={null}
+        isConfiguring={false}
+        onConfigureOcr={handleConfigure}
+        onCancelOcr={vi.fn()}
+      />
+    );
+
+    const startBtn = screen.getByRole("button", { name: /Avvia Installazione Prerequisiti/i });
+    await user.click(startBtn);
+
+    expect(handleConfigure).toHaveBeenCalledWith("auto");
+  });
+});

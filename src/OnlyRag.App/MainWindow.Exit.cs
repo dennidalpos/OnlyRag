@@ -137,7 +137,7 @@ public partial class MainWindow
 
     private async Task<BackendActiveJobSnapshot> TryGetBackendActiveJobSnapshotAsync()
     {
-        if (!backendSettings.IsRunning || string.IsNullOrWhiteSpace(backendSettings.BaseUrl))
+        if (backendSettings is null || !backendSettings.IsRunning || string.IsNullOrWhiteSpace(backendSettings.BaseUrl))
         {
             return BackendActiveJobSnapshot.Known(0);
         }
@@ -225,7 +225,7 @@ public partial class MainWindow
 
     private async Task<AppShutdownPreparationResponse?> TryPrepareBackendShutdownAsync()
     {
-        if (!backendSettings.IsRunning || string.IsNullOrWhiteSpace(backendSettings.BaseUrl))
+        if (backendSettings is null || !backendSettings.IsRunning || string.IsNullOrWhiteSpace(backendSettings.BaseUrl))
         {
             return null;
         }
@@ -252,7 +252,7 @@ public partial class MainWindow
 
     private void AddBackendSessionToken(HttpClient httpClient)
     {
-        if (!string.IsNullOrWhiteSpace(backendSettings.ApiToken))
+        if (backendSettings is not null && !string.IsNullOrWhiteSpace(backendSettings.ApiToken))
         {
             httpClient.DefaultRequestHeaders.Add(backendSettings.ApiTokenHeaderName, backendSettings.ApiToken);
         }

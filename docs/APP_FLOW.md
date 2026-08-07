@@ -53,8 +53,8 @@ flowchart TD
 
 ## Startup
 
-The WPF app validates Windows and WebView2, prepares app directories, starts the backend,
-initializes the current SQLite schema, recovers local job state, initializes WebView2, and loads either bundled static
+The WPF app validates Windows and WebView2, prepares app directories, starts the in-process backend,
+initializes the SQLite database via EF Core 10 (`OnlyRagDbContext` / `LocalSqliteSchemaInitializer`), recovers local job state, initializes SignalR hubs (`ChatStreamHub`, `JobProgressHub`), initializes WebView2, and loads either bundled static
 web assets or the loopback Vite development server in Debug builds. Non-loopback or
 credential-bearing `ONLYRAG_WEB_DEV_SERVER` URLs are ignored.
 

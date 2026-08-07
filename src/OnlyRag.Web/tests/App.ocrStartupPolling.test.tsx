@@ -139,7 +139,7 @@ describe("App OCR startup polling", () => {
     });
 
     expect(screen.getByText("Configurazione OCR in corso")).toBeInTheDocument();
-    expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
+    expect(screen.getAllByText("Installazione pacchetti PaddleOCR in corso.")[0]).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3_000);
@@ -222,7 +222,7 @@ describe("App OCR startup polling", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Installa OCR CPU" }));
     await flushPromises();
-    expect(screen.getByText("Installazione pacchetti PaddleOCR in corso.")).toBeInTheDocument();
+    expect(screen.getAllByText("Installazione pacchetti PaddleOCR in corso.")[0]).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3_000);

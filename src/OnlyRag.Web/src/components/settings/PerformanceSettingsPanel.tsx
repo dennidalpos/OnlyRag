@@ -77,8 +77,8 @@ export function PerformanceSettingsPanel() {
               title="Preset Prestazioni"
               subtitle={
                 performanceFormState.profile === "auto"
-                  ? `Rilevamento automatico hardware hardware attivo: ${autoDetectedLabel}`
-                  : "Standardizza l'uso di risorse CPU/RAM/VRAM per tutti gli elaboratori locali."
+                  ? `Rilevamento automatico attivo: ${autoDetectedLabel}`
+                  : "Configura l'uso di risorse CPU/RAM/VRAM."
               }
               allowedPresets={["auto", "basso", "medio", "alto", "custom"]}
               activePreset={activePreset}
@@ -162,14 +162,12 @@ export function PerformanceSettingsPanel() {
             </div>
             {(performanceFormState.profile === "power" || performanceFormState.profile === "custom") && (
               <div className="panel-note panel-note--warning">
-                <p>
-                  Impostazioni avanzate: parallelismo, batch e timeout possono saturare RAM/VRAM o mantenere modelli caricati piu a lungo. Per problemi di contesto o offload verifica con ollama ps.
-                </p>
+                <p>Parallelismo e batch alti possono saturare RAM/VRAM. Verifica con <code>ollama ps</code> in caso di problemi.</p>
               </div>
             )}
             {(chatModelDetailsLoading || embeddingModelDetailsLoading) && (
-              <div className="panel-note">
-                <p>Lettura dettagli modello in corso.</p>
+              <div className="panel-note" role="status">
+                <p>Lettura dettagli modello...</p>
               </div>
             )}
             <div className="settings-actions">
@@ -182,7 +180,3 @@ export function PerformanceSettingsPanel() {
         </div>
   );
 }
-
-
-
-

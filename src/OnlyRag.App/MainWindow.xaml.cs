@@ -27,11 +27,12 @@ public partial class MainWindow : Window
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private readonly BackendWebSettings backendSettings;
+    private BackendWebSettings? backendSettings;
     private bool isExitConfirmed;
     private bool isExitFlowInProgress;
+    private bool isWebViewInitialized;
 
-    public MainWindow(BackendWebSettings backendSettings)
+    public MainWindow(BackendWebSettings? backendSettings = null)
     {
         this.backendSettings = backendSettings;
         InitializeComponent();
@@ -40,15 +41,38 @@ public partial class MainWindow : Window
         Closed += OnClosed;
     }
 
+    public async Task InitializeBackendSettingsAsync(BackendWebSettings settings)
+    {
+        this.backendSettings = settings;
+        if (IsLoaded)
+        {
+            await BindBackendAndShowWebViewAsync();
+        }
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
+
+        if (backendSettings is not null)
+        {
+            await BindBackendAndShowWebViewAsync();
+        }
+    }
+
+    private async Task BindBackendAndShowWebViewAsync()
+    {
+        if (backendSettings is null || isWebViewInitialized)
+        {
+            return;
+        }
 
         try
         {
             StartupPrerequisiteStatus prerequisites = CheckStartupPrerequisites();
             if (!prerequisites.IsSatisfied)
             {
+                LoadingPanel.Visibility = Visibility.Collapsed;
                 ShowStartupError(prerequisites.Title, prerequisites.Message);
                 return;
             }
@@ -57,15 +81,19 @@ public partial class MainWindow : Window
             await MainWebView.EnsureCoreWebView2Async(webViewEnvironment);
             await MainWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(CreateBackendBridgeScript(backendSettings));
             MainWebView.Source = await ResolveStartupUriAsync();
+            isWebViewInitialized = true;
+            LoadingPanel.Visibility = Visibility.Collapsed;
         }
         catch (WebView2RuntimeNotFoundException)
         {
+            LoadingPanel.Visibility = Visibility.Collapsed;
             ShowStartupError(
                 "WebView2 non e installato",
                 BuildWebView2MissingMessage());
         }
         catch (FileNotFoundException ex)
         {
+            LoadingPanel.Visibility = Visibility.Collapsed;
             string detail = UserFacingErrorText.FromExternalDetail(
                 ex.FileName,
                 "Asset UI non trovati nel percorso di build previsto.");
@@ -75,6 +103,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            LoadingPanel.Visibility = Visibility.Collapsed;
             string detail = UserFacingErrorText.FromExternalDetail(
                 ex.Message,
                 "Dettagli tecnici disponibili nei log locali.");

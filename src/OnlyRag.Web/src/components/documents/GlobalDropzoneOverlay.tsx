@@ -3,9 +3,10 @@ import { FileText, UploadCloud } from "lucide-react";
 
 type GlobalDropzoneOverlayProps = {
   onFilesDropped: (files: FileList) => void;
+  activeSection?: string;
 };
 
-export const GlobalDropzoneOverlay: React.FC<GlobalDropzoneOverlayProps> = ({ onFilesDropped }) => {
+export const GlobalDropzoneOverlay: React.FC<GlobalDropzoneOverlayProps> = ({ onFilesDropped, activeSection }) => {
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -93,9 +94,13 @@ export const GlobalDropzoneOverlay: React.FC<GlobalDropzoneOverlayProps> = ({ on
         <div style={{ background: "rgba(56, 189, 248, 0.15)", padding: "20px", borderRadius: "50%", color: "#38bdf8" }}>
           <UploadCloud size={56} />
         </div>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}>Rilascia i documenti qui</h2>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}>
+          {activeSection === "coding" ? "Rilascia i file per l'analisi Coding" : "Rilascia i documenti qui"}
+        </h2>
         <p style={{ color: "#94a3b8", fontSize: "0.95rem", maxWidth: "420px", margin: 0 }}>
-          I file verranno importati. Potrai scegliere la modalità OCR prima dell'elaborazione.
+          {activeSection === "coding"
+            ? "I file verranno inseriti direttamente nella pipeline di analisi del Workspace Coding."
+            : "I file verranno importati. Potrai scegliere la modalità OCR prima dell'elaborazione."}
         </p>
         <div style={{ display: "flex", gap: "8px", color: "#38bdf8", fontSize: "0.82rem", fontWeight: 600 }}>
           <FileText size={16} /> PDF, DOCX, XLSX, PPTX, TXT, MD, PNG, JPG...

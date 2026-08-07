@@ -320,6 +320,7 @@ internal sealed record OcrRuntimeManifest(
 {
     public static OcrRuntimeManifest Default { get; } = new([
         new OcrRuntimeTarget("cpu", "requirements-cpu.txt", "cpu", null, null),
+        new OcrRuntimeTarget("nvidia", "requirements-nvidia-cu130.txt", "cuda130", "580.82", "7.5"),
         new OcrRuntimeTarget("nvidia", "requirements-nvidia-cu129.txt", "cuda129", "576.02", "7.5"),
         new OcrRuntimeTarget("nvidia", "requirements-nvidia-cu126.txt", "cuda126", "560.94", "7.5"),
         new OcrRuntimeTarget("nvidia", "requirements-nvidia-cu118.txt", "cuda118", "520.06", "7.5")

@@ -21,11 +21,10 @@ current technical and operational documentation. Do not use these pages as chang
 ## Feature Pipelines
 
 - [Agent engine](AGENT_ENGINE.md): autonomous agent engine architecture, phase machine, subagent DAG orchestrator, memory system, and endpoints.
-- [RAG & Knowledge Graph pipeline](RAG_PIPELINE.md): ingestion, dual-tier chunking, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Qdrant indexing, hybrid search, and chat grounding.
+- [RAG & Knowledge Graph pipeline](RAG_PIPELINE.md): ingestion (OpenXML, PDF, archive, TXT, CSV), dual-tier chunking, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Qdrant indexing, hybrid search, and chat grounding.
 - [OCR pipeline](OCR_PIPELINE.md): Dual-engine OCR architecture (Native C# DirectML ONNX engine `OnnxDirectMlOcrEngine` + Python PaddleOCR bridge `PaddleOcrEngine`).
 - [Image generation](IMAGE_GENERATION.md): integrated local model catalog, required-file
   downloads, verification, GPU/CPU runtime behavior, toolbar editing workflow, and release checks.
-- [Office ingestion](OFFICE_INGESTION.md): native OpenXML extraction for DOCX, XLSX, and PPTX.
 - [Translation pipeline](TRANSLATION_PIPELINE.md): page-based translation jobs, editing, and
   export formats.
 
@@ -36,7 +35,6 @@ current technical and operational documentation. Do not use these pages as chang
 ## Tracked Files
 
 - [Operational tracker](../PROJECT_STATUS.json)
-- [Tech elevation plan](../TECH_ELEVATION_PLAN.md)
 - [Solution file](../OnlyRag.sln)
 - [CI workflow](../.github/workflows/ci.yml)
 - [OCR catalog workflow](../.github/workflows/ocr-runtime-catalog.yml)

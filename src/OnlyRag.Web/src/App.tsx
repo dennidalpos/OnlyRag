@@ -5,6 +5,7 @@ import { JobsDrawer } from "./components/layout/JobsDrawer";
 import { SectionId, Sidebar } from "./components/layout/Sidebar";
 import { SetupBanner } from "./components/layout/SetupBanner";
 import { CommandPaletteModal } from "./components/layout/CommandPaletteModal";
+import { PrerequisitesModal } from "./components/layout/PrerequisitesModal";
 import { GlobalDropzoneOverlay } from "./components/documents/GlobalDropzoneOverlay";
 import { SkeletonSection } from "./components/common/SkeletonSection";
 import { QueryProvider } from "./context/QueryProvider";
@@ -41,6 +42,7 @@ export function AppContent() {
   const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isPrerequisitesModalOpen, setIsPrerequisitesModalOpen] = useState(false);
 
   const setup = useAppSetup();
 
@@ -103,12 +105,21 @@ export function AppContent() {
     previousSectionRef.current = activeSection;
   }, [activeSection, setup]);
 
+  const [droppedCodingFiles, setDroppedCodingFiles] = useState<FileList | null>(null);
+
+  const handleGlobalFilesDropped = useCallback((files: FileList) => {
+    if (activeSection === "coding") {
+      setDroppedCodingFiles(files);
+    } else {
+      setActiveSection("documents");
+    }
+  }, [activeSection]);
+
   return (
     <div className="desktop-shell" data-theme={theme}>
       <GlobalDropzoneOverlay
-        onFilesDropped={() => {
-          setActiveSection("documents");
-        }}
+        activeSection={activeSection}
+        onFilesDropped={handleGlobalFilesDropped}
       />
       <a className="skip-link" href="#main-workspace">
         Salta al contenuto principale
@@ -153,6 +164,7 @@ export function AppContent() {
               onConfigureOcr={(runtimeTarget) => void setup.ocrStartupPrompt.configure(runtimeTarget)}
               onCancelOcr={() => void setup.ocrStartupPrompt.cancel()}
               onRecheck={() => void setup.handleRecheckInitialSetup()}
+              onOpenPrerequisitesModal={() => setIsPrerequisitesModalOpen(true)}
             />
           )}
           <div hidden={activeSection !== "chat"} className="chat-section-wrapper">
@@ -184,6 +196,8 @@ export function AppContent() {
                 defaultModel={setup.ollamaSettings?.defaultCodingModel ?? setup.ollamaSettings?.defaultChatModel ?? null}
                 loadError={setup.ollamaLoadError}
                 isActive={activeSection === "coding"}
+                droppedFiles={droppedCodingFiles}
+                onHandledDroppedFiles={() => setDroppedCodingFiles(null)}
               />
             </div>
             {activeSection === "settings" && (
@@ -215,6 +229,17 @@ export function AppContent() {
           setActiveSection(section);
           setIsJobsDrawerOpen(false);
         }}
+      />
+      <PrerequisitesModal
+        isOpen={isPrerequisitesModalOpen || Boolean(setup.ocrStartupPrompt.provisionStatus?.isRunning)}
+        onClose={() => setIsPrerequisitesModalOpen(false)}
+        ocrAnalysis={setup.ocrStartupPrompt.analysis}
+        ocrProvisionStatus={setup.ocrStartupPrompt.provisionStatus}
+        isConfiguring={setup.ocrStartupPrompt.isConfiguring}
+        onConfigureOcr={(target) => void setup.ocrStartupPrompt.configure(target)}
+        onCancelOcr={() => void setup.ocrStartupPrompt.cancel()}
+        onInstallOllama={() => void setup.handleInstallOllama()}
+        ollamaInstalled={Boolean(setup.ollamaInstallStatus?.cliInstalled)}
       />
     </div>
   );

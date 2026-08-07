@@ -24,6 +24,7 @@ type SetupBannerProps = {
   onConfigureOcr: (runtimeTarget?: "auto" | "cpu" | "nvidia") => void;
   onCancelOcr: () => void;
   onRecheck: () => void;
+  onOpenPrerequisitesModal?: () => void;
 };
 
 export function SetupBanner({
@@ -40,7 +41,8 @@ export function SetupBanner({
   onInstallOllama,
   onConfigureOcr,
   onCancelOcr,
-  onRecheck
+  onRecheck,
+  onOpenPrerequisitesModal
 }: SetupBannerProps) {
   const [dismissed, setDismissed] = useState(false);
   const issues = detectSetupIssues(
@@ -133,6 +135,11 @@ export function SetupBanner({
           }
           return null;
         })}
+        {onOpenPrerequisitesModal && (
+          <button type="button" onClick={onOpenPrerequisitesModal}>
+            Installa Prerequisiti
+          </button>
+        )}
         <button type="button" className="button-secondary" onClick={onOpenSettings}>
           Apri Impostazioni
         </button>
