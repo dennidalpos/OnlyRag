@@ -705,10 +705,12 @@ public sealed class LocalSqliteSchemaInitializer
 
     private async Task EnsureEfCoreModelConfiguredAsync(CancellationToken cancellationToken)
     {
+        await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         var optionsBuilder = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<EF.OnlyRagDbContext>();
-        optionsBuilder.UseSqlite($"Data Source={descriptor.Paths.DatabasePath}");
+        optionsBuilder.UseSqlite(connection);
         await using EF.OnlyRagDbContext dbContext = new(optionsBuilder.Options);
         _ = dbContext.Model;
+        await dbContext.Database.EnsureCreatedAsync(cancellationToken);
     }
 
     private static async Task<bool> HasAnyUserTablesAsync(

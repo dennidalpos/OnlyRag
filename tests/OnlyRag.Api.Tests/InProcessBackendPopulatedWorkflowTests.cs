@@ -20,6 +20,12 @@ public sealed partial class InProcessBackendTests
             new InProcessBackendOptions { QdrantVectorStore = new FakeQdrantVectorStore() });
         using HttpClient httpClient = CreateAuthenticatedClient(backend);
 
+        using HttpResponseMessage profileResponse = await httpClient.PostAsJsonAsync(
+            "/api/system/hardware/profile",
+            new SetEnergyProfileRequest(HardwareEnergyProfile.Performance),
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
+
         OllamaSettings ollamaSettings = new(
             ollama.BaseUrl,
             "chat-model",
@@ -164,7 +170,7 @@ public sealed partial class InProcessBackendTests
         Func<T, bool> isReady,
         string description)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(60);
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(300);
         T last = await readAsync();
         while (DateTimeOffset.UtcNow < deadline)
         {

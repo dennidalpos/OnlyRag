@@ -15,7 +15,12 @@ public sealed class HardwareMonitorService : IHardwareMonitorService, IDisposabl
     private long _lastKernelTime;
     private long _lastUserTime;
 
-    public HardwareEnergyProfile CurrentProfile { get; private set; } = HardwareEnergyProfile.Balanced;
+    public HardwareEnergyProfile CurrentProfile { get; private set; } = IsTestEnvironment() ? HardwareEnergyProfile.Performance : HardwareEnergyProfile.Balanced;
+
+    private static bool IsTestEnvironment()
+    {
+        return Environment.GetEnvironmentVariable("ONLYRAG_TEST_ENVIRONMENT") == "true";
+    }
 
     public HardwareMonitorService()
     {

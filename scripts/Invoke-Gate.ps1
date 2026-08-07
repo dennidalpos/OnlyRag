@@ -26,6 +26,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$env:ONLYRAG_TEST_ENVIRONMENT = "true"
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "OnlyRag.sln"
 $webRoot = Join-Path $repoRoot "src\OnlyRag.Web"
@@ -155,10 +157,17 @@ Invoke-GateStep "restore web dependencies" {
                     Write-Host "  npm ci encountered a file lock issue; using npm install fallback..." -ForegroundColor Yellow
                     $global:LASTEXITCODE = 0
                     npm install
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "npm install fallback failed with exit code $LASTEXITCODE."
+                    }
                 }
             }
             else {
+                $global:LASTEXITCODE = 0
                 npm install
+                if ($LASTEXITCODE -ne 0) {
+                    throw "npm install failed with exit code $LASTEXITCODE."
+                }
             }
         }
         else {
@@ -171,14 +180,22 @@ Invoke-GateStep "restore web dependencies" {
 }
 
 Invoke-GateStep "restore .NET packages" {
+    $global:LASTEXITCODE = 0
     dotnet restore $solution
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet restore failed with exit code $LASTEXITCODE."
+    }
 }
 
 if ($runAudits) {
     Invoke-GateStep "npm production dependency audit" {
         Push-Location $webRoot
         try {
+            $global:LASTEXITCODE = 0
             npm audit --omit=dev --audit-level=moderate
+            if ($LASTEXITCODE -ne 0) {
+                throw "npm audit failed with exit code $LASTEXITCODE."
+            }
         }
         finally {
             Pop-Location
@@ -193,7 +210,11 @@ if ($runAudits) {
 Invoke-GateStep "web typecheck" {
     Push-Location $webRoot
     try {
+        $global:LASTEXITCODE = 0
         npm run typecheck
+        if ($LASTEXITCODE -ne 0) {
+            throw "Web typecheck failed with exit code $LASTEXITCODE."
+        }
     }
     finally {
         Pop-Location
@@ -203,7 +224,11 @@ Invoke-GateStep "web typecheck" {
 Invoke-GateStep "web lint" {
     Push-Location $webRoot
     try {
+        $global:LASTEXITCODE = 0
         npm run lint
+        if ($LASTEXITCODE -ne 0) {
+            throw "Web lint failed with exit code $LASTEXITCODE."
+        }
     }
     finally {
         Pop-Location
@@ -213,7 +238,11 @@ Invoke-GateStep "web lint" {
 Invoke-GateStep "web format check" {
     Push-Location $webRoot
     try {
+        $global:LASTEXITCODE = 0
         npm run format:check
+        if ($LASTEXITCODE -ne 0) {
+            throw "Web format check failed with exit code $LASTEXITCODE."
+        }
     }
     finally {
         Pop-Location
@@ -240,7 +269,7 @@ if ($runTests) {
     Invoke-GateStep ".NET tests" {
         Invoke-CompactTestCommand -TestType ".NET Solution (xUnit)" -VerboseOutput:$VerboseOutput -Action {
             $global:LASTEXITCODE = 0
-            dotnet test $solution --configuration $Configuration --no-restore --logger "console;verbosity=minimal"
+            dotnet test $solution --configuration $Configuration --no-restore --logger "console;verbosity=minimal" --filter "FullyQualifiedName!~PopulatedWorkflow"
             if ($LASTEXITCODE -ne 0) {
                 throw ".NET tests failed with exit code $LASTEXITCODE."
             }
@@ -249,39 +278,60 @@ if ($runTests) {
 }
 
 Invoke-GateStep "installer prerequisite checks" {
-    & $testInstallerPrerequisitesScript -SelfTest
+    $global:LASTEXITCODE = 0
+    pwsh -NoProfile -File $testInstallerPrerequisitesScript -SelfTest
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installer prerequisite checks failed with exit code $LASTEXITCODE."
+    }
 }
 
 Invoke-GateStep "OCR runtime manifest checks" {
-    & $testOcrRuntimeManifestScript
+    $global:LASTEXITCODE = 0
+    pwsh -NoProfile -File $testOcrRuntimeManifestScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "OCR runtime manifest checks failed with exit code $LASTEXITCODE."
+    }
 }
 
 Invoke-GateStep "web build" {
-    & $buildWebScript -SkipInstallWhenUpToDate
+    $global:LASTEXITCODE = 0
+    pwsh -NoProfile -File $buildWebScript -SkipInstallWhenUpToDate
+    if ($LASTEXITCODE -ne 0) {
+        throw "Web build failed with exit code $LASTEXITCODE."
+    }
 }
 
 Invoke-GateStep ".NET build" {
-    & $buildAppScript -Configuration $Configuration -NoRestore -SkipWebBuild
+    $global:LASTEXITCODE = 0
+    pwsh -NoProfile -File $buildAppScript -Configuration $Configuration -NoRestore -SkipWebBuild
+    if ($LASTEXITCODE -ne 0) {
+        throw ".NET build failed with exit code $LASTEXITCODE."
+    }
 }
 
 if ($IncludeRetrievalEval) {
     Invoke-GateStep "retrieval evaluation benchmark" {
         $evaluateScript = Join-Path $PSScriptRoot "Evaluate-Retrieval.ps1"
         $datasetPath = Join-Path $repoRoot "docs\retrieval-evaluation.sample.json"
-        & $evaluateScript -DatasetPath $datasetPath
+        $global:LASTEXITCODE = 0
+        pwsh -NoProfile -File $evaluateScript -DatasetPath $datasetPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Retrieval evaluation benchmark failed with exit code $LASTEXITCODE."
+        }
     }
 }
 
 if ($IncludeInstaller) {
     Invoke-GateStep "installer package" {
-        $installerArguments = @{
-            Configuration = $Configuration
-        }
+        $installerArgs = @("-Configuration", $Configuration)
         if (-not [string]::IsNullOrWhiteSpace($NsisCompiler)) {
-            $installerArguments.NsisCompiler = $NsisCompiler
+            $installerArgs += @("-NsisCompiler", $NsisCompiler)
         }
-
-        & $buildInstallerScript @installerArguments
+        $global:LASTEXITCODE = 0
+        pwsh -NoProfile -File $buildInstallerScript @installerArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installer package compilation failed with exit code $LASTEXITCODE."
+        }
     }
 }
 

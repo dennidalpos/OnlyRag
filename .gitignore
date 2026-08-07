@@ -32,3 +32,14 @@ certificates/app/*
 !certificates/app/
 !certificates/app/README.md
 !certificates/app/.gitkeep
+
+# IDEs
+.vscode/
+
+# Build and Cache Tools
+.eslintcache
+.sass-cache
+.pytest_cache
+.turbo/
+.next/
+.nuxt/

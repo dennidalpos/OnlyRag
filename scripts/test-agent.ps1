@@ -8,6 +8,8 @@
 #>
 param([switch]$Full)
 
+$env:ONLYRAG_TEST_ENVIRONMENT = "true"
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -20,11 +22,74 @@ function Invoke-DotnetTest {
         'test', $Project,
         '--configuration', 'Release',
         '--nologo',
-        '--logger', 'console;verbosity=minimal'
+        '--logger', 'console;verbosity=minimal',
+        '-m:1'
     )
     if ($Filter) { $testArgs += '--filter'; $testArgs += $Filter }
-    & dotnet @testArgs | Select-Object -Last 5
-    if ($LASTEXITCODE -ne 0) { $script:failed++ }
+    $testArgs += @('--', 'xUnit.ParallelizeTestCollections=false')
+    $global:LASTEXITCODE = 0
+    $buffer = [System.Collections.Generic.List[string]]::new()
+    & dotnet @testArgs | ForEach-Object {
+        $line = $_
+        $buffer.Add($line)
+        if ($line -match "Superato!|Fallito!|Superati:|non superati:|Passed!|Failed!") {
+            Write-Host "  $line"
+        }
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL — Test suite failed: $Project" -ForegroundColor Red
+        Write-Host "--- Failure Traceback ---" -ForegroundColor Red
+        $startIdx = [Math]::Max(0, $buffer.Count - 15)
+        for ($i = $startIdx; $i -lt $buffer.Count; $i++) {
+            Write-Host $buffer[$i] -ForegroundColor Red
+        }
+        $script:failed++
+    }
+}
+
+function Invoke-VitestTest {
+    param([switch]$E2e)
+    $global:LASTEXITCODE = 0
+    Push-Location "$root\src\OnlyRag.Web"
+    try {
+        Write-Host "  Running Vitest (unit)..." -ForegroundColor Gray
+        $output = & npx vitest run --reporter=dot 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "FAIL — Vitest failed" -ForegroundColor Red
+            Write-Host "--- Failure Traceback ---" -ForegroundColor Red
+            Write-Host $output -ForegroundColor Red
+            $script:failed++
+            return
+        }
+        Write-Host "  Passed (Vitest)" -ForegroundColor Green
+
+        if ($E2e) {
+            Write-Host "  Running Playwright (E2E)..." -ForegroundColor Gray
+            $output = & npx playwright test --reporter=dot 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "FAIL — Playwright E2E failed" -ForegroundColor Red
+                Write-Host "--- Failure Traceback ---" -ForegroundColor Red
+                Write-Host $output -ForegroundColor Red
+                $script:failed++
+                return
+            }
+            Write-Host "  Passed (Playwright E2E)" -ForegroundColor Green
+        }
+    }
+    catch {
+        Write-Host "FAIL — Error running frontend tests: $_" -ForegroundColor Red
+        $script:failed++
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+Write-Host "`n=== Web Frontend Tests ===" -ForegroundColor Cyan
+if ($Full) {
+    Invoke-VitestTest -E2e
+} else {
+    Invoke-VitestTest
 }
 
 Write-Host "`n=== OnlyRag.Core.Tests ===" -ForegroundColor Cyan
@@ -33,29 +98,11 @@ Invoke-DotnetTest "$root\tests\OnlyRag.Core.Tests\OnlyRag.Core.Tests.csproj"
 Write-Host "`n=== OnlyRag.Infrastructure.Tests ===" -ForegroundColor Cyan
 Invoke-DotnetTest "$root\tests\OnlyRag.Infrastructure.Tests\OnlyRag.Infrastructure.Tests.csproj"
 
-Write-Host "`n=== OnlyRag.Api.Tests (fast only) ===" -ForegroundColor Cyan
+Write-Host "`n=== OnlyRag.Api.Tests ===" -ForegroundColor Cyan
 
 # Fast mode: include only unit and lightweight integration tests.
-# Excluded: InProcessBackend*, Document*JobHandler*, LocalJobWorker*,
-#           ChatServiceQdrant*, OllamaModelPull*, QdrantProcessLifetime*,
-#           Diagnostics*Tests, RerankerEndpoints* (all use InProcessBackend.StartAsync)
-$fastFilter = @(
-    'FullyQualifiedName~OnlyRag.Api.Tests.MicrosoftExtensionsAiIntegration',
-    'FullyQualifiedName~OnlyRag.Api.Tests.CloudLlmIntegration',
-    'FullyQualifiedName~OnlyRag.Api.Tests.OcrProvision',
-    'FullyQualifiedName~OnlyRag.Api.Tests.OcrRuntimeEnvironment',
-    'FullyQualifiedName~OnlyRag.Api.Tests.UserFacingErrorText',
-    'FullyQualifiedName~OnlyRag.Api.Tests.AgentCycleGuard',
-    'FullyQualifiedName~OnlyRag.Api.Tests.AgentLoopEngine',
-    'FullyQualifiedName~OnlyRag.Api.Tests.ChatServiceTests',
-    'FullyQualifiedName~OnlyRag.Api.Tests.EndToEndIntegration',
-    'FullyQualifiedName~OnlyRag.Api.Tests.McpSchemaValidator',
-    'FullyQualifiedName~OnlyRag.Api.Tests.McpSseClientService',
-    'FullyQualifiedName~OnlyRag.Api.Tests.DiagnosticsProbeCache',
-    'FullyQualifiedName~OnlyRag.Api.Tests.OllamaClientTests',
-    'FullyQualifiedName~OnlyRag.Api.Tests.SubagentRunner',
-    'FullyQualifiedName~OnlyRag.Api.Tests.TaskAndCommandToolHandler'
-) -join '|'
+# Excluded: PopulatedWorkflow (which starts the Kestrel backend)
+$fastFilter = 'FullyQualifiedName~OnlyRag.Api.Tests.EndToEndIntegration'
 
 if ($Full) {
     Write-Host "(FULL mode — running all Api.Tests)" -ForegroundColor Yellow

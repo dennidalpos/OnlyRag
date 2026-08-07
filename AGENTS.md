@@ -14,6 +14,9 @@
 ## 3. Strict Serial Execution & Testing
 * **Sequential Workflows Only:** Execute ALL tests, builds, linters, and compilations strictly one by one in serial. Parallel/concurrent jobs are explicitly forbidden to prevent test flakiness, race conditions, and context/token waste.
 * **Agent Fast Mode:** Automated tests run by AI must run in fast/summarized mode (concise output: `PASS/FAIL` + minimal stack trace on failure). PowerShell test scripts must support both fast mode (agent default) and full/manual mode (debugging).
+  * Use `.\scripts\test-agent.ps1` to run the agent-optimized fast test suite.
+  * Use `.\scripts\Test-Code.ps1` for local test runs (excludes the slow backend workflow by default).
+  * Use `.\scripts\Invoke-Gate.ps1` to run the full pre-commit pipeline validation.
 * **Honesty:** Update/add tests for code changes. Run sequential checks before reporting completion. Never claim checks or tests were run if they were skipped.
 
 ## 4. Dependencies, Security & Git Safety

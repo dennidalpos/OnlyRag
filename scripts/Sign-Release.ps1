@@ -125,7 +125,8 @@ try {
     if (-not $SkipReleaseVerification) {
         $verificationScript = Join-Path $PSScriptRoot "Test-InstallerRelease.ps1"
         Write-Host "Running signed release verification..." -ForegroundColor Cyan
-        & $verificationScript -InstallerPath $installer.FullName -RequireSigned
+        $global:LASTEXITCODE = 0
+        pwsh -NoProfile -File $verificationScript -InstallerPath $installer.FullName -RequireSigned
         if ($LASTEXITCODE -ne 0) {
             throw "Signed release verification failed with exit code $LASTEXITCODE."
         }

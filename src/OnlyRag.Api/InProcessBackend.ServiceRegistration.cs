@@ -98,7 +98,15 @@ internal static class InProcessBackendServiceRegistration
         services.AddDbContext<OnlyRagDbContext>((sp, opts) =>
         {
             var descriptor = sp.GetRequiredService<InProcessBackendDescriptor>();
-            opts.UseSqlite($"Data Source={descriptor.StoragePaths.DatabasePath}");
+            var keyProvider = sp.GetRequiredService<ISqliteKeyProvider>();
+            string dbKey = keyProvider.GetOrCreateDatabaseKey();
+            var connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            {
+                DataSource = descriptor.StoragePaths.DatabasePath,
+                Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate,
+                Password = dbKey
+            }.ToString();
+            opts.UseSqlite(connectionString);
         });
         services.AddSingleton<LocalSqliteSchemaInitializer>();
         services.AddSingleton<ILocalStorageService, LocalSqliteStorageService>();

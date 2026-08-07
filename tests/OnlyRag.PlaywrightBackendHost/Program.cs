@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
@@ -33,6 +34,9 @@ await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
         SessionToken = sessionToken,
         EnableDevelopmentCorsOrigins = true
     });
+
+var hardwareMonitor = backend.Services.GetRequiredService<IHardwareMonitorService>();
+await hardwareMonitor.SetEnergyProfileAsync(HardwareEnergyProfile.Performance);
 
 Console.WriteLine($"OnlyRag Playwright backend listening on {backend.BaseUri}");
 Console.Out.Flush();

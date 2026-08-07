@@ -1,12 +1,3 @@
 {
-  "todos": [
-    "P1: EF Core DbContext (OnlyRagDbContext) maps only 11 tables but the real schema has 30+ tables - expand DbContext to cover full schema OR use it only for read queries and keep ADO.NET only for write paths already covered",
-    "P1: EnsureEfCoreModelConfiguredAsync in LocalSqliteSchemaInitializer only validates EF model without migrating - wire EF Core EnsureCreatedAsync/MigrateAsync as the primary schema driver for EF-managed tables",
-    "P2: OnnxDirectMlOcrEngine.RecognizeAsync is a stub returning empty text - implement real ONNX inference using ONNX Runtime DirectML with a PaddleOCR-compatible ONNX model (det + rec pipeline)",
-    "P2: OllamaClient.cs custom HTTP client still coexists alongside Microsoft.Extensions.AI IChatClient/IEmbeddingGenerator - migrate all internal callers that use IOllamaClient to use IChatClient/IEmbeddingGenerator and remove OllamaClient.cs when no longer referenced",
-    "P2: openapi-ts.config.ts reads from local file 'openapi.json' - wire OpenAPI export as a build step (generate openapi.json from running backend) and run openapi:generate script; replace hand-crafted apiClient.ts and apiTypes/ with generated types",
-    "P3: Scaffold EF Core Migrations folder and initial migration for all tables managed by DbContext using dotnet ef migrations add InitialCreate",
-    "P3: Remove SqliteCommandExtensions.cs legacy helper - replace remaining callers with direct DbContext queries",
-    "P3: Run dotnet test for OnlyRag.Infrastructure.Tests and OnlyRag.Api.Tests and fix any failures"
-  ]
+  "todos": []
 }

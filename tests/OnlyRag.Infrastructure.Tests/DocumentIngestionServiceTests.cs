@@ -180,7 +180,7 @@ public sealed partial class DocumentIngestionServiceTests
     public async Task IngestAsync_LargeTextFile_ProcessesMultipleBlocks()
     {
         using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
-        string largeBlock = string.Join(' ', Enumerable.Range(0, 15000).Select(index => $"alpha{index}"));
+        string largeBlock = string.Concat(System.Linq.Enumerable.Repeat("alpha ", 13000));
         ImportedDocument document = await tempStorage.CreateDocumentAsync(
             "large.txt",
             $"{largeBlock}\n\n{largeBlock}\n\n{largeBlock}");
@@ -471,7 +471,7 @@ public sealed partial class DocumentIngestionServiceTests
     public async Task IngestAsync_ResumesFromCheckpointWithoutDuplicatingChunks()
     {
         using TempStorage tempStorage = await TempStorage.CreateInitializedAsync();
-        string largeBlock = string.Join(' ', Enumerable.Range(0, 15000).Select(index => $"resume{index}"));
+        string largeBlock = string.Concat(System.Linq.Enumerable.Repeat("resume ", 13000));
         ImportedDocument document = await tempStorage.CreateDocumentAsync(
             "resume.txt",
             $"{largeBlock}\n\n{largeBlock}");

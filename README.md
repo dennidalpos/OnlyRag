@@ -121,10 +121,17 @@ npm run format:check
 npm run test
 ```
 
-Direct .NET tests:
+Direct .NET tests (fast/AI-friendly mode by default; excludes the slow PopulatedWorkflow test):
 
 ```powershell
-dotnet test .\OnlyRag.sln --configuration Release
+# Runs all tests in the solution except the slow Kestrel integration test (~2.5 minutes)
+pwsh .\scripts\Test-Code.ps1
+
+# Run the complete test suite including PopulatedWorkflow integration (~5.5 minutes)
+pwsh .\scripts\Test-Code.ps1 -IncludeIntegration
+
+# Standard agent automated fast test runner (AGENTS.md compliant)
+pwsh .\scripts\test-agent.ps1
 ```
 
 ## Readiness Gates

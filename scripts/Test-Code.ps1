@@ -18,6 +18,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$env:ONLYRAG_TEST_ENVIRONMENT = "true"
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "OnlyRag.sln"
 $coreTestsProject = Join-Path $repoRoot "tests\OnlyRag.Core.Tests\OnlyRag.Core.Tests.csproj"
@@ -36,6 +38,9 @@ Invoke-CompactTestCommand -TestType "Web Frontend (Vitest)" -VerboseOutput:$Verb
         $global:LASTEXITCODE = 0
         if ($IncludeE2e) {
             npx vitest run --reporter=dot
+            if ($LASTEXITCODE -ne 0) {
+                throw "Vitest unit tests failed with exit code $LASTEXITCODE."
+            }
             npx playwright test --reporter=dot
         }
         else {
@@ -57,15 +62,18 @@ Invoke-CompactTestCommand -TestType ".NET Solution (xUnit)" -VerboseOutput:$Verb
     $global:LASTEXITCODE = 0
 
     $dotnetTestArgs = @(
-        "test"
+        "test",
+        $solution,
+        "-m:1"
     )
 
     if ($Fast -or (-not $IncludeIntegration)) {
-        # Lightweight fast mode: run unit test project
-        $dotnetTestArgs += $coreTestsProject
-    } else {
-        # Full solution integration test mode
-        $dotnetTestArgs += $solution
+        # By default (or in fast mode), run all tests except the slow PopulatedWorkflow integration test
+        if ([string]::IsNullOrWhiteSpace($Filter)) {
+            $Filter = "FullyQualifiedName!~PopulatedWorkflow"
+        } else {
+            $Filter = "($Filter)&(FullyQualifiedName!~PopulatedWorkflow)"
+        }
     }
 
     $dotnetTestArgs += @(
@@ -77,6 +85,8 @@ Invoke-CompactTestCommand -TestType ".NET Solution (xUnit)" -VerboseOutput:$Verb
     if (-not [string]::IsNullOrWhiteSpace($Filter)) {
         $dotnetTestArgs += "--filter", $Filter
     }
+
+    $dotnetTestArgs += @("--", "xUnit.ParallelizeTestCollections=false")
 
     dotnet @dotnetTestArgs
     if ($LASTEXITCODE -ne 0) {

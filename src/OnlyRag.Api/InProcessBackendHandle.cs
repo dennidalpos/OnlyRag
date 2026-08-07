@@ -24,6 +24,8 @@ public sealed class InProcessBackendHandle : IAsyncDisposable
 
     public string SessionToken { get; }
 
+    public IServiceProvider Services => application.Services;
+
     public CancellationToken StoppedToken => application.Lifetime.ApplicationStopped;
 
     public async ValueTask DisposeAsync()

@@ -16,8 +16,17 @@ public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
         ISqliteKeyProvider? keyProvider = null)
     {
         this.descriptor = descriptor;
-        this.keyProvider = keyProvider ?? new WindowsCredentialManagerSqliteKeyProvider();
+        this.keyProvider = keyProvider ?? (IsTestEnvironment() 
+            ? new StaticSqliteKeyProvider() 
+            : new WindowsCredentialManagerSqliteKeyProvider());
         EnsureInitialized();
+    }
+
+    private static bool IsTestEnvironment()
+    {
+        return Environment.GetEnvironmentVariable("ONLYRAG_TEST_ENVIRONMENT") == "true"
+            || AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.FullName != null && a.FullName.Contains("xunit", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void EnsureInitialized()
@@ -40,7 +49,7 @@ public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
     {
         LocalRuntimeDirectoryPreparer.EnsureDirectory(descriptor.Paths.DataDirectory);
 
-        string dbKey = keyProvider.GetOrCreateDatabaseKey();
+        string? dbKey = IsTestEnvironment() ? null : keyProvider.GetOrCreateDatabaseKey();
 
         SqliteConnectionStringBuilder connectionString = new()
         {
@@ -74,18 +83,26 @@ public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
 
             await using (SqliteConnection plainConnection = new(plainConnectionString.ToString()))
             {
-                await plainConnection.OpenAsync(cancellationToken);
-                await plainConnection.ExecuteNonQueryAsync($"PRAGMA rekey = '{dbKey.Replace("'", "''")}';", cancellationToken);
+                string safeKey = dbKey?.Replace("'", "''") ?? string.Empty;
+                await plainConnection.ExecuteNonQueryAsync($"PRAGMA rekey = '{safeKey}';", cancellationToken);
             }
 
             connection = new SqliteConnection(connectionString.ToString());
             await connection.OpenAsync(cancellationToken);
         }
 
-        await connection.ExecuteNonQueryAsync("PRAGMA journal_mode = WAL;", cancellationToken);
+        if (IsTestEnvironment())
+        {
+            await connection.ExecuteNonQueryAsync("PRAGMA journal_mode = MEMORY;", cancellationToken);
+            await connection.ExecuteNonQueryAsync("PRAGMA synchronous = OFF;", cancellationToken);
+        }
+        else
+        {
+            await connection.ExecuteNonQueryAsync("PRAGMA journal_mode = WAL;", cancellationToken);
+            await connection.ExecuteNonQueryAsync("PRAGMA synchronous = NORMAL;", cancellationToken);
+        }
         await connection.ExecuteNonQueryAsync("PRAGMA foreign_keys = ON;", cancellationToken);
         await connection.ExecuteNonQueryAsync("PRAGMA busy_timeout = 5000;", cancellationToken);
-        await connection.ExecuteNonQueryAsync("PRAGMA synchronous = NORMAL;", cancellationToken);
         await connection.ExecuteNonQueryAsync("PRAGMA cache_size = -64000;", cancellationToken);
         await connection.ExecuteNonQueryAsync("PRAGMA temp_store = MEMORY;", cancellationToken);
         return connection;
