@@ -992,6 +992,8 @@ textarea:hover:not(:disabled) {
   top: calc(100% + 8px);
   right: 0;
   width: 340px;
+  max-height: calc(85vh - 60px);
+  overflow-y: auto;
   background: var(--bg-card-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);

@@ -69,9 +69,10 @@ describe("App initial setup", () => {
       expect(status).toHaveTextContent("Ollama");
       expect(status).toHaveTextContent("Qdrant");
       expect(status).toHaveTextContent("Offline");
-      expect(status).toHaveTextContent("OCR");
+      expect(status).toHaveTextContent("OCR (Testo)");
       expect(status).toHaveTextContent("Disponibile");
-      expect(status).not.toHaveTextContent("OCR GPU");
+      expect(status).toHaveTextContent("OCR GPU");
+      expect(status).toHaveTextContent("CPU Fallback");
       expect(status).toHaveTextContent("Operazioni");
       expect(status).toHaveTextContent("Nessuna");
     });

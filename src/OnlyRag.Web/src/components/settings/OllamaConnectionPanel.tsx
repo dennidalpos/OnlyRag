@@ -13,12 +13,15 @@ export function OllamaConnectionPanel() {
     testConnection,
     ollamaInstallStatus,
     installOllama,
-    loadError
+    loadError,
+    infoMessage,
+    errorMessage
   } = useSettingsSectionContext();
   const endpointTooltip = usesNonLocalOllamaEndpoint
     ? "Endpoint non locale: chat, embedding e traduzione inviano testo a questo servizio. Abilita la fiducia solo su reti attendibili."
     : "Indirizzo dell'API Ollama locale o remota da usare per chat, embedding e traduzione.";
-  const connectionMessage = status?.suggestion ?? loadError ?? null;
+  const connectionMessage = infoMessage ?? errorMessage ?? status?.message ?? status?.suggestion ?? loadError ?? null;
+  const isError = Boolean(errorMessage || (status && !status.isReachable) || loadError);
 
   return (
         <div className="settings-card settings-card--wide">
@@ -79,7 +82,7 @@ export function OllamaConnectionPanel() {
             </div>
             {hasDirtyOllamaSettings && <span className="dirty-hint">Modifiche non salvate</span>}
             {connectionMessage && (
-              <div className="panel-note">
+              <div className={`panel-note ${isError ? "panel-note--warning" : ""}`}>
                 <p>{connectionMessage}</p>
               </div>
             )}

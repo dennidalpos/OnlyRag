@@ -248,6 +248,16 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
       modelState: "Verified",
       fallbackReason: null
     },
+    reranker: {
+      isDownloaded: true,
+      isDownloading: false,
+      statusText: "ONNX Cross-Encoder"
+    },
+    cloudLlm: {
+      provider: "OpenAI",
+      hasApiKey: false,
+      statusText: "Non configurato"
+    },
     ...overrides
   };
 }

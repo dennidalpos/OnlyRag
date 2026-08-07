@@ -121,7 +121,7 @@ describe("SettingsSection OCR provisioning", () => {
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "Installa OCR CPU" }));
-    expect(await screen.findByText("Configurazione OCR avviata.")).toBeInTheDocument();
+    expect(await screen.findByText("Configurazione OCR avviata.", { selector: ".feedback-banner" })).toBeInTheDocument();
     expect(api.calls.some((call) => call.path === "/api/settings/ocr/auto-enable-gpu")).toBe(true);
     expect(api.calls.filter((call) => call.path === "/api/settings/ocr")).toHaveLength(2);
   });

@@ -156,9 +156,9 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
 
             long[] filteredDocumentIds = documentIds.Where(id => id > 0).Distinct().ToArray();
             Filter filter = new() { Must = { Match("document_id", filteredDocumentIds) } };
-            IReadOnlyList<ScoredPoint> points = await client.SearchAsync(
+            IReadOnlyList<ScoredPoint> points = await client.QueryAsync(
                 collection,
-                queryVector.ToArray(),
+                query: queryVector.ToArray(),
                 filter: filter,
                 limit: (ulong)Math.Max(1, limit),
                 payloadSelector: new WithPayloadSelector { Enable = true },
@@ -364,16 +364,14 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             {
                 Scalar = new ScalarQuantization
                 {
-                    Type = QuantizationType.Int8,
-                    AlwaysRam = true
+                    Type = QuantizationType.Int8
                 }
             },
             QdrantQuantizationMode.ProductPQ => new QuantizationConfig
             {
                 Product = new ProductQuantization
                 {
-                    Compression = CompressionRatio.X8,
-                    AlwaysRam = true
+                    Compression = CompressionRatio.X8
                 }
             },
             _ => null

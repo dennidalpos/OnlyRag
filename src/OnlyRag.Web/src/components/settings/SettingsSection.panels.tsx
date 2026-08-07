@@ -12,7 +12,6 @@ import { PerformanceSettingsPanel } from "./PerformanceSettingsPanel";
 import { RerankerModelPanel } from "./RerankerModelPanel";
 import { ThemeSelectorPanel } from "./SettingsSection.fields";
 import { HardwareMonitorPanel } from "./HardwareMonitorPanel";
-import { RagBenchmarkPanel } from "./RagBenchmarkPanel";
 import { AlertCard, AlertCardVariant } from "../common/AlertCard";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 
@@ -108,8 +107,8 @@ export function SettingsConfigurationAlerts() {
     alerts.push({
       id: "libreoffice-missing",
       variant: "warning",
-      title: "LibreOffice non configurato.",
-      detail: "LibreOffice è necessario per esportare documenti e traduzioni in PDF.",
+      title: "Export PDF non disponibile.",
+      detail: pdfExportStatus.message ?? "LibreOffice è necessario per esportare documenti e traduzioni in PDF.",
       actionLabel: "Scarica LibreOffice",
       onAction: () => void openLibreOfficeDownload()
     });
@@ -256,9 +255,6 @@ export function SettingsSectionPanels() {
               <HardwareMonitorPanel />
               <IngestionSettingsPanel />
               <RerankerModelPanel />
-            </div>
-            <div className="mt-6">
-              <RagBenchmarkPanel />
             </div>
           </section>
         )}

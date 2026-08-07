@@ -81,17 +81,19 @@ public static partial class InProcessBackend
 
         app.MapGet("/api/dependencies/ocr", async (
             DependencyProvisioningService dependencies,
+            DiagnosticsProbeCacheService diagnosticsProbeCache,
             IOcrEngine ocrEngine,
             OcrGpuCapabilityService gpuCapability,
             CancellationToken cancellationToken) =>
-            Results.Ok(await dependencies.GetOcrStatusAsync(ocrEngine, gpuCapability, cancellationToken)));
+            Results.Ok(await dependencies.GetOcrStatusAsync(diagnosticsProbeCache, ocrEngine, gpuCapability, cancellationToken)));
 
         app.MapGet("/api/dependencies/ocr/startup-analysis", async (
             OcrStartupAnalysisService startupAnalysis,
+            DiagnosticsProbeCacheService diagnosticsProbeCache,
             IOcrEngine ocrEngine,
             OcrGpuCapabilityService gpuCapability,
             CancellationToken cancellationToken) =>
-            Results.Ok(await startupAnalysis.AnalyzeAsync(ocrEngine, gpuCapability, cancellationToken)));
+            Results.Ok(await startupAnalysis.AnalyzeAsync(diagnosticsProbeCache, ocrEngine, gpuCapability, cancellationToken)));
 
         app.MapPost("/api/dependencies/ocr/provision", (
             HttpContext httpContext,

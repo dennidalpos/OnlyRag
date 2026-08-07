@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using OnlyRag.Core;
+using OnlyRag.Infrastructure.Logging;
 
 namespace OnlyRag.Api;
 
@@ -9,12 +10,18 @@ internal static class BackendLog
     private const int MaxLogFiles = 3;
     private const string LogFileName = "backend.log";
     private static readonly object FileLock = new();
+    private static ILoggingService? _loggingService;
+
+    public static void SetLoggingService(ILoggingService? loggingService)
+    {
+        _loggingService = loggingService;
+    }
 
     public static void Write(AppStoragePaths paths, string message) =>
-        WriteCore(paths, correlationId: null, message);
+        WriteCore(paths, correlationId: null, message, AppLogLevel.Information);
 
     public static void Write(AppStoragePaths paths, string? correlationId, string message) =>
-        WriteCore(paths, correlationId, message);
+        WriteCore(paths, correlationId, message, AppLogLevel.Information);
 
     public static void WriteException(AppStoragePaths paths, string? correlationId, string context, Exception exception)
     {
@@ -29,7 +36,7 @@ internal static class BackendLog
             exInfo += $" Stack: {SanitizeLogMessage(exception.StackTrace)}";
         }
 
-        WriteCore(paths, correlationId, $"{SanitizeLogMessage(context)} {exInfo}");
+        WriteCore(paths, correlationId, $"{SanitizeLogMessage(context)} {exInfo}", AppLogLevel.Error, exception);
     }
 
     public static string ResolveAppVersion()
@@ -40,11 +47,21 @@ internal static class BackendLog
             : "1.0.0";
     }
 
-    private static void WriteCore(AppStoragePaths paths, string? correlationId, string message)
+    private static void WriteCore(AppStoragePaths paths, string? correlationId, string message, AppLogLevel level = AppLogLevel.Information, Exception? exception = null)
     {
         string prefix = correlationId is not null ? $"[{correlationId}] " : string.Empty;
-        string line = $"{DateTimeOffset.Now:O} {prefix}{SanitizeLogMessage(message)}{Environment.NewLine}";
+        string sanitizedMessage = SanitizeLogMessage(message);
+        string line = $"{DateTimeOffset.Now:O} {prefix}{sanitizedMessage}{Environment.NewLine}";
         Debug.Write(line);
+
+        try
+        {
+            _loggingService?.Log(level, "Backend", prefix + sanitizedMessage, exception);
+        }
+        catch
+        {
+            // Ignora fallimenti verso ILoggingService
+        }
 
         try
         {

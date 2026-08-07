@@ -20,7 +20,7 @@ export function DiagnosticsPanel() {
   } = useSettingsSectionContext();
   const canRepairOcrRuntime =
     diagnostics?.ocrGpuCapability.status === "Runtime OCR da riparare" ||
-    ocrProvisionStatus?.message.startsWith("Runtime OCR locale incompleto o danneggiato.") === true;
+    ocrProvisionStatus?.message?.startsWith("Runtime OCR locale incompleto o danneggiato.") === true;
   const ocrConfigureButtonLabel = ocrProvisionStatus?.isRunning
     ? "Configurazione OCR..."
     : canRepairOcrRuntime

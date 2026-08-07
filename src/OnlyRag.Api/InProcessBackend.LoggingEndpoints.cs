@@ -45,17 +45,45 @@ public static partial class InProcessBackend
 
         app.MapGet("/api/logs/stream", async (
             HttpContext httpContext,
-            ILoggingService loggingService) =>
+            ILoggingService loggingService,
+            string? minLevel,
+            string? search) =>
         {
             httpContext.Response.ContentType = "text/event-stream";
             httpContext.Response.Headers.CacheControl = "no-cache";
             httpContext.Response.Headers.Connection = "keep-alive";
 
+            AppLogLevel? filterLevel = null;
+            if (!string.IsNullOrWhiteSpace(minLevel) &&
+                Enum.TryParse<AppLogLevel>(minLevel, ignoreCase: true, out var parsedLevel))
+            {
+                filterLevel = parsedLevel;
+            }
+
             var channel = System.Threading.Channels.Channel.CreateUnbounded<LogEntry>();
+
+            bool MatchesFilter(LogEntry entry)
+            {
+                if (filterLevel.HasValue && entry.Level < filterLevel.Value)
+                {
+                    return false;
+                }
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    string s = search.Trim();
+                    return entry.Message.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                           entry.Category.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                           (entry.ExceptionDetails != null && entry.ExceptionDetails.Contains(s, StringComparison.OrdinalIgnoreCase));
+                }
+                return true;
+            }
 
             void OnLog(LogEntry entry)
             {
-                channel.Writer.TryWrite(entry);
+                if (MatchesFilter(entry))
+                {
+                    channel.Writer.TryWrite(entry);
+                }
             }
 
             LoggingService? concreteLogging = loggingService as LoggingService;
@@ -66,7 +94,7 @@ public static partial class InProcessBackend
 
             try
             {
-                var initialLogs = loggingService.GetRecentLogs(limit: 50);
+                var initialLogs = loggingService.GetRecentLogs(filterLevel, search, limit: 50);
                 var reversed = initialLogs.Reverse().ToList();
                 foreach (var log in reversed)
                 {

@@ -16,8 +16,8 @@ public sealed class LocalSqliteConnectionFactory : ISqliteConnectionFactory
         ISqliteKeyProvider? keyProvider = null)
     {
         this.descriptor = descriptor;
-        this.keyProvider = keyProvider ?? (IsTestEnvironment() 
-            ? new StaticSqliteKeyProvider() 
+        this.keyProvider = keyProvider ?? (IsTestEnvironment()
+            ? new StaticSqliteKeyProvider()
             : new WindowsCredentialManagerSqliteKeyProvider());
         EnsureInitialized();
     }

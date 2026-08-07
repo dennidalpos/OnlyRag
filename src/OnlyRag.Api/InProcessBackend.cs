@@ -31,6 +31,12 @@ public static partial class InProcessBackend
         var runtimeState = new BackendRuntimeState(DateTimeOffset.UtcNow);
         WebApplication app = BuildApplication(descriptor, options, runtimeState, sessionToken);
 
+        var loggingService = app.Services.GetService<OnlyRag.Infrastructure.Logging.ILoggingService>();
+        if (loggingService is not null)
+        {
+            BackendLog.SetLoggingService(loggingService);
+        }
+
         try
         {
             StorageStatusResponse storageStatus = await app.Services

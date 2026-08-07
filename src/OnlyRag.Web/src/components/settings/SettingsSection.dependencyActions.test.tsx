@@ -102,7 +102,7 @@ describe("SettingsSection dependency actions", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Annulla OCR" }));
 
-    expect(await screen.findByText("Annullamento configurazione OCR richiesto.")).toBeInTheDocument();
+    expect(await screen.findByText("Annullamento configurazione OCR richiesto.", { selector: ".feedback-banner" })).toBeInTheDocument();
     const cancelCall = api.calls.find((call) => call.path === "/api/dependencies/ocr/cancel");
     expect(cancelCall?.method).toBe("POST");
     expect(JSON.parse(String(cancelCall?.body))).toEqual({ confirmed: true });
@@ -213,7 +213,7 @@ describe("SettingsSection dependency actions", () => {
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "Installa OCR GPU" }));
-    expect(await screen.findByText("Configurazione OCR avviata.")).toBeInTheDocument();
+    expect(await screen.findByText("Configurazione OCR avviata.", { selector: ".feedback-banner" })).toBeInTheDocument();
 
     const provisionCalls = api.calls.filter((call) => call.path === "/api/dependencies/ocr/provision");
     expect(provisionCalls).toHaveLength(1);
@@ -369,7 +369,7 @@ describe("SettingsSection dependency actions", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Reset dati al riavvio" }));
 
-    expect(await screen.findByText("Reset dati pianificato.")).toBeInTheDocument();
+    expect(await screen.findByText("Reset dati pianificato.", { selector: ".feedback-banner" })).toBeInTheDocument();
     const resetCall = api.calls.find((call) => call.path === "/api/app/reset-on-next-startup");
     expect(JSON.parse(String(resetCall?.body))).toEqual({ confirmed: true });
   });

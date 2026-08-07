@@ -1,6 +1,18 @@
 import type { OllamaRunningModel } from "./settings";
 import type { ImageGenerationRuntimeStatus } from "./images";
 
+export type RerankerDiagnosticsStatus = {
+  isDownloaded: boolean;
+  isDownloading: boolean;
+  statusText: string;
+};
+
+export type CloudLlmDiagnosticsStatus = {
+  provider: string;
+  hasApiKey: boolean;
+  statusText: string;
+};
+
 export type DiagnosticsResponse = {
   appVersion: string;
   databasePath: string;
@@ -16,6 +28,8 @@ export type DiagnosticsResponse = {
   ocrGpuCapability: OcrGpuCapability;
   systemTelemetry: SystemTelemetry;
   imageGeneration: ImageGenerationRuntimeStatus | null;
+  reranker?: RerankerDiagnosticsStatus | null;
+  cloudLlm?: CloudLlmDiagnosticsStatus | null;
 };
 
 export type QdrantStatusResponse = {

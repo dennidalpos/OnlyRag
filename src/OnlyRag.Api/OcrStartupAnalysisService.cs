@@ -16,7 +16,16 @@ public sealed class OcrStartupAnalysisService
         ocrRuntimeResolver = new OcrProvisionRuntimeResolver(processLauncher);
     }
 
-    public async Task<OcrStartupAnalysisResponse> AnalyzeAsync(
+    public Task<OcrStartupAnalysisResponse> AnalyzeAsync(
+        IOcrEngine ocrEngine,
+        OcrGpuCapabilityService gpuCapability,
+        CancellationToken cancellationToken)
+    {
+        return AnalyzeAsync(null, ocrEngine, gpuCapability, cancellationToken);
+    }
+
+    internal async Task<OcrStartupAnalysisResponse> AnalyzeAsync(
+        DiagnosticsProbeCacheService? probeCache,
         IOcrEngine ocrEngine,
         OcrGpuCapabilityService gpuCapability,
         CancellationToken cancellationToken)
@@ -39,7 +48,9 @@ public sealed class OcrStartupAnalysisService
             ? "Compatible Python 3.10-3.13 detected."
             : "Python 3.10-3.13 not detected.");
 
-        OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+        OcrEngineAvailability availability = probeCache is not null
+            ? await probeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken)
+            : await ocrEngine.CheckAvailabilityAsync(cancellationToken);
         findings.Add(availability.IsConfigured
             ? $"OCR runtime configured: {availability.EngineName} {availability.EngineVersion}."
             : "Paddle OCR runtime not yet configured.");
@@ -48,7 +59,9 @@ public sealed class OcrStartupAnalysisService
         bool isNvidiaRuntimeAvailable = runtime.IsNvidia;
         findings.Add(runtime.Detail);
 
-        OcrGpuCapabilityResponse gpu = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+        OcrGpuCapabilityResponse gpu = probeCache is not null
+            ? await probeCache.CheckOcrGpuCapabilityAsync(gpuCapability, ocrEngine, cancellationToken)
+            : await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
         findings.Add(gpu.IsUsable
             ? "GPU PaddleOCR usable."
             : gpu.BlockReason ?? "GPU PaddleOCR unusable.");

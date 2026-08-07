@@ -17,7 +17,7 @@ type PrerequisitesModalProps = {
 export const PrerequisitesModal: React.FC<PrerequisitesModalProps> = ({
   isOpen,
   onClose,
-  ocrAnalysis,
+  ocrAnalysis: _ocrAnalysis,
   ocrProvisionStatus,
   isConfiguring,
   onConfigureOcr,

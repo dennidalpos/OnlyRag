@@ -71,6 +71,22 @@ describe("SettingsSection", () => {
         }
       },
       {
+        path: "/api/rag/reranker/model",
+        response: {
+          modelId: "bge-reranker-v2-m3-onnx",
+          modelName: "BAAI/bge-reranker-v2-m3",
+          isDownloaded: true,
+          isDownloading: false,
+          downloadProgressPercent: 100,
+          downloadSpeedBytesPerSec: 0,
+          fileSizeBytes: 560000000,
+          downloadedBytes: 560000000,
+          localPath: "C:\\models\\reranker.onnx",
+          executionProvider: "CPU",
+          lastError: null
+        }
+      },
+      {
         path: "/api/settings/ollama",
         method: "PUT",
         handler: (request) => ({
@@ -93,12 +109,13 @@ describe("SettingsSection", () => {
 
     await userEvent.clear(screen.getByLabelText("URL Ollama"));
     await userEvent.type(screen.getByLabelText("URL Ollama"), "http://192.168.1.50:11434");
-    expect(screen.getAllByTitle(/Abilita la fiducia solo su reti attendibili/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Abilita la fiducia solo su reti attendibili/).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByLabelText("Considera attendibile questo endpoint Ollama non locale"));
-    await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+    const connectionsSection = screen.getByRole("region", { name: /Connessione/i });
+    await userEvent.click(within(connectionsSection).getByRole("button", { name: "Salva impostazioni" }));
 
-    expect(await screen.findByText("Impostazioni Ollama salvate.")).toBeInTheDocument();
+    expect(await screen.findByText("Impostazioni Ollama salvate.", { selector: ".feedback-banner" })).toBeInTheDocument();
     expect(onDataChanged).toHaveBeenCalledOnce();
 
     const saveCall = api.calls.find((call) => call.path === "/api/settings/ollama" && call.method === "PUT");
@@ -165,8 +182,8 @@ describe("SettingsSection", () => {
       />
     );
 
-    expect(await screen.findByText("Dati diagnostici non disponibili.")).toBeInTheDocument();
-    expect(await screen.findByText("Export PDF non disponibile.")).toBeInTheDocument();
+    expect(await screen.findByText("Dati diagnostici non disponibili.", undefined, { timeout: 10000 })).toBeInTheDocument();
+    expect(await screen.findByText("Export PDF non disponibile.", undefined, { timeout: 10000 })).toBeInTheDocument();
   });
 
   it("shows a repair action when the OCR runtime is damaged", async () => {

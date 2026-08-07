@@ -12,6 +12,8 @@ public static class InProcessBackendCloudLlmEndpoints
 {
     private static CloudLlmConfiguration _currentConfig = new();
 
+    public static CloudLlmConfiguration GetCurrentConfig() => _currentConfig;
+
     public static IEndpointRouteBuilder MapCloudLlmEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/settings/cloud-llm").WithTags("CloudLLM");

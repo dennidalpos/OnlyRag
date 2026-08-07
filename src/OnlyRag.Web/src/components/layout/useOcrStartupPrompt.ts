@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   apiRequest,
   type DependencyActionResponse,
@@ -13,6 +13,7 @@ export function useOcrStartupPrompt() {
   const [provisionStatus, setProvisionStatus] = useState<OcrProvisionStatus | null>(null);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const gpuAutoEnableAttemptedRef = useRef(false);
 
   async function refresh() {
     const [analysisResult, statusResult] = await Promise.all([
@@ -23,7 +24,10 @@ export function useOcrStartupPrompt() {
     setProvisionStatus(statusResult);
     setLastCheckedAt(new Date());
 
-    await autoEnableGpuAfterProvisioning(statusResult);
+    if (statusResult?.isConfigured && !statusResult.isRunning && !gpuAutoEnableAttemptedRef.current) {
+      gpuAutoEnableAttemptedRef.current = true;
+      await autoEnableGpuAfterProvisioning(statusResult);
+    }
   }
 
   async function configure(runtimeTarget: "auto" | "cpu" | "nvidia" = "auto") {

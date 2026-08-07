@@ -23,6 +23,20 @@ public sealed class LoggingService : ILoggingService
 
         Directory.CreateDirectory(storagePaths.LogsDirectory);
 
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+            {
+                LogError("UnhandledException", "Unhandled AppDomain exception occurred.", ex);
+            }
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogError("TaskScheduler", "Unobserved task exception occurred.", args.Exception);
+            args.SetObserved();
+        };
+
         // Caricamento iniziale asincrono in background per non bloccare l'inizializzazione
         Task.Run(async () =>
         {

@@ -39,6 +39,47 @@ export function mockApi(routes: MockApiRoute[]) {
 
     const defaultRoutes: MockApiRoute[] = [
       {
+        path: "/api/settings/cloud-llm",
+        method: "GET",
+        response: {
+          provider: 0,
+          endpoint: "",
+          chatModel: "",
+          embeddingModel: "",
+          deploymentName: "",
+          apiVersion: "2024-02-15-preview",
+          hasApiKey: false
+        }
+      },
+      {
+        path: "/api/settings/logging",
+        method: "GET",
+        response: {
+          minLogLevel: "Information",
+          enableFileLogging: true,
+          enableConsoleLogging: true,
+          maxLogFileSizeBytes: 10485760,
+          retainedLogFileCount: 7
+        }
+      },
+      {
+        path: "/api/rag/reranker/model",
+        method: "GET",
+        response: {
+          modelId: "bge-reranker-v2-m3-onnx",
+          modelName: "BAAI/bge-reranker-v2-m3",
+          isDownloaded: true,
+          isDownloading: false,
+          downloadProgressPercent: 100,
+          downloadSpeedBytesPerSec: 0,
+          fileSizeBytes: 560000000,
+          downloadedBytes: 560000000,
+          localPath: "C:\\models\\reranker.onnx",
+          executionProvider: "CPU",
+          lastError: null
+        }
+      },
+      {
         path: /\/hubs\/.*\/negotiate.*/,
         method: "POST",
         response: {

@@ -225,7 +225,7 @@ public sealed class OcrGpuCapabilityService
             ? $" (installed: {installedPackage})"
             : string.Empty;
         return $"GPU OCR runtime ({resolvedRuntime}) is not usable{packageClause}. {rawBridgeMessage}"
-            .TrimEnd('.')  + '.';
+            .TrimEnd('.') + '.';
     }
 
     private async Task<NvidiaHardwareProbe> DetectNvidiaHardwareAsync(CancellationToken cancellationToken)

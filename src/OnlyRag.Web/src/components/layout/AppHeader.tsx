@@ -37,10 +37,15 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
   const statusBadges: StatusBadge[] = [
     { label: "Backend", value: backendStatus.backendValue, tone: backendStatus.backendTone },
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
+    buildCloudLlmBadge(diagnostics, backendStatus.backendTone),
     buildQdrantBadge(diagnostics, backendStatus.backendTone),
+    buildSqliteBadge(backendStatus.backendTone),
+    buildRerankerBadge(diagnostics, backendStatus.backendTone),
     buildOcrBadge(diagnostics, backendStatus.backendTone),
     buildOcrGpuBadge(diagnostics, backendStatus.backendTone),
-    buildImageBadge(diagnostics, backendStatus.backendTone)
+    buildImageBadge(diagnostics, backendStatus.backendTone),
+    buildAgentEngineBadge(backendStatus.backendTone),
+    buildKnowledgeGraphBadge(backendStatus.backendTone)
   ].filter((badge): badge is StatusBadge => badge !== null);
 
   const isOverallHealthy = backendStatus.backendTone === "online" && backendStatus.ollamaTone === "online";
@@ -176,22 +181,78 @@ export function AppHeader({ currentSection, backendStatus, diagnostics, onOpenJo
 
 
 
-function buildQdrantBadge(
+function buildCloudLlmBadge(
   diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
 ): StatusBadge {
-  if (!diagnostics) {
+  if (!diagnostics?.cloudLlm) {
     return {
-      label: "Qdrant",
+      label: "LLM Cloud",
       value: backendTone === "offline" ? "Offline" : "In lettura",
       tone: backendTone === "offline" ? "offline" : "neutral"
     };
   }
 
   return {
-    label: "Qdrant",
+    label: "LLM Cloud",
+    value: diagnostics.cloudLlm.hasApiKey ? diagnostics.cloudLlm.provider : "Non configurato",
+    tone: diagnostics.cloudLlm.hasApiKey ? "online" : "neutral"
+  };
+}
+
+function buildQdrantBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics) {
+    return {
+      label: "Vettori (Qdrant)",
+      value: backendTone === "offline" ? "Offline" : "In lettura",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  return {
+    label: "Vettori (Qdrant)",
     value: diagnostics.qdrant.status,
     tone: diagnostics.qdrant.isReachable ? "online" : "offline"
+  };
+}
+
+function buildSqliteBadge(
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  return {
+    label: "Database & FTS5",
+    value: backendTone === "offline" ? "Offline" : "Attivo",
+    tone: backendTone === "offline" ? "offline" : "online"
+  };
+}
+
+function buildRerankerBadge(
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (!diagnostics?.reranker) {
+    return {
+      label: "Re-ranker AI",
+      value: backendTone === "offline" ? "Offline" : "Euristico (CPU)",
+      tone: backendTone === "offline" ? "offline" : "neutral"
+    };
+  }
+
+  if (diagnostics.reranker.isDownloading) {
+    return {
+      label: "Re-ranker AI",
+      value: "Download...",
+      tone: "warning"
+    };
+  }
+
+  return {
+    label: "Re-ranker AI",
+    value: diagnostics.reranker.isDownloaded ? "ONNX Cross-Encoder" : "Euristico (CPU)",
+    tone: diagnostics.reranker.isDownloaded ? "online" : "neutral"
   };
 }
 
@@ -201,14 +262,14 @@ function buildOcrBadge(
 ): StatusBadge {
   if (!diagnostics) {
     return {
-      label: "OCR",
+      label: "OCR (Testo)",
       value: backendTone === "offline" ? "Offline" : "In lettura",
       tone: backendTone === "offline" ? "offline" : "neutral"
     };
   }
 
   return {
-    label: "OCR",
+    label: "OCR (Testo)",
     value: diagnostics.ocrStatus,
     tone: diagnostics.ocrIsConfigured ? "online" : "offline"
   };
@@ -217,7 +278,7 @@ function buildOcrBadge(
 function buildOcrGpuBadge(
   diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
-): StatusBadge | null {
+): StatusBadge {
   if (!diagnostics) {
     return {
       label: "OCR GPU",
@@ -227,12 +288,16 @@ function buildOcrGpuBadge(
   }
 
   if (diagnostics.ocrGpuCapability.capabilityStatus === "no_nvidia_gpu") {
-    return null;
+    return {
+      label: "OCR GPU",
+      value: "CPU Fallback",
+      tone: "neutral"
+    };
   }
 
   return {
     label: "OCR GPU",
-    value: diagnostics.ocrGpuCapability.isUsable ? "Disponibile" : "Non disponibile",
+    value: diagnostics.ocrGpuCapability.isUsable ? "Disponibile (CUDA)" : "Non disponibile",
     tone: diagnostics.ocrGpuCapability.isUsable ? "online" : "neutral"
   };
 }
@@ -243,7 +308,7 @@ function buildImageBadge(
 ): StatusBadge {
   if (!diagnostics?.imageGeneration) {
     return {
-      label: "Immagini",
+      label: "Immagini (ONNX)",
       value: backendTone === "offline" ? "Offline" : "In lettura",
       tone: backendTone === "offline" ? "offline" : "neutral"
     };
@@ -252,7 +317,7 @@ function buildImageBadge(
   const status = diagnostics.imageGeneration;
   if (!status.isReady) {
     return {
-      label: "Immagini",
+      label: "Immagini (ONNX)",
       value: "Modello mancante",
       tone: "warning"
     };
@@ -260,7 +325,7 @@ function buildImageBadge(
 
   if (status.executionProvider === "DirectML") {
     return {
-      label: "Immagini",
+      label: "Immagini (ONNX)",
       value: "DirectML",
       tone: "online"
     };
@@ -268,16 +333,36 @@ function buildImageBadge(
 
   if (status.executionProvider === "CPU") {
     return {
-      label: "Immagini",
+      label: "Immagini (ONNX)",
       value: "CPU",
       tone: status.preferredExecutionProvider === "DirectML" ? "warning" : "online"
     };
   }
 
   return {
-    label: "Immagini",
+    label: "Immagini (ONNX)",
     value: "Pronto",
     tone: "online"
+  };
+}
+
+function buildAgentEngineBadge(
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  return {
+    label: "Agent Engine",
+    value: backendTone === "offline" ? "Offline" : "Attivo (MCTS)",
+    tone: backendTone === "offline" ? "offline" : "online"
+  };
+}
+
+function buildKnowledgeGraphBadge(
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  return {
+    label: "Knowledge Graph",
+    value: backendTone === "offline" ? "Offline" : "Attivo",
+    tone: backendTone === "offline" ? "offline" : "online"
   };
 }
 

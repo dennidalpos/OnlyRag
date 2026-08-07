@@ -18,6 +18,16 @@ public sealed record AppShutdownPreparationResponse(
     public bool IsComplete => UnstoppedJobIds.Length == 0;
 }
 
+public sealed record RerankerDiagnosticsStatus(
+    bool IsDownloaded,
+    bool IsDownloading,
+    string StatusText);
+
+public sealed record CloudLlmDiagnosticsStatus(
+    string Provider,
+    bool HasApiKey,
+    string StatusText);
+
 public sealed record DiagnosticsResponse(
     string AppVersion,
     string DatabasePath,
@@ -32,7 +42,9 @@ public sealed record DiagnosticsResponse(
     SystemTelemetryResponse SystemTelemetry,
     string? OllamaVersion = null,
     IReadOnlyList<OllamaRunningModelResponse>? OllamaRunningModels = null,
-    ImageGenerationRuntimeStatus? ImageGeneration = null);
+    ImageGenerationRuntimeStatus? ImageGeneration = null,
+    RerankerDiagnosticsStatus? Reranker = null,
+    CloudLlmDiagnosticsStatus? CloudLlm = null);
 
 public sealed record OcrGpuCapabilityResponse(
     bool IsUsable,

@@ -173,7 +173,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<OnlyRag.Infrastructure.Agent.Memory.EpisodicMemoryIndexer>();
         services.AddSingleton<IAgentExecutionPolicyService, AgentExecutionPolicyService>();
         services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
-        services.AddSingleton<IRetrievalBenchmarkReportService, RetrievalBenchmarkReportService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();
@@ -223,7 +222,10 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<OnlyRag.Core.IHardwareMonitorService, OnlyRag.Infrastructure.Hardware.HardwareMonitorService>();
         services.AddSingleton<PdfExportSettingsStore>();
         services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingSettingsStore>();
-        services.AddSingleton<OnlyRag.Infrastructure.Logging.ILoggingService, OnlyRag.Infrastructure.Logging.LoggingService>();
+        services.AddSingleton<OnlyRag.Infrastructure.Logging.LoggingService>();
+        services.AddSingleton<OnlyRag.Infrastructure.Logging.ILoggingService>(sp => sp.GetRequiredService<OnlyRag.Infrastructure.Logging.LoggingService>());
+        services.AddSingleton<Microsoft.Extensions.Logging.ILoggerProvider>(sp =>
+            new OnlyRag.Infrastructure.Logging.OnlyRagLoggerProvider(sp.GetRequiredService<OnlyRag.Infrastructure.Logging.ILoggingService>()));
         services.AddSingleton<OllamaGenerationCoordinator>();
         services.AddSingleton<DependencyProvisioningService>();
         services.AddSingleton<DiagnosticsProbeCacheService>();

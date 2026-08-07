@@ -1,5 +1,23 @@
 import { useState, useEffect } from "react";
+import { resolveBackendBaseUrl } from "../../apiClient";
 import { SettingsFieldLabel } from "./SettingsSection.helpers";
+
+function getCloudLlmUrl(path: string): string {
+  const baseUrl = resolveBackendBaseUrl();
+  return baseUrl ? `${baseUrl.replace(/\/$/, "")}${path}` : path;
+}
+
+function getCloudLlmHeaders(hasBody = false): Record<string, string> {
+  const bridge = window.__ONLYRAG_BACKEND__;
+  const headers: Record<string, string> = {};
+  if (hasBody) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (bridge?.apiToken && bridge.apiTokenHeaderName) {
+    headers[bridge.apiTokenHeaderName] = bridge.apiToken;
+  }
+  return headers;
+}
 
 export enum CloudLlmProvider {
   OllamaLocal = 0,
@@ -49,16 +67,21 @@ export function CloudProviderPanel() {
   const fetchCloudSettings = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/settings/cloud-llm");
+      const res = await fetch(getCloudLlmUrl("/api/settings/cloud-llm"), {
+        headers: getCloudLlmHeaders()
+      });
       if (res.ok) {
         const data: CloudLlmSettingsResponse = await res.json();
-        setProvider(data.provider);
-        setEndpoint(data.endpoint);
-        setChatModel(data.chatModel);
-        setEmbeddingModel(data.embeddingModel);
-        setDeploymentName(data.deploymentName);
-        setApiVersion(data.apiVersion || "2024-02-15-preview");
-        setHasApiKey(data.hasApiKey);
+        setProvider((curr) => (curr !== data.provider ? data.provider : curr));
+        setEndpoint((curr) => (curr !== data.endpoint ? data.endpoint : curr));
+        setChatModel((curr) => (curr !== data.chatModel ? data.chatModel : curr));
+        setEmbeddingModel((curr) => (curr !== data.embeddingModel ? data.embeddingModel : curr));
+        setDeploymentName((curr) => (curr !== data.deploymentName ? data.deploymentName : curr));
+        setApiVersion((curr) => {
+          const next = data.apiVersion || "2024-02-15-preview";
+          return curr !== next ? next : curr;
+        });
+        setHasApiKey((curr) => (curr !== data.hasApiKey ? data.hasApiKey : curr));
       }
     } catch {
       // Ignora errori di fetch iniziale se il server locale parte senza cloud
@@ -71,9 +94,9 @@ export function CloudProviderPanel() {
     try {
       setSaving(true);
       setStatusMessage(null);
-      const res = await fetch("/api/settings/cloud-llm", {
+      const res = await fetch(getCloudLlmUrl("/api/settings/cloud-llm"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getCloudLlmHeaders(true),
         body: JSON.stringify({
           provider,
           endpoint,
@@ -90,10 +113,17 @@ export function CloudProviderPanel() {
         setApiKey("");
         setStatusMessage("Impostazioni Cloud LLM salvate con successo.");
       } else {
-        setStatusMessage("Errore durante il salvataggio delle impostazioni.");
+        let errorDetail = `Errore HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.message) errorDetail = errData.message;
+        } catch {
+          // ignora errore di parsing json
+        }
+        setStatusMessage(`Errore durante il salvataggio: ${errorDetail}`);
       }
     } catch {
-      setStatusMessage("Errore di rete durante il salvataggio.");
+      setStatusMessage("Errore di rete durante il salvataggio: verificare che il server locale OnlyRag sia in esecuzione.");
     } finally {
       setSaving(false);
     }
@@ -103,9 +133,9 @@ export function CloudProviderPanel() {
     try {
       setTesting(true);
       setTestResult(null);
-      const res = await fetch("/api/settings/cloud-llm/test", {
+      const res = await fetch(getCloudLlmUrl("/api/settings/cloud-llm/test"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getCloudLlmHeaders(true),
         body: JSON.stringify({
           provider,
           endpoint,
@@ -119,11 +149,24 @@ export function CloudProviderPanel() {
       if (res.ok) {
         const result: CloudLlmTestResult = await res.json();
         setTestResult(result);
+      } else {
+        let errorDetail = `Errore HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.message) errorDetail = errData.message;
+        } catch {
+          // ignora errore di parsing json
+        }
+        setTestResult({
+          success: false,
+          message: `Test del provider non riuscito: ${errorDetail}`,
+          latencyMs: 0
+        });
       }
     } catch {
       setTestResult({
         success: false,
-        message: "Impossibile contattare il server locale per il test del provider.",
+        message: "Impossibile contattare il server locale per il test del provider. Verificare che il backend OnlyRag sia in esecuzione.",
         latencyMs: 0
       });
     } finally {

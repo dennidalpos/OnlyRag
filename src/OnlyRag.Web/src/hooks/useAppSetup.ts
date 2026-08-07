@@ -100,12 +100,16 @@ export function useAppSetup() {
     }
   }
 
-  async function runInitialSetupChecks({ showBusy = false }: { showBusy?: boolean } = {}) {
-    if (initialSetupCheckInProgressRef.current) {
+  const lastSetupCheckTimeRef = useRef<number>(0);
+
+  async function runInitialSetupChecks({ showBusy = false, force = false }: { showBusy?: boolean; force?: boolean } = {}) {
+    const now = Date.now();
+    if (initialSetupCheckInProgressRef.current || (!force && now - lastSetupCheckTimeRef.current < 5000)) {
       return;
     }
 
     initialSetupCheckInProgressRef.current = true;
+    lastSetupCheckTimeRef.current = now;
     if (showBusy) {
       setIsRecheckingOllama(true);
     }
@@ -126,7 +130,7 @@ export function useAppSetup() {
   }
 
   async function handleRecheckInitialSetup() {
-    await runInitialSetupChecks({ showBusy: true });
+    await runInitialSetupChecks({ showBusy: true, force: true });
   }
 
   useEffect(() => {

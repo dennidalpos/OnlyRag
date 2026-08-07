@@ -100,7 +100,16 @@ public sealed class DependencyProvisioningService
         return new DependencyActionResponse(true, "LibreOffice download page for PDF export opened.");
     }
 
-    public async Task<OcrProvisionStatus> GetOcrStatusAsync(
+    public Task<OcrProvisionStatus> GetOcrStatusAsync(
+        IOcrEngine ocrEngine,
+        OcrGpuCapabilityService gpuCapability,
+        CancellationToken cancellationToken)
+    {
+        return GetOcrStatusAsync(null, ocrEngine, gpuCapability, cancellationToken);
+    }
+
+    internal async Task<OcrProvisionStatus> GetOcrStatusAsync(
+        DiagnosticsProbeCacheService? probeCache,
         IOcrEngine ocrEngine,
         OcrGpuCapabilityService gpuCapability,
         CancellationToken cancellationToken)
@@ -113,8 +122,13 @@ public sealed class DependencyProvisioningService
             }
         }
 
-        OcrEngineAvailability availability = await ocrEngine.CheckAvailabilityAsync(cancellationToken);
-        OcrGpuCapabilityResponse capability = await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+        OcrEngineAvailability availability = probeCache is not null
+            ? await probeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken)
+            : await ocrEngine.CheckAvailabilityAsync(cancellationToken);
+        OcrGpuCapabilityResponse capability = probeCache is not null
+            ? await probeCache.CheckOcrGpuCapabilityAsync(gpuCapability, ocrEngine, cancellationToken)
+            : await gpuCapability.CheckAsync(ocrEngine, cancellationToken);
+
         OcrProvisionStatus recentStatus;
         lock (syncRoot)
         {
@@ -123,6 +137,10 @@ public sealed class DependencyProvisioningService
 
         if (availability.IsConfigured)
         {
+            new OcrRuntimeEnvironment(ResolveOcrInstallRoot()).EnsureStampIfMissing(
+                capability.IsUsable ? "nvidia-cuda" : OcrProvisionRuntimeResolver.CpuTarget,
+                capability.IsUsable ? "requirements-windows-nvidia.txt" : "requirements-windows-cpu.txt");
+
             return new OcrProvisionStatus(
                 true,
                 false,

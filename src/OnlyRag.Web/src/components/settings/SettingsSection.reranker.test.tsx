@@ -108,7 +108,7 @@ describe("SettingsSection Reranker Panel", () => {
 
     fireEvent.click(downloadButton);
 
-    expect(await screen.findByText("Download del modello ONNX Re-Ranker avviato.")).toBeInTheDocument();
+    expect(await screen.findByText("Download del modello ONNX Re-Ranker avviato.", { selector: ".feedback-banner" })).toBeInTheDocument();
     expect(api.calls).toContainEqual(
       expect.objectContaining({
         path: "/api/rag/reranker/download",
@@ -143,7 +143,7 @@ describe("SettingsSection Reranker Panel", () => {
 
     fireEvent.click(cancelButton);
 
-    expect(await screen.findByText("Download del modello ONNX Re-Ranker annullato.")).toBeInTheDocument();
+    expect(await screen.findByText("Download del modello ONNX Re-Ranker annullato.", { selector: ".feedback-banner" })).toBeInTheDocument();
     expect(api.calls).toContainEqual(
       expect.objectContaining({
         path: "/api/rag/reranker/download",
@@ -178,7 +178,7 @@ describe("SettingsSection Reranker Panel", () => {
 
     fireEvent.click(deleteButton);
 
-    expect(await screen.findByText("Modello ONNX Re-Ranker eliminato.")).toBeInTheDocument();
+    expect(await screen.findByText("Modello ONNX Re-Ranker eliminato.", { selector: ".feedback-banner" })).toBeInTheDocument();
     expect(api.calls).toContainEqual(
       expect.objectContaining({
         path: "/api/rag/reranker/model",

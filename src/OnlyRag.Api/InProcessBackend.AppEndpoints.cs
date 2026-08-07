@@ -5,7 +5,9 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ocr;
+using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Storage;
+using OnlyRag.Infrastructure.Storage.Security;
 using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Worker;
 
@@ -130,6 +132,8 @@ public static partial class InProcessBackend
             OcrGpuCapabilityService ocrGpuCapability,
             SystemTelemetryService systemTelemetry,
             DiagnosticsProbeCacheService diagnosticsProbeCache,
+            RerankerModelManager rerankerModelManager,
+            ICloudApiKeyVault cloudKeyVault,
             CancellationToken cancellationToken) =>
         {
             string ollamaStatus;
@@ -158,6 +162,20 @@ public static partial class InProcessBackend
             SystemTelemetryResponse telemetry = await diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken);
             ImageGenerationRuntimeStatus imageGenerationStatus = await imageGeneration.GetRuntimeStatusAsync(cancellationToken);
 
+            RerankerModelInfo rerankerInfo = await rerankerModelManager.GetModelStatusAsync(cancellationToken);
+            var rerankerStatus = new RerankerDiagnosticsStatus(
+                rerankerInfo.IsDownloaded,
+                rerankerInfo.IsDownloading,
+                rerankerInfo.IsDownloaded ? "ONNX Cross-Encoder" : (rerankerInfo.IsDownloading ? "Download in corso" : "Euristico (CPU)"));
+
+            CloudLlmConfiguration cloudConfig = InProcessBackendCloudLlmEndpoints.GetCurrentConfig();
+            string? cloudApiKey = await cloudKeyVault.GetApiKeyAsync(cloudConfig.Provider, cancellationToken);
+            bool cloudHasKey = !string.IsNullOrWhiteSpace(cloudApiKey);
+            var cloudLlmStatus = new CloudLlmDiagnosticsStatus(
+                cloudConfig.Provider.ToString(),
+                cloudHasKey,
+                cloudHasKey ? $"Pronto ({cloudConfig.Provider})" : "Non configurato");
+
             return Results.Ok(new DiagnosticsResponse(
                 BackendLog.ResolveAppVersion(),
                 descriptor.StoragePaths.DatabasePath,
@@ -172,7 +190,9 @@ public static partial class InProcessBackend
                 telemetry,
                 ollamaVersion,
                 ollamaRunningModels,
-                imageGenerationStatus));
+                imageGenerationStatus,
+                rerankerStatus,
+                cloudLlmStatus));
         });
 
         app.MapPost("/api/diagnostics/open-logs-folder", (

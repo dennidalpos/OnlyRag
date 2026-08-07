@@ -344,18 +344,6 @@ export async function getMultiAgentOrchestrationStatus(id: string): Promise<Mult
   return apiRequest<MultiAgentOrchestrationStatus>(`/api/agent/orchestrate/${encodeURIComponent(id)}`);
 }
 
-export async function runRagBenchmark(): Promise<import("./apiTypes/search").RetrievalBenchmarkReport> {
-  return apiRequest<import("./apiTypes/search").RetrievalBenchmarkReport>("/api/rag/benchmark/run", {
-    method: "POST"
-  });
-}
-
-export async function runConcurrencyBenchmark(concurrency: number = 10, simulateFaults: boolean = true): Promise<import("./apiTypes/search").ConcurrencyBenchmarkReport> {
-  const query = new URLSearchParams({ concurrency: concurrency.toString(), simulateFaults: simulateFaults.toString() }).toString();
-  return apiRequest<import("./apiTypes/search").ConcurrencyBenchmarkReport>(`/api/rag/benchmark/concurrency?${query}`, {
-    method: "POST"
-  });
-}
 
 export async function getAgentPolicyAuditLogs(limit: number = 50): Promise<AgentPolicyAuditRecord[]> {
   return apiRequest<AgentPolicyAuditRecord[]>(`/api/agent/policy-audit?limit=${limit}`);

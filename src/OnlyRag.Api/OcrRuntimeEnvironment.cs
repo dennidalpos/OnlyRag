@@ -56,6 +56,29 @@ internal sealed class OcrRuntimeEnvironment
         }
     }
 
+    public void EnsureStampIfMissing(string runtimeName, string requirementsFile)
+    {
+        string livePath = LivePath;
+        if (!Directory.Exists(livePath) || !File.Exists(PythonPath(livePath)))
+        {
+            return;
+        }
+
+        string stampPath = Path.Combine(livePath, StampFileName);
+        if (!File.Exists(stampPath))
+        {
+            try
+            {
+                File.WriteAllText(
+                    stampPath,
+                    JsonSerializer.Serialize(new { runtimeName, requirementsFile, updatedAt = DateTimeOffset.UtcNow }));
+            }
+            catch
+            {
+            }
+        }
+    }
+
     public OcrRuntimeEnvironmentTransaction BeginTransaction()
     {
         Directory.CreateDirectory(installRoot);

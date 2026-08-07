@@ -14,5 +14,5 @@ test("real backend contract: app status, settings, and empty document list reach
   await expect(page.getByText("Nessun documento presente. Importa un file per iniziare.")).toBeVisible({ timeout: 10000 });
 
   await page.getByRole("button", { name: "Apri Impostazioni" }).click();
-  await expect(page.getByLabel("URL Ollama")).toHaveValue("http://localhost:11434");
+  await expect(page.getByRole("textbox", { name: "URL Ollama" })).toHaveValue("http://localhost:11434");
 });

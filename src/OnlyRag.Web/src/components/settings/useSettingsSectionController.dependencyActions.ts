@@ -84,8 +84,15 @@ export function createSettingsSectionDependencyActions(params: SettingsSectionDe
       setPdfExportFormState(normalizedPdfExportSettings);
       setSavedPdfExportFormState(normalizedPdfExportSettings);
       setPdfExportStatus(converterStatus);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossibile leggere le impostazioni export PDF.");
+    } catch {
+      setPdfExportStatus({
+        state: "Missing",
+        isAvailable: false,
+        executablePath: null,
+        message: "LibreOffice non configurato.",
+        suggestion: null,
+        conversionTimeoutSeconds: 120
+      });
     }
   }
 
