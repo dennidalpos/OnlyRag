@@ -11,6 +11,7 @@ describe("Sidebar", () => {
         sections={{
           chat: "Chat",
           documents: "Documenti",
+          graph: "Grafo",
           images: "Immagini",
           translation: "Traduzione",
           coding: "Coding",

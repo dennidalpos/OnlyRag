@@ -361,6 +361,21 @@ export async function getAgentPolicyAuditLogs(limit: number = 50): Promise<Agent
   return apiRequest<AgentPolicyAuditRecord[]>(`/api/agent/policy-audit?limit=${limit}`);
 }
 
+export async function getGraphData(limit: number = 200, documentId?: string, entityType?: string): Promise<import("./apiTypes/graph").GraphRetrievalResult> {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (documentId) params.set("documentId", documentId);
+  if (entityType) params.set("entityType", entityType);
+  return apiRequest<import("./apiTypes/graph").GraphRetrievalResult>(`/api/graph/data?${params.toString()}`);
+}
+
+export async function searchGraph(request: import("./apiTypes/graph").GraphSearchRequest): Promise<import("./apiTypes/graph").GraphRetrievalResult> {
+  return apiRequest<import("./apiTypes/graph").GraphRetrievalResult>("/api/graph/search", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
   const url = new URL(path, baseUrl);
   const backendOrigin = new URL(baseUrl).origin;

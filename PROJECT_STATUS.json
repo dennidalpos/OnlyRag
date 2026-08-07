@@ -1,28 +1,12 @@
 {
   "todos": [
-    {
-      "id": "TASK-045",
-      "priority": "P1",
-      "category": "AI Framework & Integrations",
-      "title": "Integrazione Adapter LLM Remote Cloud (Azure OpenAI / Anthropic / Google Gemini)",
-      "description": "Espandere l'astrazione Microsoft.Extensions.AI del backend per supportare, in aggiunta ad Ollama locale, provider LLM/Embedding cloud remoti: (1) adattatori configurabili per Azure OpenAI, OpenAI, Anthropic Claude e Google Gemini, (2) gestione sicura delle chiavi API in Windows Credential Manager / ISqliteKeyProvider, (3) selettore dinamico nelle Impostazioni per commutare al volo tra provider locali e remoti in base alle esigenze di riservatezza dei dati.",
-      "status": "in_progress"
-    },
-    {
-      "id": "TASK-046",
-      "priority": "P2",
-      "category": "GraphRAG & UI Visualizer",
-      "title": "Visualizzatore Interattivo Grafo di Conoscenza GraphRAG (Knowledge Graph Canvas)",
-      "description": "Creare un componente visivo interattivo in React 19 per l'esplorazione del grafo di conoscenza GraphRAG: (1) rendering bidimensionale ad alte prestazioni di nodi ed archi caricati da document_graph_nodes e document_graph_edges, (2) filtri per tipo di entità, rilevanza e sezione documentale, (3) evidenziazione dinamica dei cammini di traversamento del grafo eseguiti da GraphRetrievalService durante le risposte RAG, (4) ispezione dettagliata delle proprietà di nodi e relazioni al click.",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-048",
-      "priority": "P3",
-      "category": "Observability & Telemetry",
-      "title": "Telemetria Avanzata OpenTelemetry & Dashboard Metriche Prometheus/Grafana Local Export",
-      "description": "Integrare la telemetria standard OpenTelemetry su Kestrel API, SQLite, Qdrant ed Agent Engine: (1) esportatore di metriche OTLP/Prometheus locale abilitabile da configurazione, (2) tracciamento delle latenze dettagliate della ricerca 2-stage (Query Transformation, Qdrant HNSW, SQLite FTS5, Re-ranking ONNX), (3) monitoraggio continuo dei consumi di RAM/VRAM e rateo di completamento dei subagenti.",
-      "status": "pending"
-    }
+    "P1: EF Core DbContext (OnlyRagDbContext) maps only 11 tables but the real schema has 30+ tables - expand DbContext to cover full schema OR use it only for read queries and keep ADO.NET only for write paths already covered",
+    "P1: EnsureEfCoreModelConfiguredAsync in LocalSqliteSchemaInitializer only validates EF model without migrating - wire EF Core EnsureCreatedAsync/MigrateAsync as the primary schema driver for EF-managed tables",
+    "P2: OnnxDirectMlOcrEngine.RecognizeAsync is a stub returning empty text - implement real ONNX inference using ONNX Runtime DirectML with a PaddleOCR-compatible ONNX model (det + rec pipeline)",
+    "P2: OllamaClient.cs custom HTTP client still coexists alongside Microsoft.Extensions.AI IChatClient/IEmbeddingGenerator - migrate all internal callers that use IOllamaClient to use IChatClient/IEmbeddingGenerator and remove OllamaClient.cs when no longer referenced",
+    "P2: openapi-ts.config.ts reads from local file 'openapi.json' - wire OpenAPI export as a build step (generate openapi.json from running backend) and run openapi:generate script; replace hand-crafted apiClient.ts and apiTypes/ with generated types",
+    "P3: Scaffold EF Core Migrations folder and initial migration for all tables managed by DbContext using dotnet ef migrations add InitialCreate",
+    "P3: Remove SqliteCommandExtensions.cs legacy helper - replace remaining callers with direct DbContext queries",
+    "P3: Run dotnet test for OnlyRag.Infrastructure.Tests and OnlyRag.Api.Tests and fix any failures"
   ]
 }

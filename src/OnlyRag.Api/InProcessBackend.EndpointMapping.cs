@@ -20,7 +20,9 @@ internal static class InProcessBackendEndpointMapping
         app.MapBackupEndpoints();
         app.MapCloudLlmEndpoints();
         app.MapDatabaseEndpoints();
+        app.MapGraphEndpoints();
         app.MapLoggingEndpoints();
         return app;
     }
+
 }

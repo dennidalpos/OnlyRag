@@ -20,4 +20,16 @@ public sealed class JobProgressHub : Hub<IJobProgressClient>
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, jobId);
     }
+
+    /// <summary>Subscribes this client to all job events (for global job list refresh).</summary>
+    public async Task SubscribeGlobalJobs()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, SignalRJobProgressNotifier.GlobalJobsGroup);
+    }
+
+    /// <summary>Unsubscribes this client from global job events.</summary>
+    public async Task UnsubscribeGlobalJobs()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, SignalRJobProgressNotifier.GlobalJobsGroup);
+    }
 }

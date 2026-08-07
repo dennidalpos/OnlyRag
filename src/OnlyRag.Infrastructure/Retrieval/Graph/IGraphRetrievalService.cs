@@ -14,4 +14,11 @@ public interface IGraphRetrievalService
         int maxHops = 2,
         int maxNodes = 20,
         CancellationToken cancellationToken = default);
+
+    Task<GraphRetrievalResult> GetFullGraphAsync(
+        int limit = 200,
+        string? documentId = null,
+        string? entityType = null,
+        CancellationToken cancellationToken = default);
 }
+

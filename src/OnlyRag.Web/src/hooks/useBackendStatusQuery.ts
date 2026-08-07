@@ -55,7 +55,7 @@ export function useBackendStatusQuery() {
         throw err;
       }
     },
-    refetchInterval: 3000,
+    refetchInterval: 15000,
     retry: 1
   });
 }

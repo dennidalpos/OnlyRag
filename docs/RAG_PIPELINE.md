@@ -51,7 +51,19 @@ elementi non supportati avanzano senza entrare nel contesto. Il manifest è cons
 
 ---
 
-## 2. Vettorizzazione & Storage Vettoriale
+## 2. Knowledge Graph & Graph Retrieval
+
+OnlyRag include un motore di indicizzazione e recupero a grafo (Knowledge Graph Retrieval) integrato:
+- **Tabelle SQLite Graph**: `document_graph_nodes` e `document_graph_edges` gestiscono entità, relazioni semanticamente estratte, nodi concettuali e collegamenti tra documenti e sezioni.
+- **Service Layer**: [`SqliteGraphRetrievalService`](../src/OnlyRag.Infrastructure/Retrieval/Graph/SqliteGraphRetrievalService.cs) implementa [`IGraphRetrievalService`](../src/OnlyRag.Infrastructure/Retrieval/Graph/IGraphRetrievalService.cs) per eseguire traversal k-hop sui nodi, estrazione di sotto-grafi e ricerca di percorsi relazionali tra concetti.
+- **Endpoints Graph**:
+  - `GET /api/graph/data`: Restituisce i nodi e gli archi del grafo con filtri opzionali (`limit`, `documentId`, `entityType`).
+  - `POST /api/graph/search`: Esegue ricerche con traversal multi-hop (`query`, `maxHops`, `maxNodes`).
+- **Visualizzazione UI**: Componente React dedicato [`GraphView`](../src/OnlyRag.Web/src/components/graph/) per la navigazione interattiva e visuale della rete di concetti.
+
+---
+
+## 3. Vettorizzazione & Storage Vettoriale
 
 I task di embedding comunicano con l'endpoint Ollama configurato. I vettori vengono salvati su Qdrant locale gestito tramite [`packaging/qdrant/manifest.json`](../packaging/qdrant/manifest.json) e avviato dal servizio in-process [`QdrantLocalRuntimeService`](../src/OnlyRag.Infrastructure/Vector/QdrantSettingsStore.cs).
 

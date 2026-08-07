@@ -241,4 +241,98 @@ public sealed class SqliteGraphRetrievalService : IGraphRetrievalService
         float score = Math.Min(1.0f, (matchedNodes.Count * 0.1f) + (matchedEdges.Count * 0.15f));
         return new GraphRetrievalResult(matchedNodes.Values.ToList(), matchedEdges, relatedChunkIds.ToList(), score);
     }
+
+    public async Task<GraphRetrievalResult> GetFullGraphAsync(
+        int limit = 200,
+        string? documentId = null,
+        string? entityType = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+
+        var nodesDict = new Dictionary<long, EntityGraphNode>();
+        var nodeUidToDbId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        var edges = new List<EntityGraphEdge>();
+        var chunkIds = new HashSet<string>();
+
+        // Query nodes
+        await using (SqliteCommand cmd = connection.CreateCommand())
+        {
+            var clauses = new List<string>();
+            if (!string.IsNullOrWhiteSpace(documentId) && long.TryParse(documentId, out long dId))
+            {
+                clauses.Add("document_id = $docId");
+                cmd.AddParameter("$docId", dId);
+            }
+            if (!string.IsNullOrWhiteSpace(entityType))
+            {
+                clauses.Add("type = $type");
+                cmd.AddParameter("$type", entityType);
+            }
+
+            string whereClause = clauses.Count > 0 ? "WHERE " + string.Join(" AND ", clauses) : "";
+            cmd.CommandText = $"""
+                SELECT id, node_uid, document_id, chunk_id, name, type, description
+                FROM document_graph_nodes
+                {whereClause}
+                ORDER BY id DESC
+                LIMIT $limit;
+                """;
+            cmd.AddParameter("$limit", limit);
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                long dbId = reader.GetInt64(0);
+                string nodeUid = reader.GetString(1);
+                long docIdVal = reader.IsDBNull(2) ? 0 : reader.GetInt64(2);
+                string? chunkId = reader.IsDBNull(3) ? null : reader.GetInt64(3).ToString();
+                string name = reader.GetString(4);
+                string type = reader.GetString(5);
+                string? desc = reader.IsDBNull(6) ? null : reader.GetString(6);
+
+                var node = new EntityGraphNode(nodeUid, docIdVal > 0 ? docIdVal.ToString() : "", chunkId ?? "", name, type, desc ?? "");
+                nodesDict[dbId] = node;
+                nodeUidToDbId[nodeUid] = dbId;
+                if (!string.IsNullOrEmpty(chunkId)) chunkIds.Add(chunkId);
+            }
+        }
+
+        if (nodesDict.Count == 0)
+        {
+            return new GraphRetrievalResult(Array.Empty<EntityGraphNode>(), Array.Empty<EntityGraphEdge>(), Array.Empty<string>(), 0f);
+        }
+
+        // Query connecting edges
+        string inClause = string.Join(",", nodesDict.Keys);
+        await using (SqliteCommand cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = $"""
+                SELECT e.edge_uid, sn.node_uid as src_uid, tn.node_uid as tgt_uid, e.relation_type, e.weight, e.chunk_id
+                FROM document_graph_edges e
+                JOIN document_graph_nodes sn ON e.source_node_id = sn.id
+                JOIN document_graph_nodes tn ON e.target_node_id = tn.id
+                WHERE e.source_node_id IN ({inClause}) AND e.target_node_id IN ({inClause})
+                LIMIT $limit;
+                """;
+            cmd.AddParameter("$limit", limit * 2);
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                string edgeUid = reader.GetString(0);
+                string srcUid = reader.GetString(1);
+                string tgtUid = reader.GetString(2);
+                string relType = reader.GetString(3);
+                float weight = (float)reader.GetDouble(4);
+                string? chunkId = reader.IsDBNull(5) ? null : reader.GetInt64(5).ToString();
+
+                edges.Add(new EntityGraphEdge(edgeUid, srcUid, tgtUid, relType, weight, chunkId ?? ""));
+                if (!string.IsNullOrEmpty(chunkId)) chunkIds.Add(chunkId);
+            }
+        }
+
+        return new GraphRetrievalResult(nodesDict.Values.ToList(), edges, chunkIds.ToList(), 1.0f);
+    }
 }
+

@@ -75,6 +75,10 @@ class SignalRService {
 
       this.jobHubConnection = builder.build();
       await this.jobHubConnection.start();
+
+      // Subscribe to global job events for document list refresh
+      await this.jobHubConnection.invoke("SubscribeGlobalJobs");
+
       return this.jobHubConnection;
     } catch (error) {
       console.warn("[SignalRService] Failed to connect to JobProgressHub:", error);

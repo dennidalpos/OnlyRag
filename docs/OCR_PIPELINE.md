@@ -1,23 +1,19 @@
-# OCR Pipeline
+# OCR Pipeline (Dual-Engine Architecture)
 
-OnlyRag uses a Python PaddleOCR bridge for scanned PDFs and image text extraction when OCR
-prerequisites are prepared.
+OnlyRag features a dual-engine OCR architecture:
+1. **Native C# DirectML ONNX OCR Engine** ([`OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs)): Built-in in-process OCR engine running directly via ONNX Runtime DirectML with hardware GPU acceleration. Requires zero external Python runtime dependencies.
+2. **Python PaddleOCR Bridge** ([`PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs)): Subprocess bridge for PaddleOCR when Python OCR prerequisites (Python 3.10-3.13) are installed.
 
 ## Components
 
-- [`scripts/ocr/paddle_ocr_bridge.py`](../scripts/ocr/paddle_ocr_bridge.py): Python bridge called
-  by the app.
-- [`scripts/ocr/install_ocr_runtime.ps1`](../scripts/ocr/install_ocr_runtime.ps1): installer-time
-  and setup-time OCR runtime provisioning.
-- [`scripts/ocr/runtime-manifest.json`](../scripts/ocr/runtime-manifest.json): CPU/GPU runtime
-  manifest.
-- [`scripts/ocr/requirements-*.txt`](../scripts/ocr): pinned Python package sets.
-- [`src/OnlyRag.Infrastructure/Ocr`](../src/OnlyRag.Infrastructure/Ocr): OCR engine, cache, retry,
-  and settings code.
-- [`src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs`](../src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs):
-  runtime selection support used by the app.
-- [`src/OnlyRag.Api/OcrRuntimeEnvironment.cs`](../src/OnlyRag.Api/OcrRuntimeEnvironment.cs):
-  transactional lifecycle for the private virtual environment.
+- [`src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs): Native C# DirectML ONNX OCR engine implementation.
+- [`src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs): Python PaddleOCR subprocess bridge.
+- [`scripts/ocr/paddle_ocr_bridge.py`](../scripts/ocr/paddle_ocr_bridge.py): Python bridge script.
+- [`scripts/ocr/install_ocr_runtime.ps1`](../scripts/ocr/install_ocr_runtime.ps1): Python OCR runtime provisioning script.
+- [`scripts/ocr/runtime-manifest.json`](../scripts/ocr/runtime-manifest.json): CPU/GPU runtime manifest for PaddleOCR.
+- [`src/OnlyRag.Infrastructure/Ocr`](../src/OnlyRag.Infrastructure/Ocr): OCR engine factory (`IOcrEngine`), SQLite cache (`SqliteOcrCacheRepository`), retry policies, and settings store.
+- [`src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs`](../src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs): runtime selection resolver.
+- [`src/OnlyRag.Api/OcrRuntimeEnvironment.cs`](../src/OnlyRag.Api/OcrRuntimeEnvironment.cs): transactional virtual environment lifecycle.
 
 ## Runtime Selection
 

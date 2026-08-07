@@ -12,6 +12,7 @@ import { useJobProgress } from "../context/SignalRContext";
 export function useDocumentListQuery() {
   const invalidateDocuments = useInvalidateDocuments();
 
+  // Invalidate on SignalR job events — no HTTP polling needed
   useJobProgress(
     () => invalidateDocuments(),
     () => invalidateDocuments(),
@@ -23,7 +24,7 @@ export function useDocumentListQuery() {
     queryFn: async () => {
       return await apiRequest<ImportedDocument[]>("/api/documents");
     },
-    refetchInterval: 5000,
+    staleTime: 30000,
     retry: 1
   });
 }
@@ -34,7 +35,7 @@ export function useVectorHealthQuery() {
     queryFn: async () => {
       return await apiRequest<VectorBackendHealth>("/api/diagnostics/vector-health");
     },
-    refetchInterval: 10000,
+    staleTime: 30000,
     retry: 1
   });
 }

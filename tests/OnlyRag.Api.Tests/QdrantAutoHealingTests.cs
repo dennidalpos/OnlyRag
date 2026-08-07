@@ -7,7 +7,8 @@ namespace OnlyRag.Api.Tests;
 public sealed class QdrantAutoHealingTests
 {
     [Fact]
-    public void QdrantProcessSupervisor_RecordAutoHeal_IncrementsCounterAndSetsTimestamp()
+    public async Task QdrantProcessSupervisor_RecordAutoHeal_IncrementsCounterAndSetsTimestamp()
+
     {
         await using var supervisor = new QdrantProcessSupervisor();
 

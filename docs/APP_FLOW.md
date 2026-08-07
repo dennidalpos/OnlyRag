@@ -15,26 +15,27 @@ flowchart TD
     H --> I["Initial polling: app, diagnostics, settings, dependencies, OCR languages, Qdrant, Ollama"]
     I --> J["User works in Chat, Documents, Jobs, Translation, Settings"]
 
-    J --> K["Settings: configure Ollama, Qdrant, OCR, PDF export, models, ingestion, performance, reset"]
-    K --> L["External tools: Ollama, Qdrant, PaddleOCR Python, LibreOffice, official download pages"]
+    J --> K["Settings: configure Ollama, Cloud LLMs, Qdrant, OCR, PDF export, models, ingestion, performance, reset"]
+    K --> L["External endpoints: Ollama, Cloud LLMs (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek), Qdrant, PaddleOCR Python, LibreOffice"]
 
     J --> M["Documents: import files with OCR policy and document language"]
     M --> N["Validate upload limits, storage quota, file names, dedupe hash, local copy"]
     N --> O["Create document row and enqueue document-ingestion job"]
     O --> P["Worker extracts TXT/MD/CSV/OpenXML/PDF/image content"]
-    P --> Q["Optional PaddleOCR with cache/retry/timeout"]
-    Q --> R["Persist pages, chunks, OCR status, preview/pipeline state in SQLite"]
+    P --> Q["Native C# DirectML ONNX OCR engine or optional PaddleOCR bridge with cache/retry/timeout"]
+    Q --> R["Persist pages, chunks, graph nodes/edges, OCR status, preview/pipeline state in SQLite"]
     R --> S["If embedding model exists, enqueue document-embedding"]
-    S --> T["Ollama embeds chunks; Qdrant stores vectors by model/vector shape"]
+    S --> T["Ollama/Cloud LLM embeds chunks; Qdrant stores vectors by model/vector shape"]
 
     J --> U["Chat/Search: user submits query with or without selected documents"]
     U --> V{"Document chat?"}
-    V -->|yes| W["Hybrid retrieval: SQLite FTS + Ollama query embedding + Qdrant vector search"]
-    W --> X["Prompt includes retrieved snippets only"]
+    V -->|yes| W["Hybrid retrieval: SQLite FTS5 + Graph Traversal + Ollama/Cloud LLM query embedding + Qdrant vector search"]
+    W --> X["Prompt includes retrieved snippets and graph context"]
     V -->|no| Y["Direct chat prompt"]
-    X --> Z["Ollama chat response"]
-    Y --> Z
+    X --> Z["Ollama/Cloud LLM chat response"]
     Z --> AA["Persist chat turn and return answer, sources, notices"]
+
+    J --> GV["Graph Visualizer: interactively query and explore concept graph networks (/api/graph/data, /api/graph/search)"]
 
     J --> AB["Translation: create translation for indexed document"]
     AB --> AC["Verify model/document, create page-based units, enqueue document-translation"]

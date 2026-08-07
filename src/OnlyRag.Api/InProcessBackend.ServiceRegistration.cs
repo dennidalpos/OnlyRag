@@ -6,7 +6,9 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Api.Services;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
+using OnlyRag.Infrastructure.Ai;
 using OnlyRag.Infrastructure.Export;
+
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Ocr;
@@ -63,7 +65,8 @@ internal static class InProcessBackendServiceRegistration
                 policy
                     .WithOrigins(allowedCorsOrigins)
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials(); // Required for SignalR WebSocket handshake
             });
         });
 
@@ -222,32 +225,40 @@ internal static class InProcessBackendServiceRegistration
 
         services.AddTransient<Microsoft.Extensions.AI.IChatClient>(sp =>
         {
-            var settingsService = sp.GetRequiredService<IOllamaSettingsService>();
-            var loggerFactory = sp.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
-            var settings = settingsService.GetAsync().GetAwaiter().GetResult();
-            var endpoint = string.IsNullOrWhiteSpace(settings.OllamaBaseUrl) ? "http://127.0.0.1:11434" : settings.OllamaBaseUrl;
-            var model = string.IsNullOrWhiteSpace(settings.DefaultChatModel) ? "llama3" : settings.DefaultChatModel;
-            var client = new Microsoft.Extensions.AI.OllamaChatClient(endpoint, model);
-            if (loggerFactory is not null)
+            var settingsService = sp.GetService<IOllamaSettingsService>();
+            var httpClient = sp.GetService<HttpClient>() ?? new HttpClient();
+            var endpoint = "http://127.0.0.1:11434";
+            var model = "llama3";
+            if (settingsService is not null)
             {
-                return new Microsoft.Extensions.AI.LoggingChatClient(client, loggerFactory.CreateLogger("Microsoft.Extensions.AI.OllamaChatClient"));
+                try
+                {
+                    var settings = settingsService.GetAsync().GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(settings.OllamaBaseUrl)) endpoint = settings.OllamaBaseUrl;
+                    if (!string.IsNullOrWhiteSpace(settings.DefaultChatModel)) model = settings.DefaultChatModel;
+                }
+                catch { }
             }
-            return client;
+            return OllamaLocalClientFactory.CreateChatClient(httpClient, endpoint, model);
         });
 
         services.AddTransient<Microsoft.Extensions.AI.IEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>>>(sp =>
         {
-            var settingsService = sp.GetRequiredService<IOllamaSettingsService>();
-            var loggerFactory = sp.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
-            var settings = settingsService.GetAsync().GetAwaiter().GetResult();
-            var endpoint = string.IsNullOrWhiteSpace(settings.OllamaBaseUrl) ? "http://127.0.0.1:11434" : settings.OllamaBaseUrl;
-            var model = string.IsNullOrWhiteSpace(settings.DefaultEmbeddingModel) ? "nomic-embed-text" : settings.DefaultEmbeddingModel;
-            var generator = new Microsoft.Extensions.AI.OllamaEmbeddingGenerator(endpoint, model);
-            if (loggerFactory is not null)
+            var settingsService = sp.GetService<IOllamaSettingsService>();
+            var httpClient = sp.GetService<HttpClient>() ?? new HttpClient();
+            var endpoint = "http://127.0.0.1:11434";
+            var model = "nomic-embed-text";
+            if (settingsService is not null)
             {
-                return new Microsoft.Extensions.AI.LoggingEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>>(generator, loggerFactory.CreateLogger("Microsoft.Extensions.AI.OllamaEmbeddingGenerator"));
+                try
+                {
+                    var settings = settingsService.GetAsync().GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(settings.OllamaBaseUrl)) endpoint = settings.OllamaBaseUrl;
+                    if (!string.IsNullOrWhiteSpace(settings.DefaultEmbeddingModel)) model = settings.DefaultEmbeddingModel;
+                }
+                catch { }
             }
-            return generator;
+            return OllamaLocalClientFactory.CreateEmbeddingGenerator(httpClient, endpoint, model);
         });
 
         services.AddSingleton<IStreamingEmbeddingGenerator, MicrosoftExtensionsAiEmbeddingGeneratorAdapter>();

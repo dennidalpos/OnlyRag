@@ -7,7 +7,7 @@ export function useDiagnosticsQuery() {
     queryFn: async () => {
       return await apiRequest<DiagnosticsResponse>("/api/diagnostics");
     },
-    refetchInterval: 10000,
+    staleTime: 30000,
     retry: 1
   });
 }

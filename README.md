@@ -16,20 +16,17 @@ documents.
 
 ## Supported Capabilities
 
-- Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, and image files.
-- Run OCR for scanned PDFs and images through the PaddleOCR bridge when Python OCR prerequisites
-  are available.
-- Generate embeddings through a configured Ollama endpoint and store vectors in Qdrant.
-- Search selected documents with SQLite FTS plus Qdrant vector retrieval, with keyword-only
-  fallback notices when vector retrieval is unavailable.
-- Chat with selected documents and show grounded source snippets.
-- Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML,
-  DOCX, or PDF output.
-- Generate local images with the integrated ONNX/DirectML image provider after a model is
-  downloaded and verified.
-- Configure Ollama, Qdrant, OCR, PDF export, ingestion, models, `num_ctx`, and performance
-  from the desktop UI.
-- Track ingestion, embedding, OCR, translation, and Ollama model-install jobs.
+- Import TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, image files, and archive containers (ZIP, TAR, 7Z).
+- Run OCR for scanned PDFs and images via either the **native C# DirectML ONNX OCR engine** (zero Python required) or the optional PaddleOCR Python bridge.
+- Generate embeddings through a configured Ollama or Cloud LLM endpoint and store vectors in Qdrant.
+- Search selected documents with SQLite FTS5, Qdrant vector retrieval, and **Knowledge Graph traversal**, with keyword-only fallback notices when vector retrieval is unavailable.
+- Explore document relationships and concept networks interactively via the built-in **Knowledge Graph Visualizer** (`/api/graph/*`).
+- Chat with selected documents and show grounded source snippets, or integrate external Cloud LLM providers (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek).
+- Execute complex development and problem-solving goals using the **Autonomous Agent Engine SOTA** (6-phase loop, subagent DAG orchestration, persistent memory).
+- Translate indexed documents, edit page-based translation units, and export TXT, Markdown, HTML, DOCX, or PDF output.
+- Generate local images with the integrated ONNX/DirectML image provider after a model is downloaded and verified.
+- Configure Ollama, Cloud LLMs, Qdrant, OCR, PDF export, ingestion, models, `num_ctx`, and performance from the desktop UI.
+- Track ingestion, embedding, OCR, translation, and model-install jobs.
 - Confirm app exit when local jobs or unsaved UI work exist.
 - Build, test, package, sign, and verify Windows installer candidates with repository scripts.
 

@@ -20,21 +20,22 @@ export function useOllamaStatusQuery() {
   const settingsQuery = useQuery<OllamaSettings>({
     queryKey: ["ollamaSettings"],
     queryFn: () => apiRequest<OllamaSettings>("/api/settings/ollama"),
-    refetchInterval: 5000,
+    staleTime: 30000,
     retry: 1
   });
 
+  // Ollama is an external process — poll infrequently as a liveness fallback
   const statusQuery = useQuery<OllamaStatusResponse>({
     queryKey: ["ollamaStatus"],
     queryFn: () => apiRequest<OllamaStatusResponse>("/api/ollama/status"),
-    refetchInterval: 5000,
+    refetchInterval: 30000,
     retry: 1
   });
 
   const installStatusQuery = useQuery<OllamaInstallStatus | null>({
     queryKey: ["ollamaInstallStatus"],
     queryFn: () => apiRequest<OllamaInstallStatus>("/api/dependencies/ollama").catch(() => null),
-    refetchInterval: 5000,
+    staleTime: 60000,
     retry: 1
   });
 
@@ -44,7 +45,7 @@ export function useOllamaStatusQuery() {
     queryKey: ["ollamaModels"],
     queryFn: () => apiRequest<OllamaModelsResponse>("/api/ollama/models"),
     enabled: isReachable,
-    refetchInterval: 5000,
+    staleTime: 30000,
     retry: 1
   });
 

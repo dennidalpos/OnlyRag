@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 using OnlyRag.Core;
+using MsChatResponse = Microsoft.Extensions.AI.ChatResponse;
 
 namespace OnlyRag.Infrastructure.Ai;
 
@@ -15,6 +16,18 @@ public interface ICloudLlmClientFactory
     IChatClient CreateChatClient(CloudLlmConfiguration config, string? apiKey);
     IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(CloudLlmConfiguration config, string? apiKey);
     Task<CloudLlmTestResult> TestConnectionAsync(CloudLlmConfiguration config, string? apiKey, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Creates local Ollama clients using native HTTP without the <c>Microsoft.Extensions.AI.Ollama</c> package.
+/// </summary>
+public static class OllamaLocalClientFactory
+{
+    public static IChatClient CreateChatClient(HttpClient httpClient, string endpoint, string model)
+        => new OllamaHttpChatClient(httpClient, endpoint, model);
+
+    public static IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(HttpClient httpClient, string endpoint, string model)
+        => new OllamaHttpEmbeddingGenerator(httpClient, endpoint, model);
 }
 
 public sealed class CloudLlmClientFactory : ICloudLlmClientFactory
@@ -61,7 +74,8 @@ public sealed class CloudLlmClientFactory : ICloudLlmClientFactory
                 cancellationToken);
 
             sw.Stop();
-            string responseText = response.Message.Text?.Trim() ?? "";
+            string responseText = response.Text?.Trim() ?? "";
+
             return new CloudLlmTestResult(
                 Success: true,
                 Message: $"Connessione riuscita a {config.Provider} in {sw.ElapsedMilliseconds}ms. Risposta: {responseText}",
@@ -114,7 +128,7 @@ internal sealed class OpenAiCompatibleChatClient : IChatClient
 
     public void Dispose() { }
 
-    public async Task<ChatResponse> GetResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<MsChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         string model = options?.ModelId ?? _defaultModel;
         string url = _isAzure
@@ -146,14 +160,15 @@ internal sealed class OpenAiCompatibleChatClient : IChatClient
         var json = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken: cancellationToken);
         string content = json?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "";
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, content));
+        return new MsChatResponse(new ChatMessage(ChatRole.Assistant, content));
     }
 
-    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await GetResponseAsync(messages, options, cancellationToken);
-        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Message.Text);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
     }
+
 
     public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
 }
@@ -258,7 +273,7 @@ internal sealed class AnthropicChatClient : IChatClient
 
     public void Dispose() { }
 
-    public async Task<ChatResponse> GetResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<MsChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         string model = options?.ModelId ?? _defaultModel;
         string url = $"{_endpoint}/messages";
@@ -292,14 +307,15 @@ internal sealed class AnthropicChatClient : IChatClient
         var json = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken: cancellationToken);
         string content = json?["content"]?[0]?["text"]?.ToString() ?? "";
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, content));
+        return new MsChatResponse(new ChatMessage(ChatRole.Assistant, content));
     }
 
-    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await GetResponseAsync(messages, options, cancellationToken);
-        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Message.Text);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
     }
+
 
     public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
 }
@@ -327,7 +343,7 @@ internal sealed class GoogleGeminiChatClient : IChatClient
 
     public void Dispose() { }
 
-    public async Task<ChatResponse> GetResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<MsChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         string model = options?.ModelId ?? _defaultModel;
         string url = $"{_endpoint}/models/{model}:generateContent?key={_apiKey}";
@@ -349,14 +365,15 @@ internal sealed class GoogleGeminiChatClient : IChatClient
         var json = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken: cancellationToken);
         string text = json?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString() ?? "";
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, text));
+        return new MsChatResponse(new ChatMessage(ChatRole.Assistant, text));
     }
 
-    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await GetResponseAsync(messages, options, cancellationToken);
-        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Message.Text);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
     }
+
 
     public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
 }
@@ -439,7 +456,7 @@ internal sealed class OllamaHttpChatClient : IChatClient
 
     public void Dispose() { }
 
-    public async Task<ChatResponse> GetResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<MsChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         string model = options?.ModelId ?? _defaultModel;
         string url = $"{_endpoint}/api/chat";
@@ -458,14 +475,15 @@ internal sealed class OllamaHttpChatClient : IChatClient
         var json = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken: cancellationToken);
         string content = json?["message"]?["content"]?.ToString() ?? "";
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, content));
+        return new MsChatResponse(new ChatMessage(ChatRole.Assistant, content));
     }
 
-    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IList<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await GetResponseAsync(messages, options, cancellationToken);
-        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Message.Text);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
     }
+
 
     public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
 }

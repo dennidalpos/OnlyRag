@@ -17,6 +17,7 @@ const CodingSection = lazy(() => import("./components/coding/CodingSection").the
 const DocumentsSection = lazy(() => import("./components/documents/DocumentsSection").then(m => ({ default: m.DocumentsSection })));
 const ImagesSection = lazy(() => import("./components/images/ImagesSection").then(m => ({ default: m.ImagesSection })));
 const TranslationSection = lazy(() => import("./components/translation/TranslationSection").then(m => ({ default: m.TranslationSection })));
+const GraphSection = lazy(() => import("./components/graph/KnowledgeGraphSection").then(m => ({ default: m.KnowledgeGraphSection })));
 const SettingsSection = lazy(() => import("./components/settings/SettingsSection").then(m => ({ default: m.SettingsSection })));
 
 export type { BackendStatus } from "./hooks/useAppSetup";
@@ -24,11 +25,13 @@ export type { BackendStatus } from "./hooks/useAppSetup";
 const sectionLabels: Record<SectionId, string> = {
   chat: "Chat",
   documents: "Documenti",
+  graph: "Grafo",
   images: "Immagini",
   translation: "Traduzione",
   coding: "Coding",
   settings: "Impostazioni"
 };
+
 
 export function AppContent() {
   const { theme } = useTheme();
@@ -164,7 +167,9 @@ export function AppContent() {
           </div>
           <Suspense fallback={<SkeletonSection />}>
             {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
+            {activeSection === "graph" && <GraphSection />}
             {activeSection === "images" && <ImagesSection />}
+
             {activeSection === "translation" && (
               <TranslationSection
                 models={setup.ollamaModels}

@@ -6,10 +6,10 @@ OnlyRag è un'applicazione desktop Windows *local-first* basata su un'architettu
 - **Shell Desktop**: Windows Presentation Foundation (WPF) in **.NET 10** (`net10.0-windows`).
 - **Frontend UI**: **React 19**, **TypeScript 5.9**, **Vite 6** e **TanStack Query v5**, integrato tramite Microsoft Edge **WebView2** runtime.
 - **Backend**: In-process ASP.NET Core Minimal API in esecuzione all'interno dell'applicazione WPF su server Kestrel in loopback (`127.0.0.1`).
-- **Database & System of Record**: **SQLite** tramite ADO.NET basico (`Microsoft.Data.Sqlite` 10.0.10 e `SQLitePCLRaw.bundle_e_sqlite3` 2.1.12) con FTS5 per la ricerca testuale.
+- **Database & System of Record**: **SQLite** tramite ADO.NET basico (`Microsoft.Data.Sqlite` 10.0.10 e `SQLitePCLRaw.bundle_e_sqlite3` 2.1.12) con FTS5 e tabelle **Knowledge Graph** (`document_graph_nodes`, `document_graph_edges`).
 - **Vector Store**: **Qdrant** (client `Qdrant.Client` 1.18.1) eseguito via processo locale affiancato (*sidecar binary*).
-- **Elaborazione Documenti**: `PdfPig` (PDF), `DocumentFormat.OpenXml` (DOCX/XLSX/PPTX), `SharpCompress` (Archivi).
-- **AI & OCR Bridge**: Integratione Ollama HTTP personalizzata, ponte subprocess Python per **PaddleOCR** (`scripts/ocr`), e **ONNX Runtime DirectML** (`Microsoft.ML.OnnxRuntime.DirectML` 1.24.4 + `OnnxStack.StableDiffusion` 0.60.0) per la generazione locale di immagini.
+- **Elaborazione Documenti**: `PdfPig` (PDF), `DocumentFormat.OpenXml` (DOCX/XLSX/PPTX), `SharpCompress` (Archivi ZIP/TAR/7Z), `System.Threading.Channels` per la pipeline di ingestion ad alte prestazioni in streaming.
+- **AI, Graph & OCR Engine**: Integratione Ollama & Cloud LLMs (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek), recupero **Knowledge Graph** (`SqliteGraphRetrievalService`), **Engine OCR Nativo C# ONNX DirectML** (`OnnxDirectMlOcrEngine`) a zero-dipendenze Python + ponte subprocess Python per **PaddleOCR** legacy (`scripts/ocr`), e **ONNX Runtime DirectML** (`Microsoft.ML.OnnxRuntime.DirectML` 1.24.4 + `OnnxStack.StableDiffusion` 0.60.0) per la generazione locale di immagini.
 
 Questo documento definisce un **audit architetturale completo** e un **piano di elevazione tecnologica** strutturato per eliminare il debito tecnico, introdurre le più recenti astrazioni .NET 10 e web moderni, rafforzare la sicurezza a riposo e massimizzare le prestazioni complessive.
 

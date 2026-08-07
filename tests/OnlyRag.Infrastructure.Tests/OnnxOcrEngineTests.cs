@@ -1,5 +1,7 @@
+using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 using Xunit;
+
 
 namespace OnlyRag.Infrastructure.Tests;
 
@@ -21,7 +23,7 @@ public sealed class OnnxOcrEngineTests
     public async Task OnnxDirectMlOcrEngine_PreparePageAsync_ReturnsPreparedPage()
     {
         var engine = new OnnxDirectMlOcrEngine();
-        var request = new OcrPagePreparationRequest("sample_test_path.png", 1);
+        var request = new OcrPagePreparationRequest("sample_test_path.png", "image", 1, "out_dir", "v1", OcrSettings.Default);
 
         var prep = await engine.PreparePageAsync(request);
 
@@ -35,7 +37,8 @@ public sealed class OnnxOcrEngineTests
     public async Task OnnxDirectMlOcrEngine_RecognizeAsync_ReturnsValidPageResult()
     {
         var engine = new OnnxDirectMlOcrEngine();
-        var request = new OcrRecognitionRequest("sample_test_path.png", "it");
+        var request = new OcrRecognitionRequest("sample_test_path.png", "it", OcrSettings.Default);
+
 
         var result = await engine.RecognizeAsync(request);
 

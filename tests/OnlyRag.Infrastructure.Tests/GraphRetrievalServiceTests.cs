@@ -70,4 +70,31 @@ public sealed class GraphRetrievalServiceTests : IDisposable
         Assert.NotEmpty(result.Edges);
         Assert.True(result.RelevanceScore > 0f);
     }
+
+    [Fact]
+    public async Task SqliteGraphRetrievalService_GetFullGraphAsync_ReturnsNodesAndEdges()
+    {
+        var graphService = new SqliteGraphRetrievalService(connectionFactory);
+
+        var nodes = new List<EntityGraphNode>
+        {
+            new("n1", "1", "10", "OllamaEngine", "Component", "Ollama LLM Engine"),
+            new("n2", "1", "10", "QdrantStore", "Component", "Qdrant Vector Database")
+        };
+
+        var edges = new List<EntityGraphEdge>
+        {
+            new("e1", "n1", "n2", "uses", 1.0f, "10")
+        };
+
+        await graphService.InsertGraphAsync(nodes, edges);
+
+        var fullGraph = await graphService.GetFullGraphAsync(limit: 50);
+
+        Assert.NotNull(fullGraph);
+        Assert.NotEmpty(fullGraph.Nodes);
+        Assert.NotEmpty(fullGraph.Edges);
+        Assert.Equal(1.0f, fullGraph.RelevanceScore);
+    }
 }
+
