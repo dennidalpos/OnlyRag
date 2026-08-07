@@ -241,6 +241,7 @@ export function SettingsSectionPanels() {
             <h3 id="settings-connections-title">Connessione &amp; Modelli</h3>
             <div className="settings-section__grid">
               <OllamaConnectionPanel />
+              <CloudProviderPanel />
               <DefaultModelsPanel />
               <ModelManagementPanel />
             </div>
