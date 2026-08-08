@@ -36,7 +36,10 @@ pwsh .\scripts\Lint-Code.ps1 -Configuration Release
 
 ### Automated Testing
 ```powershell
-# Run fast Vitest unit tests and .NET unit tests (default compact AI summary)
+# Run agent-optimized fast test suite (compact PASS/FAIL summary)
+pwsh .\scripts\test-agent.ps1
+
+# Run Vitest unit tests and .NET unit tests (default compact AI summary)
 pwsh .\scripts\Test-Code.ps1 -Fast
 
 # Run full solution integration tests

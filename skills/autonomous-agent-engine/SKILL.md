@@ -7,7 +7,14 @@ description: Specialized technical skill for the autonomous AI agent engine in O
 
 This skill provides operational and technical standards for developing, maintaining, and extending the autonomous agent execution engine in OnlyRag.
 
-## 1. Core Architecture & Components
+## 1. Official Documentation & Technical References
+
+- **Microsoft .NET 10 Task & Channel Concurrent Execution**: [learn.microsoft.com/dotnet/standard/threads/system-threading-channels](https://learn.microsoft.com/en-us/dotnet/standard/threads/system-threading-channels)
+- **ASP.NET Core Server-Sent Events (SSE) & SignalR Streaming**: [learn.microsoft.com/aspnet/core/signalr/streaming](https://learn.microsoft.com/en-us/aspnet/core/signalr/streaming)
+- **EF Core 10 State & Transaction Management**: [learn.microsoft.com/ef/core/saving/transactions](https://learn.microsoft.com/en-us/ef/core/saving/transactions)
+- **MCTS & Tree-of-Thought Reasoning Literature**: [arxiv.org/abs/2305.10601](https://arxiv.org/abs/2305.10601)
+
+## 2. Core Architecture & Components
 
 OnlyRag includes a state-of-the-art, local-first autonomous agent engine superior to commercial agent frameworks (e.g. AutoGPT, CrewAI, LangGraph):
 
@@ -25,7 +32,7 @@ OnlyRag includes a state-of-the-art, local-first autonomous agent engine superio
 - **MCTS Tree-of-Thought**: [`src/OnlyRag.Infrastructure/Agent/AgentMctsStateMachine.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure/Agent/AgentMctsStateMachine.cs)
 - **Episodic Memory**: [`src/OnlyRag.Infrastructure/Agent/Memory/AgentEpisodicMemoryService.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure/Agent/Memory/AgentEpisodicMemoryService.cs)
 - **Skill Repository**: [`src/OnlyRag.Infrastructure/Agent/Memory/AgentSkillRepository.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure/Agent/Memory/AgentSkillRepository.cs)
-- **Subagent Execution Engine**: [`src/OnlyRag.Infrastructure/Agent/SubagentRunner.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure/Agent/SubagentRunner.cs)
+- **Subagent Execution Engine**: [`src/OnlyRag.Api/SubagentRunner.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api/SubagentRunner.cs) e [`src/OnlyRag.Infrastructure/Agent/ISubagentRunner.cs`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure/Agent/ISubagentRunner.cs)
 - **Evaluation Trace Dataset**: [`docs/agent-evaluation.dataset.json`](file:///d:/GITHUB/OnlyRag/docs/agent-evaluation.dataset.json)
 
 ## 3. Persistent Run Recovery API

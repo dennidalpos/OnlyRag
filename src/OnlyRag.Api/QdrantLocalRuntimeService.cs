@@ -17,6 +17,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     private readonly SemaphoreSlim healingLock = new(1, 1);
     private CancellationTokenSource? autoHealingCts;
     private Task? autoHealingTask;
+    private volatile bool isStartupInProgress;
 
     public QdrantLocalRuntimeService(
         InProcessBackendDescriptor descriptor,
@@ -45,8 +46,15 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         }
 
         bool isHealingActive = autoHealingTask is { IsCompleted: false };
+        bool isStarting = isStartupInProgress;
+        string statusText = reachable
+            ? "Online"
+            : isStarting
+                ? "Caricamento"
+                : "Offline";
+
         return new QdrantStatusResponse(
-            reachable ? "Online" : "Offline",
+            statusText,
             reachable,
             settings.GrpcEndpoint,
             QdrantSettingsStore.IsLoopback(endpoint),
@@ -58,7 +66,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             ResolveStorageDirectory(),
             ReadPid(),
             BuildWarning(settings, endpoint),
-            error,
+            reachable || isStarting ? null : error,
             AutoHealingActive: isHealingActive,
             AutoHealRestartCount: processSupervisor.AutoHealRestartCount,
             LastAutoHealedAtUtc: processSupervisor.LastAutoHealedAtUtc);
@@ -81,9 +89,17 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         if (existingPid is not null && processSupervisor.IsOwnedProcess(existingPid.Value, ResolveBinaryPath()))
         {
             processSupervisor.TryAdoptProcess(existingPid.Value, ResolveBinaryPath());
-            QdrantStatusResponse status = await WaitForAvailabilityAsync(vectorStore, existingPid.Value, StartupTimeout, cancellationToken);
-            StartAutoHealingSupervisor(vectorStore);
-            return status;
+            isStartupInProgress = true;
+            try
+            {
+                QdrantStatusResponse status = await WaitForAvailabilityAsync(vectorStore, existingPid.Value, StartupTimeout, cancellationToken);
+                StartAutoHealingSupervisor(vectorStore);
+                return status;
+            }
+            finally
+            {
+                isStartupInProgress = false;
+            }
         }
 
         if (existingPid is not null)
@@ -91,11 +107,19 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             DeletePidFile();
         }
 
-        await StartLocalProcessAsync(settings, cancellationToken);
-        int? startedPid = ReadPid();
-        QdrantStatusResponse startedStatus = await WaitForAvailabilityAsync(vectorStore, startedPid, StartupTimeout, cancellationToken);
-        StartAutoHealingSupervisor(vectorStore);
-        return startedStatus;
+        isStartupInProgress = true;
+        try
+        {
+            await StartLocalProcessAsync(settings, cancellationToken);
+            int? startedPid = ReadPid();
+            QdrantStatusResponse startedStatus = await WaitForAvailabilityAsync(vectorStore, startedPid, StartupTimeout, cancellationToken);
+            StartAutoHealingSupervisor(vectorStore);
+            return startedStatus;
+        }
+        finally
+        {
+            isStartupInProgress = false;
+        }
     }
 
     public async Task<QdrantStatusResponse> EnsureLocalServerAsync(

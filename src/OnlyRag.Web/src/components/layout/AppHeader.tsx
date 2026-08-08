@@ -76,10 +76,15 @@ export function AppHeader({
         : "In caricamento...";
     overallTone = "warning";
   } else {
+    const isQdrantStarting =
+      diagnostics?.qdrant.status === "Caricamento" ||
+      diagnostics?.qdrant.status === "In caricamento..." ||
+      diagnostics?.qdrant.status === "Starting";
+
     const hasCriticalIssues =
       backendStatus.ollamaTone !== "online" ||
       (diagnostics !== null && !diagnostics.ocrIsConfigured) ||
-      (diagnostics !== null && !diagnostics.qdrant.isReachable) ||
+      (diagnostics !== null && !diagnostics.qdrant.isReachable && !isQdrantStarting) ||
       statusBadges.some((b) => b.tone === "offline");
 
     if (hasCriticalIssues) {
@@ -271,9 +276,14 @@ function buildQdrantBadge(
     };
   }
 
+  const isStarting =
+    diagnostics.qdrant.status === "Caricamento" ||
+    diagnostics.qdrant.status === "In caricamento..." ||
+    diagnostics.qdrant.status === "Starting";
+
   return {
     label: "Vettori (Qdrant)",
-    value: diagnostics.qdrant.status,
+    value: isStarting ? "Caricamento..." : diagnostics.qdrant.status,
     tone: diagnostics.qdrant.isReachable ? "online" : "warning"
   };
 }

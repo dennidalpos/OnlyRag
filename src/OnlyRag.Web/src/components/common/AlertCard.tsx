@@ -96,6 +96,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexWrap: "wrap",
         gap: "12px",
         padding: "10px 14px",
         borderRadius: "8px",
@@ -107,11 +108,11 @@ export const AlertCard: React.FC<AlertCardProps> = ({
         ...style
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 auto", minWidth: 0 }}>
-        <span style={{ color: styles.iconColor, display: "inline-flex" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 200px", minWidth: 0 }}>
+        <span style={{ color: styles.iconColor, display: "inline-flex", flexShrink: 0 }}>
           {styles.icon}
         </span>
-        <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
           {title}
         </span>
         {detail && (

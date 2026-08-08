@@ -115,14 +115,19 @@ export function SettingsConfigurationAlerts() {
   }
 
   // 6. Qdrant errors/warnings
-  if (diagnostics && diagnostics.qdrant.error) {
+  const isQdrantStarting =
+    diagnostics?.qdrant.status === "Caricamento" ||
+    diagnostics?.qdrant.status === "In caricamento..." ||
+    diagnostics?.qdrant.status === "Starting";
+
+  if (diagnostics && diagnostics.qdrant.error && !isQdrantStarting) {
     alerts.push({
       id: "qdrant-error",
       variant: "error",
       title: "Errore database vettoriale Qdrant.",
       detail: diagnostics.qdrant.error
     });
-  } else if (diagnostics && diagnostics.qdrant.warning) {
+  } else if (diagnostics && diagnostics.qdrant.warning && !isQdrantStarting) {
     alerts.push({
       id: "qdrant-warning",
       variant: "warning",

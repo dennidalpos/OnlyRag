@@ -29,15 +29,19 @@
 * Strict active todo list in `PROJECT_STATUS.json`: `{"todos": ["Task"]}`. Add active tasks only; immediately remove completed or obsolete items. No changelogs, blockers, or notes.
 
 ## 6. Portable Agent Skills & Code Maintenance Tooling
-* **Skills Directory (`skills/`):** All domain skills are stored in the root `skills/` folder for portability. AI agents MUST inspect and load relevant skills before undertaking work in specific sub-systems:
+* **Skills Directory (`skills/`):** All domain skills are stored in the root `skills/` folder for portability. AI agents MUST inspect and load relevant skills using `view_file` before undertaking work in specific sub-systems:
   - [`skills/onlyrag`](file:///d:/GITHUB/OnlyRag/skills/onlyrag/SKILL.md): Primary architecture, workflows, local data paths, and gate checks.
   - [`skills/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop, SQLite.
   - [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright.
-  - [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, Heuristic Re-ranking, CRAG evaluation.
+  - [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, ONNX Cross-Encoder re-ranking, CRAG evaluation.
   - [`skills/autonomous-agent-engine`](file:///d:/GITHUB/OnlyRag/skills/autonomous-agent-engine/SKILL.md): MCTS Tree-of-Thought, Plan-Act-Observe-Verify state machine, Episodic memory, Subagent DAG.
   - [`skills/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skills/onnx-directml-image-gen/SKILL.md): ONNX DirectML GPU / CPU fallback, SDXL/LCM models, SHA256 integrity, Canvas editor.
   - [`skills/windows-packaging-signing`](file:///d:/GITHUB/OnlyRag/skills/windows-packaging-signing/SKILL.md): NSIS packaging, signtool.exe signing, prerequisite testing, installer release lifecycle.
   - [`skills/code-maintenance-automation`](file:///d:/GITHUB/OnlyRag/skills/code-maintenance-automation/SKILL.md): Automated code formatting, static linting, and testing workflows.
+* **Mandatory Skill Loading Instructions for AI Agents:**
+  1. Before modifying or implementing features in any module, check the `skills/` directory for the relevant domain skill.
+  2. Invoke `view_file` on the target `skills/<skill-name>/SKILL.md` (setting `IsSkillFile: true` where applicable) to load detailed standards, official API documentation sources, and verification commands into your context.
+  3. Adhere strictly to the architecture patterns and operational rules defined in the loaded skill.
 * **Code Formatting & Linting Utility Scripts:**
   - `pwsh .\scripts\Format-Code.ps1`: Formats .NET C# solution (`dotnet format`) and Web frontend (`npm run format`). Use `-CheckOnly` to verify without mutating files.
   - `pwsh .\scripts\Lint-Code.ps1`: Performs TypeScript typechecking (`npm run typecheck`), ESLint validation (`npm run lint`), and .NET static analyzer builds.

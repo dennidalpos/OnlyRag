@@ -149,6 +149,33 @@
   }
 }
 
+@media (max-width: 900px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .status-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .chat-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-toolbar > * {
+    width: 100%;
+  }
+
+  .alert-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* Controls must reflow before they can collide. These apply across all sections. */
 @media (max-width: 700px) {
   .app-header,

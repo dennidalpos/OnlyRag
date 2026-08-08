@@ -130,6 +130,7 @@
 .document-row__header div {
   display: grid;
   gap: 2px;
+  flex: 1 1 180px;
   min-width: 0;
 }
 
@@ -166,6 +167,7 @@
 
 .document-conversion-badge {
   min-width: 0;
+  flex-shrink: 0;
   padding: 3px 10px;
   border: 1px solid #f59e0b;
   border-radius: var(--radius-full);
@@ -178,6 +180,11 @@
 
 .document-row__actions {
   flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.document-row__actions > button {
+  flex-shrink: 0;
 }
 
 .document-details {

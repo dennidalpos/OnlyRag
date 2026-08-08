@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type RefObject } from "react";
+import { useEffect, useState, type FormEvent, type RefObject } from "react";
 import {
   apiRequest,
   type ImageGenerationSettings,
@@ -38,6 +38,7 @@ export function ImageModelCatalogModal({
   modalRef,
   settings,
   catalog,
+  modelStates,
   selectedModel,
   selectedModelState,
   isSaving,
@@ -56,6 +57,16 @@ export function ImageModelCatalogModal({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isVerifyingUrl, setIsVerifyingUrl] = useState(false);
   const [verifyFeedback, setVerifyFeedback] = useState<{ tone: "success" | "error" | "warning"; message: string } | null>(null);
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings, isOpen]);
+
+  const activeSelectedModel =
+    catalog.find((m) => m.id === localSettings.selectedModelId) ?? selectedModel;
+
+  const activeSelectedModelState =
+    modelStates.find((s) => s.modelId === localSettings.selectedModelId) ?? selectedModelState;
 
   if (!isOpen) return null;
 
@@ -209,13 +220,13 @@ export function ImageModelCatalogModal({
               </InfoTip>
             </div>
 
-            {selectedModel && (
+            {activeSelectedModel && (
               <ModelReadiness
-                model={selectedModel}
-                state={selectedModelState}
-                onAskConsent={() => onAskConsent(selectedModel.id)}
-                onDelete={() => onDeleteModel(selectedModel.id)}
-                onDeleteCatalogModel={onDeleteCatalogModel ? () => onDeleteCatalogModel(selectedModel.id) : undefined}
+                model={activeSelectedModel}
+                state={activeSelectedModelState}
+                onAskConsent={() => onAskConsent(activeSelectedModel.id)}
+                onDelete={() => onDeleteModel(activeSelectedModel.id)}
+                onDeleteCatalogModel={onDeleteCatalogModel ? () => onDeleteCatalogModel(activeSelectedModel.id) : undefined}
                 disabled={isModelActionRunning}
               />
             )}

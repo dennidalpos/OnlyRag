@@ -9,6 +9,18 @@ This skill provides comprehensive operational and architectural guidance for dev
 
 ## 1. Documentazione Ufficiale & Riferimenti
 
+### Fonti Ufficiali Platform & Framework
+- **Microsoft .NET 10 & C# 13 Documentation**: [learn.microsoft.com/dotnet](https://learn.microsoft.com/en-us/dotnet/)
+- **ASP.NET Core Minimal APIs**: [learn.microsoft.com/aspnet/core/fundamentals/minimal-apis](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis)
+- **Microsoft Edge WebView2**: [learn.microsoft.com/microsoft-edge/webview2](https://learn.microsoft.com/en-us/microsoft-edge/webview2/)
+- **SQLite FTS5 Extension**: [sqlite.org/fts5.html](https://www.sqlite.org/fts5.html)
+- **Qdrant Vector Database**: [qdrant.tech/documentation](https://qdrant.tech/documentation/)
+- **React 19 Documentation**: [react.dev](https://react.dev/)
+- **Vite Build Tool**: [vite.dev/guide](https://vite.dev/guide/)
+- **ONNX Runtime DirectML**: [learn.microsoft.com/windows/ai/directml](https://learn.microsoft.com/en-us/windows/ai/directml/)
+- **NSIS Installer Documentation**: [nsis.sourceforge.io/Docs/](https://nsis.sourceforge.io/Docs/)
+
+### Documentazione Interna OnlyRag
 - **Indice Documentazione OnlyRag**: [docs/README.md](file:///d:/GITHUB/OnlyRag/docs/README.md)
 - **Architettura**: [docs/ARCHITECTURE.md](file:///d:/GITHUB/OnlyRag/docs/ARCHITECTURE.md)
 - **Operazioni & Handoff**: [docs/OPERATIONS.md](file:///d:/GITHUB/OnlyRag/docs/OPERATIONS.md)
@@ -71,6 +83,9 @@ pwsh .\scripts\Format-Code.ps1
 
 # Static analysis and linting (TypeScript + ESLint + .NET analyzers)
 pwsh .\scripts\Lint-Code.ps1
+
+# Run agent-optimized fast test suite (compact PASS/FAIL summary)
+pwsh .\scripts\test-agent.ps1
 
 # Run fast unit test suite with compact AI summary (.NET xUnit + Vitest unit tests)
 pwsh .\scripts\Test-Code.ps1 -Fast

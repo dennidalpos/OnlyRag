@@ -772,6 +772,7 @@ textarea:hover:not(:disabled) {
   background: var(--bg-header);
   border-bottom: 1px solid var(--border-light);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  flex-wrap: wrap;
 }
 
 .app-header > div:first-child {
@@ -784,6 +785,9 @@ textarea:hover:not(:disabled) {
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-row {
@@ -801,6 +805,7 @@ textarea:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .status-row__operations {
@@ -813,7 +818,8 @@ textarea:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  max-width: 200px;
+  max-width: 220px;
+  flex-shrink: 0;
   height: 28px;
   padding: 0 10px;
   border-radius: var(--radius-full);

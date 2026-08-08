@@ -19,6 +19,7 @@ import {
   createEmptyEditState,
   defaultModelId,
   defaultSettings,
+  getCompatiblePresets,
   resolveGenerationProfile,
   type ArrowLayer,
   type EditTool,
@@ -267,6 +268,19 @@ export function useImagesSectionController() {
       setBatchSize(profile.batchSize);
     }
   }, [generationProfile, settings.selectedModelId]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      const presets = getCompatiblePresets(selectedModel);
+      if (presets.length > 0) {
+        const isCurrentValid = presets.some((p) => p.width === width && p.height === height);
+        if (!isCurrentValid) {
+          setWidth(presets[0].width);
+          setHeight(presets[0].height);
+        }
+      }
+    }
+  }, [selectedModel]);
 
   useEffect(() => {
     if (images.length === 0) {

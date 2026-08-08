@@ -105,9 +105,10 @@
 
 .chat-toolbar {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-light);
@@ -115,6 +116,7 @@
 
 .chat-model-field {
   min-width: 0;
+  flex: 1 1 220px;
   width: 100%;
 }
 

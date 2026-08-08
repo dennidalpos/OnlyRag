@@ -73,6 +73,8 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 | Avvio dev server Vite | `Set-Location .\src\OnlyRag.Web; npm run dev` |
 | Gate di verifica rapido | `pwsh .\scripts\Invoke-Gate.ps1 -Fast` |
 | Gate di verifica completo | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release` |
+| Suite test agente rapida | `pwsh .\scripts\test-agent.ps1` |
+| Benchmark di recupero RAG | `pwsh .\scripts\Evaluate-Retrieval.ps1 -DatasetPath .\docs\retrieval-evaluation.sample.json` |
 | Verifica prontezza installer | `pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -IncludeInstaller` |
 | Controlli frontend | `Set-Location .\src\OnlyRag.Web; npm run typecheck; npm run lint; npm run format:check; npm run test` |
 | Test .NET | `dotnet test .\OnlyRag.sln --configuration Release` |
