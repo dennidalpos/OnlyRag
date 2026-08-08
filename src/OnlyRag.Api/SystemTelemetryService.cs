@@ -6,8 +6,10 @@ namespace OnlyRag.Api;
 
 public sealed class SystemTelemetryService
 {
-    private const int CpuSampleDelayMs = 250;
     private readonly ILocalProcessLauncher processLauncher;
+    private readonly object cpuLock = new();
+    private CpuTimes lastCpuTimes;
+    private DateTimeOffset lastCpuSampleTime;
 
     public SystemTelemetryService(ILocalProcessLauncher processLauncher)
     {
@@ -26,21 +28,44 @@ public sealed class SystemTelemetryService
             await gpuTask);
     }
 
-    private static async Task<double?> CaptureCpuUsageAsync(CancellationToken cancellationToken)
+    private async Task<double?> CaptureCpuUsageAsync(CancellationToken cancellationToken)
     {
-        if (!OperatingSystem.IsWindows() || !TryReadCpuTimes(out CpuTimes start))
+        if (!OperatingSystem.IsWindows() || !TryReadCpuTimes(out CpuTimes current))
         {
             return null;
         }
 
-        await Task.Delay(CpuSampleDelayMs, cancellationToken);
-        if (!TryReadCpuTimes(out CpuTimes end))
+        CpuTimes previous;
+        DateTimeOffset previousTime;
+        lock (cpuLock)
         {
-            return null;
+            previous = lastCpuTimes;
+            previousTime = lastCpuSampleTime;
+            lastCpuTimes = current;
+            lastCpuSampleTime = DateTimeOffset.UtcNow;
         }
 
-        ulong idle = end.Idle - start.Idle;
-        ulong total = end.Total - start.Total;
+        if (previous.Total == 0 || (DateTimeOffset.UtcNow - previousTime) > TimeSpan.FromSeconds(10))
+        {
+            await Task.Delay(50, cancellationToken);
+            if (!TryReadCpuTimes(out CpuTimes second))
+            {
+                return null;
+            }
+
+            ulong idleSample = second.Idle - current.Idle;
+            ulong totalSample = second.Total - current.Total;
+            lock (cpuLock)
+            {
+                lastCpuTimes = second;
+                lastCpuSampleTime = DateTimeOffset.UtcNow;
+            }
+            if (totalSample == 0 || idleSample > totalSample) return null;
+            return Math.Round((1d - (double)idleSample / totalSample) * 100d, 1);
+        }
+
+        ulong idle = current.Idle - previous.Idle;
+        ulong total = current.Total - previous.Total;
         if (total == 0 || idle > total)
         {
             return null;

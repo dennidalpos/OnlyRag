@@ -169,16 +169,48 @@ internal sealed class OcrProvisionRuntimeResolver
 
         IEnumerable<string> candidateDirectories = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        candidateDirectories = candidateDirectories.Concat([
-            Environment.GetFolderPath(Environment.SpecialFolder.System)
-        ]);
+        
+        var extraDirectories = new List<string>
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NVIDIA Corporation", "NVSMI"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "NVIDIA Corporation", "NVSMI")
+        };
+
+        candidateDirectories = candidateDirectories.Concat(extraDirectories);
 
         foreach (string directory in candidateDirectories)
         {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                continue;
+            }
+
             string candidate = Path.Combine(directory, normalizedName);
             if (File.Exists(candidate))
             {
                 return candidate;
+            }
+        }
+
+        if (string.Equals(executableName, "nvidia-smi", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(executableName, "nvidia-smi.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string driverStore = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "DriverStore", "FileRepository");
+                if (Directory.Exists(driverStore))
+                {
+                    string? match = Directory.EnumerateFiles(driverStore, "nvidia-smi.exe", SearchOption.AllDirectories).FirstOrDefault();
+                    if (match is not null)
+                    {
+                        return match;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignora eventuali eccezioni I/O o access denied su DriverStore
             }
         }
 

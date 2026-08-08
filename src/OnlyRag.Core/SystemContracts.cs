@@ -195,6 +195,7 @@ public static class AppDataReset
             return false;
         }
 
+        Logging.EarlyBootstrapperLogger.Close();
         CreateTimestampedBackup(paths);
         DeleteDirectoryContents(paths.DataRoot);
         return true;
@@ -204,6 +205,7 @@ public static class AppDataReset
     {
         ArgumentNullException.ThrowIfNull(paths);
 
+        Logging.EarlyBootstrapperLogger.Close();
         AppDataResetBackup backup = CreateTimestampedBackup(paths);
         DeleteDirectoryContents(paths.DataRoot);
         return backup;
@@ -236,16 +238,40 @@ public static class AppDataReset
                 continue;
             }
 
-            if (Directory.Exists(entry))
+            DeleteFileSystemEntrySafe(entry);
+        }
+    }
+
+    private static void DeleteFileSystemEntrySafe(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
             {
-                ClearAttributesRecursive(entry);
-                Directory.Delete(entry, recursive: true);
+                ClearAttributesRecursive(path);
+                foreach (string entry in Directory.EnumerateFileSystemEntries(path))
+                {
+                    DeleteFileSystemEntrySafe(entry);
+                }
+
+                try
+                {
+                    Directory.Delete(path, recursive: false);
+                }
+                catch
+                {
+                    // Ignore directory deletion failure if a locked file inside could not be deleted
+                }
             }
-            else
+            else if (File.Exists(path))
             {
-                File.SetAttributes(entry, FileAttributes.Normal);
-                File.Delete(entry);
+                File.SetAttributes(path, FileAttributes.Normal);
+                File.Delete(path);
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Ignore locked active files (e.g. startup-bootstrap.log or active log files) during data reset
         }
     }
 
@@ -270,8 +296,15 @@ public static class AppDataReset
             }
             else
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-                File.Copy(sourcePath, destinationPath, overwrite: false);
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                    File.Copy(sourcePath, destinationPath, overwrite: false);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Ignore locked files during backup copy
+                }
             }
         }
     }

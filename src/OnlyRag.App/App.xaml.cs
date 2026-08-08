@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using OnlyRag.Api;
 using OnlyRag.Core;
+using OnlyRag.Core.Logging;
 
 namespace OnlyRag.App;
 
@@ -12,26 +13,39 @@ public partial class App : Application
     private bool terminatePeerProcessesOnExit;
     private bool isDisposingBackend;
 
+    static App()
+    {
+        string logDir = AppStoragePaths.FromLocalAppData().LogsDirectory;
+        EarlyBootstrapperLogger.Initialize(logDir);
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        using var appScope = EarlyBootstrapperLogger.TraceScope("WPF_App_OnStartup");
         base.OnStartup(e);
 
         string? resetError = TryApplyPendingDataReset();
-        MainWindow mainWindow = new();
-        MainWindow = mainWindow;
-        mainWindow.Show();
+        MainWindow mainWindow;
+        using (EarlyBootstrapperLogger.TraceScope("Create_MainWindow"))
+        {
+            mainWindow = new MainWindow();
+            MainWindow = mainWindow;
+            mainWindow.Show();
+        }
 
         _ = InitializeBackendAsync(mainWindow, resetError);
     }
 
     private async Task InitializeBackendAsync(MainWindow mainWindow, string? resetError)
     {
+        using var backendInitScope = EarlyBootstrapperLogger.TraceScope("InitializeBackendAsync");
         BackendWebSettings backendSettings = resetError is null
             ? await StartBackendAsync()
             : BackendWebSettings.Offline(resetError);
 
         await mainWindow.Dispatcher.InvokeAsync(async () =>
         {
+            using var uiBindScope = EarlyBootstrapperLogger.TraceScope("UI_BindBackendSettings");
             await mainWindow.InitializeBackendSettingsAsync(backendSettings);
         });
     }
@@ -59,7 +73,8 @@ public partial class App : Application
             isDisposingBackend = true;
             try
             {
-                backend.DisposeAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+                Task.Run(async () => await backend.DisposeAsync().ConfigureAwait(false))
+                    .Wait(TimeSpan.FromSeconds(5));
             }
             catch
             {
@@ -78,7 +93,7 @@ public partial class App : Application
     {
         try
         {
-            backend = await InProcessBackend.StartAsync();
+            backend = await Task.Run(async () => await InProcessBackend.StartAsync().ConfigureAwait(false)).ConfigureAwait(false);
             backend.StoppedToken.Register(OnBackendStopped);
             return new BackendWebSettings(
                 true,

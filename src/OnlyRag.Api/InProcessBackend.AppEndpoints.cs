@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -136,40 +137,71 @@ public static partial class InProcessBackend
             ICloudApiKeyVault cloudKeyVault,
             CancellationToken cancellationToken) =>
         {
-            string ollamaStatus;
-            bool ollamaReachable;
-            string? ollamaVersion = null;
-            IReadOnlyList<OllamaRunningModelResponse> ollamaRunningModels = [];
-            try
-            {
-                await ollamaClient.ListModelsAsync(cancellationToken);
-                ollamaVersion = await TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
-                ollamaRunningModels = await TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
-                ollamaStatus = "Online";
-                ollamaReachable = true;
-            }
-            catch (OllamaApiException ex)
-            {
-                ollamaStatus = ex.Kind is OllamaErrorKind.Unreachable or OllamaErrorKind.Timeout
-                    ? "Offline"
-                    : ex.Kind.ToString();
-                ollamaReachable = false;
-            }
+            // Use a short timeout for Ollama status probes (not for generation)
+            using var ollamaStatusCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            ollamaStatusCts.CancelAfter(TimeSpan.FromSeconds(5));
 
-            QdrantStatusResponse qdrantStatus = await qdrantRuntime.EnsureLocalServerAsync(qdrantVectorStore, cancellationToken);
-            OcrEngineAvailability ocrAvailability = await diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken);
-            OcrGpuCapabilityResponse gpuCapability = await diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, cancellationToken);
-            SystemTelemetryResponse telemetry = await diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken);
-            ImageGenerationRuntimeStatus imageGenerationStatus = await imageGeneration.GetRuntimeStatusAsync(cancellationToken);
+            // Launch all probes in parallel — each isolated so one failure doesn't block others
+            Task<(string status, bool reachable, string? version, IReadOnlyList<OllamaRunningModelResponse> runningModels)> ollamaTask =
+                ProbeOllamaAsync(ollamaClient, ollamaStatusCts.Token);
 
-            RerankerModelInfo rerankerInfo = await rerankerModelManager.GetModelStatusAsync(cancellationToken);
+            Task<QdrantStatusResponse> qdrantTask =
+                RunSafeAsync(
+                    () => qdrantRuntime.GetStatusAsync(qdrantVectorStore, cancellationToken),
+                    new QdrantStatusResponse("Sconosciuto", false, string.Empty, false, false, false, null, null, null, null, null, null, null));
+
+            Task<OcrEngineAvailability> ocrAvailabilityTask =
+                RunSafeAsync(
+                    () => diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken),
+                    new OcrEngineAvailability(false, string.Empty, string.Empty, null));
+
+            Task<OcrGpuCapabilityResponse> gpuTask =
+                RunSafeAsync(
+                    () => diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, cancellationToken),
+                    new OcrGpuCapabilityResponse(false, "unknown", null, null, null, null, null, null, null, null, new Dictionary<string, string>()));
+
+            Task<SystemTelemetryResponse> telemetryTask =
+                RunSafeAsync(
+                    () => diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken),
+                    new SystemTelemetryResponse(
+                        new CpuTelemetryResponse(Environment.ProcessorCount, null),
+                        new MemoryTelemetryResponse(0, 0),
+                        new DiskTelemetryResponse("?", 0, 0),
+                        null));
+
+            Task<ImageGenerationRuntimeStatus> imageGenTask =
+                RunSafeAsync(
+                    () => imageGeneration.GetRuntimeStatusAsync(cancellationToken),
+                    new ImageGenerationRuntimeStatus("Unknown", false, "CPU", string.Empty, null));
+
+            Task<RerankerModelInfo> rerankerTask =
+                RunSafeAsync(
+                    () => rerankerModelManager.GetModelStatusAsync(cancellationToken),
+                    new RerankerModelInfo(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, 0, string.Empty, false, 0, false, null));
+
+            CloudLlmConfiguration cloudConfig = InProcessBackendCloudLlmEndpoints.GetCurrentConfig();
+            Task<string?> cloudKeyTask =
+                RunSafeAsync<string?>(
+                    () => cloudKeyVault.GetApiKeyAsync(cloudConfig.Provider, cancellationToken),
+                    null);
+
+            await Task.WhenAll(ollamaTask, qdrantTask, ocrAvailabilityTask, gpuTask,
+                telemetryTask, imageGenTask, rerankerTask, cloudKeyTask);
+
+            var (ollamaStatus, ollamaReachable, ollamaVersion, ollamaRunningModels) = ollamaTask.Result;
+            QdrantStatusResponse qdrantStatus = qdrantTask.Result;
+            OcrEngineAvailability ocrAvailability = ocrAvailabilityTask.Result;
+            OcrGpuCapabilityResponse gpuCapability = gpuTask.Result;
+            SystemTelemetryResponse telemetry = telemetryTask.Result;
+            ImageGenerationRuntimeStatus imageGenerationStatus = imageGenTask.Result;
+            RerankerModelInfo rerankerInfo = rerankerTask.Result;
+            string? cloudApiKey = cloudKeyTask.Result;
+
             var rerankerStatus = new RerankerDiagnosticsStatus(
                 rerankerInfo.IsDownloaded,
                 rerankerInfo.IsDownloading,
                 rerankerInfo.IsDownloaded ? "ONNX Cross-Encoder" : (rerankerInfo.IsDownloading ? "Download in corso" : "Euristico (CPU)"));
 
-            CloudLlmConfiguration cloudConfig = InProcessBackendCloudLlmEndpoints.GetCurrentConfig();
-            string? cloudApiKey = await cloudKeyVault.GetApiKeyAsync(cloudConfig.Provider, cancellationToken);
             bool cloudHasKey = !string.IsNullOrWhiteSpace(cloudApiKey);
             var cloudLlmStatus = new CloudLlmDiagnosticsStatus(
                 cloudConfig.Provider.ToString(),
@@ -194,6 +226,13 @@ public static partial class InProcessBackend
                 rerankerStatus,
                 cloudLlmStatus));
         });
+
+        app.MapGet("/api/diagnostics/startup-trace", (StartupTracer startupTracer) =>
+            Results.Ok(new
+            {
+                TotalElapsedMs = (long)startupTracer.Elapsed.TotalMilliseconds,
+                Milestones = startupTracer.GetTrace()
+            }));
 
         app.MapPost("/api/diagnostics/open-logs-folder", (
             HttpContext httpContext,
@@ -266,6 +305,42 @@ public static partial class InProcessBackend
         {
             BackendLog.WriteException(descriptor.StoragePaths, httpContext.TraceIdentifier, $"{operationName} failed.", ex);
             return CreateUnexpectedErrorProblem(failureTitle, httpContext.TraceIdentifier);
+        }
+    }
+
+    private static async Task<(string status, bool reachable, string? version, IReadOnlyList<OllamaRunningModelResponse> runningModels)> ProbeOllamaAsync(
+        IOllamaClient ollamaClient,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ollamaClient.ListModelsAsync(cancellationToken);
+            string? version = await TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
+            IReadOnlyList<OllamaRunningModelResponse> running = await TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
+            return ("Online", true, version, running);
+        }
+        catch (OllamaApiException ex)
+        {
+            string status = ex.Kind is OllamaErrorKind.Unreachable or OllamaErrorKind.Timeout
+                ? "Offline"
+                : ex.Kind.ToString();
+            return (status, false, null, []);
+        }
+        catch (OperationCanceledException)
+        {
+            return ("Timeout", false, null, []);
+        }
+    }
+
+    private static async Task<T> RunSafeAsync<T>(Func<Task<T>> probe, T fallback)
+    {
+        try
+        {
+            return await probe();
+        }
+        catch
+        {
+            return fallback;
         }
     }
 

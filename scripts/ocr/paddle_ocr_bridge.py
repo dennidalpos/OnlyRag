@@ -5,7 +5,10 @@ import importlib.metadata
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore")
 
 # PaddleOCR 3.x on Windows uses OneDNN by default, which has a bug with PP-OCRv5 models.
 # Must be set before paddleocr/paddlex is imported.

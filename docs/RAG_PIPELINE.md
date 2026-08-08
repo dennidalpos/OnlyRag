@@ -1,17 +1,17 @@
-# RAG Pipeline (Next-Gen 2.0)
+# Pipeline RAG (Next-Gen 2.0)
 
-OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking con HeuristicReRankerService, risoluzione Parent-Child e valutazione di confidenza Self-Corrective RAG (CRAG).
+OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking ONNX Cross-Encoder con fallback euristico, risoluzione Parent-Child, Knowledge Graph Traversal e valutazione di confidenza Self-Corrective RAG (CRAG).
 
 ---
 
-## Architecture Flow
+## Flusso dell'Architettura
 
 ```mermaid
 flowchart TD
     UserQuery["Domanda Utente"] --> QueryTransform["1. Query Transformation (Multi-Query / HyDE)"]
     QueryTransform --> CoarseSearch["2. Ricerca Ibrida 1° Stadio (SQLite FTS5 + Qdrant HNSW)"]
     CoarseSearch --> TopKCandidates["Top Candidate Child Chunks"]
-    TopKCandidates --> ReRanker["3. Re-ranking 2° Stadio (Cross-Encoder Model)"]
+    TopKCandidates --> ReRanker["3. Re-ranking 2° Stadio (OnnxCrossEncoderReRankerService)"]
     ReRanker --> ParentResolver["4. Parent-Child Chunk Resolver"]
     ParentResolver --> ContextAssembly["5. Context Assembly & Faithfulness Check (CRAG)"]
     ContextAssembly --> LLMGeneration["6. Generazione Ollama + Citazioni Interattive"]
@@ -34,22 +34,9 @@ La pipeline di ingestion supporta l'elaborazione ad alte prestazioni in streamin
 
 I dati sono gestiti dai servizi sotto [`src/OnlyRag.Infrastructure/Ingestion`](../src/OnlyRag.Infrastructure/Ingestion) e conservati nello schema SQLite corrente (gestito tramite EF Core 10 `OnlyRagDbContext` / `LocalSqliteSchemaInitializer`) sotto [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage). Lo schema include anche le tabelle `document_graph_nodes` e `document_graph_edges` per l'indicizzazione delle relazioni di grafo tra concetti e sezioni documentali.
 
-### Sicurezza archivi
+### Sicurezza Archivi
 
-La configurazione di ingestione include limiti persistenti per il numero di file, la dimensione
-decompressa totale e per singolo file, e la profondita' delle directory. Il servizio
-`ArchiveExtractionService` legge ZIP, TAR e 7Z senza estrarre in una directory controllata
-dall'archivio: convalida ogni percorso (nessun path assoluto o traversal) e consegna il contenuto
-in streaming al chiamante. I limiti vengono verificati sui byte effettivamente letti, così
-proteggono anche da archive bomb con metadati falsificati. L'importazione accetta gli archivi come
-documenti contenitore; gli elementi TXT/MD/CSV, Office Open XML e PDF vengono indicizzati come
-pagine dello stesso documento, con il percorso dell'elemento conservato nella provenienza testuale.
-Il manifest SQLite `archive_manifest_entries` è collegato al documento contenitore e registra
-indice, percorso, dimensioni dichiarate/reali, SHA-256, stato, errore e conteggi di pagine/chunk.
-Il percorso è univoco nel contenitore, quindi gli elementi ripetuti vengono drenati in sicurezza e
-marcati come duplicati senza essere indicizzati due volte. Il checkpoint è per elemento e gli
-elementi non supportati avanzano senza entrare nel contesto. Il manifest è consultabile tramite
-`GET /api/documents/{id}/archive-manifest`.
+La configurazione di ingestione include limiti persistenti per il numero di file, la dimensione decompressa totale e per singolo file, e la profondità delle directory. Il servizio `ArchiveExtractionService` legge ZIP, TAR e 7Z senza estrarre in una directory controllata dall'archivio: convalida ogni percorso (nessun path assoluto o traversal) e consegna il contenuto in streaming al chiamante. I limiti vengono verificati sui byte effettivamente letti, proteggendo anche da archive bomb con metadati falsificati. L'importazione accetta gli archivi come documenti contenitore; gli elementi TXT/MD/CSV, Office Open XML e PDF vengono indicizzati come pagine dello stesso documento, con il percorso dell'elemento conservato nella provenienza testuale. Le immagini (.png, .jpg, .jpeg, .bmp, .gif, .tif, .tiff, .webp) vengono processate via OCR nell'archivio. Il manifest SQLite `archive_manifest_entries` è collegato al documento contenitore. Il manifest è consultabile tramite `GET /api/documents/{id}/archive-manifest`.
 
 ---
 
@@ -73,20 +60,20 @@ Le collezioni sono separate per modello di embedding e dimensione del vettore. S
 
 ---
 
-## 3. Recupero a Due Stadi & Query Transformation
+## 4. Recupero a Due Stadi & Query Transformation
 
 Il recupero è orchestrato da [`HybridRetrievalService`](../src/OnlyRag.Infrastructure/Retrieval/HybridRetrievalService.cs) ed è strutturato in 6 stadi:
 
 1. **Query Transformation**: Espansione di varianti sintattiche/semantiche della query tramite [`IQueryTransformationService`](../src/OnlyRag.Infrastructure/Retrieval/IQueryTransformationService.cs) (Multi-Query, Sub-Query, HyDE).
 2. **Ricerca Ibrida di 1° Stadio**: Combinazione dei candidati FTS5 e Qdrant tramite l'algoritmo **Reciprocal Rank Fusion (RRF)**.
-3. **Re-ranking di 2° Stadio**: Calcolo del punteggio di pertinenza incrociata `(Query, Chunk)` tramite il re-ranker [`IReRankerService`](../src/OnlyRag.Infrastructure/Retrieval/IReRankerService.cs) (`HeuristicReRankerService`).
+3. **Re-ranking di 2° Stadio**: Calcolo del punteggio di pertinenza incrociata `(Query, Chunk)` tramite il re-ranker [`IReRankerService`](../src/OnlyRag.Infrastructure/Retrieval/IReRankerService.cs) (`OnnxCrossEncoderReRankerService` come primario, con `HeuristicReRankerService` come fallback).
 4. **Parent-Child Resolver**: Risoluzione dei Child Chunk selezionati nei corrispondenti Parent Chunk tramite [`ParentChildChunkResolver`](../src/OnlyRag.Infrastructure/Retrieval/ParentChildChunkResolver.cs).
 5. **Valutazione CRAG (Self-Corrective RAG)**: Valutazione della confidenza dei risultati tramite [`CragEvaluator`](../src/OnlyRag.Infrastructure/Retrieval/CragEvaluator.cs) e assemblaggio del contesto.
 6. **Generazione LLM & Citazioni Interattive**: Invio del contesto arricchito a Ollama e generazione di risposte grounded corredate da citazioni interattive `[Pag. X, Chunk Y]`.
 
 ---
 
-## 4. Valutazione della Qualità di Recupero
+## 5. Valutazione della Qualità di Recupero
 
 È possibile valutare la qualità di recupero (Recall@K, MRR, dimensione contesto) tramite lo script di benchmark dedicato:
 
@@ -94,10 +81,7 @@ Il recupero è orchestrato da [`HybridRetrievalService`](../src/OnlyRag.Infrastr
 pwsh .\scripts\Evaluate-Retrieval.ps1 -DatasetPath .\docs\retrieval-evaluation.sample.json
 ```
 
-## Grounding obbligatorio
+## Grounding Obbligatorio
 
-Quando la chat usa documenti, gli estratti recuperati vengono prima sintetizzati nel prompt e la
-risposta finale passa sempre da una verifica runtime. Ogni paragrafo fattuale deve includere una
-citazione `Source: NomeDocumento` valida e condividere termini significativi con lo snippet citato.
-Le risposte non supportate vengono sostituite da un’astensione esplicita; le evidenze con negazioni
-opposte e termini condivisi producono il notice `grounding_conflicting_evidence`.
+Quando la chat usa documenti, gli estratti recuperati vengono prima sintetizzati nel prompt e la risposta finale passa sempre da una verifica runtime via `GroundingVerifier`. Ogni paragrafo fattuale deve includere una citazione `Source: NomeDocumento` valida e condividere termini significativi con lo snippet citato. Le risposte non supportate vengono sostituite da un’astensione esplicita; le evidenze con negazioni opposte e termini condivisi producono il notice `grounding_conflicting_evidence`.
+

@@ -8,6 +8,9 @@ export function useDiagnosticsQuery() {
       return await apiRequest<DiagnosticsResponse>("/api/diagnostics");
     },
     staleTime: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
     retry: 1
   });
+
 }

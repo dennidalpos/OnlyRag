@@ -230,6 +230,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<DependencyProvisioningService>();
         services.AddSingleton<DiagnosticsProbeCacheService>();
         services.AddSingleton<SystemTelemetryService>();
+        services.AddSingleton<StartupTracer>();
         services.AddHttpClient<IOllamaClient, OllamaClient>();
         services.AddSignalR();
 
@@ -302,7 +303,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ILocalJobHandler, OllamaModelPullJobHandler>();
         services.AddSingleton<RunningJobCancellationRegistry>();
         services.AddHostedService<LocalJobWorkerService>();
-        services.AddHostedService<Services.OnnxModelWarmupBackgroundService>();
         return services;
     }
 }

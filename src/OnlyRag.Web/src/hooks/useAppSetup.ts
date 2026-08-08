@@ -100,11 +100,18 @@ export function useAppSetup() {
     }
   }
 
+  async function handleOpenLibreOfficeDownload() {
+    await apiRequest<DependencyActionResponse>("/api/dependencies/libreoffice/open-download", {
+      method: "POST",
+      body: JSON.stringify({ confirmed: true })
+    }).catch(() => {});
+  }
+
   const lastSetupCheckTimeRef = useRef<number>(0);
 
   async function runInitialSetupChecks({ showBusy = false, force = false }: { showBusy?: boolean; force?: boolean } = {}) {
     const now = Date.now();
-    if (initialSetupCheckInProgressRef.current || (!force && now - lastSetupCheckTimeRef.current < 5000)) {
+    if (initialSetupCheckInProgressRef.current || (!force && now - lastSetupCheckTimeRef.current < 15000)) {
       return;
     }
 
@@ -143,12 +150,18 @@ export function useAppSetup() {
     async function load() {
       initialSetupCheckInProgressRef.current = true;
       try {
-        const [_, __, diagnosticsResult] = await Promise.all([
-          backendQuery.refetch(),
+        // Stage 1: confirm backend is alive before launching heavy probes
+        await backendQuery.refetch();
+        if (isCancelled) return;
+
+        // Stage 2: run remaining probes in parallel once backend is confirmed
+        const diagnosticsResultPromise = diagnosticsQuery.refetch().then((res) => res.data ?? null).catch(() => null);
+        await Promise.all([
           ollamaQuery.refetch(),
-          diagnosticsQuery.refetch().then((res) => res.data ?? null).catch(() => null),
+          diagnosticsResultPromise,
           ocrStartupPrompt.refresh()
         ]);
+        const diagnosticsResult = await diagnosticsResultPromise;
 
         if (isCancelled) return;
 
@@ -193,6 +206,9 @@ export function useAppSetup() {
     };
   }, []);
 
+
+
+
   return {
     backendStatus,
     statusChecked,
@@ -210,6 +226,7 @@ export function useAppSetup() {
     ollamaQuery,
     diagnosticsQuery,
     handleInstallOllama,
+    handleOpenLibreOfficeDownload,
     handleRecheckInitialSetup,
     runInitialSetupChecks
   };

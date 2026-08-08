@@ -1,17 +1,24 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Logging;
 
-public sealed class LoggingService : ILoggingService
+public sealed class LoggingService : ILoggingService, IAsyncDisposable
 {
     private const int MaxMemoryLogs = 1000;
+    private const int MaxPendingWrites = 2000;
+    private const int WriteBatchSize = 50;
+    private static readonly TimeSpan FlushInterval = TimeSpan.FromMilliseconds(500);
+
     private readonly AppStoragePaths storagePaths;
     private readonly LoggingSettingsStore settingsStore;
     private readonly ConcurrentQueue<LogEntry> memoryLogs = new();
-    private readonly object fileLock = new();
+    private readonly Channel<LogEntry> fileWriteChannel;
+    private readonly Task backgroundWriterTask;
+    private readonly CancellationTokenSource writerCts = new();
     private AppLogLevel currentMinLevel = AppLogLevel.Trace;
 
     public event Action<LogEntry>? OnLogWritten;
@@ -22,6 +29,15 @@ public sealed class LoggingService : ILoggingService
         this.settingsStore = settingsStore;
 
         Directory.CreateDirectory(storagePaths.LogsDirectory);
+
+        fileWriteChannel = Channel.CreateBounded<LogEntry>(
+            new BoundedChannelOptions(MaxPendingWrites)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true
+            });
+
+        backgroundWriterTask = Task.Run(() => BackgroundWriterLoopAsync(writerCts.Token));
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
@@ -103,7 +119,8 @@ public sealed class LoggingService : ILoggingService
             memoryLogs.TryDequeue(out _);
         }
 
-        WriteToFile(entry);
+        // Non-blocking write to channel — drops oldest if full
+        fileWriteChannel.Writer.TryWrite(entry);
 
         try
         {
@@ -180,22 +197,19 @@ public sealed class LoggingService : ILoggingService
     {
         while (memoryLogs.TryDequeue(out _)) { }
 
-        lock (fileLock)
+        if (Directory.Exists(storagePaths.LogsDirectory))
         {
-            if (Directory.Exists(storagePaths.LogsDirectory))
+            var files = Directory.GetFiles(storagePaths.LogsDirectory, "*.*", SearchOption.TopDirectoryOnly);
+            foreach (var file in files)
             {
-                var files = Directory.GetFiles(storagePaths.LogsDirectory, "*.*", SearchOption.TopDirectoryOnly);
-                foreach (var file in files)
+                try
                 {
-                    try
-                    {
-                        File.Delete(file);
-                    }
-                    catch
-                    {
-                        // In caso di file aperto in scrittura, prova a svuotarlo
-                        try { File.WriteAllText(file, string.Empty); } catch { }
-                    }
+                    File.Delete(file);
+                }
+                catch
+                {
+                    // In caso di file aperto in scrittura, prova a svuotarlo
+                    try { File.WriteAllText(file, string.Empty); } catch { }
                 }
             }
         }
@@ -203,27 +217,123 @@ public sealed class LoggingService : ILoggingService
         return Task.CompletedTask;
     }
 
-    private void WriteToFile(LogEntry entry)
+    private bool isDisposed;
+
+    public async ValueTask DisposeAsync()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+        isDisposed = true;
+
+        fileWriteChannel.Writer.TryComplete();
         try
         {
-            string logFilePath = Path.Combine(storagePaths.LogsDirectory, $"onlyrag-{entry.TimestampUtc:yyyy-MM-dd}.log");
-            var sb = new StringBuilder();
-            sb.Append($"[{entry.TimestampUtc:yyyy-MM-dd HH:mm:ss.fff Z}] [{entry.Level.ToString().ToUpperInvariant()}] [{entry.Category}] {entry.Message}");
+            await writerCts.CancelAsync();
+            await backgroundWriterTask.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        catch
+        {
+            // Ensure shutdown is not blocked
+        }
+        finally
+        {
+            writerCts.Dispose();
+        }
+    }
 
-            if (!string.IsNullOrEmpty(entry.DataJson))
-            {
-                sb.Append($" | DATA: {entry.DataJson}");
-            }
-            if (!string.IsNullOrEmpty(entry.ExceptionDetails))
-            {
-                sb.AppendLine();
-                sb.Append($"[EXCEPTION] {entry.ExceptionDetails}");
-            }
-            sb.AppendLine();
+    private async Task BackgroundWriterLoopAsync(CancellationToken cancellationToken)
+    {
+        var batch = new List<LogEntry>(WriteBatchSize);
+        var reader = fileWriteChannel.Reader;
 
-            lock (fileLock)
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
             {
+                batch.Clear();
+
+                // Wait for the first entry (blocks until data or channel completes)
+                if (!await reader.WaitToReadAsync(cancellationToken))
+                {
+                    break;
+                }
+
+                // Drain available entries up to batch size
+                while (batch.Count < WriteBatchSize && reader.TryRead(out LogEntry? entry))
+                {
+                    batch.Add(entry);
+                }
+
+                // If we have fewer than a full batch, wait briefly for more to arrive
+                if (batch.Count < WriteBatchSize)
+                {
+                    using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    delayCts.CancelAfter(FlushInterval);
+                    try
+                    {
+                        while (batch.Count < WriteBatchSize && await reader.WaitToReadAsync(delayCts.Token))
+                        {
+                            while (batch.Count < WriteBatchSize && reader.TryRead(out LogEntry? extra))
+                            {
+                                batch.Add(extra);
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Flush timer expired — write what we have
+                    }
+                }
+
+                FlushBatch(batch);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Shutdown requested — fall through to drain
+        }
+
+        // Drain any remaining entries on shutdown
+        batch.Clear();
+        while (reader.TryRead(out LogEntry? remaining))
+        {
+            batch.Add(remaining);
+        }
+        if (batch.Count > 0)
+        {
+            FlushBatch(batch);
+        }
+    }
+
+    private void FlushBatch(List<LogEntry> batch)
+    {
+        if (batch.Count == 0) return;
+
+        try
+        {
+            // Group by date to handle midnight rollovers
+            foreach (var group in batch.GroupBy(e => e.TimestampUtc.Date))
+            {
+                string logFilePath = Path.Combine(storagePaths.LogsDirectory, $"onlyrag-{group.Key:yyyy-MM-dd}.log");
+                var sb = new StringBuilder(batch.Count * 200);
+
+                foreach (LogEntry entry in group)
+                {
+                    sb.Append($"[{entry.TimestampUtc:yyyy-MM-dd HH:mm:ss.fff Z}] [{entry.Level.ToString().ToUpperInvariant()}] [{entry.Category}] {entry.Message}");
+                    if (!string.IsNullOrEmpty(entry.DataJson))
+                    {
+                        sb.Append($" | DATA: {entry.DataJson}");
+                    }
+                    if (!string.IsNullOrEmpty(entry.ExceptionDetails))
+                    {
+                        sb.AppendLine();
+                        sb.Append($"[EXCEPTION] {entry.ExceptionDetails}");
+                    }
+                    sb.AppendLine();
+                }
+
                 File.AppendAllText(logFilePath, sb.ToString(), Encoding.UTF8);
             }
         }

@@ -1,89 +1,90 @@
-# Autonomous Agent Engine (SOTA Edition)
+# Motore Agenti Autonomi (Edizione SOTA)
 
-OnlyRag features a fully autonomous, local-first software development and problem-solving agent engine built directly into the C# ASP.NET Core in-process backend (`src/OnlyRag.Api`) and backed by SQLite persistence (`src/OnlyRag.Infrastructure`).
+OnlyRag include un motore per agenti autonomi di sviluppo software e problem solving local-first integrato direttamente nel backend C# ASP.NET Core in-process (`src/OnlyRag.Api`) e supportato dalla persistenza SQLite (`src/OnlyRag.Infrastructure`).
 
 ---
 
-## Architecture Flow
+## Flusso dell'Architettura
 
 ```mermaid
 flowchart TD
     Request["POST /api/agent/run-stream (Goal / resumeRunId)"] --> Init["AgentLoopEngine Initialization"]
-    Init --> PhasePlan["1. PLAN (Decompose Goal & Set Criteria)"]
-    PhasePlan --> PhaseAct["2. ACT (Tool Call Generation & Execution)"]
-    PhaseAct --> CheckTool{"Tool requires approval?"}
-    CheckTool -->|yes| HumanApproval["Human-in-the-loop (POST /api/agent/approve-tool)"]
-    CheckTool -->|no| ExecTool["Execute Tool (File/Command/Search/Subagent)"]
+    Init --> PhasePlan["1. PLAN (Decomposizione Obiettivo & Criteri)"]
+    PhasePlan --> PhaseAct["2. ACT (Generazione & Esecuzione Tool Call)"]
+    PhaseAct --> CheckTool{"Il tool richiede approvazione?"}
+    CheckTool -->|sì| HumanApproval["Human-in-the-loop (POST /api/agent/approve-tool)"]
+    CheckTool -->|no| ExecTool["Esecuzione Tool (File/Comando/Ricerca/Subagente)"]
     HumanApproval --> ExecTool
-    ExecTool --> PhaseObserve["3. OBSERVE (Capture Output & Update Memory)"]
-    PhaseObserve --> PhaseVerify["4. VERIFY (Check Completion Evidence & Gate)"]
-    PhaseVerify --> CheckSuccess{"All criteria passed?"}
-    CheckSuccess -->|yes| PhaseFinalize["6. FINALIZE → COMPLETED"]
-    CheckSuccess -->|no| CheckError{"Execution error / loop stall?"}
-    CheckError -->|yes| PhaseRecover["5. RECOVER (Self-Correction & Backtrack)"]
+    ExecTool --> PhaseObserve["3. OBSERVE (Cattura Output & Aggiornamento Memoria)"]
+    PhaseObserve --> PhaseVerify["4. VERIFY (Verifica Evidenze Esecuzione)"]
+    PhaseVerify --> CheckSuccess{"Tutti i criteri superati?"}
+    CheckSuccess -->|sì| PhaseFinalize["6. FINALIZE → COMPLETED"]
+    CheckSuccess -->|no| CheckError{"Errore esecuzione / blocco ciclo?"}
+    CheckError -->|sì| PhaseRecover["5. RECOVER (Autocorrezione & Backtrack)"]
     CheckError -->|no| PhaseAct
     PhaseRecover --> PhaseAct
 ```
 
 ---
 
-## Key Components
+## Componenti Chiave
 
-### 1. Loop Engine & Phase Machine
-- **[`AgentLoopEngine.cs`](../src/OnlyRag.Api/AgentLoopEngine.cs)**: Drives the agent execution loop through strict phase state transitions:
-  - **`Plan`**: Analyzes the goal, loads relevant memory/skills, and breaks down work into structured steps.
-  - **`Act`**: Generates structured tool calls or responses via the configured Ollama model.
-  - **`Observe`**: Captures tool results, command outputs, file diffs, or subagent outputs and updates context.
-  - **`Verify`**: Validates runtime-observed evidence (test results, build status, file modifications) against explicit completion criteria. `COMPLETED` phase is blocked until verification passes.
-  - **`Recover`**: Intercepts repeated cycle stalls, missing dependencies, or tool failures to auto-correct tactics.
-  - **`Finalize`**: Records final execution summaries, trace events, and updates persistent run state.
+### 1. Loop Engine & Macchina a Stati (Phase Machine)
+- **[`AgentLoopEngine.cs`](../src/OnlyRag.Api/AgentLoopEngine.cs)**: Esegue il ciclo dell'agente attraverso transizioni di fase rigide:
+  - **`Plan`**: Analizza l'obiettivo, carica memorie/skill rilevanti e scompone il lavoro in passaggi strutturati.
+  - **`Act`**: Genera invocazioni tool strutturate o risposte tramite il modello Ollama o Cloud LLM configurato.
+  - **`Observe`**: Cattura i risultati dei tool, l'output dei comandi, i diff dei file o i report dei subagenti ed aggiorna il contesto.
+  - **`Verify`**: Convalida le evidenze osservate a runtime (risultati dei test, stato delle build, modifiche file) rispetto ai criteri espliciti. La fase `COMPLETED` è bloccata fino al superamento della verifica.
+  - **`Recover`**: Intercetta blocchi ripetuti o fallimenti di tool per autocorregere le tattiche dell'agente.
+  - **`Finalize`**: Registra i riepiloghi finali dell'esecuzione, gli eventi di traccia e aggiorna lo stato persistente in SQLite.
 
-### 2. Subagent DAG Orchestration
-- **[`SubagentRunner.cs`](../src/OnlyRag.Api/SubagentRunner.cs)**: Handles parallel subagent invocation and DAG dependency execution (`invoke_subagent` tool):
-  - Supports spawning specialized subagents concurrently or in a dependency graph.
-  - Enforces recursion depth limits to prevent infinite subagent nesting.
-  - Channels subagent step events real-time back to the parent agent execution stream.
-  - Persists subagent summaries and structured findings in `subagent_report_cache`.
+### 2. Orchestrazione Subagenti DAG
+- **[`SubagentRunner.cs`](../src/OnlyRag.Api/SubagentRunner.cs)**: Gestisce l'invocazione parallela dei subagenti e l'esecuzione dei grafi di dipendenza DAG (`invoke_subagent` tool):
+  - Supporta lo spawning di subagenti specializzati in parallelo o in un grafo di dipendenze.
+  - Impone limiti di profondità di ricorsione per evitare nidificazioni infinite.
+  - Trasmette gli eventi di ciascun subagente in tempo reale al flusso di esecuzione principale.
+  - Salva i report dei subagenti in `subagent_report_cache`.
 
-### 3. Memory & Skill System
-- **[`AgentMemoryManager.cs`](../src/OnlyRag.Api/AgentMemoryManager.cs)**: Manages short-term working context, key facts, and long-term episodic memory.
-- **SQLite Storage Tables**:
-  - `agent_episodic_memories`: Stores historical task execution patterns, successful solutions, and recovery strategies.
-  - `agent_skills`: Stores reusable skill procedures and domain workflows.
-  - `subagent_report_cache`: Caches subagent outputs for reference during multi-agent orchestrations.
+### 3. Sistema di Memoria & Skill
+- **[`AgentMemoryManager.cs`](../src/OnlyRag.Api/AgentMemoryManager.cs)**: Gestisce il contesto di lavoro a breve termine, i fatti chiave e la memoria episodica a lungo termine.
+- **Tabelle SQLite**:
+  - `agent_episodic_memories`: Memorizza i pattern di risoluzione storici e le strategie di recovery.
+  - `agent_skills`: Memorizza procedure e workflow di dominio riutilizzabili.
+  - `subagent_report_cache`: Memorizza in cache i report dei subagenti.
 
-### 4. Tool Call Parser & Execution
-- **[`AgentToolCallParser.cs`](../src/OnlyRag.Api/AgentToolCallParser.cs)**: Parses tool calls from standard JSON or XML format output by LLM models.
-- **Supported Tool Types**:
+### 4. Tool Call Parser ed Esecuzione
+- **[`AgentToolCallParser.cs`](../src/OnlyRag.Api/AgentToolCallParser.cs)**: Effettua il parsing delle chiamate tool da JSON o XML prodotte dal modello LLM.
+- **Tool Supportati**:
   - `view_file`, `write_to_file`, `replace_file_content`, `multi_replace_file_content`
-  - `run_command` (PowerShell command execution with async task streaming)
-  - `search_web` / RAG retrieval
-  - `invoke_subagent` (DAG subagent delegation)
-  - `plan_task`, `reflect_step` (Internal state and checklist management)
+  - `run_command` (Esecuzione comandi PowerShell 7 con streaming asincrono)
+  - `search_web` / Retrieval RAG
+  - `invoke_subagent` (Delegazione a subagenti via DAG)
+  - `plan_task`, `reflect_step` (Gestione dello stato interno e checklist)
 
-### 5. Policy Audit & MCTS Checkpoints
-- **[`AgentPolicyAuditLogger.cs`](../src/OnlyRag.Api/AgentPolicyAuditLogger.cs)**: Logs security-sensitive tool invocations (command executions, file writes) to `agent_policy_audit_logs`.
-- **MCTS Checkpoint Repository**: Saves branch search snapshots to `agent_mcts_checkpoints` for complex multi-step plan rollbacks and tree searches.
+### 5. Policy Audit & Checkpoint MCTS
+- **[`AgentPolicyAuditLogger.cs`](../src/OnlyRag.Api/AgentPolicyAuditLogger.cs)**: Registra le invocazioni dei tool sensibili in `agent_policy_audit_logs`.
+- **MCTS Checkpoint Repository**: Salva gli snapshot delle ricerche di ramo in `agent_mcts_checkpoints` per rollback e ricerche ad albero complesse.
 
 ---
 
-## API Endpoints
+## Endpoints API
 
-| Endpoint | Method | Description |
+| Endpoint | Metodo | Descrizione |
 |---|---|---|
-| `/api/agent/run-stream` | POST | Starts or resumes an agent run with Server-Sent Events (SSE) streaming output. |
-| `/api/agent/approve-tool` | POST | Submits human approval/rejection for gated tool executions. |
-| `/api/agent/runs/{runId}` | GET | Returns snapshot details and current phase status for a specific run. |
-| `/api/agent/runs/resumable` | GET | Lists non-terminal runs that can be resumed after application restart. |
-| `/api/agent/runs/{runId}/trace` | GET | Retrieves full immutable event trace (`agent_run_trace_events`) for audit. |
-| `/api/agent/runs/{runId}/evaluation` | GET | Evaluates run performance metrics against benchmark expectations. |
-| `/api/agent/policy-audit` | GET | Queries policy audit logs for security compliance verification. |
-| `/api/agent/orchestrate` | POST | Submits a multi-agent orchestration workflow. |
-| `/api/agent/orchestrate/{id}` | GET | Fetches status for a multi-agent orchestration session. |
+| `/api/agent/run-stream` | POST | Avvia o riprende un run dell'agente con output in streaming Server-Sent Events (SSE). |
+| `/api/agent/approve-tool` | POST | Invia l'approvazione/rifiuto umano per l'esecuzione di tool gated. |
+| `/api/agent/runs/{runId}` | GET | Restituisce i dettagli dello snapshot e lo stato di fase per un run specifico. |
+| `/api/agent/runs/resumable` | GET | Elenca i run non terminali riprendibili dopo il riavvio dell'applicazione. |
+| `/api/agent/runs/{runId}/trace` | GET | Recupera la traccia immutabile completa degli eventi (`agent_run_trace_events`). |
+| `/api/agent/runs/{runId}/evaluation` | GET | Valuta le metriche di prestazione del run rispetto al benchmark. |
+| `/api/agent/policy-audit` | GET | Interroga i log di audit delle policy per la verifica di sicurezza. |
+| `/api/agent/orchestrate` | POST | Invia un workflow di orchestrazione multi-agente. |
+| `/api/agent/orchestrate/{id}` | GET | Recupera lo stato di una sessione di orchestrazione multi-agente. |
 
 ---
 
-## Benchmark & Evaluation
+## Benchmark & Valutazione
 
-- Evaluation dataset: [`docs/agent-evaluation.dataset.json`](agent-evaluation.dataset.json).
-- Defines repeatable task goals, expected step counts, latency limits, and success criteria for continuous agent engine benchmark testing.
+- Dataset di valutazione: [`docs/agent-evaluation.dataset.json`](agent-evaluation.dataset.json).
+- Definisce obiettivi di task ripetibili, numero di passaggi previsti, limiti di latenza e criteri di successo per il testing continuo del motore agenti.
+

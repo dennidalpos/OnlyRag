@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Core;
+using OnlyRag.Core.Logging;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
@@ -16,6 +17,8 @@ public static partial class InProcessBackend
         InProcessBackendOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        using var startBackendScope = EarlyBootstrapperLogger.TraceScope("InProcessBackend_StartAsync");
+
         descriptor ??= InProcessBackendDescriptor.CreateDefault();
         options ??= new InProcessBackendOptions();
 
@@ -29,7 +32,17 @@ public static partial class InProcessBackend
 
         string sessionToken = ResolveSessionToken(options);
         var runtimeState = new BackendRuntimeState(DateTimeOffset.UtcNow);
-        WebApplication app = BuildApplication(descriptor, options, runtimeState, sessionToken);
+        
+        WebApplication app;
+        using (EarlyBootstrapperLogger.TraceScope("Build_WebApplication_DI"))
+        {
+            app = BuildApplication(descriptor, options, runtimeState, sessionToken);
+        }
+
+        // StartupTracer is available after DI container is built
+        StartupTracer startupTracer = app.Services.GetRequiredService<StartupTracer>();
+        startupTracer.Record("Backend: DI container built");
+        EarlyBootstrapperLogger.LogMilestone("Backend_DI_Built", "DI Container built successfully.");
 
         var loggingService = app.Services.GetService<OnlyRag.Infrastructure.Logging.ILoggingService>();
         if (loggingService is not null)
@@ -39,11 +52,16 @@ public static partial class InProcessBackend
 
         try
         {
-            StorageStatusResponse storageStatus = await app.Services
-                .GetRequiredService<ILocalStorageService>()
-                .InitializeAsync(cancellationToken);
+            StorageStatusResponse storageStatus;
+            using (EarlyBootstrapperLogger.TraceScope("Initialize_SQLite_Storage"))
+            {
+                storageStatus = await app.Services
+                    .GetRequiredService<ILocalStorageService>()
+                    .InitializeAsync(cancellationToken);
+            }
             runtimeState.DatabaseStatus = storageStatus.SchemaStatus;
             BackendLog.Write(descriptor.StoragePaths, $"Local SQLite schema version {storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion}: {storageStatus.SchemaStatus}.");
+            startupTracer.Record($"SQLite: Schema v{storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion} ({storageStatus.SchemaStatus})");
 
             int recoveredJobs = await app.Services
                 .GetRequiredService<ILocalJobQueue>()
@@ -51,13 +69,30 @@ public static partial class InProcessBackend
             if (recoveredJobs > 0)
             {
                 BackendLog.Write(descriptor.StoragePaths, $"Recovered {recoveredJobs} interrupted job(s).");
+                startupTracer.Record($"Worker: Recovered {recoveredJobs} interrupted job(s)");
+            }
+            else
+            {
+                startupTracer.Record("Worker: Job queue ready (0 interrupted)");
             }
 
-            await app.StartAsync(cancellationToken);
+            using (EarlyBootstrapperLogger.TraceScope("Start_Kestrel_Server"))
+            {
+                await app.StartAsync(cancellationToken);
+            }
             Uri baseUri = ResolveBaseUri(app);
             runtimeState.BaseUri = baseUri;
             BackendLog.Write(descriptor.StoragePaths, $"In-process backend listening on {baseUri}.");
-            await EnsureQdrantLocalRuntimeAsync(app, descriptor, cancellationToken);
+            startupTracer.Record($"Kestrel: HTTP server listening on {baseUri}");
+
+            _ = Task.Run(async () =>
+            {
+                using (EarlyBootstrapperLogger.TraceScope("Ensure_Qdrant_Runtime"))
+                {
+                    await EnsureQdrantLocalRuntimeAsync(app, descriptor, CancellationToken.None).ConfigureAwait(false);
+                }
+                startupTracer.Record("Qdrant: Local runtime status evaluated");
+            }, CancellationToken.None);
 
             return new InProcessBackendHandle(app, baseUri, descriptor, sessionToken);
         }

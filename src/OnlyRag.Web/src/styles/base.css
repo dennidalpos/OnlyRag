@@ -248,6 +248,7 @@ button:disabled {
   font-weight: 800;
   line-height: 1;
   box-shadow: none;
+  cursor: help;
 }
 
 .info-tip__trigger:hover:not(:disabled),
@@ -259,29 +260,89 @@ button:disabled {
 
 .info-tip__content {
   position: absolute;
-  z-index: 100;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  width: min(280px, calc(100vw - 32px));
-  padding: 8px 10px;
-  border: 1px solid var(--border-light);
+  z-index: 9999;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 8px 12px;
+  border: 1px solid var(--border-light, #334155);
   border-radius: var(--radius-md);
-  background: var(--bg-sidebar);
+  background: #1e293b;
   color: #f8fafc;
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: left;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 4px);
   transition: opacity var(--transition-fast), transform var(--transition-fast);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
 }
 
-.info-tip:hover .info-tip__content,
-.info-tip:focus-within .info-tip__content {
+/* Placements */
+.info-tip__content--place-top {
+  bottom: calc(100% + 8px);
+  top: auto;
+}
+
+.info-tip__content--place-bottom {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+/* Alignments */
+.info-tip__content--align-left {
+  left: 0;
+  right: auto;
+  transform: translateY(4px);
+}
+
+.info-tip__content--place-bottom.info-tip__content--align-left {
+  transform: translateY(-4px);
+}
+
+.info-tip__content--align-right {
+  right: 0;
+  left: auto;
+  transform: translateY(4px);
+}
+
+.info-tip__content--place-bottom.info-tip__content--align-right {
+  transform: translateY(-4px);
+}
+
+.info-tip__content--align-center {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.info-tip__content--place-bottom.info-tip__content--align-center {
+  transform: translateX(-50%) translateY(-4px);
+}
+
+/* Active / Hover states */
+.info-tip:hover .info-tip__content--align-left,
+.info-tip:focus-within .info-tip__content--align-left,
+.info-tip:hover .info-tip__content--align-right,
+.info-tip:focus-within .info-tip__content--align-right {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
+}
+
+.info-tip:hover .info-tip__content--align-center,
+.info-tip:focus-within .info-tip__content--align-center {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.info-tip:hover .info-tip__content:not([class*="--align-"]),
+.info-tip:focus-within .info-tip__content:not([class*="--align-"]) {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Collapsible benchmark details table */

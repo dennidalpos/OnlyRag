@@ -147,21 +147,6 @@
   font-weight: 650;
 }
 
-.field-group .ocr-tooltip {
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--border-light);
-  border-radius: 50%;
-  background: var(--bg-card-glass);
-  color: var(--primary);
-  cursor: help;
-  font-size: 12px;
-  line-height: 1;
-}
-
 .ocr-range-field {
   align-content: start;
   gap: 6px;

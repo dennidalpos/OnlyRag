@@ -136,6 +136,8 @@ export function AppContent() {
           currentSection={sectionLabels[activeSection]}
           backendStatus={setup.backendStatus}
           diagnostics={setup.diagnostics}
+          ocrProvisionStatus={setup.ocrStartupPrompt.provisionStatus}
+          isInitialChecking={!setup.initialCheckDone}
           onOpenJobsDrawer={() => setIsJobsDrawerOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
@@ -231,7 +233,7 @@ export function AppContent() {
         }}
       />
       <PrerequisitesModal
-        isOpen={isPrerequisitesModalOpen || Boolean(setup.ocrStartupPrompt.provisionStatus?.isRunning)}
+        isOpen={isPrerequisitesModalOpen}
         onClose={() => setIsPrerequisitesModalOpen(false)}
         ocrAnalysis={setup.ocrStartupPrompt.analysis}
         ocrProvisionStatus={setup.ocrStartupPrompt.provisionStatus}
@@ -240,6 +242,7 @@ export function AppContent() {
         onCancelOcr={() => void setup.ocrStartupPrompt.cancel()}
         onInstallOllama={() => void setup.handleInstallOllama()}
         ollamaInstalled={Boolean(setup.ollamaInstallStatus?.cliInstalled)}
+        onOpenLibreOfficeDownload={() => void setup.handleOpenLibreOfficeDownload()}
       />
     </div>
   );

@@ -76,7 +76,6 @@ export function SettingsRangeField({
         step={step}
         value={normalizedValue}
         disabled={disabled}
-        title={tooltip}
         aria-label={label}
         aria-describedby={tooltip ? descriptionId : undefined}
         onChange={(event) => onChange(Number(event.target.value))}
@@ -202,7 +201,6 @@ export function OcrSelectField({
       <select
         id={id}
         value={value}
-        title={tooltip}
         aria-label={label}
         aria-describedby={descriptionId}
         onChange={(event) => onChange(event.target.value)}
@@ -242,7 +240,6 @@ export function OcrRangeField({
         max={max}
         step={step}
         value={value}
-        title={tooltip}
         aria-label={label}
         aria-describedby={descriptionId}
         onChange={(event) => onChange(Number(event.target.value))}

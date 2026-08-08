@@ -56,6 +56,8 @@ export function useBackendStatusQuery() {
       }
     },
     refetchInterval: 15000,
+    refetchOnWindowFocus: false,
     retry: 1
   });
+
 }

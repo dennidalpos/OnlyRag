@@ -5,7 +5,7 @@ namespace OnlyRag.Api;
 
 internal sealed class DiagnosticsProbeCacheService
 {
-    private static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromSeconds(60);
 
     private readonly TimeProvider timeProvider;
     private readonly TimeSpan cacheDuration;

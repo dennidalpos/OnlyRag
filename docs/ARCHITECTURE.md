@@ -1,34 +1,35 @@
-# Architecture
+# Architettura
 
-OnlyRag is a local-first Windows desktop application with a WPF shell, a React/Vite WebView UI, and an in-process .NET backend.
+OnlyRag è un'applicazione desktop Windows local-first composta da uno shell WPF, un'interfaccia utente React/Vite in WebView2 e un backend .NET in-process.
 
-## Source Layout
+## Struttura dei Sorgenti
 
-- [`src/OnlyRag.App`](../src/OnlyRag.App): WPF desktop shell, WebView2 hosting, app startup and shutdown.
-- [`src/OnlyRag.Web`](../src/OnlyRag.Web): React/Vite frontend, API bridge types, Knowledge Graph Visualization UI (`GraphView`), UI tests, and Playwright tests.
-- [`src/OnlyRag.Api`](../src/OnlyRag.Api): in-process Minimal API backend, Autonomous Agent Engine SOTA, app endpoints, dependency endpoints, Cloud LLM endpoints, Graph endpoints, job orchestration, Ollama integration, Qdrant runtime management, and user-facing error mapping.
-- [`src/OnlyRag.Core`](../src/OnlyRag.Core): shared contracts, settings DTOs, responses, graph DTOs, and request models.
-- [`src/OnlyRag.Infrastructure`](../src/OnlyRag.Infrastructure): SQLite storage, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Dual OCR engine (Native DirectML ONNX `OnnxDirectMlOcrEngine` + Python PaddleOCR bridge `PaddleOcrEngine`), Cloud LLM client factory (`CloudLlmClientFactory`), ONNX DirectML image generation, PDF export conversion, retrieval, and Qdrant vector store adapters.
-- [`src/OnlyRag.Worker`](../src/OnlyRag.Worker): local job queue abstractions and job state.
-- [`tests`](../tests): xUnit tests for .NET layers and a Playwright backend host for frontend e2e contract tests.
-- [`scripts`](../scripts): PowerShell automation for bootstrap, gates, build, packaging, signing, assets, OCR, and cleanup.
-- [`packaging`](../packaging): NSIS script and bundled Qdrant runtime manifest/payload.
-- [`assets/brand`](../assets/brand): generated source brand assets and setup/social imagery.
+- [`src/OnlyRag.App`](../src/OnlyRag.App): Shell desktop WPF, hosting WebView2, avvio e chiusura dell'applicazione.
+- [`src/OnlyRag.Web`](../src/OnlyRag.Web): Frontend React/Vite, tipi di bridge API, interfaccia di visualizzazione del Knowledge Graph (`GraphView`), test UI e test e2e Playwright.
+- [`src/OnlyRag.Api`](../src/OnlyRag.Api): Backend Minimal API in-process, motore per Agenti Autonomi SOTA, endpoint dell'app, endpoint delle dipendenze, endpoint Cloud LLM, endpoint Graph, orchestrazione dei job, integrazione Ollama, gestione runtime Qdrant e mappatura errori per l'utente.
+- [`src/OnlyRag.Core`](../src/OnlyRag.Core): Contratti condivisi, DTO delle impostazioni, risposte standard (`ApiResponse<T>`), DTO del grafo e modelli di richiesta.
+- [`src/OnlyRag.Infrastructure`](../src/OnlyRag.Infrastructure): Storage SQLite schema v11, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Re-ranking Cross-Encoder ONNX (`OnnxCrossEncoderReRankerService` con fallback `HeuristicReRankerService`), Dual OCR engine (`OnnxDirectMlOcrEngine` nativo C# DirectML ONNX + `PaddleOcrEngine` bridge Python), client factory Cloud LLM (`CloudLlmClientFactory`), generazione immagini ONNX DirectML, conversione ed esportazione PDF via LibreOffice, motori di retrieval e adapter vettoriali Qdrant.
+- [`src/OnlyRag.Worker`](../src/OnlyRag.Worker): Astrazioni per la coda locale dei job e gestione dello stato dei task in background.
+- [`tests`](../tests): Test xUnit per i layer .NET e host backend Playwright per i test di contratto e2e del frontend.
+- [`scripts`](../scripts): Automazione PowerShell 7 per bootstrap, gate di verifica, build, packaging, firma, brand asset, OCR e pulizia workspace.
+- [`packaging`](../packaging): Script NSIS e payload/manifest del runtime Qdrant integrato.
+- [`assets/brand`](../assets/brand): Asset grafici di marca generati, immagini di setup e social.
 
-## Runtime Boundaries
+## Confini del Runtime
 
-The WPF app starts the in-process backend and hosts the React UI inside WebView2. The frontend communicates with the backend through the app bridge or real-time ASP.NET Core SignalR WebSockets (`ChatStreamHub`, `JobProgressHub`) for token streaming and live job progress. Debug builds can use a loopback Vite development server when `ONLYRAG_WEB_DEV_SERVER` is set to a loopback `http` or `https` URL.
+L'applicazione WPF avvia il backend in-process e ospita l'interfaccia React all'interno del controllo WebView2. Il frontend comunica con il backend tramite chiamate HTTP REST e hub ASP.NET Core SignalR in tempo reale (`ChatStreamHub`, `JobProgressHub`) per lo streaming dei token e l'avanzamento live dei job. Le build di debug possono utilizzare un server di sviluppo Vite tramite l'ambiente `ONLYRAG_WEB_DEV_SERVER`.
 
-LLM workloads are unified under `Microsoft.Extensions.AI` (`IChatClient`, `IEmbeddingGenerator`) supporting Ollama and Cloud LLM providers (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek, Google Gemini). Ollama can run locally or on a trusted LAN endpoint. Qdrant can be bundled and managed locally by the app, with remote Qdrant configuration guarded by trust/TLS checks in settings. SQLite managed via EF Core 10 (`OnlyRagDbContext`) and FTS5 extensions is the local system of record for documents, chunks, Knowledge Graph nodes/edges, settings, jobs, chat, translations, OCR cache, agent episodic memories, subagent report cache, and indexing metadata.
+I carichi di lavoro LLM sono unificati sotto `Microsoft.Extensions.AI` (`IChatClient`, `IEmbeddingGenerator`), supportando provider locali (Ollama) e provider Cloud LLM (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek, Google Gemini). Qdrant viene gestito e avviato localmente dall'applicazione. SQLite (gestito tramite EF Core 10 `OnlyRagDbContext` ed estensioni FTS5) rappresenta il sistema di record locale per documenti, chunk, nodi/archi del Knowledge Graph, impostazioni, job, chat, traduzioni, cache OCR, memorie episodiche dell'agente e metadati di indicizzazione.
 
-## Data And Processes
+## Dati e Processi
 
-User data lives under `%LOCALAPPDATA%\OnlyRag`. Installed app files live under `%LOCALAPPDATA%\Programs\OnlyRag` after installer installation.
+I dati utente risiedono in `%LOCALAPPDATA%\OnlyRag`. I file dell'applicazione installata risiedono in `%LOCALAPPDATA%\Programs\OnlyRag`.
 
-Long-running ingestion, OCR, embedding, and translation work is executed as high-performance streaming jobs (`StreamingDocumentIngestionPipeline` using `System.Threading.Channels`). Real-time updates are pushed via SignalR hubs alongside REST polling fallback. Confirmed app exit cancels active local jobs, persists available UI work, and stops backend processes.
+L'ingestione di documenti a lungo termine, l'OCR, i calcoli degli embedding e la traduzione sono eseguiti come job streaming ad alte prestazioni (`StreamingDocumentIngestionPipeline` basata su `System.Threading.Channels`). Gli aggiornamenti in tempo reale vengono inviati tramite SignalR con fallback di polling REST. La chiusura confermata dell'app annulla i job locali attivi, salva il lavoro UI disponibile e arresta i processi backend.
 
-## Dependency Model
+## Modello delle Dipendenze
 
-Development uses .NET 10, npm from Node.js, and PowerShell 7. End-user installer payloads are self-contained for .NET runtime components and include the bundled Qdrant runtime. WebView2, Ollama, Python, NSIS, and signing tools are external prerequisites depending on workflow. LibreOffice is optional and used only for translation PDF export.
+Lo sviluppo richiede .NET 10, npm da Node.js e PowerShell 7. I pacchetti installer per l'utente finale sono autotenuti per i componenti runtime .NET e includono il runtime Qdrant integrato. WebView2, Ollama, Python, NSIS e strumenti di firma sono prerequisiti esterni in base al workflow. LibreOffice è opzionale ed è utilizzato per l'esportazione PDF delle traduzioni.
 
-No repository code should store secrets. Signing PFX files must stay outside the repository.
+Nessun codice nel repository memorizza segreti o credenziali. I file di certificato PFX per la firma devono rimanere all'esterno del repository.
+

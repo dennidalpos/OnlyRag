@@ -299,10 +299,11 @@ public sealed class PaddleOcrEngine : IOcrEngine
                     : detail);
         }
 
+        string jsonPayload = ExtractJsonPayload(stdout);
         T? result;
         try
         {
-            result = JsonSerializer.Deserialize<T>(stdout, JsonOptions);
+            result = JsonSerializer.Deserialize<T>(jsonPayload, JsonOptions);
         }
         catch (JsonException ex)
         {
@@ -315,6 +316,23 @@ public sealed class PaddleOcrEngine : IOcrEngine
         }
 
         return result ?? throw new InvalidOperationException("Invalid OCR JSON response.");
+    }
+
+    private static string ExtractJsonPayload(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return string.Empty;
+        }
+
+        int firstBrace = output.IndexOf('{');
+        int lastBrace = output.LastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace)
+        {
+            return output.Substring(firstBrace, lastBrace - firstBrace + 1);
+        }
+
+        return output;
     }
 
     private static void KillProcessTree(Process process)

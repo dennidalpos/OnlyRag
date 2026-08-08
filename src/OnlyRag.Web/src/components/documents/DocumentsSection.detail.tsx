@@ -270,7 +270,7 @@ export function ActionButton({
       : "doc-action-btn doc-action-btn--recovery";
 
   return (
-    <div className="doc-action-wrapper" title={tooltip}>
+    <div className="doc-action-wrapper">
       <button
         className={className}
         type="button"

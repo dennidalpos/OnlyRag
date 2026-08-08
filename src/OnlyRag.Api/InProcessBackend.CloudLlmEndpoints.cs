@@ -12,7 +12,7 @@ public static class InProcessBackendCloudLlmEndpoints
 {
     private static CloudLlmConfiguration _currentConfig = new();
 
-    public static CloudLlmConfiguration GetCurrentConfig() => _currentConfig;
+    public static CloudLlmConfiguration GetCurrentConfig() => Volatile.Read(ref _currentConfig);
 
     public static IEndpointRouteBuilder MapCloudLlmEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -35,13 +35,14 @@ public static class InProcessBackendCloudLlmEndpoints
 
         group.MapPost("", async (UpdateCloudLlmSettingsRequest request, ICloudApiKeyVault keyVault, CancellationToken ct) =>
         {
-            _currentConfig = new CloudLlmConfiguration(
+            var newConfig = new CloudLlmConfiguration(
                 Provider: request.Provider,
                 Endpoint: request.Endpoint,
                 ChatModel: request.ChatModel,
                 EmbeddingModel: request.EmbeddingModel,
                 DeploymentName: request.DeploymentName,
                 ApiVersion: request.ApiVersion);
+            Volatile.Write(ref _currentConfig, newConfig);
 
             if (!string.IsNullOrWhiteSpace(request.ApiKey))
             {

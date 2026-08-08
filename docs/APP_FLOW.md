@@ -1,102 +1,63 @@
-# Application Flow
+# Flusso dell'Applicazione
 
-The editable source diagram is [`APP_FLOW.drawio`](APP_FLOW.drawio). This Markdown page is the
-text fallback for review and handoff.
+Il diagramma sorgente modificabile è [`APP_FLOW.drawio`](APP_FLOW.drawio). Questa pagina Markdown è il riferimento testuale completo.
 
 ```mermaid
 flowchart TD
-    A["User launches OnlyRag.App.exe"] --> B["WPF shell starts"]
-    B --> C["Windows/WebView2 prerequisites checked"]
-    C --> D["%LOCALAPPDATA%\\OnlyRag paths prepared"]
-    D --> E["SQLite schema initialized and persistent jobs recovered"]
-    E --> F["In-process backend starts on dynamic loopback port"]
-    F --> G["WebView2 loads React UI from Vite dev server or bundled static assets"]
-    G --> H["Backend bridge injects base URL and session token"]
-    H --> I["Initial polling: app, diagnostics, settings, dependencies, OCR languages, Qdrant, Ollama"]
-    I --> J["User works in Chat, Documents, Jobs, Translation, Settings"]
+    A["Lancio dell'applicazione OnlyRag.App.exe"] --> B["Avvio dello shell WPF"]
+    B --> C["Verifica prerequisiti Windows / WebView2"]
+    C --> D["Inizializzazione percorsi in %LOCALAPPDATA%\\OnlyRag"]
+    D --> E["Inizializzazione schema SQLite v11 e recupero job persistenti"]
+    E --> F["Avvio backend Minimal API in-process su porta loopback dinamica"]
+    F --> G["WebView2 carica l'interfaccia React dal dev server Vite o dagli asset statici integrati"]
+    G --> H["Il bridge backend inietta l'URL base e il token di sessione"]
+    H --> I["Polling iniziale: stato app, diagnostica, impostazioni, dipendenze, OCR, Qdrant, Ollama"]
+    I --> J["Operazioni utente: Chat, Documenti, Job, Traduzione, Agenti, Generazione Immagini, Impostazioni"]
 
-    J --> K["Settings: configure Ollama, Cloud LLMs, Qdrant, OCR, PDF export, models, ingestion, performance, reset"]
-    K --> L["External endpoints: Ollama, Cloud LLMs (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek), Qdrant, PaddleOCR Python, LibreOffice"]
+    J --> K["Impostazioni: configurazione Ollama, Cloud LLM, Qdrant, OCR, esportazione PDF, modelli, ingestione, reset"]
+    K --> L["Endpoint esterni: Ollama, Cloud LLM (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek), Qdrant, Python PaddleOCR, LibreOffice"]
 
-    J --> M["Documents: import files with OCR policy and document language"]
-    M --> N["Validate upload limits, storage quota, file names, dedupe hash, local copy"]
-    N --> O["Create document row and enqueue document-ingestion job"]
-    O --> P["Worker extracts TXT/MD/CSV/OpenXML/PDF/image content"]
-    P --> Q["Native C# DirectML ONNX OCR engine or optional PaddleOCR bridge with cache/retry/timeout"]
-    Q --> R["Persist pages, chunks, graph nodes/edges, OCR status, preview/pipeline state in SQLite"]
-    R --> S["If embedding model exists, enqueue document-embedding"]
-    S --> T["Ollama/Cloud LLM embeds chunks; Qdrant stores vectors by model/vector shape"]
+    J --> M["Documenti: importazione file con policy OCR e lingua del documento"]
+    M --> N["Convalida limiti upload, quota storage, nomi file, deduplicazione hash, copia locale"]
+    N --> O["Creazione record documento ed enqueue del job document-ingestion"]
+    O --> P["Worker estrae contenuti TXT/MD/CSV/OpenXML/PDF/archivi/immagini"]
+    P --> Q["Engine OCR nativo DirectML ONNX o bridge Python PaddleOCR opzionale con cache/retry"]
+    Q --> R["Salvataggio pagine, chunk Parent-Child, nodi/archi del grafo, stato OCR in SQLite"]
+    R --> S["Se esiste il modello di embedding, enqueue di document-embedding"]
+    S --> T["Ollama/Cloud LLM genera gli embedding; Qdrant salva i vettori per modello e dimensione"]
 
-    J --> U["Chat/Search: user submits query with or without selected documents"]
-    U --> V{"Document chat?"}
-    V -->|yes| W["Hybrid retrieval: SQLite FTS5 + Graph Traversal + Ollama/Cloud LLM query embedding + Qdrant vector search"]
-    W --> X["Prompt includes retrieved snippets and graph context"]
-    V -->|no| Y["Direct chat prompt"]
-    X --> Z["Ollama/Cloud LLM chat response"]
-    Z --> AA["Persist chat turn and return answer, sources, notices"]
+    J --> U["Chat/Search: l'utente invia una query con o senza documenti selezionati"]
+    U --> V{"Chat sui documenti?"}
+    V -->|sì| W["Retrieval Ibrido 6 Stadi: SQLite FTS5 + Traversal Grafo + Re-ranking ONNX Cross-Encoder + Qdrant Vector Search"]
+    W --> X["Il prompt sintetizza gli snippet recuperati e il contesto di grafo"]
+    V -->|no| Y["Prompt diretto di chat"]
+    X --> Z["Risposta chat da Ollama/Cloud LLM con verifica GroundingVerifier"]
+    Z --> AA["Salvataggio turno di chat e restituzione risposta, fonti e citazioni [Pag. X, Chunk Y]"]
 
-    J --> GV["Graph Visualizer: interactively query and explore concept graph networks (/api/graph/data, /api/graph/search)"]
+    J --> GV["Visualizzatore Grafo: esplorazione interattiva della rete di concetti (/api/graph/data, /api/graph/search)"]
 
-    J --> AB["Translation: create translation for indexed document"]
-    AB --> AC["Verify model/document, create page-based units, enqueue document-translation"]
-    AC --> AD["Worker prompts Ollama, validates output, checkpoints units"]
-    AD --> AE["User reviews/corrects units and exports TXT/MD/HTML/DOCX/PDF"]
+    J --> AB["Traduzione: creazione traduzione per un documento indicizzato"]
+    AB --> AC["Verifica modello/documento, creazione unità per pagina, enqueue document-translation"]
+    AC --> AD["Il worker interroga Ollama, valida l'output e salva i checkpoint delle unità"]
+    AD --> AE["L'utente esamina/corregge le unità ed esporta in TXT/MD/HTML/DOCX/PDF"]
 
-    J --> AF["Jobs: poll queue, pause/resume/cancel/delete local jobs"]
-    J --> AI["Coding: start or resume a persistent agent run"]
-    AI --> AJ["SQLite records run snapshot, phase transitions, budgets, and conversation state"]
-    AJ --> AK["PLAN → ACT → OBSERVE → VERIFY; failures go through RECOVER"]
-    AK --> AL["FINALIZE → COMPLETED, or resume an interrupted non-terminal run"]
-    J --> AG["Confirmed exit or reset request"]
-    AG --> AH["Save available UI work, cancel active jobs, stop child processes/Qdrant, dispose backend"]
+    J --> AF["Job: polling della coda, pausa/ripresa/annullamento/eliminazione job locali"]
+    J --> AI["Agenti: avvio o ripresa di un run agente autonomo SOTA (6 fasi)"]
+    AI --> AJ["SQLite registra lo snapshot del run, le transizioni di fase, i budget e lo stato della conversazione"]
+    AJ --> AK["PLAN → ACT → OBSERVE → VERIFY; i fallimenti passano da RECOVER"]
+    AK --> AL["FINALIZE → COMPLETED, o ripresa di un run non terminale interrotto"]
+    J --> AG["Uscita o reset confermato dell'utente"]
+    AG --> AH["Salvataggio lavoro UI disponibile, annullamento job attivi, arresto processi figli/Qdrant, chiusura backend"]
 ```
 
-## Startup
+## Avvio
 
-The WPF app validates Windows and WebView2, prepares app directories, starts the in-process backend,
-initializes the SQLite database via EF Core 10 (`OnlyRagDbContext` / `LocalSqliteSchemaInitializer`), recovers local job state, initializes SignalR hubs (`ChatStreamHub`, `JobProgressHub`), initializes WebView2, and loads either bundled static
-web assets or the loopback Vite development server in Debug builds. Non-loopback or
-credential-bearing `ONLYRAG_WEB_DEV_SERVER` URLs are ignored.
+L'applicazione WPF convalida l'ambiente Windows e WebView2, prepara le directory locali, avvia il backend in-process su una porta dinamica, inizializza il database SQLite tramite EF Core 10 (`OnlyRagDbContext` / `LocalSqliteSchemaInitializer`), ripristina lo stato dei job, inizializza gli hub SignalR (`ChatStreamHub`, `JobProgressHub`) e carica l'interfaccia React in WebView2.
 
-## Initial Setup
+## Workflow
 
-The UI exposes dependency status and setup actions for Ollama, Qdrant, OCR, and LibreOffice for
-PDF export. The app opens official install pages for manual external installs where appropriate.
-OCR provisioning uses repository runtime manifests and local Python when available. Qdrant
-settings distinguish the bundled local runtime from trusted remote endpoints.
-
-## Workflows
-
-Document import validates local limits, creates local records, and enqueues persistent jobs.
-Ingestion extracts text, optional OCR adds text for scanned/image content, embeddings are
-generated through Ollama, and vector data is stored in Qdrant. Search and chat use selected
-document scopes with hybrid SQLite FTS plus vector retrieval. Translation jobs generate editable
-page-based units and exports.
-
-## Agent runs
-
-Coding-agent runs are durable SQLite records. The runtime, rather than the model prompt, enforces
-the `Plan`, `Act`, `Observe`, `Verify`, `Recover`, and `Finalize` phases. It persists the LLM
-conversation snapshot and phase transitions after each action cycle, applies tool-call, estimated-token,
-and wall-clock budgets, and exposes `GET /api/agent/runs/{runId}` plus
-`GET /api/agent/runs/resumable` for recovery after an application restart. A new streaming request can
-pass `resumeRunId` to continue a non-terminal run.
-
-Every new run also persists typed completion criteria and runtime-observed verification evidence.
-`FINALIZE` and `COMPLETED` are blocked until every required criterion has a successful matching tool
-result. Command criteria may require an exact `run_command`; when omitted, the default criterion
-accepts only a successful build, test, lint, typecheck, or release-gate command. Model claims and
-`reflect_step` output are never treated as completion evidence.
-
-## Agent evaluation traces
-
-Every run appends immutable events to `agent_run_trace_events`: goal decision, phase, model response
-latency, tool result, observations, errors, token usage, evidence and terminal outcome. Events are
-available from `GET /api/agent/runs/{runId}/trace`. The committed
-[`agent-evaluation.dataset.json`](agent-evaluation.dataset.json) defines repeatable real development
-tasks and expected limits for success, regressions, duration and step count.
-
-## Shutdown
-
-When local jobs or unsaved UI work exist, the app asks for confirmation. Confirmed exit saves
-available work, cancels active local jobs, and shuts down the in-process backend.
+- **Importazione Documenti**: Convalida limiti locali, estrazione testo nativa (OpenXML/PDF/TXT), OCR automatico per immagini/PDF scansionati, generazione embedding via Ollama e salvataggio vettori su Qdrant.
+- **Ricerca e Chat RAG**: Retrieval ibrido a 6 stadi basato su SQLite FTS5, Qdrant HNSW, re-ranking ONNX Cross-Encoder (`OnnxCrossEncoderReRankerService`), Knowledge Graph Traversal e verifica runtime `GroundingVerifier`.
+- **Agenti Autonomi SOTA**: Ciclo a 6 fasi (`Plan` → `Act` → `Observe` → `Verify` → `Recover` → `Finalize`) guidato da `AgentLoopEngine`, memoria episodica e verifiche empiriche dei tool.
+- **Chiusura**: Annullo sicuro dei job attivi, salvataggio dello stato utente e arresto controllato dei processi figli.
+backend.

@@ -127,6 +127,7 @@ public sealed class WindowsCredentialManagerCloudKeyVault : ICloudApiKeyVault
             }
             finally
             {
+                CryptographicOperations.ZeroMemory(blob);
                 Marshal.FreeHGlobal(pBlob);
             }
         }
@@ -194,8 +195,15 @@ public sealed class WindowsCredentialManagerCloudKeyVault : ICloudApiKeyVault
 
             string filePath = GetDpapiFilePath(provider);
             byte[] keyBytes = Encoding.UTF8.GetBytes(key);
-            byte[] encryptedBytes = ProtectedData.Protect(keyBytes, null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(filePath, encryptedBytes);
+            try
+            {
+                byte[] encryptedBytes = ProtectedData.Protect(keyBytes, null, DataProtectionScope.CurrentUser);
+                File.WriteAllBytes(filePath, encryptedBytes);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(keyBytes);
+            }
         }
         catch
         {

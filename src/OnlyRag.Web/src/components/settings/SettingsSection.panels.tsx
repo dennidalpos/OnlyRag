@@ -20,10 +20,10 @@ type SettingsTab = "all" | "theme" | "models" | "rag" | "ocr" | "diagnostics";
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: string }[] = [
   { id: "all", label: "Tutte le opzioni", icon: "⚙️" },
   { id: "theme", label: "Tema & Grafica", icon: "🎨" },
-  { id: "models", label: "Ollama & Modelli", icon: "🤖" },
+  { id: "models", label: "Modelli & Provider AI", icon: "🤖" },
   { id: "rag", label: "RAG & Prestazioni", icon: "⚡" },
   { id: "ocr", label: "OCR & PDF Export", icon: "📄" },
-  { id: "diagnostics", label: "Log & Diagnostica", icon: "🛠️" }
+  { id: "diagnostics", label: "Diagnostica & Log", icon: "🛠️" }
 ];
 
 export function SettingsConfigurationAlerts() {

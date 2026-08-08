@@ -1,64 +1,45 @@
-# OCR Pipeline (Dual-Engine Architecture)
+# Pipeline OCR (Architettura Dual-Engine)
 
-OnlyRag features a dual-engine OCR architecture:
-1. **Native C# DirectML ONNX OCR Engine** ([`OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs)): Built-in in-process OCR engine running directly via ONNX Runtime DirectML with hardware GPU acceleration. Requires zero external Python runtime dependencies.
-2. **Python PaddleOCR Bridge** ([`PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs)): Subprocess bridge for PaddleOCR when Python OCR prerequisites (Python 3.10-3.13) are installed.
+OnlyRag include un'architettura Dual-Engine OCR:
+1. **Motore Nativo C# DirectML ONNX OCR** ([`OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs)): Motore OCR in-process nativo basato su ONNX Runtime DirectML con accelerazione GPU hardware. Non richiede alcuna dipendenza runtime Python esterna.
+2. **Bridge Python PaddleOCR** ([`PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs)): Subprocess bridge per PaddleOCR attivo quando i prerequisiti Python OCR (Python 3.10-3.13) sono installati nel sistema.
 
-## Components
+## Componenti
 
-- [`src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs): Native C# DirectML ONNX OCR engine implementation.
-- [`src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs): Python PaddleOCR subprocess bridge.
-- [`scripts/ocr/paddle_ocr_bridge.py`](../scripts/ocr/paddle_ocr_bridge.py): Python bridge script.
-- [`scripts/ocr/install_ocr_runtime.ps1`](../scripts/ocr/install_ocr_runtime.ps1): Python OCR runtime provisioning script.
-- [`scripts/ocr/runtime-manifest.json`](../scripts/ocr/runtime-manifest.json): CPU/GPU runtime manifest for PaddleOCR.
-- [`src/OnlyRag.Infrastructure/Ocr`](../src/OnlyRag.Infrastructure/Ocr): OCR engine factory (`IOcrEngine`), SQLite cache (`SqliteOcrCacheRepository`), retry policies, and settings store.
-- [`src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs`](../src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs): runtime selection resolver.
-- [`src/OnlyRag.Api/OcrRuntimeEnvironment.cs`](../src/OnlyRag.Api/OcrRuntimeEnvironment.cs): transactional virtual environment lifecycle.
+- [`src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/OnnxDirectMlOcrEngine.cs): Implementazione nativa C# DirectML ONNX OCR.
+- [`src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs`](../src/OnlyRag.Infrastructure/Ocr/PaddleOcrEngine.cs): Subprocess bridge Python per PaddleOCR.
+- [`scripts/ocr/paddle_ocr_bridge.py`](../scripts/ocr/paddle_ocr_bridge.py): Script bridge Python.
+- [`scripts/ocr/install_ocr_runtime.ps1`](../scripts/ocr/install_ocr_runtime.ps1): Script per il provisioning dell'ambiente runtime OCR Python.
+- [`scripts/ocr/runtime-manifest.json`](../scripts/ocr/runtime-manifest.json): Manifest del runtime CPU/GPU per PaddleOCR.
+- [`src/OnlyRag.Infrastructure/Ocr`](../src/OnlyRag.Infrastructure/Ocr): Factory dei motori OCR (`IOcrEngine`), repository di cache SQLite (`SqliteOcrCacheRepository`), policy di retry e store impostazioni.
+- [`src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs`](../src/OnlyRag.Api/OcrProvisionRuntimeResolver.cs): Risolutore per la selezione del runtime OCR.
+- [`src/OnlyRag.Api/OcrRuntimeEnvironment.cs`](../src/OnlyRag.Api/OcrRuntimeEnvironment.cs): Gestore transazionale del ciclo di vita dell'ambiente virtuale.
 
-## Runtime Selection
+## Selezione del Runtime
 
-Python 3.10 through 3.13 is supported. Python 3.14 is not supported by the pinned PaddlePaddle
-runtime. Provisioning selects NVIDIA GPU wheels only when compatible local driver/runtime signals
-are available; CPU OCR is the fallback. The app selects GPU automatically after Diagnostics proves
-OCR GPU usable, unless the user saved CPU manually.
+È supportato Python da 3.10 a 3.13. Il provisioning seleziona i pacchetti GPU NVIDIA solo quando vengono rilevati driver/runtime locali compatibili; in caso contrario viene utilizzato il fallback CPU. L'applicazione seleziona la GPU automaticamente dopo la verifica della Diagnostica.
 
-## Environment lifecycle and recovery
+## Ciclo di Vita dell'Ambiente e Ripristino
 
-The application-owned environment is `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`. Provisioning
-never changes that live directory while package installation is running: it creates a uniquely
-named sibling staging directory, installs the selected pinned requirements there, and performs the
-PaddleOCR bridge check there. Only a checked environment containing `Scripts\python.exe` and a
-runtime stamp is published. The previous environment is retained until publication succeeds, so a
-cancelled, timed-out, or failed installation leaves the last working environment untouched.
+L'ambiente gestito dall'applicazione risiede in `%LOCALAPPDATA%\OnlyRag\ocr-python\.venv`. Il provisioning crea un ambiente staging fratello, installa le dipendenze verificate ed effettua il controllo del bridge prima di pubblicarlo.
 
-Diagnostics classify the local environment as `missing`, `incomplete`, `corrupt`, or `ready`
-without exposing Python command output or local paths to the UI. For an `incomplete` or `corrupt`
-environment, the dependency status endpoint starts one background repair attempt per application
-session. Its progress, selected runtime, timeout and cancellation state are observable in the UI.
-The attempt uses the same 45-minute timeout and transactional staging as manual provisioning. If
-it is cancelled, times out, or fails, automatic retries stop for that session and the UI exposes
-**Repair OCR** as the explicit fallback. Missing environments still require **Install OCR**.
+La diagnostica classifica l'ambiente locale come `missing`, `incomplete`, `corrupt`, o `ready`. Per un ambiente `incomplete` o `corrupt`, la diagnostica avvia un tentativo di riparazione in background per sessione.
 
-## Verification
+## Convalida
 
-Manifest validation:
+Verifica manifest:
 
 ```powershell
 pwsh .\scripts\ocr\Test-OcrRuntimeManifest.ps1
 ```
 
-Catalog drift check:
+Controllo del catalogo:
 
 ```powershell
 pwsh .\scripts\ocr\Test-OcrRuntimeCatalog.ps1 -OutputPath .\artifacts\ocr-runtime-catalog\ocr-runtime-catalog.json
 ```
 
-The scheduled GitHub workflow [`ocr-runtime-catalog.yml`](../.github/workflows/ocr-runtime-catalog.yml)
-runs the catalog check for Python 3.10 through 3.13 and opens a maintenance issue when a reachable
-PaddlePaddle GPU runtime is missing from the manifest.
+## Limiti
 
-## Limits
-
-- OCR is optional; missing Python or package preparation must not block non-OCR workflows.
-- Requirements are pinned but not hash-locked.
-- Internet access is required when provisioning downloads Python packages.
+- L'OCR è opzionale; l'assenza di Python non blocca le funzionalità RAG o di indicizzazione del testo.
+- L'accesso ad Internet è necessario durante il provisioning per scaricare i pacchetti Python.

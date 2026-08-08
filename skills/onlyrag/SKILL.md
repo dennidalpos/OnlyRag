@@ -7,19 +7,21 @@ description: Primary development skill for OnlyRag. Covers overall architecture,
 
 This skill provides comprehensive operational and architectural guidance for developing, testing, packaging, and verifying the OnlyRag application.
 
-## 1. Official Documentation & References
+## 1. Documentazione Ufficiale & Riferimenti
 
-- **OnlyRag Documentation Index**: [docs/README.md](file:///d:/GITHUB/OnlyRag/docs/README.md)
-- **Architecture**: [docs/ARCHITECTURE.md](file:///d:/GITHUB/OnlyRag/docs/ARCHITECTURE.md)
-- **Operations & Handoff**: [docs/OPERATIONS.md](file:///d:/GITHUB/OnlyRag/docs/OPERATIONS.md)
-- **Application Flow**: [docs/APP_FLOW.md](file:///d:/GITHUB/OnlyRag/docs/APP_FLOW.md)
-- **Scripts Inventory**: [scripts/README.md](file:///d:/GITHUB/OnlyRag/scripts/README.md)
-- **RAG Pipeline**: [docs/RAG_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/RAG_PIPELINE.md)
-- **OCR Pipeline**: [docs/OCR_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/OCR_PIPELINE.md)
-- **Image Generation**: [docs/IMAGE_GENERATION.md](file:///d:/GITHUB/OnlyRag/docs/IMAGE_GENERATION.md)
-- **Translation Pipeline**: [docs/TRANSLATION_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/TRANSLATION_PIPELINE.md)
-- **Packaging**: [packaging/README.md](file:///d:/GITHUB/OnlyRag/packaging/README.md)
-- **Signing**: [docs/SIGNING.md](file:///d:/GITHUB/OnlyRag/docs/SIGNING.md)
+- **Indice Documentazione OnlyRag**: [docs/README.md](file:///d:/GITHUB/OnlyRag/docs/README.md)
+- **Architettura**: [docs/ARCHITECTURE.md](file:///d:/GITHUB/OnlyRag/docs/ARCHITECTURE.md)
+- **Operazioni & Handoff**: [docs/OPERATIONS.md](file:///d:/GITHUB/OnlyRag/docs/OPERATIONS.md)
+- **Flusso Applicazione**: [docs/APP_FLOW.md](file:///d:/GITHUB/OnlyRag/docs/APP_FLOW.md)
+- **Inventario Script**: [scripts/README.md](file:///d:/GITHUB/OnlyRag/scripts/README.md)
+- **Pipeline RAG & Knowledge Graph**: [docs/RAG_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/RAG_PIPELINE.md)
+- **Motore Agenti Autonomi**: [docs/AGENT_ENGINE.md](file:///d:/GITHUB/OnlyRag/docs/AGENT_ENGINE.md)
+- **Pipeline OCR**: [docs/OCR_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/OCR_PIPELINE.md)
+- **Generazione Immagini**: [docs/IMAGE_GENERATION.md](file:///d:/GITHUB/OnlyRag/docs/IMAGE_GENERATION.md)
+- **Pipeline Traduzione**: [docs/TRANSLATION_PIPELINE.md](file:///d:/GITHUB/OnlyRag/docs/TRANSLATION_PIPELINE.md)
+- **Packaging NSIS**: [packaging/README.md](file:///d:/GITHUB/OnlyRag/packaging/README.md)
+- **Firma Digitale**: [docs/SIGNING.md](file:///d:/GITHUB/OnlyRag/docs/SIGNING.md)
+
 
 ## 2. Core Architecture
 

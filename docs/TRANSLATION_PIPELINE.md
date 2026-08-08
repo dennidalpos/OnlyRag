@@ -1,32 +1,19 @@
-# Translation Pipeline
+# Pipeline di Traduzione
 
-OnlyRag supports local document translation workflows backed by Ollama.
+OnlyRag supporta workflow di traduzione locale dei documenti indicizzati basati su Ollama.
 
-## Flow
+## Flusso
 
-1. A user selects an indexed document and target translation settings.
-2. The backend creates a local translation job.
-3. Source text is processed into page-based translation units.
-4. Ollama receives translation prompts for the configured model.
-5. Outputs are validated for required placeholders. If validation fails, the job asks Ollama to
-   repair the same unit before marking it failed.
-6. Translation units are persisted locally and can be edited in the UI.
-7. Export creates TXT, Markdown, HTML, DOCX, or PDF output.
+1. L'utente seleziona un documento indicizzato e configura le impostazioni di traduzione.
+2. Il backend crea un job di traduzione locale.
+3. Il testo sorgente viene suddiviso in unità di traduzione basate sulla pagina.
+4. Ollama riceve i prompt di traduzione per il modello configurato.
+5. Gli output vengono validati per i placeholder richiesti. In caso di errore, il job tenta una riparazione dell'unità prima di segnarla come fallita.
+6. Le unità tradotte vengono salvate localmente e possono essere modificate nell'interfaccia UI.
+7. L'esportazione genera file TXT, Markdown, HTML, DOCX o PDF (via LibreOffice).
 
-Backend translation code lives in [`src/OnlyRag.Api`](../src/OnlyRag.Api), especially the
-translation endpoints, prompt builder, output validator, and export services. Storage for
-translation records lives under [`src/OnlyRag.Infrastructure/Storage`](../src/OnlyRag.Infrastructure/Storage).
-Frontend translation UI code lives under [`src/OnlyRag.Web/src/components`](../src/OnlyRag.Web/src/components).
+## Prerequisiti
 
-## Requirements
-
-- A reachable Ollama endpoint and configured translation model.
-- Indexed source document text.
-- Optional LibreOffice/conversion support for PDF export paths.
-
-## Limits
-
-- Translation quality and context handling depend on the configured model and `num_ctx` settings.
-- PDF export has more runtime prerequisites than TXT, Markdown, HTML, or DOCX export.
-- Active translation jobs are local jobs and follow the same shutdown/cancellation behavior as
-  other local work.
+- Endpoint Ollama raggiungibile e modello di traduzione configurato.
+- Testo del documento sorgente indicizzato.
+- LibreOffice installato per l'esportazione in formato PDF.

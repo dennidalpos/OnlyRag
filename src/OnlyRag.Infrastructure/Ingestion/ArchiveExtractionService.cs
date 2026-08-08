@@ -168,7 +168,11 @@ public sealed class ArchiveExtractionService
         }
         protected override void Dispose(bool disposing)
         {
-            if (disposing) source.Dispose();
+            if (disposing)
+            {
+                source.Dispose();
+                contentHash.Dispose();
+            }
             base.Dispose(disposing);
         }
         public override async ValueTask DisposeAsync()

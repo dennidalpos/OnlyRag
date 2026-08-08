@@ -30,7 +30,6 @@ export function InfoTip({
         type="button"
         className="info-tip__trigger"
         aria-label={label}
-        title={label}
         aria-describedby={descriptionId}
       >
         <svg

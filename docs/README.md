@@ -1,42 +1,37 @@
-# OnlyRag Documentation
+# Documentazione OnlyRag
 
-The root [README](../README.md) is the quick start and command map. This directory contains
-current technical and operational documentation. Do not use these pages as changelogs.
+Il file [README](../README.md) nella radice è la guida rapida e la mappa dei comandi. Questa directory contiene la documentazione tecnica ed operativa corrente di OnlyRag.
 
-## Operations
+## Operazioni
 
-- [Operations and handoff](OPERATIONS.md): Windows prerequisites, setup, dev/start, readiness
-  gates, packaging, signing handoff, runtime paths, environment variables, and troubleshooting.
-- [Scripts](../scripts/README.md): public PowerShell script inventory and canonical command flows.
-- [Signing](SIGNING.md): certificate handling and release signing commands.
-- [Packaging](../packaging/README.md): installer inputs, outputs, behavior, and release evidence.
+- [Operazioni e handoff](OPERATIONS.md): Prerequisiti Windows, configurazione, sviluppo/avvio, gate di verifica, packaging, firma e risoluzione problemi.
+- [Script](../scripts/README.md): Inventario completo degli script PowerShell 7 e flussi di comandi canonici.
+- [Firma Digitale](SIGNING.md): Gestione dei certificati e comandi di firma dei rilascio Authenticode.
+- [Packaging](../packaging/README.md): Input, output, comportamento e verifica dell'installer NSIS.
 
-## Architecture And Flow
+## Architettura e Flusso
 
-- [Architecture](ARCHITECTURE.md): source layout, runtime boundaries, storage, dependencies, and
-  test surfaces.
-- [Application flow](APP_FLOW.md): desktop startup, backend bridge, job flow, shutdown, and the
-  editable draw.io diagram.
+- [Architettura](ARCHITECTURE.md): Struttura dei sorgenti, confini del runtime, storage SQLite/Qdrant, dipendenze e superfici di test.
+- [Flusso dell'applicazione](APP_FLOW.md): Avvio desktop shell WPF, bridge backend, flusso dei job, chiusura e diagramma draw.io.
 
-## Feature Pipelines
+## Pipeline delle Funzionalità
 
-- [Agent engine](AGENT_ENGINE.md): autonomous agent engine architecture, phase machine, subagent DAG orchestrator, memory system, and endpoints.
-- [RAG & Knowledge Graph pipeline](RAG_PIPELINE.md): ingestion (OpenXML, PDF, archive, TXT, CSV), dual-tier chunking, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Qdrant indexing, hybrid search, and chat grounding.
-- [OCR pipeline](OCR_PIPELINE.md): Dual-engine OCR architecture (Native C# DirectML ONNX engine `OnnxDirectMlOcrEngine` + Python PaddleOCR bridge `PaddleOcrEngine`).
-- [Image generation](IMAGE_GENERATION.md): integrated local model catalog, required-file
-  downloads, verification, GPU/CPU runtime behavior, toolbar editing workflow, and release checks.
-- [Translation pipeline](TRANSLATION_PIPELINE.md): page-based translation jobs, editing, and
-  export formats.
+- [Motore Agenti Autonomi](AGENT_ENGINE.md): Architettura del motore agenti autonomi SOTA (6 fasi), orchestratore subagenti DAG, sistema di memoria episodica ed endpoint API.
+- [Pipeline RAG & Knowledge Graph](RAG_PIPELINE.md): Ingestione (OpenXML, PDF, archivi, TXT, CSV), chunking Parent-Child, Knowledge Graph traversal (`SqliteGraphRetrievalService`), Re-ranking ONNX Cross-Encoder (`OnnxCrossEncoderReRankerService`), indicizzazione Qdrant e grounding chat.
+- [Pipeline OCR](OCR_PIPELINE.md): Architettura Dual-Engine OCR (Motore C# nativo DirectML ONNX `OnnxDirectMlOcrEngine` + Bridge Python PaddleOCR `PaddleOcrEngine`).
+- [Generazione Immagini](IMAGE_GENERATION.md): Catalogo modelli locale ONNX DirectML/CPU (`lcm-sdxl-olive-onnx`), consenso download, verifica SHA256, editor canvas e verifiche di rilascio.
+- [Pipeline di Traduzione](TRANSLATION_PIPELINE.md): Traduzione a unità per pagina con Ollama, validazione prompt ed esportazione multi-formato (TXT, MD, HTML, DOCX, PDF via LibreOffice).
 
-## Assets
+## Asset
 
-- [Brand assets](BRAND_ASSETS.md): generated asset locations and regeneration command.
+- [Asset di Marca](BRAND_ASSETS.md): Posizione degli asset generati e comandi di rigenerazione.
 
-## Tracked Files
+## File Tracciati
 
-- [Operational tracker](../PROJECT_STATUS.json)
-- [Solution file](../OnlyRag.sln)
-- [CI workflow](../.github/workflows/ci.yml)
-- [OCR catalog workflow](../.github/workflows/ocr-runtime-catalog.yml)
-- [Qdrant runtime manifest](../packaging/qdrant/manifest.json)
-- [OCR runtime manifest](../scripts/ocr/runtime-manifest.json)
+- [Tracker Operativo](../PROJECT_STATUS.json)
+- [File Soluzione Visual Studio](../OnlyRag.sln)
+- [Workflow CI GitHub Actions](../.github/workflows/ci.yml)
+- [Workflow Catalogo OCR](../.github/workflows/ocr-runtime-catalog.yml)
+- [Manifest Runtime Qdrant](../packaging/qdrant/manifest.json)
+- [Manifest Runtime OCR](../scripts/ocr/runtime-manifest.json)
+

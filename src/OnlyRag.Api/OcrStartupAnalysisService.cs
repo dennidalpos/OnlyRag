@@ -9,6 +9,7 @@ public sealed class OcrStartupAnalysisService
 
     private readonly ILocalProcessLauncher processLauncher;
     private readonly OcrProvisionRuntimeResolver ocrRuntimeResolver;
+    private bool? cachedHasCompatiblePython;
 
     public OcrStartupAnalysisService(ILocalProcessLauncher processLauncher)
     {
@@ -107,6 +108,11 @@ public sealed class OcrStartupAnalysisService
 
     private async Task<bool> HasCompatiblePythonAsync(CancellationToken cancellationToken)
     {
+        if (cachedHasCompatiblePython.HasValue)
+        {
+            return cachedHasCompatiblePython.Value;
+        }
+
         foreach (OcrPythonCommand candidate in ResolvePythonCandidates())
         {
             LocalProcessResult result = await processLauncher.RunAsync(
@@ -122,10 +128,12 @@ public sealed class OcrStartupAnalysisService
             Version? version = OcrPythonRuntime.ParseVersion(OcrPythonRuntime.GetVersionText(result));
             if (version is not null && OcrPythonRuntime.IsSupportedVersion(version))
             {
+                cachedHasCompatiblePython = true;
                 return true;
             }
         }
 
+        cachedHasCompatiblePython = false;
         return false;
     }
 
