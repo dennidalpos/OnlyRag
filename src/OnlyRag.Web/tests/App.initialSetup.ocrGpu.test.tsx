@@ -72,7 +72,7 @@ describe("App initial setup OCR GPU residual checks", () => {
                 provisionStarted && ocrStatusRequests >= 3
                   ? "OCR configurato."
                   : "Configurazione OCR runtime in corso.",
-              resolvedRuntime: provisionStarted && ocrStatusRequests >= 3 ? "cuda129" : "cpu",
+              resolvedRuntime: provisionStarted && ocrStatusRequests >= 3 ? "cuda126" : "cpu",
               startedAtUtc: provisionStarted ? "2026-05-24T14:00:00Z" : null,
               updatedAtUtc: "2026-05-24T14:03:00Z"
             })

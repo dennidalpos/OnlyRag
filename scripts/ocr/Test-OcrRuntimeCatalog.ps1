@@ -13,8 +13,6 @@ $manifestPath = Join-Path $PSScriptRoot "runtime-manifest.json"
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 
 $knownCatalog = @(
-    [pscustomobject]@{ Runtime = "cuda130"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu130/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" },
-    [pscustomobject]@{ Runtime = "cuda129"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu129/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" },
     [pscustomobject]@{ Runtime = "cuda126"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu126/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" },
     [pscustomobject]@{ Runtime = "cuda118"; Url = "https://www.paddlepaddle.org.cn/packages/stable/cu118/"; Package = "paddlepaddle-gpu"; Version = "3.3.1" }
 )

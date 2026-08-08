@@ -81,7 +81,7 @@ describe("SettingsSection OCR provisioning", () => {
             message: provisionStarted ? "OCR configurato." : "OCR non configurato.",
             lastError: null,
             runtimeTarget: "auto",
-            resolvedRuntime: provisionStarted ? "cuda129" : "cpu",
+            resolvedRuntime: provisionStarted ? "cuda126" : "cpu",
             runtimeDetail: provisionStarted ? "NVIDIA compatibile." : "Runtime scelto automaticamente."
           }
         })

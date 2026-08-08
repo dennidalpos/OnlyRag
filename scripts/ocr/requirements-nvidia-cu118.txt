@@ -1,3 +1,4 @@
 -r requirements-common.txt
---extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu118/
+-i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+--extra-index-url https://pypi.org/simple
 paddlepaddle-gpu==3.3.1

@@ -19,36 +19,6 @@
     },
     {
       "target": "nvidia",
-      "requirementsFile": "requirements-nvidia-cu130.txt",
-      "resolvedRuntime": "cuda130",
-      "paddlePackage": "paddlepaddle-gpu",
-      "paddleVersion": "3.3.1",
-      "minimumWindowsDriver": "580.82",
-      "minimumComputeCapability": "7.5",
-      "supportedPythonMin": "3.10.0",
-      "supportedPythonMax": "3.13.x",
-      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu130/",
-      "knownLimitations": [
-        "NVIDIA RTX 50 series Windows support is treated as experimental until stable PaddlePaddle wheels fully support it."
-      ]
-    },
-    {
-      "target": "nvidia",
-      "requirementsFile": "requirements-nvidia-cu129.txt",
-      "resolvedRuntime": "cuda129",
-      "paddlePackage": "paddlepaddle-gpu",
-      "paddleVersion": "3.3.1",
-      "cudnnPackage": "nvidia-cudnn-cu12",
-      "cudnnVersion": "9.9.0.52",
-      "minimumWindowsDriver": "576.02",
-      "minimumComputeCapability": "7.5",
-      "supportedPythonMin": "3.10.0",
-      "supportedPythonMax": "3.13.x",
-      "sourceUrl": "https://www.paddlepaddle.org.cn/packages/stable/cu129/",
-      "knownLimitations": []
-    },
-    {
-      "target": "nvidia",
       "requirementsFile": "requirements-nvidia-cu126.txt",
       "resolvedRuntime": "cuda126",
       "paddlePackage": "paddlepaddle-gpu",

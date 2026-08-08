@@ -298,8 +298,6 @@ else {
     Test-PathExpectation -Id "ocr-requirements-cpu" -Path (Join-Path $installDir "scripts\ocr\requirements-cpu.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements-nvidia-cu118" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu118.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements-nvidia-cu126" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu126.txt") -Kind "file"
-    Test-PathExpectation -Id "ocr-requirements-nvidia-cu129" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu129.txt") -Kind "file"
-    Test-PathExpectation -Id "ocr-requirements-nvidia-cu130" -Path (Join-Path $installDir "scripts\ocr\requirements-nvidia-cu130.txt") -Kind "file"
     Test-PathExpectation -Id "ocr-runtime-manifest" -Path (Join-Path $installDir "scripts\ocr\runtime-manifest.json") -Kind "file"
     Test-PathExpectation -Id "web-ui-entrypoint" -Path (Join-Path $installDir "wwwroot\index.html") -Kind "file"
     Test-PathExpectation -Id "start-menu-shortcut" -Path $startMenuShortcut -Kind "file"

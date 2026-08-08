@@ -1,4 +1,0 @@
--r requirements-common.txt
---extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu129/
-paddlepaddle-gpu==3.3.1
-nvidia-cudnn-cu12==9.9.0.52

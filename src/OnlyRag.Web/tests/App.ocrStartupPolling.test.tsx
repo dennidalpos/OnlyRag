@@ -39,7 +39,7 @@ describe("App OCR startup polling", () => {
       {
         path: "/api/dependencies/ocr",
         response: createOcrProvisionStatus({
-          resolvedRuntime: "cuda129",
+          resolvedRuntime: "cuda126",
           runtimeDetail: "NVIDIA compatibile."
         })
       },

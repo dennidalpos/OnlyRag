@@ -259,7 +259,7 @@ describe("SettingsSection", () => {
             "Runtime OCR locale incompleto o danneggiato. Apri Impostazioni > Diagnostica e premi Ripara OCR per reinstallare PaddleOCR e il runtime PaddlePaddle corretto.",
           lastError: null,
           runtimeTarget: "auto",
-          resolvedRuntime: "cuda129",
+          resolvedRuntime: "cuda126",
           runtimeDetail: "NVIDIA compatibile."
         }
       }
