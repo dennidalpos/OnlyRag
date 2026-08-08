@@ -1,5 +1,3 @@
 {
-  "todos": [
-    "Evaluate and upgrade npm frontend packages in src/OnlyRag.Web (vite, vitest, typescript, lucide-react, @vitejs/plugin-react, jsdom, @types/node)"
-  ]
+  "todos": []
 }
