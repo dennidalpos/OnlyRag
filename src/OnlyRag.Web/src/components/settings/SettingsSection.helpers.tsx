@@ -274,4 +274,31 @@ export function buildContextChunkRecommendation(numCtx: number | null): number |
   return clampNumber(Math.round(numCtx / 1024), 1, 24);
 }
 
+export function classifyHardwareProfile(diagnostics: {
+  systemTelemetry?: {
+    cpu?: { processorCount?: number };
+    memory?: { totalBytes?: number };
+    gpu?: unknown;
+  };
+  ocrGpuCapability?: { capabilityStatus?: string };
+} | null): "eco" | "balanced" | "power" {
+  if (!diagnostics) return "balanced";
+
+  const telemetry = diagnostics.systemTelemetry;
+  const cpuCores = telemetry?.cpu?.processorCount ?? 4;
+  const memoryBytes = telemetry?.memory?.totalBytes ?? (8 * 1024 * 1024 * 1024);
+  const memoryGB = memoryBytes / (1024 * 1024 * 1024);
+  const hasGpu = Boolean(telemetry?.gpu) || diagnostics.ocrGpuCapability?.capabilityStatus !== "no_nvidia_gpu";
+
+  if (memoryGB < 8 || (cpuCores <= 4 && !hasGpu)) {
+    return "eco";
+  }
+
+  if (memoryGB >= 16 && (cpuCores >= 8 || hasGpu)) {
+    return "power";
+  }
+
+  return "balanced";
+}
+
 

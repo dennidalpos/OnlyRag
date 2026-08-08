@@ -75,34 +75,6 @@ export function IngestionSettingsPanel() {
               }
             />
             <SettingsRangeField
-              id="archive-max-files"
-              label="File massimi per archivio"
-              tooltip="Limite di protezione contro archivi con un numero eccessivo di file."
-              min={1}
-              max={100000}
-              step={100}
-              value={ingestionFormState.archive.maxFileCount}
-              formatValue={(value) => value.toLocaleString("it-IT")}
-              onChange={(value) => setIngestionFormState((current) => ({
-                ...current,
-                archive: { ...current.archive, maxFileCount: value }
-              }))}
-            />
-            <SettingsRangeField
-              id="archive-max-depth"
-              label="Profondita' cartelle archivio"
-              tooltip="Profondita' massima dei percorsi estratti; protegge da strutture annidate anomale."
-              min={0}
-              max={64}
-              step={1}
-              value={ingestionFormState.archive.maxDirectoryDepth}
-              formatValue={(value) => `${value} livelli`}
-              onChange={(value) => setIngestionFormState((current) => ({
-                ...current,
-                archive: { ...current.archive, maxDirectoryDepth: value }
-              }))}
-            />
-            <SettingsRangeField
               id="ingestion-overlap"
               label="Overlap chunk"
               tooltip="Token ripetuti tra chunk adiacenti per conservare contesto."
@@ -115,6 +87,39 @@ export function IngestionSettingsPanel() {
                 setIngestionFormState((current) => ({ ...current, overlapTokens: value }))
               }
             />
+            <details className="setup-banner__details mt-2">
+              <summary>Limiti archivi compressi</summary>
+              <div className="settings-grid mt-2">
+                <SettingsRangeField
+                  id="archive-max-files"
+                  label="File massimi per archivio"
+                  tooltip="Limite di protezione contro archivi con un numero eccessivo di file."
+                  min={1}
+                  max={100000}
+                  step={100}
+                  value={ingestionFormState.archive.maxFileCount}
+                  formatValue={(value) => value.toLocaleString("it-IT")}
+                  onChange={(value) => setIngestionFormState((current) => ({
+                    ...current,
+                    archive: { ...current.archive, maxFileCount: value }
+                  }))}
+                />
+                <SettingsRangeField
+                  id="archive-max-depth"
+                  label="Profondita' cartelle archivio"
+                  tooltip="Profondita' massima dei percorsi estratti; protegge da strutture annidate anomale."
+                  min={0}
+                  max={64}
+                  step={1}
+                  value={ingestionFormState.archive.maxDirectoryDepth}
+                  formatValue={(value) => `${value} livelli`}
+                  onChange={(value) => setIngestionFormState((current) => ({
+                    ...current,
+                    archive: { ...current.archive, maxDirectoryDepth: value }
+                  }))}
+                />
+              </div>
+            </details>
             <div className="settings-actions">
               <button type="button" onClick={saveIngestionSettings} disabled={isBusy || !hasDirtyIngestionSettings}>
                 Salva ingestione
@@ -125,4 +130,3 @@ export function IngestionSettingsPanel() {
         </div>
   );
 }
-

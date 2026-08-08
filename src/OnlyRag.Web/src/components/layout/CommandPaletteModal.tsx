@@ -27,6 +27,7 @@ const baseCommands: CommandItem[] = [
   { id: "nav-translation", label: "Traduzione", group: "Sezioni", sectionId: "translation", shortcut: "Ctrl+4", icon: <Languages size={16} /> },
   { id: "nav-images", label: "Generazione Immagini", group: "Sezioni", sectionId: "images", shortcut: "Ctrl+5", icon: <Image size={16} /> },
   { id: "nav-settings", label: "Impostazioni", group: "Sezioni", sectionId: "settings", shortcut: "Ctrl+6", icon: <Settings size={16} /> },
+  { id: "nav-graph", label: "Grafo della Conoscenza", group: "Sezioni", sectionId: "graph", shortcut: "Ctrl+7", icon: <Sparkles size={16} /> },
   { id: "act-new-chat", label: "Nuova Chat", group: "Azioni Rapide", sectionId: "chat", icon: <Sparkles size={16} /> },
   { id: "theme-dark", label: "Tema Scuro Midnight", group: "Temi Visivi", themeId: "dark", icon: <Moon size={16} /> },
   { id: "theme-light", label: "Tema Chiaro Crisp", group: "Temi Visivi", themeId: "light", icon: <Sun size={16} /> },
@@ -80,9 +81,10 @@ export function CommandPaletteModal({ isOpen, onClose, onSelectSection }: Comman
   }
 
   return (
-    <div className="command-palette-backdrop" onClick={onClose} aria-modal="true" role="dialog">
+    <div className="command-palette-backdrop" onClick={onClose} aria-modal="true" role="dialog" aria-label="Tavolozza comandi">
       <div
         ref={modalRef}
+        id="command-palette-modal"
         className="command-palette-modal"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -92,12 +94,13 @@ export function CommandPaletteModal({ isOpen, onClose, onSelectSection }: Comman
           <input
             type="text"
             className="command-palette-input"
-            placeholder="Cerca comandi... (Esc)"
+            placeholder="Cerca comandi o sezioni... (Esc per uscire)"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
+            aria-label="Cerca comandi o sezioni"
             autoFocus
           />
         </div>

@@ -17,13 +17,13 @@ import { useSettingsSectionContext } from "./SettingsSectionContext";
 
 type SettingsTab = "all" | "theme" | "models" | "rag" | "ocr" | "diagnostics";
 
-const SETTINGS_TABS: { id: SettingsTab; label: string; icon: string }[] = [
-  { id: "all", label: "Tutte le opzioni", icon: "⚙️" },
-  { id: "theme", label: "Tema & Grafica", icon: "🎨" },
-  { id: "models", label: "Modelli & Provider AI", icon: "🤖" },
-  { id: "rag", label: "RAG & Prestazioni", icon: "⚡" },
-  { id: "ocr", label: "OCR & PDF Export", icon: "📄" },
-  { id: "diagnostics", label: "Diagnostica & Log", icon: "🛠️" }
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: "all", label: "Tutte" },
+  { id: "theme", label: "Tema" },
+  { id: "models", label: "Modelli AI" },
+  { id: "rag", label: "RAG & GPU" },
+  { id: "ocr", label: "OCR & Export" },
+  { id: "diagnostics", label: "Diagnostica" }
 ];
 
 export function SettingsConfigurationAlerts() {
@@ -211,7 +211,6 @@ export function SettingsSectionPanels() {
             className={`settings-tab-button ${activeTab === tab.id ? "settings-tab-button--active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span>{tab.icon}</span>
             <span style={{ flexGrow: 1 }}>{tab.label}</span>
             {hasWarning(tab.id) && (
               <span className="settings-tab-warning-dot" title="Configurazione incompleta o errore" />

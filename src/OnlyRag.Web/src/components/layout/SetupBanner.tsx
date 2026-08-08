@@ -137,14 +137,14 @@ export function SetupBanner({
         })}
         {onOpenPrerequisitesModal && (
           <button type="button" onClick={onOpenPrerequisitesModal}>
-            Installa Prerequisiti
+            Prerequisiti
           </button>
         )}
         <button type="button" className="button-secondary" onClick={onOpenSettings}>
-          Apri Impostazioni
+          Impostazioni
         </button>
         <button type="button" className="button-secondary" onClick={onRecheck} disabled={isChecking}>
-          {isChecking ? "Controllo..." : "Verifica"}
+          {isChecking ? "Verifica..." : "Verifica"}
         </button>
         <button
           type="button"

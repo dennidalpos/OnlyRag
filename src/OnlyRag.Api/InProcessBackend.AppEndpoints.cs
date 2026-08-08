@@ -137,9 +137,9 @@ public static partial class InProcessBackend
             ICloudApiKeyVault cloudKeyVault,
             CancellationToken cancellationToken) =>
         {
-            // Use a short timeout for Ollama status probes (not for generation)
+            // Use a 10-second timeout for Ollama status probes
             using var ollamaStatusCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            ollamaStatusCts.CancelAfter(TimeSpan.FromSeconds(5));
+            ollamaStatusCts.CancelAfter(TimeSpan.FromSeconds(10));
 
             // Launch all probes in parallel — each isolated so one failure doesn't block others
             Task<(string status, bool reachable, string? version, IReadOnlyList<OllamaRunningModelResponse> runningModels)> ollamaTask =
@@ -314,9 +314,15 @@ public static partial class InProcessBackend
     {
         try
         {
-            await ollamaClient.ListModelsAsync(cancellationToken);
-            string? version = await TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
-            IReadOnlyList<OllamaRunningModelResponse> running = await TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
+            Task listTask = ollamaClient.ListModelsAsync(cancellationToken);
+            Task<string?> versionTask = TryGetOllamaVersionAsync(ollamaClient, cancellationToken);
+            Task<IReadOnlyList<OllamaRunningModelResponse>> runningTask = TryListRunningOllamaModelsAsync(ollamaClient, cancellationToken);
+
+            await listTask;
+
+            string? version = versionTask.IsCompletedSuccessfully ? versionTask.Result : null;
+            IReadOnlyList<OllamaRunningModelResponse> running = runningTask.IsCompletedSuccessfully ? runningTask.Result : [];
+
             return ("Online", true, version, running);
         }
         catch (OllamaApiException ex)

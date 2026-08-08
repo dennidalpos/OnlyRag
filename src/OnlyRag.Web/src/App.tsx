@@ -89,6 +89,10 @@ export function AppContent() {
           event.preventDefault();
           setActiveSection("settings");
           setIsJobsDrawerOpen(false);
+        } else if (key === "7" || code === "Digit7" || code === "Numpad7") {
+          event.preventDefault();
+          setActiveSection("graph");
+          setIsJobsDrawerOpen(false);
         }
       }
     }

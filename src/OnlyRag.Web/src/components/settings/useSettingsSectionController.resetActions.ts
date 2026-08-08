@@ -142,7 +142,7 @@ export function createSettingsSectionResetActions(params: SettingsSectionResetAc
       setInfoMessage("Impostazioni iniziali bilanciate ripristinate. I dati locali non sono stati eliminati.");
       await refreshPdfExportConverter();
       await refreshDependencyStatus();
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Ripristino impostazioni non riuscito.");
     } finally {

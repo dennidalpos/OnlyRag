@@ -130,6 +130,7 @@ export const Sidebar = memo(function SidebarComponent({
             <span className="nav-group__title">{group.title}</span>
             {group.items.map((section) => (
               <button
+                id={`nav-item-${section}`}
                 className={section === activeSection ? "nav-item nav-item--active" : "nav-item"}
                 key={section}
                 type="button"

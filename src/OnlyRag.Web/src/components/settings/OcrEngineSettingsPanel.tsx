@@ -57,81 +57,84 @@ export function OcrEngineSettingsPanel() {
           activePreset={activePreset}
           onSelectPreset={handleSelectPreset}
         />
-        <div className="settings-grid">
-          <OcrSelectField
-            id="ocr-device"
-            label="Dispositivo"
-            tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Installa OCR quando disponibile."
-            value={ocrFormState.device}
-            options={[
-              { value: "cpu", label: "CPU" },
-              ...(hasNvidiaGpu ? [{ value: "gpu", label: "GPU", disabled: !isGpuUsable }] : [])
-            ]}
-            onChange={(value) =>
-              ocrFormState.profile !== "custom"
-                ? applyOcrProfile(ocrFormState.profile, value)
-                : updateOcrSettings({ device: value })
-            }
-          />
-          <OcrRangeField
-            id="ocr-pdf-dpi"
-            label="DPI PDF"
-            tooltip="Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
-            min={96}
-            max={400}
-            value={ocrFormState.pdfDpi}
-            onChange={(value) => updateOcrSettings({ pdfDpi: value })}
-          />
-          <OcrRangeField
-            id="ocr-detection-side-limit"
-            label="Lato massimo detection"
-            tooltip="Dimensione massima usata dal detector testo. Valori bassi riducono tempo e memoria, valori alti aiutano pagine grandi o dettagli fini."
-            min={320}
-            max={4096}
-            value={ocrFormState.detectionSideLimit}
-            onChange={(value) => updateOcrSettings({ detectionSideLimit: value })}
-          />
-          <OcrRangeField
-            id="ocr-detection-threshold"
-            label="Soglia detection"
-            tooltip="Confidenza minima per proporre aree di testo. Valori bassi rilevano piu elementi, valori alti scartano rumore."
-            min={0.01}
-            max={0.99}
-            step={0.01}
-            value={ocrFormState.detectionThreshold}
-            formatValue={formatOcrDecimal}
-            onChange={(value) => updateOcrSettings({ detectionThreshold: value })}
-          />
-          <OcrRangeField
-            id="ocr-recognition-score-threshold"
-            label="Soglia riconoscimento"
-            tooltip="Confidenza minima delle parole riconosciute. Valori bassi mantengono piu testo, valori alti privilegiano risultati piu affidabili."
-            min={0.01}
-            max={0.99}
-            step={0.01}
-            value={ocrFormState.recognitionScoreThreshold}
-            formatValue={formatOcrDecimal}
-            onChange={(value) => updateOcrSettings({ recognitionScoreThreshold: value })}
-          />
-          <OcrRangeField
-            id="ocr-recognition-batch-size"
-            label="Batch riconoscimento"
-            tooltip="Numero di crop di testo riconosciuti insieme. Valori bassi consumano meno memoria, valori alti possono accelerare su hardware adeguato."
-            min={1}
-            max={32}
-            value={ocrFormState.recognitionBatchSize}
-            onChange={(value) => updateOcrSettings({ recognitionBatchSize: value })}
-          />
-          <OcrRangeField
-            id="ocr-cpu-threads"
-            label="Thread CPU"
-            tooltip="Thread CPU dedicati a PaddleOCR. Valori bassi lasciano il PC piu reattivo, valori alti possono ridurre i tempi OCR."
-            min={1}
-            max={16}
-            value={ocrFormState.cpuThreads}
-            onChange={(value) => updateOcrSettings({ cpuThreads: value })}
-          />
-        </div>
+        <OcrSelectField
+          id="ocr-device"
+          label="Dispositivo"
+          tooltip="CPU e' piu compatibile. GPU usa il runtime NVIDIA preparato da Installa OCR quando disponibile."
+          value={ocrFormState.device}
+          options={[
+            { value: "cpu", label: "CPU" },
+            ...(hasNvidiaGpu ? [{ value: "gpu", label: "GPU", disabled: !isGpuUsable }] : [])
+          ]}
+          onChange={(value) =>
+            ocrFormState.profile !== "custom"
+              ? applyOcrProfile(ocrFormState.profile, value)
+              : updateOcrSettings({ device: value })
+          }
+        />
+        <details className="setup-banner__details" open={ocrFormState.profile === "custom"}>
+          <summary>Parametri OCR avanzati</summary>
+          <div className="settings-grid mt-2">
+            <OcrRangeField
+              id="ocr-pdf-dpi"
+              label="DPI PDF"
+              tooltip="Risoluzione usata per convertire pagine PDF in immagini prima dell'OCR. Valori bassi sono piu veloci, valori alti leggono meglio testi piccoli."
+              min={96}
+              max={400}
+              value={ocrFormState.pdfDpi}
+              onChange={(value) => updateOcrSettings({ pdfDpi: value })}
+            />
+            <OcrRangeField
+              id="ocr-detection-side-limit"
+              label="Lato massimo detection"
+              tooltip="Dimensione massima usata dal detector testo. Valori bassi riducono tempo e memoria, valori alti aiutano pagine grandi o dettagli fini."
+              min={320}
+              max={4096}
+              value={ocrFormState.detectionSideLimit}
+              onChange={(value) => updateOcrSettings({ detectionSideLimit: value })}
+            />
+            <OcrRangeField
+              id="ocr-detection-threshold"
+              label="Soglia detection"
+              tooltip="Confidenza minima per proporre aree di testo. Valori bassi rilevano piu elementi, valori alti scartano rumore."
+              min={0.01}
+              max={0.99}
+              step={0.01}
+              value={ocrFormState.detectionThreshold}
+              formatValue={formatOcrDecimal}
+              onChange={(value) => updateOcrSettings({ detectionThreshold: value })}
+            />
+            <OcrRangeField
+              id="ocr-recognition-score-threshold"
+              label="Soglia riconoscimento"
+              tooltip="Confidenza minima delle parole riconosciute. Valori bassi mantengono piu testo, valori alti privilegiano risultati piu affidabili."
+              min={0.01}
+              max={0.99}
+              step={0.01}
+              value={ocrFormState.recognitionScoreThreshold}
+              formatValue={formatOcrDecimal}
+              onChange={(value) => updateOcrSettings({ recognitionScoreThreshold: value })}
+            />
+            <OcrRangeField
+              id="ocr-recognition-batch-size"
+              label="Batch riconoscimento"
+              tooltip="Numero di crop di testo riconosciuti insieme. Valori bassi consumano meno memoria, valori alti possono accelerare su hardware adeguato."
+              min={1}
+              max={32}
+              value={ocrFormState.recognitionBatchSize}
+              onChange={(value) => updateOcrSettings({ recognitionBatchSize: value })}
+            />
+            <OcrRangeField
+              id="ocr-cpu-threads"
+              label="Thread CPU"
+              tooltip="Thread CPU dedicati a PaddleOCR. Valori bassi lasciano il PC piu reattivo, valori alti possono ridurre i tempi OCR."
+              min={1}
+              max={16}
+              value={ocrFormState.cpuThreads}
+              onChange={(value) => updateOcrSettings({ cpuThreads: value })}
+            />
+          </div>
+        </details>
         <label className="toggle-row" htmlFor="ocr-document-orientation">
           <input
             id="ocr-document-orientation"

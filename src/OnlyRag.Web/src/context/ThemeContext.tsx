@@ -10,10 +10,10 @@ export interface ThemeOption {
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { id: "dark", name: "Scuro Midnight", icon: "🌙", description: "Modalità scura bilanciata ad alto contrasto per affaticamento visivo ridotto" },
-  { id: "light", name: "Chiaro Crisp", icon: "☀️", description: "Modalità chiara e pulita ideale per ambienti molto illuminati" },
-  { id: "cyber", name: "Cyberpunk Neon", icon: "⚡", description: "Tonalità viola-ciano futuristiche con contrasti vivaci" },
-  { id: "emerald", name: "Obsidian Emerald", icon: "💎", description: "Sfondo ossidiana scuro con accenti verde smeraldo ed effetto vetro" }
+  { id: "dark", name: "Scuro Midnight", icon: "Dark", description: "Modalità scura ad alto contrasto per affaticamento visivo ridotto" },
+  { id: "light", name: "Chiaro Crisp", icon: "Light", description: "Modalità chiara ideale per ambienti illuminati" },
+  { id: "cyber", name: "Cyberpunk Neon", icon: "Cyber", description: "Tonalità viola-ciano futuristiche ad alto contrasto" },
+  { id: "emerald", name: "Obsidian Emerald", icon: "Emerald", description: "Sfondo ossidiana con accenti verde smeraldo ed effetto vetro" }
 ];
 
 interface ThemeContextType {

@@ -125,9 +125,11 @@ export function AppHeader({
         {onOpenCommandPalette && (
           <button
             type="button"
+            id="command-palette-trigger"
             className="status-badge status-badge--neutral hover:border-focus cursor-pointer"
             onClick={onOpenCommandPalette}
             title="Cerca comandi, sezioni e modelli (Ctrl+K)"
+            aria-label="Apri tavolozza comandi (Ctrl+K)"
           >
             <span>Cerca</span>
             <strong className="text-xs px-1 rounded bg-card border border-light text-muted">Ctrl+K</strong>
@@ -143,16 +145,18 @@ export function AppHeader({
               className={`status-badge status-badge--${overallTone}`}
               onClick={() => setShowStatusMenu((prev) => !prev)}
               aria-expanded={showStatusMenu}
+              aria-haspopup="true"
+              aria-controls="status-menu-popover"
               aria-label="Stato sistema"
             >
               <span>Stato Sistema</span>
               <strong>{overallLabel}</strong>
             </button>
             {showStatusMenu && (
-              <div className="status-menu-popover">
+              <div id="status-menu-popover" className="status-menu-popover" role="dialog" aria-label="Salute Moduli AI">
                 <div className="status-menu-popover__header">
                   <span className="status-menu-popover__title">Salute Moduli AI</span>
-                  <button type="button" className="button-secondary" onClick={() => setShowStatusMenu(false)} style={{ padding: "2px 6px" }}>✕</button>
+                  <button type="button" className="button-secondary" onClick={() => setShowStatusMenu(false)} aria-label="Chiudi menu stato" style={{ padding: "2px 6px" }}>✕</button>
                 </div>
                 {statusBadges.map((badge) => (
                   <div className="status-menu-item" key={badge.label}>
@@ -180,15 +184,17 @@ export function AppHeader({
               title={`Tema visivo attuale: ${currentThemeObj.name}. Clicca per cambiare tema`}
               aria-label="Cambia tema visivo"
               aria-expanded={showThemeMenu}
+              aria-haspopup="true"
+              aria-controls="theme-menu-popover"
             >
-              <span>{currentThemeObj.icon}</span>
+              <span>Tema</span>
               <strong>{currentThemeObj.name}</strong>
             </button>
             {showThemeMenu && (
-              <div className="theme-menu-popover">
+              <div id="theme-menu-popover" className="theme-menu-popover" role="dialog" aria-label="Seleziona Tema Visivo">
                 <div className="theme-menu-popover__header">
                   <span className="theme-menu-popover__title">Seleziona Tema Visivo</span>
-                  <button type="button" className="button-secondary" onClick={() => setShowThemeMenu(false)} style={{ padding: "2px 6px" }}>✕</button>
+                  <button type="button" className="button-secondary" onClick={() => setShowThemeMenu(false)} aria-label="Chiudi menu tema" style={{ padding: "2px 6px" }}>✕</button>
                 </div>
                 {themes.map((t) => (
                   <button
@@ -200,7 +206,6 @@ export function AppHeader({
                       setShowThemeMenu(false);
                     }}
                   >
-                    <span className="theme-menu-item__icon">{t.icon}</span>
                     <div className="theme-menu-item__info">
                       <span className="theme-menu-item__name">{t.name}</span>
                       <span className="theme-menu-item__desc">{t.description}</span>

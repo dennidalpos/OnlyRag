@@ -9,7 +9,9 @@ internal sealed class DiagnosticsProbeCacheService
 
     private readonly TimeProvider timeProvider;
     private readonly TimeSpan cacheDuration;
-    private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly SemaphoreSlim ocrAvailabilityGate = new(1, 1);
+    private readonly SemaphoreSlim ocrGpuCapabilityGate = new(1, 1);
+    private readonly SemaphoreSlim systemTelemetryGate = new(1, 1);
     private CachedProbe<OcrEngineAvailability>? ocrAvailability;
     private CachedProbe<OcrGpuCapabilityResponse>? ocrGpuCapability;
     private CachedProbe<SystemTelemetryResponse>? systemTelemetry;
@@ -38,6 +40,7 @@ internal sealed class DiagnosticsProbeCacheService
         ArgumentNullException.ThrowIfNull(ocrEngine);
 
         return GetCachedAsync(
+            ocrAvailabilityGate,
             () => ocrAvailability,
             value => ocrAvailability = value,
             () => ocrEngine.CheckAvailabilityAsync(cancellationToken),
@@ -53,6 +56,7 @@ internal sealed class DiagnosticsProbeCacheService
         ArgumentNullException.ThrowIfNull(ocrEngine);
 
         return GetCachedAsync(
+            ocrGpuCapabilityGate,
             () => ocrGpuCapability,
             value => ocrGpuCapability = value,
             () => ocrGpuCapabilityService.CheckAsync(ocrEngine, cancellationToken),
@@ -66,6 +70,7 @@ internal sealed class DiagnosticsProbeCacheService
         ArgumentNullException.ThrowIfNull(systemTelemetryService);
 
         return GetCachedAsync(
+            systemTelemetryGate,
             () => systemTelemetry,
             value => systemTelemetry = value,
             () => systemTelemetryService.CaptureAsync(cancellationToken),
@@ -73,6 +78,7 @@ internal sealed class DiagnosticsProbeCacheService
     }
 
     private async Task<T> GetCachedAsync<T>(
+        SemaphoreSlim gate,
         Func<CachedProbe<T>?> read,
         Action<CachedProbe<T>> write,
         Func<Task<T>> refresh,

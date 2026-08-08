@@ -101,7 +101,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setFormState(normalizedSaved);
       setSavedFormState(normalizedSaved);
       setInfoMessage("Impostazioni Ollama salvate.");
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni.");
     } finally {
@@ -130,7 +130,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       }
 
       await refreshDependencyStatus();
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Test connessione non riuscito.");
     } finally {
@@ -172,7 +172,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       );
 
       setInfoMessage(response.message);
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Rimozione modello non riuscita.");
     } finally {
@@ -228,7 +228,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
         embeddingBatchSize: normalizedSaved.embeddingBatchSize
       }));
       setInfoMessage("Impostazioni prestazioni salvate.");
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le prestazioni.");
     } finally {
@@ -251,7 +251,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setIngestionFormState(normalizedSaved);
       setSavedIngestionFormState(normalizedSaved);
       setInfoMessage("Impostazioni ingestione salvate.");
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni di ingestione.");
     } finally {
@@ -274,7 +274,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setOcrProcessingFormState(normalizedSaved);
       setSavedOcrProcessingFormState(normalizedSaved);
       setInfoMessage("Impostazioni OCR runtime salvate.");
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare OCR runtime.");
     } finally {
@@ -297,7 +297,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setOcrFormState(normalizedSaved);
       setSavedOcrFormState(normalizedSaved);
       setInfoMessage("Impostazioni OCR salvate.");
-      await onDataChanged();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni OCR.");
     } finally {
@@ -328,6 +328,7 @@ export function createSettingsSectionActions(params: SettingsSectionActionParams
       setSavedPdfExportFormState(saved);
       setInfoMessage("Impostazioni export PDF salvate.");
       await refreshPdfExportConverter();
+      void onDataChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Impossibile salvare le impostazioni export PDF.");
     } finally {

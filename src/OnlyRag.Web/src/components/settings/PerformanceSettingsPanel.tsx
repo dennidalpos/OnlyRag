@@ -84,82 +84,85 @@ export function PerformanceSettingsPanel() {
               activePreset={activePreset}
               onSelectPreset={handleSelectPreset}
             />
-            <div className="settings-grid">
-              <SettingsRangeField
-                id="max-parallel-jobs"
-                label="Job paralleli"
-                tooltip="Numero massimo di operazioni locali eseguite contemporaneamente."
-                min={1}
-                max={4}
-                value={performanceFormState.maxParallelJobs}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, maxParallelJobs: value }))
-                }
-              />
-              <SettingsRangeField
-                id="ocr-parallel-pages"
-                label="Pagine OCR parallele"
-                tooltip="Numero di pagine elaborate in parallelo durante OCR."
-                min={1}
-                max={4}
-                value={performanceFormState.maxOcrParallelPages}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, maxOcrParallelPages: value }))
-                }
-              />
-              <SettingsRangeField
-                id="performance-embedding-batch"
-                label="Batch embedding"
-                tooltip="Numero di chunk inviati insieme al modello embedding."
-                min={1}
-                max={8}
-                value={performanceFormState.embeddingBatchSize}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, embeddingBatchSize: value }))
-                }
-              />
-              <SettingsRangeField
-                id="translation-batch-size"
-                label="Batch traduzione"
-                tooltip="Numero di unita tradotte insieme per ogni richiesta."
-                min={1}
-                max={4}
-                value={performanceFormState.translationBatchSize}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, translationBatchSize: value }))
-                }
-              />
-              <SettingsRangeField
-                id="max-context-chunks"
-                label="Chunk contesto"
-                tooltip="Limita quanti chunk recuperati entrano nella risposta RAG; num_ctx Ollama resta configurato nei modelli."
-                min={1}
-                max={24}
-                value={performanceFormState.maxContextChunks}
-                hint={recommendedMaxContextChunks ? `RAG app, suggerito: ${recommendedMaxContextChunks}` : "RAG app"}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, maxContextChunks: value }))
-                }
-              />
-              <SettingsRangeField
-                id="performance-request-timeout"
-                label="Timeout richieste"
-                tooltip="Tempo massimo concesso alle richieste locali prima dell'errore."
-                min={5}
-                max={600}
-                value={performanceFormState.requestTimeoutSeconds}
-                formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
-                disabled={!manualControlsEnabled}
-                onChange={(value) =>
-                  setPerformanceFormState((current) => ({ ...current, requestTimeoutSeconds: value }))
-                }
-              />
-            </div>
+            <details className="setup-banner__details" open={manualControlsEnabled}>
+              <summary>Controlli manuali avanzati</summary>
+              <div className="settings-grid mt-2">
+                <SettingsRangeField
+                  id="max-parallel-jobs"
+                  label="Job paralleli"
+                  tooltip="Numero massimo di operazioni locali eseguite contemporaneamente."
+                  min={1}
+                  max={4}
+                  value={performanceFormState.maxParallelJobs}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, maxParallelJobs: value }))
+                  }
+                />
+                <SettingsRangeField
+                  id="ocr-parallel-pages"
+                  label="Pagine OCR parallele"
+                  tooltip="Numero di pagine elaborate in parallelo durante OCR."
+                  min={1}
+                  max={4}
+                  value={performanceFormState.maxOcrParallelPages}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, maxOcrParallelPages: value }))
+                  }
+                />
+                <SettingsRangeField
+                  id="performance-embedding-batch"
+                  label="Batch embedding"
+                  tooltip="Numero di chunk inviati insieme al modello embedding."
+                  min={1}
+                  max={8}
+                  value={performanceFormState.embeddingBatchSize}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, embeddingBatchSize: value }))
+                  }
+                />
+                <SettingsRangeField
+                  id="translation-batch-size"
+                  label="Batch traduzione"
+                  tooltip="Numero di unita tradotte insieme per ogni richiesta."
+                  min={1}
+                  max={4}
+                  value={performanceFormState.translationBatchSize}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, translationBatchSize: value }))
+                  }
+                />
+                <SettingsRangeField
+                  id="max-context-chunks"
+                  label="Chunk contesto"
+                  tooltip="Limita quanti chunk recuperati entrano nella risposta RAG; num_ctx Ollama resta configurato nei modelli."
+                  min={1}
+                  max={24}
+                  value={performanceFormState.maxContextChunks}
+                  hint={recommendedMaxContextChunks ? `RAG app, suggerito: ${recommendedMaxContextChunks}` : "RAG app"}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, maxContextChunks: value }))
+                  }
+                />
+                <SettingsRangeField
+                  id="performance-request-timeout"
+                  label="Timeout richieste"
+                  tooltip="Tempo massimo concesso alle richieste locali prima dell'errore."
+                  min={5}
+                  max={600}
+                  value={performanceFormState.requestTimeoutSeconds}
+                  formatValue={(value) => `${value.toLocaleString("it-IT")} s`}
+                  disabled={!manualControlsEnabled}
+                  onChange={(value) =>
+                    setPerformanceFormState((current) => ({ ...current, requestTimeoutSeconds: value }))
+                  }
+                />
+              </div>
+            </details>
             {(performanceFormState.profile === "power" || performanceFormState.profile === "custom") && (
               <div className="panel-note panel-note--warning">
                 <p>Parallelismo e batch alti possono saturare RAM/VRAM. Verifica con <code>ollama ps</code> in caso di problemi.</p>
