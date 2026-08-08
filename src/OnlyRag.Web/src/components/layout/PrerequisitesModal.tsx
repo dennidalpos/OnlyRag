@@ -291,7 +291,7 @@ export const PrerequisitesModal: React.FC<PrerequisitesModalProps> = ({
           {activeOcrTab === "vision" && (
             <div style={{ background: "rgba(30, 41, 59, 0.6)", padding: "16px", borderRadius: "10px", border: "1px solid #475569" }}>
               <div style={{ fontSize: "0.85rem", color: "#94a3b8", marginBottom: "12px" }}>
-                Flusso nativo C# basato su ONNX DirectML. Utilizza la GPU DirectML di Windows senza richiedere Python o dipendenze esterne.
+                Architettura nativa C# basata su ONNX DirectML. Sfrutta l'accelerazione GPU integrata di Windows per l'elaborazione locale ad alte prestazioni.
               </div>
 
               {/* Steps indicators for Vision OCR */}
@@ -312,10 +312,10 @@ export const PrerequisitesModal: React.FC<PrerequisitesModalProps> = ({
 
               <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
                 <span style={{ padding: "4px 8px", borderRadius: "6px", background: "rgba(74, 222, 128, 0.2)", color: "#4ade80", fontSize: "0.75rem", fontWeight: 600 }}>
-                  ✓ Zero Python Richiesto
+                  ✓ Esecuzione Nativa C#
                 </span>
                 <span style={{ padding: "4px 8px", borderRadius: "6px", background: "rgba(56, 189, 248, 0.2)", color: "#38bdf8", fontSize: "0.75rem", fontWeight: 600 }}>
-                  ⚡ Ultra Veloce DirectML
+                  ⚡ Accelerazione GPU DirectML
                 </span>
               </div>
             </div>

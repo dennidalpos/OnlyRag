@@ -233,9 +233,9 @@ export function DiagnosticsPanel() {
             className="button-secondary"
             onClick={() => void restoreBalancedDefaults()}
             disabled={isBusy}
-            title="Ripristina solo le impostazioni bilanciate, senza eliminare dati."
+            title="Ripristina la configurazione predefinita conservando i dati e l'indice locale."
           >
-            Ripristina default
+            Ripristina configurazione
           </button>
           <button
             type="button"

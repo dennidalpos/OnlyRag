@@ -104,7 +104,7 @@ describe("DocumentsSection", () => {
     await userEvent.upload(fileInput!, new File(["pdf"], "contratto.pdf", { type: "application/pdf" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Scegli modalità OCR" });
-    await userEvent.click(within(dialog).getByRole("button", { name: /Usa testo esistente/i }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /Estrazione Testo Incorporato/i }));
 
     expect(await screen.findByText("1 file importato. Analisi e indicizzazione in corso.")).toBeInTheDocument();
     expect((await screen.findAllByText("contratto.pdf")).length).toBeGreaterThan(0);

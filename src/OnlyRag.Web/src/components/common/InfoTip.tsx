@@ -14,7 +14,7 @@ export function InfoTip({
   tooltip,
   children,
   align = "left",
-  placement = "top"
+  placement = "bottom"
 }: InfoTipProps) {
   const descriptionId = useId();
   const content = children ?? tooltip;

@@ -260,14 +260,14 @@ button:disabled {
 
 .info-tip__content {
   position: absolute;
-  z-index: 9999;
+  z-index: 999999;
   box-sizing: border-box;
   width: max-content;
   max-width: min(320px, calc(100vw - 32px));
-  padding: 8px 12px;
-  border: 1px solid var(--border-light, #334155);
-  border-radius: var(--radius-md);
-  background: #1e293b;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md, 8px);
+  background: #0f172a;
   color: #f8fafc;
   font-size: 12px;
   font-weight: 500;
@@ -279,7 +279,7 @@ button:disabled {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-fast), transform var(--transition-fast);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
 }
 
 /* Placements */

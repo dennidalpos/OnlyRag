@@ -151,6 +151,6 @@ describe("PrerequisitesModal", () => {
 
     const visionTab = screen.getByRole("button", { name: /OCR Vision/i });
     await user.click(visionTab);
-    expect(screen.getByText(/Zero Python Richiesto/i)).toBeInTheDocument();
+    expect(screen.getByText(/Esecuzione Nativa C#/i)).toBeInTheDocument();
   });
 });

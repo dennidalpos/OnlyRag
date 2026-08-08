@@ -54,8 +54,8 @@ export function OcrChoiceDialog({
             type="button"
             onClick={() => onChoice("Auto", selectedLanguage)}
           >
-            <strong>Usa testo esistente</strong>
-            <span>Legge il testo già incorporato nel file; usa OCR solo sulle pagine che lo richiedono.</span>
+            <strong>Estrazione Testo Incorporato (Ibrida)</strong>
+            <span>Estrazione del testo incorporato con elaborazione OCR selettiva sulle sole pagine visive.</span>
           </button>
 
           <button
@@ -63,8 +63,8 @@ export function OcrChoiceDialog({
             type="button"
             onClick={() => onChoice("ForceAll", selectedLanguage)}
           >
-            <strong>Rileggi tutto con OCR</strong>
-            <span>Tratta ogni pagina come immagine e applica OCR completo.</span>
+            <strong>Elaborazione OCR Integrale</strong>
+            <span>Analisi OCR ad alta precisione sull'intero documento.</span>
           </button>
         </div>
 

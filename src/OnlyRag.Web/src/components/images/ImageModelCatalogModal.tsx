@@ -194,18 +194,20 @@ export function ImageModelCatalogModal({
               </select>
             </label>
 
-            <label className="field-group checkbox-group" htmlFor="settings-prefer-gpu" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="checkbox-field" style={{ display: "flex", alignItems: "center", gap: "10px", margin: "12px 0" }}>
               <input
                 id="settings-prefer-gpu"
                 type="checkbox"
                 checked={localSettings.preferGpu}
                 onChange={(e) => setLocalSettings({ ...localSettings, preferGpu: e.target.checked })}
               />
-              <span>Usa accelerazione GPU</span>
-              <InfoTip label="Spiegazione accelerazione GPU">
+              <label htmlFor="settings-prefer-gpu" style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", margin: 0 }}>
+                <span>Usa accelerazione GPU</span>
+              </label>
+              <InfoTip label="Spiegazione accelerazione GPU" placement="bottom">
                 Utilizza DirectML per accelerare l'inferenza della generazione immagini sulla scheda grafica Windows.
               </InfoTip>
-            </label>
+            </div>
 
             {selectedModel && (
               <ModelReadiness
@@ -218,7 +220,7 @@ export function ImageModelCatalogModal({
               />
             )}
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ marginTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
               <button type="submit" className="button-primary" disabled={isSaving} title="Salva impostazioni selezionate">
                 {isSaving ? "Salvataggio..." : "Salva impostazioni"}
               </button>
@@ -229,7 +231,7 @@ export function ImageModelCatalogModal({
                   onClick={() => setShowAddForm(!showAddForm)}
                   title="Aggiungi un nuovo modello ONNX personalizzato al catalogo"
                 >
-                  {showAddForm ? "Annulla nuovo modello" : "➕ Aggiungi altro modello"}
+                  {showAddForm ? "Chiudi modulo aggiunta" : "➕ Aggiungi altro modello"}
                 </button>
               )}
             </div>
@@ -411,7 +413,7 @@ function ModelReadiness({
           onClick={() => setShowDetails(!showDetails)}
           title="Consulta i metadati, requisiti e parametri del modello"
         >
-          ℹ️ {showDetails ? "Nascondi Info" : "Info e Configurazione"}
+          ℹ️ {showDetails ? "Nascondi dettagli" : "Dettagli e parametri modello"}
         </button>
 
         {state?.isDownloaded && (
@@ -420,9 +422,9 @@ function ModelReadiness({
             type="button"
             onClick={onDelete}
             disabled={disabled}
-            title={sizeFormatted ? `Elimina i file del modello dal disco (${sizeFormatted})` : "Elimina file dal disco"}
+            title={sizeFormatted ? `Rimuovi i file del modello dal disco (${sizeFormatted})` : "Rimuovi file dal disco"}
           >
-            🗑️ Elimina file local {sizeFormatted ? `(${sizeFormatted})` : ""}
+            🗑️ Rimuovi file modello locali {sizeFormatted ? `(${sizeFormatted})` : ""}
           </button>
         )}
 
