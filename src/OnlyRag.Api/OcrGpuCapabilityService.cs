@@ -201,9 +201,9 @@ public sealed class OcrGpuCapabilityService
                             && !string.IsNullOrWhiteSpace(padVer) && padVer != "not-installed"
                                 ? $"paddlepaddle {padVer} (CPU build)"
                                 : "a paddlepaddle package";
-        return $"The installed OCR runtime ({resolvedRuntime}) does not support CUDA: {installedPackage} is installed "
-            + "but it was not compiled with CUDA. "
-            + "Open Settings \u003e Diagnostics and press Install GPU OCR to replace it with the NVIDIA GPU build, or switch to CPU OCR.";
+        return $"Il runtime OCR installato ({resolvedRuntime}) non supporta CUDA: {installedPackage} è installato "
+            + "ma non è compilato con CUDA. "
+            + "Apri Impostazioni > Diagnostica e premi Installa OCR GPU per sostituirlo con la build NVIDIA, oppure passa a OCR CPU.";
     }
 
     private static string FormatNotConfiguredReason(

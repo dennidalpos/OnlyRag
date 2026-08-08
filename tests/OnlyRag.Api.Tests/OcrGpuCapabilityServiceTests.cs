@@ -117,6 +117,7 @@ public sealed class OcrGpuCapabilityServiceTests
         Assert.Equal("PaddlePaddle runtime without CUDA", response.Status);
         Assert.NotNull(response.BlockReason);
         Assert.Contains("paddlepaddle 3.3.1 (CPU build)", response.BlockReason);
+        Assert.Contains("Apri Impostazioni > Diagnostica", response.BlockReason);
     }
 
     [Fact]

@@ -205,8 +205,9 @@ internal static class InProcessBackendServiceRegistration
     {
         services.AddSingleton<IOcrCacheRepository, SqliteOcrCacheRepository>();
         services.AddSingleton<OcrSettingsStore>();
-        services.AddSingleton<IOcrEngine, OnnxDirectMlOcrEngine>();
         services.AddSingleton<PaddleOcrEngine>();
+        services.AddSingleton<IOcrEngine>(sp => sp.GetRequiredService<PaddleOcrEngine>());
+        services.AddSingleton<OnnxDirectMlOcrEngine>();
         services.AddSingleton<OcrRetryPolicy>();
         services.AddSingleton<OcrStartupAnalysisService>();
         services.AddSingleton<OcrGpuCapabilityService>();

@@ -464,7 +464,16 @@ public sealed class PaddleOcrEngine : IOcrEngine
         string? configured = Environment.GetEnvironmentVariable(PythonEnvVar);
         if (!string.IsNullOrWhiteSpace(configured))
         {
-            return configured;
+            string configuredPath = configured;
+            if (!Path.IsPathRooted(configuredPath))
+            {
+                configuredPath = Path.GetFullPath(configuredPath);
+            }
+
+            if (File.Exists(configuredPath))
+            {
+                return configuredPath;
+            }
         }
 
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -485,7 +494,16 @@ public sealed class PaddleOcrEngine : IOcrEngine
         string? configured = Environment.GetEnvironmentVariable(BridgeEnvVar);
         if (!string.IsNullOrWhiteSpace(configured))
         {
-            return configured;
+            string configuredPath = configured;
+            if (!Path.IsPathRooted(configuredPath))
+            {
+                configuredPath = Path.GetFullPath(configuredPath);
+            }
+
+            if (File.Exists(configuredPath))
+            {
+                return configuredPath;
+            }
         }
 
         string outputBridge = Path.Combine(AppContext.BaseDirectory, "scripts", "ocr", "paddle_ocr_bridge.py");
