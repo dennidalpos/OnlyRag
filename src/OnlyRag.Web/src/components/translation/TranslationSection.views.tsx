@@ -45,7 +45,7 @@ export function TranslationStartCard({
   onDocumentChange: (id: number | null) => void;
   onLanguageChange: (language: string) => void;
   onModelChange: (model: string) => void;
-  onStartTranslation: () => void;
+  onStartTranslation: (glossary?: Record<string, string>) => void;
 }) {
   const [glossary, setGlossary] = useState<{ source: string; target: string }[]>([]);
   const [sourceTerm, setSourceTerm] = useState("");
@@ -61,6 +61,24 @@ export function TranslationStartCard({
   function handleRemoveGlossaryTerm(index: number) {
     setGlossary((prev) => prev.filter((_, i) => i !== index));
   }
+
+  function handleStart() {
+    const glossaryDict: Record<string, string> = {};
+    for (const item of glossary) {
+      if (item.source.trim() && item.target.trim()) {
+        glossaryDict[item.source.trim()] = item.target.trim();
+      }
+    }
+    onStartTranslation(Object.keys(glossaryDict).length > 0 ? glossaryDict : undefined);
+  }
+
+  const warningMessage = !ollamaStatus?.isReachable
+    ? (loadError ?? "Ollama è offline.")
+    : (models.length === 0
+        ? "Installa almeno un modello in Ollama prima di tradurre."
+        : (selectedDocument && selectedDocument.pageCount === 0
+            ? "Il documento selezionato non ha unità indicizzate da tradurre."
+            : null));
 
   return (
     <div className="settings-card">
@@ -167,22 +185,16 @@ export function TranslationStartCard({
       </div>
 
       <div className="settings-actions">
-        <button type="button" disabled={!canStart} onClick={onStartTranslation}>
+        <button type="button" disabled={!canStart} onClick={handleStart}>
           {isStarting ? "Avvio..." : "Traduci"}
         </button>
       </div>
-      <div
-        className={selectedDocument?.chunkCount ? "panel-note" : "panel-note panel-note--warning"}
-        role={selectedDocument?.chunkCount ? undefined : "alert"}
-      >
-        {!ollamaStatus?.isReachable && <p>{loadError ?? "Ollama è offline."}</p>}
-        {ollamaStatus?.isReachable && models.length === 0 && (
-          <p>Installa almeno un modello in Ollama prima di tradurre.</p>
-        )}
-        {selectedDocument && selectedDocument.pageCount === 0 && (
-          <p>Il documento selezionato non ha unità indicizzate da tradurre.</p>
-        )}
-      </div>
+
+      {warningMessage && (
+        <div className="panel-note panel-note--warning" role="alert">
+          <p>{warningMessage}</p>
+        </div>
+      )}
     </div>
   );
 }

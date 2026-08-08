@@ -2,6 +2,7 @@ export type CreateTranslationRequest = {
   documentId: number;
   targetLanguage: string;
   model: string;
+  customGlossary?: Record<string, string>;
 };
 
 export type TranslationSummary = {

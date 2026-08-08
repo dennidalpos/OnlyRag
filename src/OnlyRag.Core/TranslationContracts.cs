@@ -12,7 +12,8 @@ public sealed record DocumentTranslationJobPayload(
     long TranslationId,
     long DocumentId,
     string TargetLanguage,
-    string Model);
+    string Model,
+    IReadOnlyDictionary<string, string>? CustomGlossary = null);
 
 public sealed record TranslationSummaryResponse(
     long Id,

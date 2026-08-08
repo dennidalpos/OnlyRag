@@ -48,7 +48,7 @@ export function TranslationSection({
           onDocumentChange={controller.handleDocumentChange}
           onLanguageChange={controller.setSelectedLanguage}
           onModelChange={controller.setSelectedModel}
-          onStartTranslation={() => void controller.startTranslation()}
+          onStartTranslation={(glossary) => void controller.startTranslation(glossary)}
         />
 
         <TranslationListCard

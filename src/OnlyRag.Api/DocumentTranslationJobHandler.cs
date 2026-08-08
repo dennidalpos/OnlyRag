@@ -171,7 +171,7 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
 
             // Parallel execution across batchUnits with adaptive token batching
             UnitTranslationResult[] results = await Task.WhenAll(batchUnits.Select(u =>
-                TranslateUnitWithRepairAsync(payload.TargetLanguage, u, model, translationNumCtx, cancellationToken)));
+                TranslateUnitWithRepairAsync(payload.TargetLanguage, u, model, translationNumCtx, payload.CustomGlossary, cancellationToken)));
 
             for (int i = 0; i < batchUnits.Count; i++)
             {
@@ -258,12 +258,14 @@ internal sealed class DocumentTranslationJobHandler : ILocalJobHandler
         StoredTranslationUnit unit,
         string model,
         int? translationNumCtx,
+        IReadOnlyDictionary<string, string>? customGlossary,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<OllamaChatMessage> messages = DocumentTranslationPromptBuilder.BuildMessages(
             targetLanguage,
-            unit);
+            unit,
+            customGlossary);
 
         string translatedText = StripDelimiters(
             await ollamaClient.GenerateChatAsync(model, messages, translationNumCtx, cancellationToken: cancellationToken));

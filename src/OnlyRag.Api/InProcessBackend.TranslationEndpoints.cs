@@ -54,7 +54,8 @@ public static partial class InProcessBackend
                     translation.Id,
                     request.DocumentId,
                     targetLanguage,
-                    model));
+                    model,
+                    request.CustomGlossary));
                 LocalJob job = await jobs.CreateAsync(
                     new CreateLocalJobRequest(
                         DocumentTranslationJobHandler.DocumentTranslationJobType,

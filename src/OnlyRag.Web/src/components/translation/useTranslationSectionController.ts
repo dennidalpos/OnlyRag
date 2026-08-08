@@ -166,7 +166,7 @@ export function useTranslationSectionController({
     restoreFocus: false
   });
 
-  async function startTranslation() {
+  async function startTranslation(customGlossary?: Record<string, string>) {
     if (!selectedDocumentId) {
       setFeedback({ tone: "error", message: "Seleziona un documento." });
       return;
@@ -185,7 +185,8 @@ export function useTranslationSectionController({
         body: JSON.stringify({
           documentId: selectedDocumentId,
           targetLanguage: selectedLanguage,
-          model: selectedModel
+          model: selectedModel,
+          customGlossary: customGlossary && Object.keys(customGlossary).length > 0 ? customGlossary : undefined
         })
       });
       setSelectedTranslationId(detail.translation.id);
