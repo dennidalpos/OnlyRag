@@ -3,7 +3,7 @@ import type {
   ImageModelCatalogEntry
 } from "../../api";
 
-export const defaultModelId = "lcm-sdxl-olive-onnx";
+export const defaultModelId = "lcm-sdxl-int8-onnx";
 
 export const defaultSettings: ImageGenerationSettings = {
   selectedModelId: defaultModelId,
@@ -51,9 +51,23 @@ export function getCompatiblePresets(selectedModel: ImageModelCatalogEntry | nul
 
 export const modelTemplates = [
   {
+    id: "lcm-sdxl-int8-onnx",
+    displayName: "LCM SDXL INT8 Quantized ONNX",
+    downloadUrl: "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
+    licenseLabel: "OpenRAIL++",
+    expectedSizeBytes: "4000000000",
+    modelType: "SDXL LCM INT8 ONNX",
+    modelProfile: "lcm-sdxl-int8",
+    supportedResolutions: "512x512, 1024x1024",
+    defaultSteps: "4",
+    defaultGuidance: "1.0",
+    scheduler: "LCM",
+    compatibilityNotes: "Profilo ultra-leggero quantizzato INT8 (4 GB) per massima velocita ed efficienza."
+  },
+  {
     id: "sdxl-turbo-onnx",
     displayName: "SDXL Turbo ONNX",
-    downloadUrl: "https://huggingface.co/optimum/sdxl-turbo-onnx",
+    downloadUrl: "https://huggingface.co/softwareweaver/Sdxl-Turbo-Olive-Onnx",
     licenseLabel: "OpenRAIL-M",
     expectedSizeBytes: "8000000000",
     modelType: "SDXL Turbo ONNX",
@@ -67,16 +81,16 @@ export const modelTemplates = [
   {
     id: "sdxl-base-1.0-onnx",
     displayName: "SDXL Base 1.0 ONNX",
-    downloadUrl: "https://huggingface.co/optimum/sdxl-base-1.0-onnx",
+    downloadUrl: "https://huggingface.co/softwareweaver/SDXL-DPO-LCM-Olive-Onnx",
     licenseLabel: "OpenRAIL-M",
-    expectedSizeBytes: "12000000000",
+    expectedSizeBytes: "8000000000",
     modelType: "SDXL Base ONNX",
     modelProfile: "sdxl-base",
     supportedResolutions: "1024x1024, 832x1216, 1216x832",
-    defaultSteps: "30",
-    defaultGuidance: "5.0",
-    scheduler: "Euler",
-    compatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM."
+    defaultSteps: "8",
+    defaultGuidance: "1.5",
+    scheduler: "LCM",
+    compatibilityNotes: "DirectML GPU consigliata con almeno 6GB VRAM."
   },
   {
     id: "lcm-sdxl-olive-onnx",

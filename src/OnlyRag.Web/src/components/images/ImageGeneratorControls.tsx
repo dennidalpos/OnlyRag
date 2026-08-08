@@ -97,28 +97,22 @@ export function ImageGeneratorControls({
 
         {/* Resolution Preset */}
         <div className="field-group">
-          <span>Preset Risoluzione</span>
-
-          <div className="resolution-category">
-            <span className="resolution-category__title">
-              🖼️ Formati supportati dal modello {selectedModel ? `(${selectedModel.displayName})` : ""}
-            </span>
-            <div className="preset-buttons-row">
-              {compatiblePresets.map((preset) => {
-                const isActive = width === preset.width && height === preset.height;
-                return (
-                  <button
-                    type="button"
-                    key={preset.label}
-                    className={`button-secondary ${isActive ? "button-secondary--active" : ""}`}
-                    aria-pressed={isActive}
-                    onClick={() => onSizeChange(preset.width, preset.height)}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
+          <span>Risoluzione</span>
+          <div className="preset-buttons-row">
+            {compatiblePresets.map((preset) => {
+              const isActive = width === preset.width && height === preset.height;
+              return (
+                <button
+                  type="button"
+                  key={preset.label}
+                  className={`button-secondary ${isActive ? "button-secondary--active" : ""}`}
+                  aria-pressed={isActive}
+                  onClick={() => onSizeChange(preset.width, preset.height)}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="settings-grid settings-grid--two custom-dimensions-grid">

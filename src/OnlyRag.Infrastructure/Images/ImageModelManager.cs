@@ -182,7 +182,7 @@ public sealed class ImageModelManager
             return new ImageModelDownloadResponse(model.Id, existingState.State, "Modello immagini gia scaricato e verificato.");
         }
 
-        CancellationTokenSource downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationTokenSource downloadCancellation = new();
         lock (gate)
         {
             if (activeDownloads.ContainsKey(model.Id))
@@ -196,50 +196,41 @@ public sealed class ImageModelManager
         }
 
         string stagingDirectory = CreateStagingDirectory(model.Id);
-        try
+        _ = Task.Run(async () =>
         {
-            await DownloadModelAsync(model, stagingDirectory, downloadCancellation.Token);
-            ValidateRequiredFiles(model, stagingDirectory);
-            ReplaceModelDirectory(stagingDirectory, GetModelDirectory(model.Id));
-            ImageModelLocalState state = await GetStateAsync(model.Id, cancellationToken);
-            if (!state.IsVerified && state.State != "Downloaded")
+            try
             {
-                throw new ImageGenerationException(
-                    ImageGenerationErrorKind.InvalidConfiguration,
-                    state.VerificationError ?? "Verifica modello immagini non riuscita.");
+                await DownloadModelAsync(model, stagingDirectory, downloadCancellation.Token);
+                ValidateRequiredFiles(model, stagingDirectory);
+                ReplaceModelDirectory(stagingDirectory, GetModelDirectory(model.Id));
             }
-
-            return new ImageModelDownloadResponse(
-                model.Id,
-                state.State,
-                state.IsVerified && !string.IsNullOrWhiteSpace(model.Sha256)
-                    ? "Modello immagini scaricato e verificato."
-                    : "Modello immagini scaricato e pronto.");
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            SafeDeleteDirectory(stagingDirectory);
-            lock (gate)
+            catch (OperationCanceledException)
             {
-                cancelledDownloads.Add(model.Id);
+                SafeDeleteDirectory(stagingDirectory);
+                lock (gate)
+                {
+                    cancelledDownloads.Add(model.Id);
+                }
             }
-
-            return new ImageModelDownloadResponse(model.Id, "Cancelled", "Download modello annullato.");
-        }
-        catch
-        {
-            SafeDeleteDirectory(stagingDirectory);
-            throw;
-        }
-        finally
-        {
-            lock (gate)
+            catch
             {
-                activeDownloads.Remove(model.Id);
+                SafeDeleteDirectory(stagingDirectory);
             }
+            finally
+            {
+                lock (gate)
+                {
+                    activeDownloads.Remove(model.Id);
+                }
 
-            downloadCancellation.Dispose();
-        }
+                downloadCancellation.Dispose();
+            }
+        }, CancellationToken.None);
+
+        return new ImageModelDownloadResponse(
+            model.Id,
+            "Downloading",
+            "Download modello immagini avviato in background.");
     }
 
     public async Task<ImageModelDownloadResponse> CancelDownloadAsync(string modelId, CancellationToken cancellationToken = default)

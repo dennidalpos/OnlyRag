@@ -4,7 +4,7 @@ namespace OnlyRag.Infrastructure.Images;
 
 public static class ImageModelCatalog
 {
-    public const string DefaultModelId = "lcm-sdxl-olive-onnx";
+    public const string DefaultModelId = "lcm-sdxl-int8-onnx";
     public const string RequiredModelFileName = "model.onnx";
     public const string PlaceholderModelContent = "OnlyRag integrated image model placeholder v1\n";
     public static readonly IReadOnlyList<string> RequiredSdxlCoreSnapshotFiles =
@@ -36,7 +36,24 @@ public static class ImageModelCatalog
     private static readonly ImageModelCatalogEntry[] DefaultModels =
     [
         new(
-            DefaultModelId,
+            "lcm-sdxl-int8-onnx",
+            "LCM SDXL INT8 Quantized ONNX",
+            "Profilo quantizzato INT8 ultra-leggero ed ultra-veloce ottimizzato per CPU ed GPU con consumo ridotto.",
+            "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
+            "OpenRAIL++",
+            4_000_000_000,
+            RequiredSdxlSnapshotFiles,
+            string.Empty,
+            IsBuiltIn: true,
+            ModelType: "SDXL LCM INT8 ONNX",
+            ModelProfile: "lcm-sdxl-int8",
+            SupportedResolutions: ["512x512", "1024x1024"],
+            DefaultSteps: 4,
+            DefaultGuidance: 1.0,
+            Scheduler: "LCM with trailing timestep spacing",
+            CompatibilityNotes: "Quantizzazione dinamica INT8 attiva per il massimo risparmio di memoria e velocita locale."),
+        new(
+            "lcm-sdxl-olive-onnx",
             "LCM SDXL Olive ONNX",
             "Profilo ONNX DirectML/CPU locale per qualita, bilanciato e performance.",
             "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
@@ -56,7 +73,7 @@ public static class ImageModelCatalog
             "sdxl-turbo-onnx",
             "SDXL Turbo ONNX",
             "Profilo ultra-veloce (1-4 step) basato su SDXL Turbo per generazioni rapide.",
-            "https://huggingface.co/optimum/sdxl-turbo-onnx",
+            "https://huggingface.co/softwareweaver/Sdxl-Turbo-Olive-Onnx",
             "OpenRAIL-M",
             8_000_000_000,
             RequiredSdxlSnapshotFiles,
@@ -73,36 +90,19 @@ public static class ImageModelCatalog
             "sdxl-base-1.0-onnx",
             "SDXL Base 1.0 ONNX",
             "Modello base SDXL alta fedelta per generazioni dettagliate a 1024x1024.",
-            "https://huggingface.co/optimum/sdxl-base-1.0-onnx",
+            "https://huggingface.co/softwareweaver/SDXL-DPO-LCM-Olive-Onnx",
             "OpenRAIL-M",
-            12_000_000_000,
+            8_000_000_000,
             RequiredSdxlSnapshotFiles,
             string.Empty,
             IsBuiltIn: true,
             ModelType: "SDXL Base ONNX",
             ModelProfile: "sdxl-base",
             SupportedResolutions: ["1024x1024", "832x1216", "1216x832"],
-            DefaultSteps: 30,
-            DefaultGuidance: 5.0,
-            Scheduler: "Euler",
-            CompatibilityNotes: "Richiede DirectML GPU consigliata con almeno 8GB VRAM."),
-        new(
-            "lcm-sdxl-int8-onnx",
-            "LCM SDXL INT8 Quantized ONNX",
-            "Profilo quantizzato INT8 ultra-leggero ottimizzato per CPU ed GPU entry-level con consumo di memoria ridotto.",
-            "https://huggingface.co/softwareweaver/Latent-Consistency-xl-Olive-Onnx",
-            "OpenRAIL++",
-            4_000_000_000,
-            RequiredSdxlSnapshotFiles,
-            string.Empty,
-            IsBuiltIn: true,
-            ModelType: "SDXL LCM INT8 ONNX",
-            ModelProfile: "lcm-sdxl-int8",
-            SupportedResolutions: ["512x512", "1024x1024"],
-            DefaultSteps: 4,
-            DefaultGuidance: 1.0,
-            Scheduler: "LCM with trailing timestep spacing",
-            CompatibilityNotes: "Quantizzazione dinamica INT8 attiva per ottimizzare il throughput su CPU ed GPU entry-level.")
+            DefaultSteps: 8,
+            DefaultGuidance: 1.5,
+            Scheduler: "LCM",
+            CompatibilityNotes: "DirectML GPU consigliata con almeno 6GB VRAM.")
     ];
 
     public static IReadOnlyList<ImageModelCatalogEntry> ListDefaults() => DefaultModels;

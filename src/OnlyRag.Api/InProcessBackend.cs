@@ -32,7 +32,7 @@ public static partial class InProcessBackend
 
         string sessionToken = ResolveSessionToken(options);
         var runtimeState = new BackendRuntimeState(DateTimeOffset.UtcNow);
-        
+
         WebApplication app;
         using (EarlyBootstrapperLogger.TraceScope("Build_WebApplication_DI"))
         {

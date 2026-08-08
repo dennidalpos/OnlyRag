@@ -20,7 +20,7 @@ describe("ImagesSection", () => {
     await screen.findByRole("heading", { name: "Crea immagine" });
 
     await userEvent.click(screen.getByRole("button", { name: /Impostazioni/i }));
-    expect(screen.getAllByText("LCM SDXL Olive ONNX").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("LCM SDXL INT8 Quantized ONNX").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Scarica modello" })).toBeInTheDocument();
     expect(screen.queryByText(/Automatic1111/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/ComfyUI/i)).not.toBeInTheDocument();
@@ -53,10 +53,10 @@ describe("ImagesSection", () => {
       { path: "/api/images/models", response: [createModelState({ isVerified: false })] },
       { path: "/api/images", response: [] },
       {
-        path: "/api/images/models/lcm-sdxl-olive-onnx/download",
+        path: "/api/images/models/lcm-sdxl-int8-onnx/download",
         method: "POST",
         response: {
-          modelId: "lcm-sdxl-olive-onnx",
+          modelId: "lcm-sdxl-int8-onnx",
           state: "Verified",
           message: "Modello immagini scaricato e verificato."
         }
@@ -87,7 +87,7 @@ describe("ImagesSection", () => {
       { path: "/api/images/models", response: [createModelState({ isVerified: false })] },
       { path: "/api/images", response: [] },
       {
-        path: "/api/images/models/lcm-sdxl-olive-onnx/download",
+        path: "/api/images/models/lcm-sdxl-int8-onnx/download",
         method: "POST",
         handler: async () => {
           await new Promise<void>((resolve) => {
@@ -95,7 +95,7 @@ describe("ImagesSection", () => {
           });
           return {
             body: {
-              modelId: "lcm-sdxl-olive-onnx",
+              modelId: "lcm-sdxl-int8-onnx",
               state: "Downloaded",
               message: "Modello immagini scaricato. Inserisci lo SHA256 per abilitarne la verifica."
             }
@@ -165,7 +165,7 @@ describe("ImagesSection", () => {
     expect(generateCall).toBeDefined();
     expect(JSON.parse(String(generateCall?.body))).toMatchObject({
       prompt: "Una libreria futuristica",
-      modelId: "lcm-sdxl-olive-onnx",
+      modelId: "lcm-sdxl-int8-onnx",
       width: 1024,
       height: 1024,
       steps: 6,
@@ -314,7 +314,7 @@ describe("ImagesSection", () => {
 
 function createImageSettings() {
   return {
-    selectedModelId: "lcm-sdxl-olive-onnx",
+    selectedModelId: "lcm-sdxl-int8-onnx",
     requestTimeoutSeconds: 300,
     preferGpu: true
   };
@@ -342,16 +342,16 @@ function createCatalogEntry(overrides: Partial<ReturnType<typeof createCatalogEn
 
 function createCatalogEntryBase() {
   return {
-    id: "lcm-sdxl-olive-onnx",
-    displayName: "LCM SDXL Olive ONNX",
-    recommendedProfile: "Profilo ONNX DirectML/CPU locale per qualita, bilanciato e performance.",
-    modelType: "SDXL Turbo/LCM ONNX",
-    modelProfile: "lcm-sdxl-olive",
-    supportedResolutions: ["1024x1024", "832x1216", "1216x832"],
-    defaultSteps: 6,
+    id: "lcm-sdxl-int8-onnx",
+    displayName: "LCM SDXL INT8 Quantized ONNX",
+    recommendedProfile: "Profilo quantizzato INT8 ultra-leggero ed ultra-veloce ottimizzato per CPU ed GPU con consumo ridotto.",
+    modelType: "SDXL LCM INT8 ONNX",
+    modelProfile: "lcm-sdxl-int8",
+    supportedResolutions: ["512x512", "1024x1024"],
+    defaultSteps: 4,
     defaultGuidance: 0,
-    scheduler: "Euler Ancestral with trailing timestep spacing",
-    compatibilityNotes: "DirectML GPU preferred; CPU fallback is supported.",
+    scheduler: "LCM",
+    compatibilityNotes: "Quantizzazione dinamica INT8 attiva per il massimo risparmio di memoria.",
     downloadUrl: "https://example.test/model.onnx",
     licenseLabel: "OpenRAIL++",
     expectedSizeBytes: 46,
@@ -363,12 +363,12 @@ function createCatalogEntryBase() {
 
 function createModelState(overrides: Partial<ImageModelLocalState> = {}): ImageModelLocalState {
   return {
-    modelId: "lcm-sdxl-olive-onnx",
+    modelId: "lcm-sdxl-int8-onnx",
     state: overrides.isVerified ? "Verified" : "NotDownloaded",
     isDownloaded: overrides.isVerified ?? false,
     isVerified: false,
     localSizeBytes: 0,
-    localDirectory: "C:\\Users\\User\\AppData\\Local\\OnlyRag\\models\\images\\lcm-sdxl-olive-onnx",
+    localDirectory: "C:\\Users\\User\\AppData\\Local\\OnlyRag\\models\\images\\lcm-sdxl-int8-onnx",
     verificationError: "Il modello non e ancora stato scaricato.",
     expectedSizeBytes: 46,
     remainingDownloadBytes: 46,

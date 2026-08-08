@@ -62,7 +62,7 @@ def get_paddle_runtime_info():
         import paddle
     except Exception:
         return {
-            "compiledWithCuda": False,
+            "compiledWithCuda": None,
             "cudaDeviceCount": 0,
             "activeDevice": None
         }

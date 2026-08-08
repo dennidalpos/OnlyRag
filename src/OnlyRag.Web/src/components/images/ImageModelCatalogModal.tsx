@@ -9,6 +9,7 @@ import {
 } from "../../api";
 import { formatFileSize } from "../documents/DocumentsSection.formatting";
 import { InfoTip } from "../common/InfoTip";
+import { ProgressBar } from "../common/ProgressBar";
 import { createEmptyModelDraft, modelTemplates, type ModelDraft } from "./imageTypes";
 
 type Props = {
@@ -375,6 +376,20 @@ function ModelReadiness({
           ? `File verificati (${formatFileSize(state?.localSizeBytes ?? 0)}) · Modello locale pronto`
           : `${state?.verificationError ?? model.recommendedProfile} · ${formatRemainingDownload(state, model)}`}
       </small>
+
+      {state?.state === "Downloading" && (
+        <div style={{ marginBottom: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600, color: "var(--text-main)" }}>
+            <span>⏳ Download e sincronizzazione file in corso...</span>
+            <span>{state.localSizeBytes > 0 && state.expectedSizeBytes > 0 ? `${Math.round((state.localSizeBytes / state.expectedSizeBytes) * 100)}%` : "In corso"}</span>
+          </div>
+          <ProgressBar
+            label="Avanzamento download modello ONNX"
+            value={state.localSizeBytes > 0 && state.expectedSizeBytes > 0 ? Math.round((state.localSizeBytes / state.expectedSizeBytes) * 100) : 0}
+            indeterminate={state.localSizeBytes <= 0}
+          />
+        </div>
+      )}
 
       {/* Main Download & Action Buttons */}
       <div className="settings-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>

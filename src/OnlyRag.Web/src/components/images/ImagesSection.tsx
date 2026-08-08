@@ -37,10 +37,25 @@ export function ImagesSection() {
         </div>
       )}
 
-      {ctrl.isModelActionRunning && (
+      {(ctrl.isModelActionRunning || ctrl.selectedModelState?.state === "Downloading") && (
         <div className="model-progress-bar">
-          <span>{ctrl.modelActionMessage ?? "Download modello in corso..."}</span>
-          <ProgressBar label={ctrl.modelActionMessage ?? "Download modello in corso..."} value={0} indeterminate />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{ctrl.modelActionMessage ?? "Download e sincronizzazione modello ONNX in corso..."}</span>
+            <span>
+              {ctrl.selectedModelState?.localSizeBytes && ctrl.selectedModelState.localSizeBytes > 0 && ctrl.selectedModelState.expectedSizeBytes > 0
+                ? `${Math.round((ctrl.selectedModelState.localSizeBytes / ctrl.selectedModelState.expectedSizeBytes) * 100)}%`
+                : "In corso"}
+            </span>
+          </div>
+          <ProgressBar
+            label={ctrl.modelActionMessage ?? "Download e sincronizzazione modello ONNX in corso..."}
+            value={
+              ctrl.selectedModelState?.localSizeBytes && ctrl.selectedModelState.localSizeBytes > 0 && ctrl.selectedModelState.expectedSizeBytes > 0
+                ? Math.round((ctrl.selectedModelState.localSizeBytes / ctrl.selectedModelState.expectedSizeBytes) * 100)
+                : 0
+            }
+            indeterminate={!ctrl.selectedModelState?.localSizeBytes || ctrl.selectedModelState.localSizeBytes <= 0}
+          />
         </div>
       )}
 

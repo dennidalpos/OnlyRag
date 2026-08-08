@@ -75,7 +75,7 @@ public sealed class RerankerModelManager
         }
     }
 
-    public async Task<bool> DownloadModelAsync(
+    public Task<bool> DownloadModelAsync(
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -96,70 +96,70 @@ public sealed class RerankerModelManager
             isDownloading = true;
             currentProgress = 0.0d;
             lastDownloadError = null;
-            currentDownloadCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            currentDownloadCts = new CancellationTokenSource();
         }
 
         CancellationToken token = currentDownloadCts.Token;
 
-        try
+        _ = Task.Run(async () =>
         {
-            // 1. Keep a previously completed ONNX download. Earlier app versions
-            // downloaded it successfully before failing on the obsolete vocab URL.
-            bool modelAlreadyAvailable = File.Exists(targetModelPath) && new FileInfo(targetModelPath).Length > 0;
-            if (!modelAlreadyAvailable)
+            try
             {
-                await DownloadFileWithProgressAsync(DefaultDownloadUrl, tempModelPath, 0.0d, 0.9d, progress, token);
+                bool modelAlreadyAvailable = File.Exists(targetModelPath) && new FileInfo(targetModelPath).Length > 0;
+                if (!modelAlreadyAvailable)
+                {
+                    await DownloadFileWithProgressAsync(DefaultDownloadUrl, tempModelPath, 0.0d, 0.9d, progress, token);
+                }
+                else
+                {
+                    lock (lockObj)
+                    {
+                        currentProgress = 0.9d;
+                    }
+                    progress?.Report(0.9d);
+                }
+
+                await DownloadFileWithProgressAsync(VocabDownloadUrl, tempVocabPath, 0.9d, 1.0d, progress, token);
+
+                if (!modelAlreadyAvailable)
+                {
+                    if (File.Exists(targetModelPath)) File.Delete(targetModelPath);
+                    File.Move(tempModelPath, targetModelPath);
+                }
+
+                if (File.Exists(targetVocabPath)) File.Delete(targetVocabPath);
+                File.Move(tempVocabPath, targetVocabPath);
+
+                lock (lockObj)
+                {
+                    currentProgress = 1.0d;
+                    isDownloading = false;
+                }
+                progress?.Report(1.0d);
             }
-            else
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (File.Exists(tempModelPath)) { try { File.Delete(tempModelPath); } catch { } }
+                if (File.Exists(tempVocabPath)) { try { File.Delete(tempVocabPath); } catch { } }
+
+                lock (lockObj)
+                {
+                    lastDownloadError = ex.Message;
+                    isDownloading = false;
+                }
+            }
+            finally
             {
                 lock (lockObj)
                 {
-                    currentProgress = 0.9d;
+                    isDownloading = false;
+                    currentDownloadCts?.Dispose();
+                    currentDownloadCts = null;
                 }
-                progress?.Report(0.9d);
             }
+        }, CancellationToken.None);
 
-            // 2. Download the XLM-RoBERTa tokenizer.
-            await DownloadFileWithProgressAsync(VocabDownloadUrl, tempVocabPath, 0.9d, 1.0d, progress, token);
-
-            if (!modelAlreadyAvailable)
-            {
-                if (File.Exists(targetModelPath)) File.Delete(targetModelPath);
-                File.Move(tempModelPath, targetModelPath);
-            }
-
-            if (File.Exists(targetVocabPath)) File.Delete(targetVocabPath);
-            File.Move(tempVocabPath, targetVocabPath);
-
-            lock (lockObj)
-            {
-                currentProgress = 1.0d;
-                isDownloading = false;
-            }
-            progress?.Report(1.0d);
-            return true;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            if (File.Exists(tempModelPath)) { try { File.Delete(tempModelPath); } catch { } }
-            if (File.Exists(tempVocabPath)) { try { File.Delete(tempVocabPath); } catch { } }
-
-            lock (lockObj)
-            {
-                lastDownloadError = ex.Message;
-                isDownloading = false;
-            }
-            throw;
-        }
-        finally
-        {
-            lock (lockObj)
-            {
-                isDownloading = false;
-                currentDownloadCts?.Dispose();
-                currentDownloadCts = null;
-            }
-        }
+        return Task.FromResult(true);
     }
 
     private async Task DownloadFileWithProgressAsync(

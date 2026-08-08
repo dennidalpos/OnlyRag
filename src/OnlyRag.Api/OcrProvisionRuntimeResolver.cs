@@ -169,7 +169,7 @@ internal sealed class OcrProvisionRuntimeResolver
 
         IEnumerable<string> candidateDirectories = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        
+
         var extraDirectories = new List<string>
         {
             Environment.GetFolderPath(Environment.SpecialFolder.System),

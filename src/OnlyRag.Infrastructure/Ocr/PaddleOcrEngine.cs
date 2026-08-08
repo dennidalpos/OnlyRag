@@ -75,6 +75,19 @@ public sealed class PaddleOcrEngine : IOcrEngine
                 $"Bridge OCR non trovato: {bridgePath}.");
         }
 
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string venvPython = Path.Combine(localAppData, "OnlyRag", "ocr-python", ".venv", "Scripts", "python.exe");
+        string? envOverride = Environment.GetEnvironmentVariable(PythonEnvVar);
+
+        if (string.IsNullOrWhiteSpace(envOverride) && !File.Exists(venvPython))
+        {
+            return new OcrEngineAvailability(
+                false,
+                EngineName,
+                EngineVersion,
+                "Ambiente venv Python per PaddleOCR non ancora installato. Clicca su Ripara / Reinstalla OCR Paddle per effettuare la prima configurazione.");
+        }
+
         try
         {
             BridgeCheckResponse response = await RunBridgeAsync<BridgeCheckResponse>(
