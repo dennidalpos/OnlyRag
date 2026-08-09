@@ -86,13 +86,31 @@ public static class ToolHelper
             target = Path.GetFullPath(Path.Combine(root, cleanedRelative.TrimStart('/', '\\')));
         }
 
-        string relFromRoot = Path.GetRelativePath(root, target);
-        if (relFromRoot.StartsWith("..") || Path.IsPathRooted(relFromRoot))
+        if (!IsPathWithinRoot(root, target))
         {
             throw new UnauthorizedAccessException($"Path Traversal blocked: the path '{relativePath}' is outside the workspace folder '{rootPath}'.");
         }
 
         return target;
+    }
+
+    private static bool IsPathWithinRoot(string rootPath, string candidatePath)
+    {
+        string normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
+        string normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidatePath));
+
+        if (string.Equals(normalizedRoot, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!normalizedCandidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        char boundaryChar = normalizedCandidate[normalizedRoot.Length];
+        return boundaryChar == Path.DirectorySeparatorChar || boundaryChar == Path.AltDirectorySeparatorChar;
     }
 
     public static string ResolveSafePathWithSmartFallback(string rootPath, string relativePath, out string resolvedRelativePath)

@@ -9,7 +9,6 @@ namespace OnlyRag.Infrastructure.Logging;
 public sealed class LoggingService : ILoggingService, IAsyncDisposable
 {
     private const int MaxMemoryLogs = 1000;
-    private const int MaxPendingWrites = 2000;
     private const int WriteBatchSize = 50;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromMilliseconds(500);
 
@@ -19,6 +18,7 @@ public sealed class LoggingService : ILoggingService, IAsyncDisposable
     private readonly Channel<LogEntry> fileWriteChannel;
     private readonly Task backgroundWriterTask;
     private readonly CancellationTokenSource writerCts = new();
+    private readonly string emergencyCrashLogPath;
     private AppLogLevel currentMinLevel = AppLogLevel.Trace;
 
     public event Action<LogEntry>? OnLogWritten;
@@ -29,13 +29,13 @@ public sealed class LoggingService : ILoggingService, IAsyncDisposable
         this.settingsStore = settingsStore;
 
         Directory.CreateDirectory(storagePaths.LogsDirectory);
+        emergencyCrashLogPath = Path.Combine(storagePaths.LogsDirectory, "crash-diagnostics.log");
 
-        fileWriteChannel = Channel.CreateBounded<LogEntry>(
-            new BoundedChannelOptions(MaxPendingWrites)
-            {
-                FullMode = BoundedChannelFullMode.DropOldest,
-                SingleReader = true
-            });
+        fileWriteChannel = Channel.CreateUnbounded<LogEntry>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
 
         backgroundWriterTask = Task.Run(() => BackgroundWriterLoopAsync(writerCts.Token));
 
@@ -44,12 +44,14 @@ public sealed class LoggingService : ILoggingService, IAsyncDisposable
             if (args.ExceptionObject is Exception ex)
             {
                 LogError("UnhandledException", "Unhandled AppDomain exception occurred.", ex);
+                WriteEmergencyCrashLog("UnhandledException", "Unhandled AppDomain exception occurred.", ex);
             }
         };
 
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             LogError("TaskScheduler", "Unobserved task exception occurred.", args.Exception);
+            WriteEmergencyCrashLog("TaskScheduler", "Unobserved task exception occurred.", args.Exception);
             args.SetObserved();
         };
 
@@ -85,6 +87,12 @@ public sealed class LoggingService : ILoggingService, IAsyncDisposable
 
     public void Log(AppLogLevel level, string category, string message, Exception? exception = null, object? data = null)
     {
+        bool shouldPersistEmergencyDiagnostics = ShouldPersistEmergencyDiagnostics(level, category, message, exception);
+        if (shouldPersistEmergencyDiagnostics)
+        {
+            WriteEmergencyCrashLog(category, message, exception);
+        }
+
         if (currentMinLevel == AppLogLevel.None || level < currentMinLevel)
         {
             return;
@@ -340,6 +348,49 @@ public sealed class LoggingService : ILoggingService, IAsyncDisposable
         catch
         {
             // Ignora fallimenti scrittura file log per evitare eccezioni a catena
+        }
+    }
+
+    private bool ShouldPersistEmergencyDiagnostics(AppLogLevel level, string? category, string? message, Exception? exception)
+    {
+        if (level >= AppLogLevel.Error)
+        {
+            return true;
+        }
+
+        string normalizedCategory = (category ?? string.Empty).ToLowerInvariant();
+        string normalizedMessage = (message ?? string.Empty).ToLowerInvariant();
+        return normalizedCategory.Contains("qdrant")
+            || normalizedCategory.Contains("cuda")
+            || normalizedCategory.Contains("ocr")
+            || normalizedCategory.Contains("startup")
+            || normalizedCategory.Contains("backend")
+            || normalizedMessage.Contains("qdrant")
+            || normalizedMessage.Contains("cuda")
+            || normalizedMessage.Contains("connection refused")
+            || normalizedMessage.Contains("failed")
+            || normalizedMessage.Contains("fatal")
+            || normalizedMessage.Contains("unavailable")
+            || exception is not null;
+    }
+
+    private void WriteEmergencyCrashLog(string? category, string? message, Exception? exception)
+    {
+        try
+        {
+            Directory.CreateDirectory(storagePaths.LogsDirectory);
+            StringBuilder sb = new();
+            sb.AppendLine($"[{DateTimeOffset.UtcNow:O}] [EMERGENCY] [{category ?? "General"}] {message ?? "No message"}");
+            if (exception is not null)
+            {
+                sb.AppendLine(exception.ToString());
+            }
+            sb.AppendLine();
+            File.AppendAllText(emergencyCrashLogPath, sb.ToString(), Encoding.UTF8);
+        }
+        catch
+        {
+            // Best-effort persistence for crash diagnostics.
         }
     }
 

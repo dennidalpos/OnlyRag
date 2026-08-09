@@ -193,7 +193,7 @@ public sealed class AgentExecutionPolicyService : IAgentExecutionPolicyService
                         if (!string.IsNullOrWhiteSpace(pathValue) && Path.IsPathRooted(pathValue))
                         {
                             string fullPath = Path.GetFullPath(pathValue);
-                            if (!fullPath.StartsWith(fullWorkspaceRoot, StringComparison.OrdinalIgnoreCase))
+                            if (!IsPathWithinRoot(fullWorkspaceRoot, fullPath))
                             {
                                 sandboxError = $"Path '{pathValue}' is outside the authorized workspace sandbox '{workspaceRoot}'.";
                                 return false;
@@ -232,11 +232,46 @@ public sealed class AgentExecutionPolicyService : IAgentExecutionPolicyService
                         return true;
                     }
                 }
+
+                if (ContainsShellMetacharacters(cmdText))
+                {
+                    commandError = "Command contains shell metacharacters that are not permitted in this sandbox.";
+                    return true;
+                }
             }
         }
         catch { }
 
         return false;
+    }
+
+    private static bool ContainsShellMetacharacters(string commandText)
+    {
+        if (string.IsNullOrWhiteSpace(commandText))
+        {
+            return false;
+        }
+
+        return commandText.IndexOfAny([';', '&', '|', '>', '<', '`']) >= 0;
+    }
+
+    private static bool IsPathWithinRoot(string rootPath, string candidatePath)
+    {
+        string normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
+        string normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidatePath));
+
+        if (string.Equals(normalizedRoot, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!normalizedCandidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        char boundaryChar = normalizedCandidate[normalizedRoot.Length];
+        return boundaryChar == Path.DirectorySeparatorChar || boundaryChar == Path.AltDirectorySeparatorChar;
     }
 
     private static bool IsPreApproved(ToolExecutionContext context)

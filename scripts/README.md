@@ -48,7 +48,7 @@ pwsh .\scripts\Clean.ps1
 | Evaluate Retrieval | `scripts\Evaluate-Retrieval.ps1` | Calcola metriche di benchmark di recupero RAG (Recall@K, MRR, contesto). | Valutazione qualità RAG. |
 | Bootstrap Prerequisites | `scripts\Bootstrap-Prerequisites.ps1` | Verifica i prerequisiti di sviluppo Windows e ripristina le dipendenze. | Configurazione iniziale o ripristino. |
 | Build Web UI | `scripts\Build-Web.ps1` | Esegue la build di produzione Vite del frontend. | Prima della build desktop. |
-| Build App | `scripts\Build-App.ps1` | Compila gli asset web, prepara Qdrant e compila l'app desktop. | Build desktop locale. |
+| Build App | `scripts\Build-App.ps1` | Compila gli asset web e compila l'app desktop. | Build desktop locale. |
 | Repository Gate | `scripts\Invoke-Gate.ps1` | Esegue il gate di verifica canonico prima del commit o rilascio. | Verifica della prontezza. |
 | Build Installer | `scripts\Build-Installer.ps1` | Pubblica l'app `win-x64` e compila l'installer NSIS. | Creazione candidato installer. |
 | Sign Release | `scripts\Sign-Release.ps1` | Firma digitalmente l'installer tramite `signtool.exe`. | Firma per rilascio. |

@@ -31,8 +31,6 @@ $appProject = Join-Path $repoRoot "src\OnlyRag.App\OnlyRag.App.csproj"
 $appIcon = Join-Path $repoRoot "src\OnlyRag.App\Assets\OnlyRag.ico"
 $webRoot = Join-Path $repoRoot "src\OnlyRag.Web"
 $nsiScript = Join-Path $repoRoot "packaging\OnlyRag.nsi"
-$downloadQdrantScript = Join-Path $PSScriptRoot "Download-Qdrant.ps1"
-$qdrantExe = Join-Path $repoRoot "packaging\qdrant\payload\qdrant.exe"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot "artifacts"
@@ -63,20 +61,7 @@ $dotnetCommand = Assert-OnlyRagDotNetSdk
 Write-Host "Building React/Vite UI..." -ForegroundColor Cyan
 Invoke-OnlyRagWebBuild -WebRoot $webRoot
 
-if (-not (Test-Path -LiteralPath $qdrantExe -PathType Leaf)) {
-    & $downloadQdrantScript
-}
-
-Write-Host "Verifying payload binary integrity (SHA256)..." -ForegroundColor Cyan
-if (Test-Path -LiteralPath $qdrantExe -PathType Leaf) {
-    $qdrantItem = Get-Item -LiteralPath $qdrantExe
-    if ($qdrantItem.Length -le 0) {
-        throw "Qdrant sidecar binary '$qdrantExe' is empty (0 bytes)."
-    }
-    $qdrantHash = (Get-FileHash -LiteralPath $qdrantExe -Algorithm SHA256).Hash
-    Write-Host "  Qdrant SHA256: $qdrantHash ($($qdrantItem.Length) bytes)" -ForegroundColor Gray
-}
-
+Write-Host "Verifying optional OCR payload integrity (SHA256)..." -ForegroundColor Cyan
 $ocrPayloadDir = Join-Path $repoRoot "packaging\ocr\payload"
 if (Test-Path -LiteralPath $ocrPayloadDir) {
     Get-ChildItem -LiteralPath $ocrPayloadDir -File -Recurse | ForEach-Object {

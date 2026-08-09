@@ -7,8 +7,8 @@ OnlyRag utilizza NSIS (Nullsoft Scriptable Install System) su Windows per impacc
 - [`OnlyRag.nsi`](OnlyRag.nsi): Script dell'installer NSIS.
 - [`../src/OnlyRag.App/OnlyRag.App.csproj`](../src/OnlyRag.App/OnlyRag.App.csproj): Progetto WPF di output.
 - [`../src/OnlyRag.Web/dist/index.html`](../src/OnlyRag.Web/dist/index.html): Build della UI web.
-- [`qdrant/manifest.json`](qdrant/manifest.json): Metadati del runtime Qdrant integrato.
-- [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): Eseguibile di Qdrant scaricato da [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1).
+- [`qdrant/manifest.json`](qdrant/manifest.json): Metadati facoltativi del runtime Qdrant. Questo repository mantiene il manifest per packaging Qdrant opzionale separato.
+- [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): Eseguibile di Qdrant scaricato da [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1). Non è richiesto per il pacchetto installer minimale.
 
 ## Compilazione
 
@@ -34,5 +34,6 @@ Output generati:
 - Destinazione 64-bit Windows (`win-x64`).
 - Percorso di installazione: `%LOCALAPPDATA%\Programs\OnlyRag`.
 - Conserva i dati utente in `%LOCALAPPDATA%\OnlyRag` alla disinstallazione.
-- Include il runtime .NET autotenuto, WebView2, SQLite, ONNX/DirectML, Qdrant, script OCR e UI web.
+- Include il runtime .NET autotenuto, WebView2, SQLite, ONNX/DirectML, script OCR e UI web.
+- Non include il runtime Qdrant nel pacchetto minimale. Qdrant è fornito come componente opzionale separato e viene gestito on demand dall'applicazione.
 

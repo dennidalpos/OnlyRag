@@ -21,8 +21,8 @@
       <Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\packaging\qdrant\payload\**\*">
-      <Link>qdrant\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="..\..\scripts\ocr\**\*" Exclude="..\..\scripts\ocr\**\__pycache__\**;..\..\scripts\ocr\**\*.pyc;..\..\scripts\ocr\Test-*.ps1">
+      <Link>scripts\ocr\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
