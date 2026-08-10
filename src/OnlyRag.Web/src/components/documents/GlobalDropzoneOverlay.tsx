@@ -34,6 +34,11 @@ export const GlobalDropzoneOverlay: React.FC<GlobalDropzoneOverlayProps> = ({ on
     };
 
     const handleDrop = (e: DragEvent) => {
+      if (e.defaultPrevented) {
+        setIsDragging(false);
+        dragCounter = 0;
+        return;
+      }
       e.preventDefault();
       setIsDragging(false);
       dragCounter = 0;

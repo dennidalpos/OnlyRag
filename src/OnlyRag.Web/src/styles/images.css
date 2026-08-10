@@ -198,6 +198,31 @@
   transition: opacity 0.3s ease;
 }
 
+.canvas-floating-toolbar {
+  pointer-events: auto;
+}
+
+.image-canvas-svg-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.image-crop-box {
+  pointer-events: none;
+}
+
+.image-text-layer {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.image-text-layer:active {
+  cursor: grabbing;
+}
+
 .generated-image-preview--empty {
   display: grid;
   place-items: center;

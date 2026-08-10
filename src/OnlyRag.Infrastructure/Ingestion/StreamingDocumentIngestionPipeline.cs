@@ -55,6 +55,10 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
         ArgumentNullException.ThrowIfNull(ingestionOptions);
         ArgumentNullException.ThrowIfNull(saveProgressAsync);
 
+        using CancellationTokenSource pipelineCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationToken pipelineToken = pipelineCancellation.Token;
+
         var pageBlockChannelOptions = new BoundedChannelOptions(streamingOptions.PageBlockChannelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -87,18 +91,19 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
         {
             try
             {
-                await foreach (var block in pageBlockStream.WithCancellation(cancellationToken).ConfigureAwait(false))
+                await foreach (var block in pageBlockStream.WithCancellation(pipelineToken).ConfigureAwait(false))
                 {
-                    await pageBlockChannel.Writer.WriteAsync(block, cancellationToken).ConfigureAwait(false);
+                    await pageBlockChannel.Writer.WriteAsync(block, pipelineToken).ConfigureAwait(false);
                 }
                 pageBlockChannel.Writer.Complete();
             }
             catch (Exception ex)
             {
+                pipelineCancellation.Cancel();
                 pageBlockChannel.Writer.Complete(ex);
                 throw;
             }
-        }, cancellationToken);
+        }, pipelineToken);
 
         // Stage 2: Chunker Consumer & Producer Task
         var chunkerTask = Task.Run(async () =>
@@ -107,7 +112,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
             long fakeChunkId = 1;
             try
             {
-                await foreach (var block in pageBlockChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var block in pageBlockChannel.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
                 {
                     Interlocked.Increment(ref totalPages);
                     string normalizedText = block.Text.Trim();
@@ -126,7 +131,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                         new IngestedDocumentPage(block.PageNumber, normalizedText),
                         chunks,
                         block.PageNumber,
-                        cancellationToken).ConfigureAwait(false);
+                        pipelineToken).ConfigureAwait(false);
 
                     if (chunks.Count > 0 && graphExtractor is not null && graphService is not null)
                     {
@@ -142,7 +147,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                             }
                             if (allNodes.Count > 0 || allEdges.Count > 0)
                             {
-                                await graphService.InsertGraphAsync(allNodes, allEdges, cancellationToken).ConfigureAwait(false);
+                                await graphService.InsertGraphAsync(allNodes, allEdges, pipelineToken).ConfigureAwait(false);
                             }
                         }
                         catch
@@ -155,23 +160,24 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                     Interlocked.Add(ref totalChunks, chunks.Count);
 
                     var batch = new IngestedChunkBatch(document.Id, block.PageNumber, chunks);
-                    await chunkBatchChannel.Writer.WriteAsync(batch, cancellationToken).ConfigureAwait(false);
+                    await chunkBatchChannel.Writer.WriteAsync(batch, pipelineToken).ConfigureAwait(false);
 
                     await saveProgressAsync(
                         new DocumentIngestionProgress(
                             50,
                             $"Streaming page {block.PageNumber}",
                             new DocumentIngestionCheckpoint(1, document.Id, block.PageNumber + 1, totalPages, currentChunkOrdinal, "streaming")),
-                        cancellationToken).ConfigureAwait(false);
+                        pipelineToken).ConfigureAwait(false);
                 }
                 chunkBatchChannel.Writer.Complete();
             }
             catch (Exception ex)
             {
+                pipelineCancellation.Cancel();
                 chunkBatchChannel.Writer.Complete(ex);
                 throw;
             }
-        }, cancellationToken);
+        }, pipelineToken);
 
         // Stage 3: Embedding Consumer & Producer Task
         bool canEmbed = !string.IsNullOrWhiteSpace(embeddingModel) && embeddingGenerator is not null && embeddings is not null;
@@ -181,7 +187,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
             {
                 if (!canEmbed)
                 {
-                    await foreach (var _ in chunkBatchChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                    await foreach (var _ in chunkBatchChannel.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
                     {
                         // Drain when embedding is disabled or unconfigured
                     }
@@ -190,7 +196,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                 }
 
                 int afterChunkIndex = 0;
-                await foreach (var _ in chunkBatchChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var _ in chunkBatchChannel.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
                 {
                     while (true)
                     {
@@ -199,7 +205,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                             embeddingModel!,
                             afterChunkIndex,
                             streamingOptions.EmbeddingBatchSize,
-                            cancellationToken).ConfigureAwait(false);
+                            pipelineToken).ConfigureAwait(false);
 
                         if (chunksNeedingEmbedding.Count == 0)
                         {
@@ -210,7 +216,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                         var vectors = await embeddingGenerator!.GenerateEmbeddingsAsync(
                             embeddingModel!,
                             contents,
-                            cancellationToken).ConfigureAwait(false);
+                            pipelineToken).ConfigureAwait(false);
 
                         var dummyChunks = chunksNeedingEmbedding.Select(c => new IngestedDocumentChunk(
                             c.ChunkIndex,
@@ -226,7 +232,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                             dummyChunks,
                             vectors);
 
-                        await vectorBatchChannel.Writer.WriteAsync(vectorBatch, cancellationToken).ConfigureAwait(false);
+                        await vectorBatchChannel.Writer.WriteAsync(vectorBatch, pipelineToken).ConfigureAwait(false);
                         afterChunkIndex = chunksNeedingEmbedding[^1].ChunkIndex + 1;
                     }
                 }
@@ -235,10 +241,11 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
             }
             catch (Exception ex)
             {
+                pipelineCancellation.Cancel();
                 vectorBatchChannel.Writer.Complete(ex);
                 throw;
             }
-        }, cancellationToken);
+        }, pipelineToken);
 
         // Stage 4: Vector Store Writer Task
         bool canWriteVector = embeddings is not null && vectorStore is not null && streamingOptions.EnableVectorStoreWriter;
@@ -246,7 +253,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
         {
             try
             {
-                await foreach (var batch in vectorBatchChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var batch in vectorBatchChannel.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
                 {
                     if (!canWriteVector || batch.Embeddings.Count == 0)
                     {
@@ -272,7 +279,7 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
 
                     if (payloads.Count > 0)
                     {
-                        await vectorStore!.UpsertChunkBatchAsync(payloads, cancellationToken).ConfigureAwait(false);
+                        await vectorStore!.UpsertChunkBatchAsync(payloads, pipelineToken).ConfigureAwait(false);
 
                         for (int i = 0; i < payloads.Count; i++)
                         {
@@ -287,16 +294,17 @@ public sealed class StreamingDocumentIngestionPipeline : IStreamingDocumentInges
                                 p.Vector.Count,
                                 collectionName,
                                 pointId,
-                                cancellationToken).ConfigureAwait(false);
+                                pipelineToken).ConfigureAwait(false);
                         }
                     }
                 }
             }
-            catch
+            catch (Exception)
             {
+                pipelineCancellation.Cancel();
                 throw;
             }
-        }, cancellationToken);
+        }, pipelineToken);
 
         await Task.WhenAll(parserTask, chunkerTask, embeddingTask, vectorWriterTask).ConfigureAwait(false);
 

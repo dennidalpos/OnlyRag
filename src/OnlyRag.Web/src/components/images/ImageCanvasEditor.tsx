@@ -87,6 +87,18 @@ export function ImageCanvasEditor({
     setBrushPos(null);
   }
 
+  function handlePreviewPointerDownInternal(event: PointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    onPreviewPointerDown(event);
+  }
+
+  function handlePreviewPointerUpInternal(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    onPreviewPointerUp();
+  }
+
   return (
     <div className="canvas-editor-container">
       {/* Header bar with Image Info & Navigation Controls */}
@@ -231,9 +243,10 @@ export function ImageCanvasEditor({
         <div
           className={`generated-image-preview-frame generated-image-preview-frame--${activeTool}`}
           ref={previewRef}
-          onPointerDown={onPreviewPointerDown}
+          onPointerDown={handlePreviewPointerDownInternal}
           onPointerMove={handlePointerMoveInternal}
-          onPointerUp={onPreviewPointerUp}
+          onPointerUp={handlePreviewPointerUpInternal}
+          onPointerCancel={handlePreviewPointerUpInternal}
           onPointerLeave={handlePointerLeave}
           style={{ position: "relative", opacity: 1 }}
         >

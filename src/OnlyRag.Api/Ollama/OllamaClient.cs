@@ -212,6 +212,10 @@ internal sealed partial class OllamaClient : IOllamaClient
         }
 
         OllamaRequestContext context = await BuildContextAsync(cancellationToken);
+        using IDisposable generationLease = await generationCoordinator.AcquireAsync(cancellationToken);
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(context.Timeout);
+        CancellationToken requestToken = timeoutSource.Token;
         var payload = new Dictionary<string, object>
         {
             ["model"] = normalizedModelName,
@@ -231,13 +235,16 @@ internal sealed partial class OllamaClient : IOllamaClient
             Content = JsonContent.Create(payload)
         };
 
-        using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using HttpResponseMessage response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            requestToken);
         response.EnsureSuccessStatusCode();
 
-        using System.IO.Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using System.IO.Stream stream = await response.Content.ReadAsStreamAsync(requestToken);
         using System.IO.StreamReader reader = new(stream);
 
-        while (!cancellationToken.IsCancellationRequested && await reader.ReadLineAsync(cancellationToken) is { } line)
+        while (!requestToken.IsCancellationRequested && await reader.ReadLineAsync(requestToken) is { } line)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
 
@@ -246,7 +253,10 @@ internal sealed partial class OllamaClient : IOllamaClient
             {
                 chunk = JsonSerializer.Deserialize<OllamaChatResponse>(line, JsonOptions);
             }
-            catch { }
+            catch (JsonException)
+            {
+                continue;
+            }
 
             if (chunk?.Message?.Content is { } contentChunk && contentChunk.Length > 0)
             {

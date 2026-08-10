@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { formatLastRefresh, shouldSurfaceRefreshFailure } from "../../pollingStatus";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
 import { ProgressBar } from "../common/ProgressBar";
@@ -11,9 +12,11 @@ import { useDocumentsSectionController } from "./useDocumentsSectionController";
 
 type DocumentsSectionProps = {
   onLibraryChanged?: () => void;
+  droppedFiles?: FileList | null;
+  onHandledDroppedFiles?: () => void;
 };
 
-export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
+export function DocumentsSection({ onLibraryChanged, droppedFiles, onHandledDroppedFiles }: DocumentsSectionProps) {
   const {
     busyDocumentId,
     canPreview,
@@ -41,6 +44,7 @@ export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
     isLoading,
     isLoadingPreview,
     isUploading,
+    handleFilesSelected,
     loadPreviewPage,
     ocrDefaultLanguage,
     ocrLanguages,
@@ -54,6 +58,15 @@ export function DocumentsSection({ onLibraryChanged }: DocumentsSectionProps) {
     selectedJob,
     vectorHealth
   } = useDocumentsSectionController({ onLibraryChanged });
+
+  useEffect(() => {
+    if (!droppedFiles || droppedFiles.length === 0) {
+      return;
+    }
+
+    handleFilesSelected(droppedFiles);
+    onHandledDroppedFiles?.();
+  }, [droppedFiles, handleFilesSelected, onHandledDroppedFiles]);
 
   return (
     <div className="documents-panel">

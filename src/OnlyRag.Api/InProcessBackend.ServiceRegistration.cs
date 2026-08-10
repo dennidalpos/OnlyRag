@@ -190,7 +190,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<OnlyRag.Core.IChatReportExportService, OnlyRag.Infrastructure.Export.ChatReportExportService>();
         services.AddSingleton<IDocumentLibraryService, LocalDocumentLibraryService>();
         services.AddSingleton<IArchiveManifestRepository, SqliteArchiveManifestRepository>();
-        services.AddSingleton<IBatchIngestionQueueService, BatchIngestionQueueService>();
         services.AddSingleton<LocalDocumentStorageGuard>();
         services.AddSingleton<IngestionSettingsStore>();
         services.AddSingleton<ArchiveExtractionService>();

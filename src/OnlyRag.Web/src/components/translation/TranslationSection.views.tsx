@@ -136,26 +136,26 @@ export function TranslationStartCard({
       </label>
 
       {/* Custom Technical Glossary Panel */}
-      <div className="glossary-section mt-3 pt-3 border-t border-light">
-        <span className="text-xs font-semibold text-main block mb-1">📖 Glossario Tecnico Personalizzato (Opzionale)</span>
-        <div className="flex gap-2 mb-2">
+      <div className="glossary-section">
+        <span className="glossary-section__title">Glossario Tecnico Personalizzato (Opzionale)</span>
+        <div className="glossary-section__fields">
           <input
             type="text"
             placeholder="Termine originale (es. RAG)"
             value={sourceTerm}
             onChange={(e) => setSourceTerm(e.target.value)}
-            className="flex-1 px-2 py-1 bg-card border border-light rounded text-xs text-main focus:outline-none focus:border-focus"
+            className="glossary-section__input"
           />
           <input
             type="text"
             placeholder="Traduzione (es. RAG)"
             value={targetTerm}
             onChange={(e) => setTargetTerm(e.target.value)}
-            className="flex-1 px-2 py-1 bg-card border border-light rounded text-xs text-main focus:outline-none focus:border-focus"
+            className="glossary-section__input"
           />
           <button
             type="button"
-            className="button-secondary button-secondary--xs"
+            className="button-secondary button-secondary--xs glossary-section__add"
             onClick={handleAddGlossaryTerm}
             disabled={!sourceTerm.trim() || !targetTerm.trim()}
           >
@@ -164,11 +164,11 @@ export function TranslationStartCard({
         </div>
 
         {glossary.length > 0 && (
-          <div className="flex flex-col gap-1 max-h-28 overflow-y-auto mb-2">
+          <div className="glossary-section__terms">
             {glossary.map((item, idx) => (
-              <div key={`${item.source}-${idx}`} className="flex items-center justify-between px-2 py-1 bg-card rounded text-xs border border-light">
+              <div key={`${item.source}-${idx}`} className="glossary-section__term">
                 <span>
-                  <strong className="text-primary">{item.source}</strong> ➔ <span>{item.target}</span>
+                  <strong>{item.source}</strong> → <span>{item.target}</span>
                 </span>
                 <button
                   type="button"

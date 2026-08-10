@@ -88,7 +88,9 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
   useEffect(() => {
     if (documents.length > 0) {
       setSelectedDocument((current) =>
-        current ? (documents.find((d) => d.id === current.id) ?? documents[0] ?? null) : (documents[0] ?? null)
+        current
+          ? (documents.some((document) => document.id === current.id) ? current : documents[0] ?? null)
+          : documents[0] ?? null
       );
     }
   }, [documents]);
@@ -375,6 +377,7 @@ export function useDocumentsSectionController({ onLibraryChanged }: UseDocuments
     feedback,
     fileInputRef,
     handleBrowseClick,
+    handleFilesSelected,
     handleClosePreview: preview.handleClosePreview,
     handleDelete,
     handleDragLeave,

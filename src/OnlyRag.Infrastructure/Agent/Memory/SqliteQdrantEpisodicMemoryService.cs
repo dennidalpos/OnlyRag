@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Retrieval;
@@ -56,7 +58,7 @@ public sealed class SqliteQdrantEpisodicMemoryService : IAgentEpisodicMemoryServ
                 var result = await embeddingGenerator.GenerateAsync($"{memory.Goal}\n{memory.Summary}", cancellationToken);
                 if (result?.Vector != null && result.Vector.Count > 0)
                 {
-                    long hashId = Math.Abs(memory.SessionId.GetHashCode());
+                    long hashId = BuildStablePointId(memory.SessionId);
                     await vectorStore.UpsertChunkAsync(
                         chunkId: hashId,
                         documentId: 0,
@@ -106,11 +108,12 @@ public sealed class SqliteQdrantEpisodicMemoryService : IAgentEpisodicMemoryServ
                         while (await reader.ReadAsync(cancellationToken))
                         {
                             var mem = ParseMemory(reader);
-                            long hashId = Math.Abs(mem.SessionId.GetHashCode());
+                            long hashId = BuildStablePointId(mem.SessionId);
                             if (matchedHashIds.Contains(hashId) && seenSessionIds.Add(mem.SessionId))
                             {
                                 results.Add(mem);
                             }
+
                         }
                     }
                 }
@@ -181,6 +184,13 @@ public sealed class SqliteQdrantEpisodicMemoryService : IAgentEpisodicMemoryServ
         }
 
         return results.Take(topK).ToList();
+    }
+
+    private static long BuildStablePointId(string sessionId)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(sessionId));
+        long value = BitConverter.ToInt64(hash, 0) & long.MaxValue;
+        return value == 0 ? 1 : value;
     }
 
     private static AgentEpisodicMemory ParseMemory(SqliteDataReader reader)
