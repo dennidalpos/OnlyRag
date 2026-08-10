@@ -196,30 +196,16 @@ public static class AppDataReset
         }
 
         Logging.EarlyBootstrapperLogger.Close();
-        CreateTimestampedBackup(paths);
         DeleteDirectoryContents(paths.DataRoot);
         return true;
     }
 
-    public static AppDataResetBackup ResetNow(AppStoragePaths paths)
+    public static void ResetNow(AppStoragePaths paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
         Logging.EarlyBootstrapperLogger.Close();
-        AppDataResetBackup backup = CreateTimestampedBackup(paths);
         DeleteDirectoryContents(paths.DataRoot);
-        return backup;
-    }
-
-    public static AppDataResetBackup CreateTimestampedBackup(AppStoragePaths paths)
-    {
-        ArgumentNullException.ThrowIfNull(paths);
-
-        Directory.CreateDirectory(paths.BackupsDirectory);
-        string backupPath = CreateUniqueBackupPath(paths.BackupsDirectory);
-        Directory.CreateDirectory(backupPath);
-        CopyDirectoryContents(paths.DataRoot, backupPath, paths.BackupsDirectory);
-        return new AppDataResetBackup(backupPath);
     }
 
     private static void DeleteDirectoryContents(string dataRoot)
@@ -230,14 +216,8 @@ public static class AppDataReset
             return;
         }
 
-        string backupRoot = Path.GetFullPath(AppStoragePaths.FromRoot(fullRoot).BackupsDirectory);
         foreach (string entry in Directory.EnumerateFileSystemEntries(fullRoot))
         {
-            if (IsSamePath(entry, backupRoot))
-            {
-                continue;
-            }
-
             DeleteFileSystemEntrySafe(entry);
         }
     }
@@ -275,69 +255,6 @@ public static class AppDataReset
         }
     }
 
-    private static void CopyDirectoryContents(string sourceRoot, string destinationRoot, string backupsDirectory)
-    {
-        string fullSourceRoot = Path.GetFullPath(sourceRoot);
-        string fullDestinationRoot = Path.GetFullPath(destinationRoot);
-        string fullBackupsDirectory = Path.GetFullPath(backupsDirectory);
-        foreach (string sourcePath in Directory.EnumerateFileSystemEntries(fullSourceRoot))
-        {
-            if (IsSamePath(sourcePath, fullBackupsDirectory))
-            {
-                continue;
-            }
-
-            string relativePath = Path.GetRelativePath(fullSourceRoot, sourcePath);
-            string destinationPath = Path.Combine(fullDestinationRoot, relativePath);
-            if (Directory.Exists(sourcePath))
-            {
-                Directory.CreateDirectory(destinationPath);
-                CopyDirectoryContents(sourcePath, destinationPath, fullBackupsDirectory);
-            }
-            else
-            {
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-                    File.Copy(sourcePath, destinationPath, overwrite: false);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Ignore locked files during backup copy
-                }
-            }
-        }
-    }
-
-    private static string CreateUniqueBackupPath(string backupsDirectory)
-    {
-        string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssZ");
-        string backupPath = Path.Combine(backupsDirectory, $"reset-{timestamp}");
-        if (!Directory.Exists(backupPath))
-        {
-            return backupPath;
-        }
-
-        for (int suffix = 2; suffix < 100; suffix++)
-        {
-            string candidate = Path.Combine(backupsDirectory, $"reset-{timestamp}-{suffix}");
-            if (!Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return Path.Combine(backupsDirectory, $"reset-{timestamp}-{Guid.NewGuid():N}");
-    }
-
-    private static bool IsSamePath(string left, string right)
-    {
-        return string.Equals(
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(left)),
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(right)),
-            StringComparison.OrdinalIgnoreCase);
-    }
-
     private static void ClearAttributesRecursive(string directory)
     {
         foreach (string file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
@@ -353,8 +270,6 @@ public static class AppDataReset
         File.SetAttributes(directory, FileAttributes.Normal);
     }
 }
-
-public sealed record AppDataResetBackup(string BackupPath);
 
 public sealed record ProcessLaunchRequest(bool Confirmed);
 
@@ -383,7 +298,6 @@ public sealed record AppStoragePaths(
     string DocumentExportsDirectory,
     string ImageModelsDirectory,
     string RerankerModelsDirectory,
-    string BackupsDirectory,
     string LogsDirectory,
     string WebView2UserDataDirectory,
     string TempDirectory)
@@ -416,7 +330,6 @@ public sealed record AppStoragePaths(
             Path.Combine(documentsRoot, "exports"),
             Path.Combine(normalizedRoot, "models", "images"),
             Path.Combine(normalizedRoot, "models", "reranker"),
-            Path.Combine(normalizedRoot, "backups"),
             Path.Combine(normalizedRoot, "logs"),
             Path.Combine(normalizedRoot, "webview2"),
             Path.Combine(normalizedRoot, "temp"));
@@ -432,7 +345,6 @@ public sealed record AppStoragePaths(
         yield return DocumentExportsDirectory;
         yield return ImageModelsDirectory;
         yield return RerankerModelsDirectory;
-        yield return BackupsDirectory;
         yield return LogsDirectory;
         yield return WebView2UserDataDirectory;
         yield return TempDirectory;

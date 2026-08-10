@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { CodingMode } from "./CodingSection.types";
 
 export type DetectedIntentType = "inline_edit" | "simple_qa" | "multi_agent_task";
 
@@ -7,7 +8,7 @@ export type DetectedIntentMeta = {
   label: string;
   badgeColor: string;
   description: string;
-  recommendedOperatingMode: "plan" | "write";
+  recommendedOperatingMode: CodingMode;
 };
 
 type UseSmartIntentRouterProps = {
@@ -45,7 +46,7 @@ export function useSmartIntentRouter({
         label: "⚡ Smart Router: Editing Chirurgico",
         badgeColor: "#38bdf8",
         description: "Modalità chirurgica attiva per modificare ed applicare modifiche sul file allegato.",
-        recommendedOperatingMode: "write"
+        recommendedOperatingMode: "full"
       };
     }
 
@@ -57,7 +58,7 @@ export function useSmartIntentRouter({
         label: "🤖 Smart Router: Task Complesso (Multi-Agente)",
         badgeColor: "#a855f7",
         description: "Obiettivo complesso rilevato. L'agente eseguirà la pianificazione e l'orchestrazione automatica.",
-        recommendedOperatingMode: "write"
+        recommendedOperatingMode: "full"
       };
     }
 
@@ -67,7 +68,7 @@ export function useSmartIntentRouter({
       label: "💡 Smart Router: Consultazione & Q&A",
       badgeColor: "#22c55e",
       description: "Modalità informativa e di analisi. L'agente risponderà senza effettuare azioni distruttive sul disco.",
-      recommendedOperatingMode: "plan"
+      recommendedOperatingMode: "ask"
     };
   }, [promptInput, selectedWorkspaceFile, attachedFileContent]);
 }

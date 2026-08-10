@@ -363,6 +363,22 @@ export async function searchGraph(request: import("./apiTypes/graph").GraphSearc
   });
 }
 
+export async function applySelectiveUpdate(
+  request: import("./apiTypes/update").ApplyUpdateRequest
+): Promise<import("./apiTypes/update").UpdateResult> {
+  return apiRequest<import("./apiTypes/update").UpdateResult>("/api/update/apply", {
+    method: "POST",
+    body: JSON.stringify(request),
+    retries: 0
+  });
+}
+
+export async function getModelIntegrityStatus(): Promise<import("./apiTypes/update").ModelIntegrityStatus> {
+  return apiRequest<import("./apiTypes/update").ModelIntegrityStatus>("/api/update/model-integrity", {
+    retries: 0
+  });
+}
+
 
 function resolveBackendRequestUrl(path: string, baseUrl: string): URL {
   const url = new URL(path, baseUrl);
