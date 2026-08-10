@@ -24,27 +24,18 @@ public sealed class OnlyRagLoggerProvider : ILoggerProvider
         private readonly string _categoryName;
         private readonly string _originalCategoryName;
         private readonly ILoggingService _loggingService;
-        private readonly bool _isNoisyFrameworkCategory;
-
         public OnlyRagLogger(string categoryName, ILoggingService loggingService)
         {
             _originalCategoryName = categoryName ?? string.Empty;
             _categoryName = SimplifyCategoryName(categoryName ?? string.Empty);
             _loggingService = loggingService;
-            _isNoisyFrameworkCategory = IsNoisyCategory(_originalCategoryName);
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            if (logLevel == LogLevel.None) return false;
-
-            // Suppress verbose framework logs (CORS, routing, request start/finish, HTTP client)
-            // to eliminate ~90% of log volume while keeping Warning/Error for real issues
-            if (_isNoisyFrameworkCategory && logLevel < LogLevel.Warning) return false;
-
-            return true;
+            return logLevel != LogLevel.None;
         }
 
         public void Log<TState>(
@@ -71,13 +62,6 @@ public sealed class OnlyRagLoggerProvider : ILoggerProvider
             };
 
             _loggingService.Log(appLogLevel, _categoryName, message, exception);
-        }
-
-        private static bool IsNoisyCategory(string categoryName)
-        {
-            return categoryName.StartsWith("Microsoft.AspNetCore.", StringComparison.OrdinalIgnoreCase)
-                || categoryName.StartsWith("Microsoft.EntityFrameworkCore.", StringComparison.OrdinalIgnoreCase)
-                || categoryName.StartsWith("System.Net.Http.", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string SimplifyCategoryName(string categoryName)

@@ -94,6 +94,65 @@ public sealed class AgentSecurityPolicyTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_PathWithSharedPrefix_BlocksExecution()
+    {
+        var (service, repo, tempDir) = CreateTestService();
+        try
+        {
+            string siblingPath = Path.GetFullPath(tempDir + "2") + Path.DirectorySeparatorChar + "secret.txt";
+            string args = JsonSerializer.Serialize(new { filePath = siblingPath });
+
+            ToolExecutionContext context = new("call_4", "write_file", args, tempDir);
+            AgentPolicyDecision decision = await service.EvaluateAsync(context);
+
+            Assert.False(decision.Allowed);
+            Assert.Contains("outside the authorized workspace sandbox", decision.DenialReason);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RelativeTraversalPath_BlocksExecution()
+    {
+        var (service, repo, tempDir) = CreateTestService();
+        try
+        {
+            string args = JsonSerializer.Serialize(new { filePath = "..\\secret.txt" });
+            AgentPolicyDecision decision = await service.EvaluateAsync(
+                new ToolExecutionContext("call_5", "write_file", args, tempDir));
+
+            Assert.False(decision.Allowed);
+            Assert.Contains("outside the authorized workspace sandbox", decision.DenialReason);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_MalformedCommandArguments_BlocksExecution()
+    {
+        var (service, repo, tempDir) = CreateTestService();
+        try
+        {
+            AgentPolicyDecision decision = await service.EvaluateAsync(
+                new ToolExecutionContext("call_6", "run_command", "{", tempDir));
+
+            Assert.False(decision.Allowed);
+            Assert.Equal(AgentRiskLevel.Critical, decision.RiskLevel);
+            Assert.Contains("Invalid JSON parameters", decision.DenialReason);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task PostExecutionVerify_LogsResultToAudit()
     {
         var (service, repo, tempDir) = CreateTestService();

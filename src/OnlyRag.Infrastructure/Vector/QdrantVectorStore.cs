@@ -16,6 +16,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
     private QdrantClient? _cachedClient;
     private QdrantSettings? _cachedSettings;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
+    private readonly SemaphoreSlim _collectionLock = new(1, 1);
 
     public QdrantVectorStore(QdrantSettingsStore settingsStore)
     {
@@ -96,7 +97,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
                 await EnsureCollectionAsync(client, collection, dimensions, mode, cancellationToken);
 
                 var uniqueChunks = group
-                    .GroupBy(c => c.ContentHash)
+                    .GroupBy(c => c.ChunkId)
                     .Select(g => g.First())
                     .ToList();
 
@@ -136,7 +137,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
-        if (queryVector.Count == 0 || documentIds.Count == 0 || limit <= 0)
+        if (queryVector.Count == 0 || limit <= 0)
         {
             return [];
         }
@@ -155,7 +156,9 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
             }
 
             long[] filteredDocumentIds = documentIds.Where(id => id > 0).Distinct().ToArray();
-            Filter filter = new() { Must = { Match("document_id", filteredDocumentIds) } };
+            Filter? filter = filteredDocumentIds.Length > 0
+                ? new Filter { Must = { Match("document_id", filteredDocumentIds) } }
+                : null;
             IReadOnlyList<ScoredPoint> points = await client.QueryAsync(
                 collection,
                 query: queryVector.ToArray(),
@@ -337,6 +340,7 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         {
             _clientLock.Release();
             _clientLock.Dispose();
+            _collectionLock.Dispose();
         }
     }
 
@@ -347,43 +351,51 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         QdrantQuantizationMode quantizationMode,
         CancellationToken cancellationToken)
     {
-        if (_knownCollections.TryGetValue(collection, out bool known) && known)
+        await _collectionLock.WaitAsync(cancellationToken);
+        try
         {
-            return;
-        }
-
-        if (await client.CollectionExistsAsync(collection, cancellationToken))
-        {
-            _knownCollections[collection] = true;
-            return;
-        }
-
-        QuantizationConfig? quantizationConfig = quantizationMode switch
-        {
-            QdrantQuantizationMode.ScalarSQ8 => new QuantizationConfig
-            {
-                Scalar = new ScalarQuantization
+                if (_knownCollections.TryGetValue(collection, out bool known) && known)
                 {
-                    Type = QuantizationType.Int8
+                    return;
                 }
-            },
-            QdrantQuantizationMode.ProductPQ => new QuantizationConfig
-            {
-                Product = new ProductQuantization
-                {
-                    Compression = CompressionRatio.X8
-                }
-            },
-            _ => null
-        };
 
-        await client.CreateCollectionAsync(
-            collection,
-            new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
-            hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
-            quantizationConfig: quantizationConfig,
-            cancellationToken: cancellationToken);
-        _knownCollections[collection] = true;
+                if (await client.CollectionExistsAsync(collection, cancellationToken))
+                {
+                    _knownCollections[collection] = true;
+                    return;
+                }
+
+                QuantizationConfig? quantizationConfig = quantizationMode switch
+                {
+                    QdrantQuantizationMode.ScalarSQ8 => new QuantizationConfig
+                    {
+                        Scalar = new ScalarQuantization
+                        {
+                            Type = QuantizationType.Int8
+                        }
+                    },
+                    QdrantQuantizationMode.ProductPQ => new QuantizationConfig
+                    {
+                        Product = new ProductQuantization
+                        {
+                            Compression = CompressionRatio.X8
+                        }
+                    },
+                    _ => null
+                };
+
+                await client.CreateCollectionAsync(
+                    collection,
+                    new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
+                    hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
+                    quantizationConfig: quantizationConfig,
+                    cancellationToken: cancellationToken);
+                _knownCollections[collection] = true;
+        }
+        finally
+        {
+                _collectionLock.Release();
+        }
     }
 
     private static long ToInt64(PointId pointId)

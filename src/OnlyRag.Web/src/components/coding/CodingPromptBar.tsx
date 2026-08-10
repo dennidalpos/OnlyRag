@@ -1,13 +1,17 @@
 import {
   Edit3,
   FileCode,
+  ListChecks,
+  MessageCircle,
   Paperclip,
   Sparkles,
   Square,
   Trash2,
+  Wrench,
   X
 } from "lucide-react";
 import { useSmartIntentRouter } from "./useSmartIntentRouter";
+import type { CodingMode } from "./CodingSection.types";
 
 type CodingPromptBarProps = {
   selectedWorkspaceFile: string | null;
@@ -17,8 +21,8 @@ type CodingPromptBarProps = {
   onRemoveAttachedFile: () => void;
   promptInput: string;
   onPromptInputChange: (value: string) => void;
-  operatingMode: "plan" | "write";
-  onSelectOperatingMode: (mode: "plan" | "write") => void;
+  operatingMode: CodingMode;
+  onSelectOperatingMode: (mode: CodingMode) => void;
   autoApproveCommands: boolean;
   onToggleAutoApproveCommands: (autoApprove: boolean) => void;
   workspaceConfigAuthorized: boolean;
@@ -37,8 +41,8 @@ export function CodingPromptBar({
   onRemoveAttachedFile,
   promptInput,
   onPromptInputChange,
-  operatingMode: _operatingMode,
-  onSelectOperatingMode: _onSelectOperatingMode,
+  operatingMode,
+  onSelectOperatingMode,
   autoApproveCommands,
   onToggleAutoApproveCommands,
   workspaceConfigAuthorized,
@@ -135,6 +139,25 @@ export function CodingPromptBar({
             title={intentMeta.description}
           >
             {intentMeta.label}
+          </div>
+
+          <div className="coding-mode-selector" role="group" aria-label="Modalita prompt">
+            {([
+              { mode: "ask", label: "Ask", icon: <MessageCircle size={13} />, description: "Risposta e analisi senza modifiche" },
+              { mode: "plan", label: "Plan", icon: <ListChecks size={13} />, description: "Piano approvabile prima delle azioni" },
+              { mode: "full", label: "Full", icon: <Wrench size={13} />, description: "Pianifica, modifica e verifica" }
+            ] as const).map((item) => (
+              <button
+                key={item.mode}
+                type="button"
+                className={`coding-mode-button ${operatingMode === item.mode ? "coding-mode-button--active" : ""}`}
+                onClick={() => onSelectOperatingMode(item.mode)}
+                title={item.description}
+                aria-pressed={operatingMode === item.mode}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
           </div>
 
           <label className="auto-approve-checkbox-label">

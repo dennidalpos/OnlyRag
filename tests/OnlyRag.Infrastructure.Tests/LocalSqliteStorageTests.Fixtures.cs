@@ -22,8 +22,6 @@ public sealed partial class LocalSqliteStorageTests
 
         public LocalSqliteStoreDescriptor Descriptor { get; }
 
-        public string BackupDirectory => Paths.BackupsDirectory;
-
         public static TempStorage Create()
         {
             string root = Path.Combine(Path.GetTempPath(), "OnlyRag.Tests", Guid.NewGuid().ToString("N"));
@@ -77,13 +75,6 @@ public sealed partial class LocalSqliteStorageTests
             command.Parameters.AddWithValue("$name", indexName);
             object? value = await command.ExecuteScalarAsync();
             return value is not null;
-        }
-
-        public string[] ListBackupRoots()
-        {
-            return Directory.Exists(BackupDirectory)
-                ? Directory.GetDirectories(BackupDirectory, "reset-*")
-                : [];
         }
 
         public void Dispose()

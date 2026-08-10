@@ -32,6 +32,10 @@ describe("CodingSection", () => {
     expect(screen.getByRole("heading", { level: 2, name: /Coding & Vibe Hub/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sfoglia Cartella/i })).toBeInTheDocument();
     expect(screen.getByText(/Smart Router:/i)).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Modalita prompt" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Plan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Full" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("sends prompt in Agent mode and renders agent thought events", async () => {

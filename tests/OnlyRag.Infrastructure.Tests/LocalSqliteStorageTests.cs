@@ -69,7 +69,7 @@ public sealed partial class LocalSqliteStorageTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ResetsVersionedSchemaAndCreatesBackup()
+    public async Task InitializeAsync_ResetsVersionedSchemaWithoutCreatingBackup()
     {
         using TempStorage tempStorage = TempStorage.Create();
         await CreateVersionedSchemaAsync(tempStorage);
@@ -86,8 +86,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal("Current", status.SchemaStatus);
         Assert.Contains("resettato", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.False(File.Exists(staleLogPath));
-        string backupRoot = Assert.Single(tempStorage.ListBackupRoots());
-        Assert.True(File.Exists(Path.Combine(backupRoot, "logs", "stale.log")));
+        Assert.DoesNotContain("backup", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.True(await tempStorage.TableExistsAsync("documents"));
         Assert.True(await tempStorage.TableExistsAsync("document_pages"));
         Assert.True(await tempStorage.TableExistsAsync("chunk_vector_index_status"));
@@ -109,7 +108,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal("Current", status.SchemaStatus);
         Assert.False(await tempStorage.TableExistsAsync("obsolete_data"));
         Assert.True(await tempStorage.TableExistsAsync("documents"));
-        Assert.Single(tempStorage.ListBackupRoots());
+        Assert.DoesNotContain("backup", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public sealed partial class LocalSqliteStorageTests
         Assert.Equal("Current", status.SchemaStatus);
         Assert.True(await tempStorage.TableExistsAsync("documents"));
         Assert.True(await tempStorage.ColumnExistsAsync("documents", "document_uid"));
-        Assert.Single(tempStorage.ListBackupRoots());
+        Assert.DoesNotContain("backup", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -141,7 +140,7 @@ public sealed partial class LocalSqliteStorageTests
 
         Assert.Equal("ResetRequired", status.SchemaStatus);
         Assert.True(await tempStorage.TableExistsAsync("obsolete_data"));
-        Assert.Empty(tempStorage.ListBackupRoots());
+        Assert.DoesNotContain("backup", status.TechnicalNote ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<int> ReadUserVersionAsync(TempStorage tempStorage)

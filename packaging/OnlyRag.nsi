@@ -76,9 +76,8 @@ Section "MainSection" SEC01
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OnlyRag" "NoModify" 1
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OnlyRag" "NoRepair" 1
 
-    ; Post-install PaddleOCR initialization script run (if script exists)
-    IfFileExists "$INSTDIR\scripts\ocr\install_ocr_runtime.ps1" 0 +2
-        ExecWait 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\scripts\ocr\install_ocr_runtime.ps1" -RuntimeTarget auto'
+    ; The installer delivers only the minimal application payload.
+    ; OCR provisioning is performed on demand by the app after first launch.
 SectionEnd
 
 Section "Uninstall"

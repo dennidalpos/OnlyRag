@@ -227,8 +227,6 @@ function Test-OnlyRagPublishPayload {
         "onnxruntime.dll",
         "onnxruntime_providers_shared.dll",
         "wwwroot\index.html",
-        "qdrant\qdrant.exe",
-        "qdrant\LICENSE",
         "scripts\ocr\install_ocr_runtime.ps1",
         "scripts\ocr\paddle_ocr_bridge.py",
         "scripts\ocr\requirements.txt",

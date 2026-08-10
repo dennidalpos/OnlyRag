@@ -289,8 +289,6 @@ else {
     Test-PathExpectation -Id "webview2-wpf-assembly" -Path (Join-Path $installDir "Microsoft.Web.WebView2.Wpf.dll") -Kind "file"
     Test-PathExpectation -Id "webview2-loader-native-asset" -Path (Join-Path $installDir "WebView2Loader.dll") -Kind "file"
     Test-PathExpectation -Id "sqlite-native-provider" -Path (Join-Path $installDir "e_sqlite3.dll") -Kind "file"
-    Test-PathExpectation -Id "qdrant-native-binary" -Path (Join-Path $installDir "qdrant\qdrant.exe") -Kind "file"
-    Test-PathExpectation -Id "qdrant-license" -Path (Join-Path $installDir "qdrant\LICENSE") -Kind "file"
     Test-PathExpectation -Id "ocr-setup-preinstall-script" -Path (Join-Path $installDir "scripts\ocr\install_ocr_runtime.ps1") -Kind "file"
     Test-PathExpectation -Id "ocr-bridge-script" -Path (Join-Path $installDir "scripts\ocr\paddle_ocr_bridge.py") -Kind "file"
     Test-PathExpectation -Id "ocr-requirements" -Path (Join-Path $installDir "scripts\ocr\requirements.txt") -Kind "file"

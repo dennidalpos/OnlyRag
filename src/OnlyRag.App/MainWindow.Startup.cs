@@ -53,6 +53,12 @@ public partial class MainWindow
                 "WebView2 non e installato",
                 BuildWebView2MissingMessage());
         }
+        catch (UnauthorizedAccessException)
+        {
+            return StartupPrerequisiteStatus.Blocked(
+                "Avvio bloccato da permessi",
+                "OnlyRag non può iniziare perché il runtime WebView2 è installato ma non accessibile dall'utente corrente. Avvia l'app come utente con permessi appropriati o reinstalla il runtime WebView2.");
+        }
 
         return StartupPrerequisiteStatus.Satisfied();
     }
@@ -65,7 +71,8 @@ public partial class MainWindow
             "- Versione minima supportata: Evergreen Runtime corrente per Windows 10 1809 o versioni successive / Windows 11\n" +
             "- Perche serve: OnlyRag e una app desktop WPF che mostra la UI React inclusa tramite Microsoft WebView2.\n" +
             "- Istruzione: installa il Microsoft Edge WebView2 Evergreen Runtime dal sito ufficiale Microsoft e riavvia OnlyRag.\n" +
-            "- Verifica: apri Impostazioni > App e controlla che Microsoft Edge WebView2 Runtime sia presente, oppure verifica msedgewebview2.exe sotto Program Files\\Microsoft\\EdgeWebView\\Application.";
+            "- Verifica: apri Impostazioni > App e controlla che Microsoft Edge WebView2 Runtime sia presente, oppure verifica msedgewebview2.exe sotto Program Files\\Microsoft\\EdgeWebView\\Application.\n" +
+            "- Nota: il pacchetto installer di OnlyRag ora è minimal e non include runtime OCR o Qdrant preinstallati; i componenti opzionali vengono installati on-demand dall'app dopo l'avvio.";
     }
 
     private static Uri GetDevServerUri()

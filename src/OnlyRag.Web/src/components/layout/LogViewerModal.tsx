@@ -36,11 +36,46 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
     void fetchLogs();
 
     if (!isLiveStreaming) return;
+
+    let eventSource: EventSource | null = null;
+    if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
+      const params = new URLSearchParams();
+      if (filterLevel !== "ALL") {
+        params.append("minLevel", filterLevel);
+      }
+      if (searchQuery.trim()) {
+        params.append("search", searchQuery.trim());
+      }
+      const query = params.toString() ? `?${params.toString()}` : "";
+      eventSource = new window.EventSource(`/api/logs/stream${query}`);
+      eventSource.onmessage = (event) => {
+        try {
+          const entry = JSON.parse(event.data) as LogEntry;
+          setLogs((previous) => {
+            if (previous.some((existing) => existing.id === entry.id)) {
+              return previous;
+            }
+            const next = [entry, ...previous];
+            return next.slice(0, 300);
+          });
+          setError(null);
+        } catch {
+          // Ignore malformed stream payloads.
+        }
+      };
+      eventSource.onerror = () => {
+        setError("Il flusso live dei log è temporaneamente non disponibile. Riprova o usa l'aggiornamento manuale.");
+      };
+    }
+
     const interval = setInterval(() => {
       void fetchLogs(true);
     }, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      eventSource?.close();
+      clearInterval(interval);
+    };
   }, [filterLevel, searchQuery, isLiveStreaming]);
 
   async function fetchLogs(isSilent = false) {
@@ -324,9 +359,8 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
             }}
           >
             <option value="ALL">Tutti i Livelli</option>
-            <option value="Trace">Trace (Verboso)</option>
             <option value="Debug">Debug</option>
-            <option value="Information">Information</option>
+            <option value="Information">Info</option>
             <option value="Warning">Warning</option>
             <option value="Error">Error</option>
           </select>

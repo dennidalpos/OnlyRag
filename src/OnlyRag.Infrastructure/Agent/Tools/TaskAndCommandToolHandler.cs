@@ -8,6 +8,7 @@ namespace OnlyRag.Infrastructure.Agent.Tools;
 public sealed class TaskAndCommandToolHandler : IToolHandler
 {
     private static readonly JsonSerializerOptions s_indentedOptions = new() { WriteIndented = true };
+    private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromMinutes(10);
     private readonly BackgroundTaskManager taskManager;
 
     public TaskAndCommandToolHandler(BackgroundTaskManager taskManager)
@@ -71,7 +72,7 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
         var psi = new ProcessStartInfo
         {
             FileName = shellExe,
-            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encodedCmd}",
+            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -EncodedCommand {encodedCmd}",
             WorkingDirectory = rootPath,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -85,13 +86,30 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
             return new AgentToolResult(callId, toolName, false, string.Empty, "Cannot start shell process.");
         }
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
-        Task.WaitAll(stdoutTask, stderrTask);
-        process.WaitForExit();
+        int timeoutSeconds = GetTimeoutSeconds(args);
+        var timeout = TimeSpan.FromSeconds(timeoutSeconds);
+        var readTask = Task.WhenAll(process.StandardOutput.ReadToEndAsync(), process.StandardError.ReadToEndAsync());
 
-        string stdout = stdoutTask.Result;
-        string stderr = stderrTask.Result;
+        bool exited = process.WaitForExit((int)timeout.TotalMilliseconds);
+        if (!exited)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            string timedOutOutput = "Command exceeded the allowed execution timeout.";
+            return new AgentToolResult(callId, toolName, false, string.Empty, timedOutOutput);
+        }
+
+        Task<string[]> completedRead = readTask;
+        Task.WaitAll(completedRead);
+
+        string stdout = completedRead.Result[0];
+        string stderr = completedRead.Result[1];
 
         string combined = string.IsNullOrWhiteSpace(stderr)
             ? stdout
@@ -103,6 +121,23 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
             process.ExitCode == 0,
             combined,
             process.ExitCode == 0 ? null : $"Process exited with code {process.ExitCode}");
+    }
+
+    private static int GetTimeoutSeconds(JsonElement args)
+    {
+        if (args.TryGetProperty("timeoutSeconds", out var timeoutSecondsProp) && timeoutSecondsProp.ValueKind == JsonValueKind.Number)
+        {
+            int parsed = timeoutSecondsProp.GetInt32();
+            return parsed > 0 ? Math.Min(parsed, 1800) : 600;
+        }
+
+        if (args.TryGetProperty("timeout", out var timeoutProp) && timeoutProp.ValueKind == JsonValueKind.Number)
+        {
+            int parsed = timeoutProp.GetInt32();
+            return parsed > 0 ? Math.Min(parsed, 1800) : 600;
+        }
+
+        return (int)DefaultCommandTimeout.TotalSeconds;
     }
 
     private static bool IsGuiFileOpenCommand(string commandLine)

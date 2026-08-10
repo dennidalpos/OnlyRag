@@ -56,8 +56,9 @@ internal sealed class LocalJobWorkerService : BackgroundService
 
             if (!didWork)
             {
-                // Wait for signal or cancellation — true zero-CPU idle
-                await queue.EnqueueSignal.WaitAsync(stoppingToken);
+                // A retry can become eligible without a new enqueue signal.
+                // Wake periodically so next_attempt_at_utc is observed.
+                await queue.EnqueueSignal.WaitAsync(TimeSpan.FromSeconds(1), stoppingToken);
             }
             else
             {

@@ -680,10 +680,10 @@ public sealed class LocalSqliteSchemaInitializer
         string? resetReason,
         CancellationToken cancellationToken)
     {
-        AppDataResetBackup backup = AppDataReset.ResetNow(descriptor.Paths);
+        AppDataReset.ResetNow(descriptor.Paths);
         string note = string.IsNullOrWhiteSpace(resetReason)
-            ? $"Database locale resettato per usare lo schema fresh corrente. Backup: {backup.BackupPath}"
-            : $"{resetReason} Database locale resettato per usare lo schema fresh corrente. Backup: {backup.BackupPath}";
+            ? "Database locale resettato per usare lo schema fresh corrente senza snapshot locale."
+            : $"{resetReason} Database locale resettato per usare lo schema fresh corrente senza snapshot locale.";
         foreach (string directory in descriptor.Paths.EnumerateRequiredDirectories())
         {
             LocalRuntimeDirectoryPreparer.EnsureDirectory(directory);

@@ -110,11 +110,13 @@ export function AppContent() {
   }, [activeSection, setup]);
 
   const [droppedCodingFiles, setDroppedCodingFiles] = useState<FileList | null>(null);
+  const [droppedDocumentFiles, setDroppedDocumentFiles] = useState<FileList | null>(null);
 
   const handleGlobalFilesDropped = useCallback((files: FileList) => {
     if (activeSection === "coding") {
       setDroppedCodingFiles(files);
     } else {
+      setDroppedDocumentFiles(files);
       setActiveSection("documents");
     }
   }, [activeSection]);
@@ -184,7 +186,13 @@ export function AppContent() {
             />
           </div>
           <Suspense fallback={<SkeletonSection />}>
-            {activeSection === "documents" && <DocumentsSection onLibraryChanged={notifyDocumentLibraryChanged} />}
+            {activeSection === "documents" && (
+              <DocumentsSection
+                onLibraryChanged={notifyDocumentLibraryChanged}
+                droppedFiles={droppedDocumentFiles}
+                onHandledDroppedFiles={() => setDroppedDocumentFiles(null)}
+              />
+            )}
             {activeSection === "graph" && <GraphSection />}
             {activeSection === "images" && <ImagesSection />}
 
