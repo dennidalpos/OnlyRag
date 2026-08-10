@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BackendStatus } from "../../App";
-import type { DiagnosticsResponse, OcrProvisionStatus } from "../../api";
+import type { DiagnosticsModuleStatus, DiagnosticsResponse, OcrProvisionStatus } from "../../api";
 import { formatTime } from "../../pollingStatus";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -171,6 +171,19 @@ export function AppHeader({
                     </span>
                   </div>
                 ))}
+                {diagnostics?.modules && diagnostics.modules.length > 0 && (
+                  <div className="status-menu-modules" aria-label="Stato dettagliato moduli">
+                    {diagnostics.modules.map((module) => (
+                      <div className="status-menu-item" key={module.module}>
+                        <span className="status-menu-item__label">{module.module}</span>
+                        <span className={`status-badge status-badge--${moduleTone(module)}`} title={module.error ?? undefined}>
+                          <strong>{moduleStateLabel(module)}</strong>
+                          <small>{module.durationMs} ms</small>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -240,6 +253,41 @@ export function AppHeader({
       </div>
     </header>
   );
+}
+
+function moduleTone(module: DiagnosticsModuleStatus): StatusBadge["tone"] {
+  switch (module.state) {
+    case "online":
+      return "online";
+    case "starting":
+    case "not_configured":
+    case "timeout":
+      return "warning";
+    case "offline":
+    case "error":
+      return "offline";
+    default:
+      return "neutral";
+  }
+}
+
+function moduleStateLabel(module: DiagnosticsModuleStatus): string {
+  switch (module.state) {
+    case "online":
+      return "Attivo";
+    case "starting":
+      return "Avvio";
+    case "not_configured":
+      return "Non configurato";
+    case "timeout":
+      return "Timeout";
+    case "offline":
+      return "Offline";
+    case "error":
+      return "Errore";
+    default:
+      return "Sconosciuto";
+  }
 }
 
 

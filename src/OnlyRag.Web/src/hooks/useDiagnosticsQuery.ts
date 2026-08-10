@@ -10,7 +10,7 @@ export function useDiagnosticsQuery() {
     staleTime: 30000,
     refetchInterval: 60000,
     refetchOnWindowFocus: false,
-    retry: 1
+    retry: 0
   });
 
 }

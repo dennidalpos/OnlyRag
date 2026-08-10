@@ -158,8 +158,7 @@ export function useAppSetup() {
         const diagnosticsResultPromise = diagnosticsQuery.refetch().then((res) => res.data ?? null).catch(() => null);
         await Promise.all([
           ollamaQuery.refetch(),
-          diagnosticsResultPromise,
-          ocrStartupPrompt.refresh()
+          diagnosticsResultPromise
         ]);
         const diagnosticsResult = await diagnosticsResultPromise;
 
@@ -171,6 +170,7 @@ export function useAppSetup() {
         if (!isCancelled) {
           setInitialCheckDone(true);
         }
+        void ocrStartupPrompt.refresh();
       } finally {
         initialSetupCheckInProgressRef.current = false;
       }

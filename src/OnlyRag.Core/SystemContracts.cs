@@ -28,6 +28,12 @@ public sealed record CloudLlmDiagnosticsStatus(
     bool HasApiKey,
     string StatusText);
 
+public sealed record DiagnosticsModuleStatus(
+    string Module,
+    string State,
+    long DurationMs,
+    string? Error = null);
+
 public sealed record DiagnosticsResponse(
     string AppVersion,
     string DatabasePath,
@@ -44,7 +50,8 @@ public sealed record DiagnosticsResponse(
     IReadOnlyList<OllamaRunningModelResponse>? OllamaRunningModels = null,
     ImageGenerationRuntimeStatus? ImageGeneration = null,
     RerankerDiagnosticsStatus? Reranker = null,
-    CloudLlmDiagnosticsStatus? CloudLlm = null);
+    CloudLlmDiagnosticsStatus? CloudLlm = null,
+    IReadOnlyList<DiagnosticsModuleStatus>? Modules = null);
 
 public sealed record OcrGpuCapabilityResponse(
     bool IsUsable,

@@ -78,12 +78,14 @@ export function useOllamaStatusQuery() {
     isLoading: settingsQuery.isLoading || statusQuery.isLoading,
     isFetched: (settingsQuery.isFetched || settingsQuery.data !== undefined) && (statusQuery.isFetched || statusQuery.data !== undefined),
     refetch: async () => {
-      await Promise.all([
-        settingsQuery.refetch(),
+      const [statusResult] = await Promise.all([
         statusQuery.refetch(),
-        installStatusQuery.refetch(),
-        modelsQuery.refetch()
+        settingsQuery.refetch(),
+        installStatusQuery.refetch()
       ]);
+      if (statusResult.data?.isReachable) {
+        await modelsQuery.refetch();
+      }
     }
   };
 }

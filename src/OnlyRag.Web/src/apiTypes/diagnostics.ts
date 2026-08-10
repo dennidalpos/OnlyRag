@@ -13,6 +13,13 @@ export type CloudLlmDiagnosticsStatus = {
   statusText: string;
 };
 
+export type DiagnosticsModuleStatus = {
+  module: string;
+  state: "online" | "starting" | "offline" | "timeout" | "error" | "not_configured" | "unknown";
+  durationMs: number;
+  error: string | null;
+};
+
 export type DiagnosticsResponse = {
   appVersion: string;
   databasePath: string;
@@ -30,6 +37,7 @@ export type DiagnosticsResponse = {
   imageGeneration: ImageGenerationRuntimeStatus | null;
   reranker?: RerankerDiagnosticsStatus | null;
   cloudLlm?: CloudLlmDiagnosticsStatus | null;
+  modules?: DiagnosticsModuleStatus[] | null;
 };
 
 export type QdrantStatusResponse = {
