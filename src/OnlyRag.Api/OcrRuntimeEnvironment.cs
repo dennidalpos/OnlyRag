@@ -102,30 +102,18 @@ internal sealed class OcrRuntimeEnvironment
             Path.Combine(stagingPath, StampFileName),
             JsonSerializer.Serialize(new { runtimeName, requirementsFile, updatedAt = DateTimeOffset.UtcNow }));
 
-        string? backupPath = null;
         try
         {
             if (Directory.Exists(LivePath))
             {
-                backupPath = Path.Combine(installRoot, $".venv.previous-{Guid.NewGuid():N}");
-                Directory.Move(LivePath, backupPath);
+                Directory.Delete(LivePath, recursive: true);
             }
 
             Directory.Move(stagingPath, LivePath);
         }
         catch
         {
-            if (backupPath is not null && !Directory.Exists(LivePath) && Directory.Exists(backupPath))
-            {
-                Directory.Move(backupPath, LivePath);
-            }
-
             throw;
-        }
-
-        if (backupPath is not null && Directory.Exists(backupPath))
-        {
-            Directory.Delete(backupPath, recursive: true);
         }
     }
 

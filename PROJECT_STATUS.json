@@ -1,7 +1,24 @@
 {
   "todos": [
-    "Audit del core e hardening della policy di esecuzione agentica",
-    "Rafforzare il sandbox dei tool filesystem e dei comandi shell",
-    "Verificare la stabilità con i test di sicurezza e integrazione"
+    "P0 Integrare il flusso di aggiornamento selettivo nel client e nel packaging Windows [API client completato; UI e lifecycle installer residue]",
+    "P0 Rendere operativo il manifest di integrita dei modelli IA e collegarlo alla diagnostica on-demand",
+    "P0 Rendere il DAG multi-agente reale e durevole [SubagentRunner, checkpoint SQLite, output sintetici e store in-memory ancora presenti]",
+    "P0 Sostituire la verifica agente euristica con evidenze strutturate di build/test/lint e criteri per progetto",
+    "P0 Decongestionare la chat Coding con una pipeline prompt a coda, serializzazione delle richieste e backpressure per evitare run concorrenti non controllati",
+    "P0 Aggiungere modalita prompt Ask, Plan e Full [selettore UI, mapping compatibile, policy backend e test server-side completati; contratti API distinti residui]",
+    "P1 Gestire allegati multipli aggiuntivi con lista contestuale, rimozione selettiva, limiti dimensione/tipo e compressione o estrazione mirata prima del prompt",
+    "P1 Mostrare un context meter con token stimati/usati/rimanenti, budget per allegati e storico, avvisi di soglia e azione per compattare o escludere contesto",
+    "P1 Aggiungere prompt queue modificabile con annulla, riordino, retry e deduplicazione, mantenendo un solo run attivo e stato persistente dopo refresh",
+    "P1 Gestire il riavvio controllato quando un binario in uso non puo essere sostituito",
+    "P1 Introdurre execution trace correlata, replay dei fallimenti e resume affidabile per run e tool",
+    "P1 Rendere cancellazione, timeout, output cap e process tree coerenti tra run_command, ricerca e tool mutativi",
+    "P1 Rafforzare sandbox e policy con parsing fail-closed, path reali/symlink e allowlist di comandi per workspace",
+    "P1 Rieseguire gate e test dopo l'integrazione end-to-end dell'aggiornamento [gate completato; test end-to-end residuo]",
+    "P2 Ridurre costo di contesto e token con cache di workspace, memoria/skill budgetate e snapshot incrementali",
+    "P2 Eliminare scritture non atomiche e indicizzazioni fire-and-forget nei tool filesystem, aggiungendo optimistic concurrency",
+    "P2 Migliorare UX Coding [layout compatto e trace collassabile completati; stato run, progress DAG, errori di polling e ripresa dopo refresh residue]",
+    "P2 Aggiungere prompt composer stile chat moderna: template, cronologia riutilizzabile, comandi rapidi, allegati inline e separazione chiara tra risposta, piano e azioni",
+    "P2 Aggiungere test UI per trace collassabile, dettagli su click, accessibilita tastiera e densita responsive della chat Coding",
+    "P2 Aggiungere evaluation dataset riproducibile per scenari Coding/Agente, sicurezza, recovery e regressioni"
   ]
 }

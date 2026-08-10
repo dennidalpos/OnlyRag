@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentStepEvent, OllamaModel } from "../../api";
 import type { MultiAgentOrchestrationStatus } from "../../apiClient";
-import type { FileAction } from "./CodingSection.types";
+import type { CodingMode, FileAction } from "./CodingSection.types";
 import { useAgentStreamHandler } from "./useAgentStreamHandler";
 import { useSmartIntentRouter } from "./useSmartIntentRouter";
 import { useWorkspaceManager } from "./useWorkspaceManager";
@@ -29,7 +29,7 @@ export function useCodingSectionController({
   defaultModel
 }: UseCodingSectionControllerOptions) {
   const [selectedModel, setSelectedModel] = useState<string>("");
-  const [operatingMode, setOperatingMode] = useState<"plan" | "write">("write");
+  const [operatingMode, setOperatingMode] = useState<CodingMode>("full");
   const [autoApproveCommands, setAutoApproveCommands] = useState(false);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState<boolean>(false);
 

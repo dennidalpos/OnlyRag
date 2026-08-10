@@ -13,3 +13,4 @@ export type { ApiProblemDetails, BackendBridge } from "./apiClient";
 export type * from "./apiTypes/workspace";
 export type * from "./apiTypes/agent";
 export type * from "./apiTypes";
+export type * from "./apiTypes/update";

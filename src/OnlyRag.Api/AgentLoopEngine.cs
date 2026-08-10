@@ -60,6 +60,36 @@ internal sealed class AgentLoopEngine
         this.mctsCheckpointRepository = mctsCheckpointRepository;
     }
 
+    internal static string NormalizeMode(string? mode)
+    {
+        return mode?.Trim().ToUpperInvariant() switch
+        {
+            "ASK" => "ASK",
+            "PLAN" => "PLAN",
+            "WRITE" or "FULL" or null or "" => "FULL",
+            _ => "ASK"
+        };
+    }
+
+    internal static bool IsToolAllowedForMode(AgentToolCall toolCall, string? mode)
+    {
+        string normalizedMode = NormalizeMode(mode);
+        if (normalizedMode == "FULL")
+        {
+            return true;
+        }
+
+        string toolName = toolCall.ToolName.ToLowerInvariant();
+        if (toolName is "read_file" or "view_file" or "list_dir" or "grep_search" or
+            "git_diff_inspect" or "web_search" or "query_retrieval_index")
+        {
+            return true;
+        }
+
+        return normalizedMode == "PLAN" &&
+            toolName is "plan_task" or "reflect_step" or "self_reflection";
+    }
+
 
     public bool ApproveToolCall(string callId, bool approved)
     {
@@ -610,6 +640,22 @@ internal sealed class AgentLoopEngine
                         continue;
                     }
 
+                    if (!IsToolAllowedForMode(toolCall, request.Mode))
+                    {
+                        string modeName = NormalizeMode(request.Mode);
+                        string modeError = $"Tool '{toolCall.ToolName}' is not available in {modeName} mode. Use Full mode to modify files or execute commands.";
+                        var modeDeniedResult = new AgentToolResult(
+                            toolCall.CallId,
+                            toolCall.ToolName,
+                            false,
+                            string.Empty,
+                            modeError);
+
+                        yield return new AgentStepEvent("tool_result", ToolResult: modeDeniedResult, RunId: runId, Phase: durableStateMachine?.Snapshot.Phase);
+                        messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccess: False\nError: {modeError}"));
+                        continue;
+                    }
+
                     bool needsApproval = toolCall.ToolName.Equals("run_command", StringComparison.OrdinalIgnoreCase) && !request.AutoApproveCommands;
                     var callWithApproval = toolCall with { RequiresApproval = needsApproval };
 
@@ -1011,12 +1057,15 @@ internal sealed class AgentLoopEngine
 
     private static string GetSystemPrompt(string? mode, bool autoApprove)
     {
-        bool isWriteMode = string.Equals(mode, "write", StringComparison.OrdinalIgnoreCase)
-                        || string.IsNullOrWhiteSpace(mode);
-        string modeLabel = isWriteMode ? "WRITE" : "ASK";
-        string modeDescription = isWriteMode
-            ? "Full agentic mode: you can read files, write files, execute commands, search the web, and modify the codebase."
-            : "Read-only RAG mode: you can read files, search code, query the retrieval index, and inspect git state. Do NOT write or execute commands.";
+        string normalizedMode = NormalizeMode(mode);
+        bool isWriteMode = normalizedMode == "FULL";
+        string modeLabel = normalizedMode;
+        string modeDescription = normalizedMode switch
+        {
+            "ASK" => "Read-only answer mode: inspect context and provide an explanation. Do NOT plan mutations, write files, or execute commands.",
+            "PLAN" => "Read-only planning mode: inspect context and produce an actionable plan. Do NOT write files or execute commands.",
+            _ => "Full agentic mode: you can read files, write files, execute commands, search the web, and modify the codebase."
+        };
         string approvalNote = autoApprove
             ? "Command auto-approval is ENABLED. run_command executes immediately without user confirmation."
             : "Command auto-approval is DISABLED. run_command requires explicit user approval before execution.";
@@ -1112,4 +1161,3 @@ internal sealed class AgentLoopEngine
         return paths;
     }
 }
-
