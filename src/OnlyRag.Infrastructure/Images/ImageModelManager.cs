@@ -453,26 +453,12 @@ public sealed class ImageModelManager
         }
 
         Directory.CreateDirectory(parent);
-        string backupDirectory = Path.Combine(parent, $".previous-{Path.GetFileName(finalDirectory)}-{Guid.NewGuid():N}");
-        try
+        if (Directory.Exists(finalDirectory))
         {
-            if (Directory.Exists(finalDirectory))
-            {
-                Directory.Move(finalDirectory, backupDirectory);
-            }
-
-            Directory.Move(stagingDirectory, finalDirectory);
-            SafeDeleteDirectory(backupDirectory);
+            Directory.Delete(finalDirectory, recursive: true);
         }
-        catch
-        {
-            if (!Directory.Exists(finalDirectory) && Directory.Exists(backupDirectory))
-            {
-                Directory.Move(backupDirectory, finalDirectory);
-            }
 
-            throw;
-        }
+        Directory.Move(stagingDirectory, finalDirectory);
     }
 
     private static void ValidateRequiredFiles(ImageModelCatalogEntry model, string modelDirectory)

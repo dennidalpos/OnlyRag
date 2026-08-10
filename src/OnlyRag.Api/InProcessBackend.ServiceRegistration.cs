@@ -18,6 +18,7 @@ using OnlyRag.Infrastructure.Agent.Memory;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Storage.EF;
 using OnlyRag.Infrastructure.Storage.Security;
+using OnlyRag.Infrastructure.Update;
 using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Infrastructure.Vram;
 using OnlyRag.Worker;
@@ -118,7 +119,7 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IAgentRunStateRepository, SqliteAgentRunStateRepository>();
         services.AddSingleton<SqlitePolicyAuditRepository>();
-        services.AddSingleton<IAesBackupService, AesBackupService>();
+        services.AddSingleton<SelectiveUpdateManager>();
         services.AddSingleton<ICloudApiKeyVault, WindowsCredentialManagerCloudKeyVault>();
         services.AddSingleton<ICloudLlmClientFactory, CloudLlmClientFactory>();
         services.AddSingleton<ISqliteMaintenanceService, SqliteMaintenanceService>();

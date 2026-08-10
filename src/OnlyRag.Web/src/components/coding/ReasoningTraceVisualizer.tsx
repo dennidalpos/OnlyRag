@@ -11,8 +11,9 @@ export function ReasoningTraceVisualizer({
   events,
   isStreaming = false
 }: ReasoningTraceVisualizerProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"trace" | "tools" | "raw">("trace");
+  const [expandedToolEvents, setExpandedToolEvents] = useState<Set<number>>(new Set());
 
   if (!events || events.length === 0) return null;
 
@@ -27,6 +28,18 @@ export function ReasoningTraceVisualizer({
       return prefix + text;
     })
     .join("");
+
+  function toggleToolEvent(index: number) {
+    setExpandedToolEvents((current) => {
+      const next = new Set(current);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="reasoning-trace-visualizer">
@@ -99,67 +112,85 @@ export function ReasoningTraceVisualizer({
                   Nessun strumento invocato finora.
                 </div>
               ) : (
-                toolEvents.map((evt, idx) => (
-                  <div key={`tool_evt_${idx}`} className="reasoning-trace-visualizer__tool-item">
-                    {evt.type === "tool_proposed" && evt.toolCall && (
-                      <div className="reasoning-trace-visualizer__tool-proposed">
-                        <span className="reasoning-trace-visualizer__tool-name" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <Terminal size={13} /> Proposal: <code>{evt.toolCall.toolName}</code>
-                          {evt.subagentRole && (
-                            <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: 6 }}>
-                              🤖 Subagent: {evt.subagentRole}
-                            </span>
-                          )}
-                        </span>
-                        {evt.toolCall.explanation && (
-                          <p className="reasoning-trace-visualizer__tool-exp">
-                            {evt.toolCall.explanation}
-                          </p>
-                        )}
-                        <pre className="reasoning-trace-visualizer__tool-args">
-                          {evt.toolCall.argumentsJson}
-                        </pre>
-                      </div>
-                    )}
-
-                    {evt.type === "tool_result" && evt.toolResult && (() => {
-                      const cragMatch = evt.toolResult.output ? evt.toolResult.output.match(/CRAG:\s*([A-Za-z0-9_\s()]+?)(?:\)|:|\n|$)/) : null;
-                      const cragText = cragMatch ? cragMatch[1].trim() : null;
-                      const isHigh = cragText?.toUpperCase().includes("HIGH");
-                      const isMedium = cragText?.toUpperCase().includes("MEDIUM");
-
-                      return (
-                        <div className={`reasoning-trace-visualizer__tool-result ${evt.toolResult.success ? "reasoning-trace-visualizer__tool-result--success" : "reasoning-trace-visualizer__tool-result--error"}`}>
-                          <div className="reasoning-trace-visualizer__tool-result-header" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                            {evt.toolResult.success ? <CheckCircle2 size={14} style={{ color: "#34d399" }} /> : <XCircle size={14} style={{ color: "#f87171" }} />}
-                            <span><code>{evt.toolResult.toolName}</code></span>
-                            {cragText && (
-                              <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: isHigh ? "rgba(16, 185, 129, 0.2)" : isMedium ? "rgba(245, 158, 11, 0.2)" : "rgba(239, 68, 68, 0.2)", color: isHigh ? "#34d399" : isMedium ? "#fbbf24" : "#f87171" }}>
-                                ⚡ CRAG: {cragText}
-                              </span>
-                            )}
+                toolEvents.map((evt, idx) => {
+                  const isToolExpanded = expandedToolEvents.has(idx);
+                  return (
+                    <div
+                      key={`tool_evt_${idx}`}
+                      className="reasoning-trace-visualizer__tool-item"
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isToolExpanded}
+                      onClick={() => toggleToolEvent(idx)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          toggleToolEvent(idx);
+                        }
+                      }}
+                    >
+                      {evt.type === "tool_proposed" && evt.toolCall && (
+                        <div className="reasoning-trace-visualizer__tool-proposed">
+                          <span className="reasoning-trace-visualizer__tool-name" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Terminal size={13} /> Proposal: <code>{evt.toolCall.toolName}</code>
                             {evt.subagentRole && (
-                              <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: "auto" }}>
+                              <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: 6 }}>
                                 🤖 Subagent: {evt.subagentRole}
                               </span>
                             )}
-                          </div>
-                          {evt.toolResult.output && (
-                            <pre className="reasoning-trace-visualizer__tool-output">
-                              {evt.toolResult.output.slice(0, 1500)}
-                              {evt.toolResult.output.length > 1500 ? "\n... [Output troncato nel visualizzatore]" : ""}
-                            </pre>
-                          )}
-                          {evt.toolResult.error && (
-                            <p className="reasoning-trace-visualizer__tool-err-msg">
-                              {evt.toolResult.error}
+                          </span>
+                          {isToolExpanded && evt.toolCall.explanation && (
+                            <p className="reasoning-trace-visualizer__tool-exp">
+                              {evt.toolCall.explanation}
                             </p>
                           )}
+                          {isToolExpanded && (
+                            <pre className="reasoning-trace-visualizer__tool-args">
+                              {evt.toolCall.argumentsJson}
+                            </pre>
+                          )}
                         </div>
-                      );
-                    })()}
-                  </div>
-                ))
+                      )}
+
+                      {evt.type === "tool_result" && evt.toolResult && (() => {
+                        const cragMatch = evt.toolResult.output ? evt.toolResult.output.match(/CRAG:\s*([A-Za-z0-9_\s()]+?)(?:\)|:|\n|$)/) : null;
+                        const cragText = cragMatch ? cragMatch[1].trim() : null;
+                        const isHigh = cragText?.toUpperCase().includes("HIGH");
+                        const isMedium = cragText?.toUpperCase().includes("MEDIUM");
+
+                        return (
+                          <div className={`reasoning-trace-visualizer__tool-result ${evt.toolResult.success ? "reasoning-trace-visualizer__tool-result--success" : "reasoning-trace-visualizer__tool-result--error"}`}>
+                            <div className="reasoning-trace-visualizer__tool-result-header" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              {evt.toolResult.success ? <CheckCircle2 size={14} style={{ color: "#34d399" }} /> : <XCircle size={14} style={{ color: "#f87171" }} />}
+                              <span><code>{evt.toolResult.toolName}</code></span>
+                              {cragText && (
+                                <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: isHigh ? "rgba(16, 185, 129, 0.2)" : isMedium ? "rgba(245, 158, 11, 0.2)" : "rgba(239, 68, 68, 0.2)", color: isHigh ? "#34d399" : isMedium ? "#fbbf24" : "#f87171" }}>
+                                  ⚡ CRAG: {cragText}
+                                </span>
+                              )}
+                              {evt.subagentRole && (
+                                <span style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: 4, background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", marginLeft: "auto" }}>
+                                  🤖 Subagent: {evt.subagentRole}
+                                </span>
+                              )}
+                            </div>
+                            {isToolExpanded && evt.toolResult.output && (
+                              <pre className="reasoning-trace-visualizer__tool-output">
+                                {evt.toolResult.output.slice(0, 1500)}
+                                {evt.toolResult.output.length > 1500 ? "\n... [Output troncato nel visualizzatore]" : ""}
+                              </pre>
+                            )}
+                            {isToolExpanded && evt.toolResult.error && (
+                              <p className="reasoning-trace-visualizer__tool-err-msg">
+                                {evt.toolResult.error}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

@@ -12,11 +12,11 @@ import {
 } from "../../apiClient";
 import type { WorkspaceFileItem } from "../../apiTypes";
 import type { CodingMessage } from "./useCodingSectionController";
-import type { FileAction } from "./CodingSection.types";
+import type { CodingMode, FileAction } from "./CodingSection.types";
 
 export type UseAgentStreamHandlerOptions = {
   selectedModel: string;
-  operatingMode: "plan" | "write";
+  operatingMode: CodingMode;
   autoApproveCommands: boolean;
   workspaceConfig: { isAuthorized: boolean; rootPath: string | null } | null;
   workspaceFiles: WorkspaceFileItem[];
@@ -229,7 +229,7 @@ export function useAgentStreamHandler({
         {
           goal: textToSend,
           model: selectedModel || null,
-          mode: operatingMode,
+          mode: operatingMode === "full" ? "write" : "plan",
           workspaceRoot: workspaceConfig?.rootPath || null,
           autoApproveCommands
         } as AgentRunRequest,
@@ -324,7 +324,7 @@ export function useAgentStreamHandler({
             }
           }
 
-          if (operatingMode === "write" && actions.length > 0 && workspaceConfig?.isAuthorized) {
+          if (operatingMode === "full" && actions.length > 0 && workspaceConfig?.isAuthorized) {
             for (const act of actions) {
               if (!act.applied && act.action === "write" && act.code) {
                 void handleApplyCodeToFileSilently(act.file, act.code);

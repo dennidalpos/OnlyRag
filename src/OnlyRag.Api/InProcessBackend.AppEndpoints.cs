@@ -97,7 +97,7 @@ public static partial class InProcessBackend
 
             AppDataReset.RequestResetOnNextStartup(descriptor.StoragePaths);
             return Results.Ok(new OperationMessageResponse(
-                "Reset dati pianificato. Al riavvio verra creato un backup timestamped prima di cancellare dati locali, profilo WebView2, cache, log e impostazioni."));
+                "Reset dati pianificato. Al riavvio i dati locali verranno rimossi senza creare backup."));
         });
 
         app.MapGet("/api/health", () =>

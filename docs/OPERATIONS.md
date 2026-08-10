@@ -64,6 +64,12 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 
 `ONLYRAG_WEB_DEV_SERVER` accetta unicamente URL loopback `http` o `https` privi di credenziali integrate.
 
+## Aggiornamento In-Place
+
+L'endpoint locale `POST /api/update/apply` applica un `installer-manifest.json` verificando SHA-256 e dimensione di ogni file. Vengono sostituiti solo i file della release che risultano diversi; file non presenti nel manifest, dati utente, database Qdrant, configurazioni e directory dei modelli non vengono copiati, cancellati o sovrascritti. Non viene creato alcun backup globale.
+
+Il controllo `GET /api/update/model-integrity` legge esclusivamente `integrity-manifest.json` nella radice dati. Eventuali modelli mancanti o corrotti vengono restituiti come segnalazioni `download` per la diagnostica on-demand; il gestore non tenta ripristini locali.
+
 ## Mappa dei Comandi
 
 | Attività | Comando |
@@ -161,7 +167,6 @@ Variabili d'ambiente opzionali:
 ## Percorsi Locali
 
 - `%LOCALAPPDATA%\OnlyRag`: Documenti, database SQLite, vettori Qdrant, job, impostazioni, storico chat, cache OCR, log e profili WebView2.
-- `%LOCALAPPDATA%\OnlyRag\backups`: Backup timestamped creati prima dei reset totali confermati.
 - `%LOCALAPPDATA%\Programs\OnlyRag`: Percorso di installazione predefinito dell'applicazione.
 
 ## Pulizia Workspace
@@ -171,4 +176,3 @@ pwsh .\scripts\Clean.ps1
 ```
 
 `Clean.ps1` rimuove tutti gli output di build, gli artefatti e le dipendenze temporanee mantenendo intatti i file sorgente tracciati da Git.
-
