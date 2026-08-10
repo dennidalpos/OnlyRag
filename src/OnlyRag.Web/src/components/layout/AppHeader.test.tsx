@@ -50,6 +50,30 @@ describe("AppHeader", () => {
 
     expect(document.documentElement.getAttribute("data-theme")).toBe("cyber");
   });
+
+  it("shows detailed module failures and probe durations in the health monitor", async () => {
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <AppHeader
+          currentSection="Chat"
+          backendStatus={createBackendStatus()}
+          diagnostics={createDiagnostics({
+            modules: [
+              { module: "Qdrant", state: "timeout", durationMs: 2000, error: "Timeout dopo 2 s." },
+              { module: "Ollama", state: "online", durationMs: 42, error: null }
+            ]
+          })}
+        />
+      </ThemeProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Stato sistema" }));
+
+    expect(screen.getByText("Timeout")).toBeInTheDocument();
+    expect(screen.getByText("2000 ms")).toBeInTheDocument();
+    expect(screen.getAllByText("Attivo").length).toBeGreaterThan(0);
+  });
 });
 
 function createBackendStatus(): BackendStatus {

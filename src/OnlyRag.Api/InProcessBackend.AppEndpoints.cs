@@ -137,65 +137,95 @@ public static partial class InProcessBackend
             ICloudApiKeyVault cloudKeyVault,
             CancellationToken cancellationToken) =>
         {
-            // Use a 10-second timeout for Ollama status probes
-            using var ollamaStatusCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            ollamaStatusCts.CancelAfter(TimeSpan.FromSeconds(10));
-
             // Launch all probes in parallel — each isolated so one failure doesn't block others
-            Task<(string status, bool reachable, string? version, IReadOnlyList<OllamaRunningModelResponse> runningModels)> ollamaTask =
-                ProbeOllamaAsync(ollamaClient, ollamaStatusCts.Token);
+            Task<ProbeResult<(string status, bool reachable, string? version, IReadOnlyList<OllamaRunningModelResponse> runningModels)>> ollamaTask =
+                RunTimedSafeAsync(
+                    "Ollama",
+                    token => ProbeOllamaAsync(ollamaClient, token),
+                    ("Timeout", false, null, []),
+                    result => result.reachable ? ("online", null) : result.status == "Timeout" ? ("timeout", result.status) : ("offline", result.status),
+                    TimeSpan.FromSeconds(10),
+                    cancellationToken);
 
-            Task<QdrantStatusResponse> qdrantTask =
-                RunSafeAsync(
-                    () => qdrantRuntime.GetStatusAsync(qdrantVectorStore, cancellationToken),
-                    new QdrantStatusResponse("Sconosciuto", false, string.Empty, false, false, false, null, null, null, null, null, null, null));
+            Task<ProbeResult<QdrantStatusResponse>> qdrantTask =
+                RunTimedSafeAsync(
+                    "Qdrant",
+                    token => qdrantRuntime.GetStatusAsync(qdrantVectorStore, token),
+                    new QdrantStatusResponse("Sconosciuto", false, string.Empty, false, false, false, null, null, null, null, null, null, null),
+                    result => result.IsReachable ? ("online", null) : result.Status is "Caricamento" or "Starting" ? ("starting", result.Status) : ("offline", result.Error ?? result.Status),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
 
-            Task<OcrEngineAvailability> ocrAvailabilityTask =
-                RunSafeAsync(
-                    () => diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, cancellationToken),
-                    new OcrEngineAvailability(false, string.Empty, string.Empty, null));
+            Task<ProbeResult<OcrEngineAvailability>> ocrAvailabilityTask =
+                RunTimedSafeAsync(
+                    "OCR",
+                    token => diagnosticsProbeCache.CheckOcrAvailabilityAsync(ocrEngine, token),
+                    new OcrEngineAvailability(false, string.Empty, string.Empty, null),
+                    result => result.IsConfigured ? ("online", null) : ("not_configured", result.Message),
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken);
 
-            Task<OcrGpuCapabilityResponse> gpuTask =
-                RunSafeAsync(
-                    () => diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, cancellationToken),
-                    new OcrGpuCapabilityResponse(false, "unknown", null, null, null, null, null, null, null, null, new Dictionary<string, string>()));
+            Task<ProbeResult<OcrGpuCapabilityResponse>> gpuTask =
+                RunTimedSafeAsync(
+                    "OCR GPU",
+                    token => diagnosticsProbeCache.CheckOcrGpuCapabilityAsync(ocrGpuCapability, ocrEngine, token),
+                    new OcrGpuCapabilityResponse(false, "unknown", null, null, null, null, null, null, null, null, new Dictionary<string, string>()),
+                    result => result.IsUsable ? ("online", null) : (result.CapabilityStatus == "no_nvidia_gpu" ? ("not_configured", result.BlockReason) : ("offline", result.BlockReason ?? result.Status)),
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken);
 
-            Task<SystemTelemetryResponse> telemetryTask =
-                RunSafeAsync(
-                    () => diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, cancellationToken),
+            Task<ProbeResult<SystemTelemetryResponse>> telemetryTask =
+                RunTimedSafeAsync(
+                    "Telemetria",
+                    token => diagnosticsProbeCache.CaptureSystemTelemetryAsync(systemTelemetry, token),
                     new SystemTelemetryResponse(
                         new CpuTelemetryResponse(Environment.ProcessorCount, null),
                         new MemoryTelemetryResponse(0, 0),
                         new DiskTelemetryResponse("?", 0, 0),
-                        null));
+                        null),
+                    _ => ("online", null),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
 
-            Task<ImageGenerationRuntimeStatus> imageGenTask =
-                RunSafeAsync(
-                    () => imageGeneration.GetRuntimeStatusAsync(cancellationToken),
-                    new ImageGenerationRuntimeStatus("Unknown", false, "CPU", string.Empty, null));
+            Task<ProbeResult<ImageGenerationRuntimeStatus>> imageGenTask =
+                RunTimedSafeAsync(
+                    "Immagini",
+                    token => imageGeneration.GetRuntimeStatusAsync(token),
+                    new ImageGenerationRuntimeStatus("Unknown", false, "CPU", string.Empty, null),
+                    result => result.IsReady ? ("online", null) : ("not_configured", result.Suggestion ?? result.Message),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
 
-            Task<RerankerModelInfo> rerankerTask =
-                RunSafeAsync(
-                    () => rerankerModelManager.GetModelStatusAsync(cancellationToken),
-                    new RerankerModelInfo(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, 0, string.Empty, false, 0, false, null));
+            Task<ProbeResult<RerankerModelInfo>> rerankerTask =
+                RunTimedSafeAsync(
+                    "Reranker",
+                    token => rerankerModelManager.GetModelStatusAsync(token),
+                    new RerankerModelInfo(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, 0, string.Empty, false, 0, false, null),
+                    result => result.IsDownloading ? ("starting", "Download in corso") : result.IsDownloaded ? ("online", null) : ("not_configured", "Modello non installato"),
+                    TimeSpan.FromSeconds(2),
+                    cancellationToken);
 
             CloudLlmConfiguration cloudConfig = InProcessBackendCloudLlmEndpoints.GetCurrentConfig();
-            Task<string?> cloudKeyTask =
-                RunSafeAsync<string?>(
-                    () => cloudKeyVault.GetApiKeyAsync(cloudConfig.Provider, cancellationToken),
-                    null);
+            Task<ProbeResult<string?>> cloudKeyTask =
+                RunTimedSafeAsync<string?>(
+                    "Cloud LLM",
+                    token => cloudKeyVault.GetApiKeyAsync(cloudConfig.Provider, token),
+                    null,
+                    result => result is null ? ("not_configured", "API key non configurata") : ("online", null),
+                    TimeSpan.FromSeconds(2),
+                    cancellationToken);
 
             await Task.WhenAll(ollamaTask, qdrantTask, ocrAvailabilityTask, gpuTask,
                 telemetryTask, imageGenTask, rerankerTask, cloudKeyTask);
 
-            var (ollamaStatus, ollamaReachable, ollamaVersion, ollamaRunningModels) = ollamaTask.Result;
-            QdrantStatusResponse qdrantStatus = qdrantTask.Result;
-            OcrEngineAvailability ocrAvailability = ocrAvailabilityTask.Result;
-            OcrGpuCapabilityResponse gpuCapability = gpuTask.Result;
-            SystemTelemetryResponse telemetry = telemetryTask.Result;
-            ImageGenerationRuntimeStatus imageGenerationStatus = imageGenTask.Result;
-            RerankerModelInfo rerankerInfo = rerankerTask.Result;
-            string? cloudApiKey = cloudKeyTask.Result;
+            var (ollamaStatus, ollamaReachable, ollamaVersion, ollamaRunningModels) = ollamaTask.Result.Value;
+            QdrantStatusResponse qdrantStatus = qdrantTask.Result.Value;
+            OcrEngineAvailability ocrAvailability = ocrAvailabilityTask.Result.Value;
+            OcrGpuCapabilityResponse gpuCapability = gpuTask.Result.Value;
+            SystemTelemetryResponse telemetry = telemetryTask.Result.Value;
+            ImageGenerationRuntimeStatus imageGenerationStatus = imageGenTask.Result.Value;
+            RerankerModelInfo rerankerInfo = rerankerTask.Result.Value;
+            string? cloudApiKey = cloudKeyTask.Result.Value;
 
             var rerankerStatus = new RerankerDiagnosticsStatus(
                 rerankerInfo.IsDownloaded,
@@ -224,7 +254,17 @@ public static partial class InProcessBackend
                 ollamaRunningModels,
                 imageGenerationStatus,
                 rerankerStatus,
-                cloudLlmStatus));
+                cloudLlmStatus,
+                [
+                    ollamaTask.Result.Status,
+                    qdrantTask.Result.Status,
+                    ocrAvailabilityTask.Result.Status,
+                    gpuTask.Result.Status,
+                    telemetryTask.Result.Status,
+                    imageGenTask.Result.Status,
+                    rerankerTask.Result.Status,
+                    cloudKeyTask.Result.Status
+                ]));
         });
 
         app.MapGet("/api/diagnostics/startup-trace", (StartupTracer startupTracer) =>
@@ -338,17 +378,45 @@ public static partial class InProcessBackend
         }
     }
 
-    private static async Task<T> RunSafeAsync<T>(Func<Task<T>> probe, T fallback)
+    private static async Task<ProbeResult<T>> RunTimedSafeAsync<T>(
+        string module,
+        Func<CancellationToken, Task<T>> probe,
+        T fallback,
+        Func<T, (string state, string? error)> classify,
+        TimeSpan timeout,
+        CancellationToken requestCancellationToken)
     {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(requestCancellationToken);
+        timeoutSource.CancelAfter(timeout);
         try
         {
-            return await probe();
+            T value = await probe(timeoutSource.Token);
+            (string state, string? error) = classify(value);
+            return new ProbeResult<T>(
+                value,
+                new DiagnosticsModuleStatus(module, state, stopwatch.ElapsedMilliseconds, error));
         }
-        catch
+        catch (OperationCanceledException)
         {
-            return fallback;
+            if (requestCancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            return new ProbeResult<T>(
+                fallback,
+                new DiagnosticsModuleStatus(module, "timeout", stopwatch.ElapsedMilliseconds, $"Timeout dopo {timeout.TotalSeconds:0} s."));
+        }
+        catch (Exception ex)
+        {
+            return new ProbeResult<T>(
+                fallback,
+                new DiagnosticsModuleStatus(module, "error", stopwatch.ElapsedMilliseconds, ex.Message));
         }
     }
+
+    private sealed record ProbeResult<T>(T Value, DiagnosticsModuleStatus Status);
 
     private static ProcessStartInfo CreateExplorerStartInfo(string folderPath)
     {

@@ -214,9 +214,11 @@ export function AppContent() {
                 initialDiagnostics={setup.diagnostics}
                 loadError={setup.ollamaLoadError}
                 onDataChanged={async () => {
-                  await setup.backendQuery.refetch();
-                  await setup.ollamaQuery.refetch();
-                  await setup.diagnosticsQuery.refetch().catch(() => {});
+                  await Promise.all([
+                    setup.backendQuery.refetch(),
+                    setup.ollamaQuery.refetch(),
+                    setup.diagnosticsQuery.refetch().catch(() => {})
+                  ]);
                 }}
               />
             )}

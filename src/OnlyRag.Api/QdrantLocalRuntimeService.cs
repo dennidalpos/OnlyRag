@@ -10,6 +10,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     private const string QdrantExeName = "qdrant.exe";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AvailabilityProbeTimeout = TimeSpan.FromSeconds(2);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
     private readonly QdrantProcessSupervisor processSupervisor = new();
@@ -37,8 +38,14 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         bool reachable = false;
         try
         {
-            await vectorStore.VerifyAvailabilityAsync(cancellationToken);
+            using CancellationTokenSource probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            probeCts.CancelAfter(AvailabilityProbeTimeout);
+            await vectorStore.VerifyAvailabilityAsync(probeCts.Token);
             reachable = true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            error = $"Qdrant availability probe timed out after {AvailabilityProbeTimeout.TotalSeconds:0} seconds.";
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Grpc.Core.RpcException)
         {
