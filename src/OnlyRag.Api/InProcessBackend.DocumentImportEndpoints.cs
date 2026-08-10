@@ -10,66 +10,6 @@ public static partial class InProcessBackend
 {
     private static void MapDocumentImportEndpoints(WebApplication app)
     {
-        app.MapPost("/api/documents/batch", async (
-            BatchEnqueueRequest payload,
-            IBatchIngestionQueueService batchQueue,
-            CancellationToken cancellationToken) =>
-        {
-            if (payload.FilePaths == null || payload.FilePaths.Count == 0)
-            {
-                return CreateBadRequestProblem(
-                    "Invalid batch request",
-                    "Provide a non-empty list of file paths.",
-                    "batch_ingestion_empty_list");
-            }
-
-            var job = await batchQueue.EnqueueBatchAsync(payload.FilePaths, cancellationToken);
-            return Results.Ok(job);
-        });
-
-        app.MapGet("/api/documents/batch/{batchId}", async (
-            string batchId,
-            IBatchIngestionQueueService batchQueue,
-            CancellationToken cancellationToken) =>
-        {
-            var job = await batchQueue.GetBatchStatusAsync(batchId, cancellationToken);
-            return job is null ? CreateNotFoundProblem("Batch job") : Results.Ok(job);
-        });
-
-        app.MapDelete("/api/documents/batch/{batchId}", async (
-            string batchId,
-            IBatchIngestionQueueService batchQueue,
-            CancellationToken cancellationToken) =>
-        {
-            await batchQueue.CancelBatchAsync(batchId, cancellationToken);
-            return Results.NoContent();
-        });
-
-        app.MapGet("/api/documents/batch/{batchId}/stream", async (
-            string batchId,
-            IBatchIngestionQueueService batchQueue,
-            HttpContext httpContext,
-            CancellationToken cancellationToken) =>
-        {
-            var job = await batchQueue.GetBatchStatusAsync(batchId, cancellationToken);
-            if (job is null)
-            {
-                return CreateNotFoundProblem("Batch job");
-            }
-
-            httpContext.Response.Headers.Append("Content-Type", "text/event-stream");
-            httpContext.Response.Headers.Append("Cache-Control", "no-cache");
-
-            await foreach (var evt in batchQueue.SubscribeProgressAsync(batchId, cancellationToken))
-            {
-                string json = System.Text.Json.JsonSerializer.Serialize(evt);
-                await httpContext.Response.WriteAsync($"data: {json}\n\n", cancellationToken);
-                await httpContext.Response.Body.FlushAsync(cancellationToken);
-            }
-
-            return Results.Empty;
-        });
-
         app.MapPost("/api/documents/import", async (
             HttpRequest request,
             IDocumentLibraryService documents,
@@ -160,8 +100,6 @@ public static partial class InProcessBackend
                 results.Any(result => !result.Succeeded)));
         });
     }
-
-    public record BatchEnqueueRequest(IReadOnlyList<string> FilePaths);
 
     private static void ValidateImportBatch(IFormFileCollection files, LocalDocumentStorageGuard storageGuard)
     {

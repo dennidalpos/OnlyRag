@@ -57,31 +57,51 @@ internal sealed class DocumentIngestionJobHandler : ILocalJobHandler
                     SingleWriter = true
                 });
 
+            using CancellationTokenSource progressCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            CancellationToken progressToken = progressCancellation.Token;
             var consumerTask = Task.Run(async () =>
             {
-                await foreach (var progress in channel.Reader.ReadAllAsync(cancellationToken))
+                await foreach (var progress in channel.Reader.ReadAllAsync(progressToken))
                 {
                     string checkpointJson = JsonSerializer.Serialize(progress.Checkpoint);
                     await queue.SaveCheckpointAsync(
                         job.Id,
                         new LocalJobCheckpoint(progress.ProgressPercent, progress.CurrentStep, checkpointJson),
-                        cancellationToken);
+                        progressToken);
                 }
-            }, cancellationToken);
+            }, progressToken);
 
-            DocumentIngestionResult result = await ingestion.IngestAsync(
-                document,
-                checkpoint,
-                async (progress, token) =>
+            DocumentIngestionResult result;
+            try
+            {
+                result = await ingestion.IngestAsync(
+                    document,
+                    checkpoint,
+                    async (progress, token) =>
+                    {
+                        await channel.Writer.WriteAsync(progress, token);
+                    },
+                    payload.ForceOcr,
+                    payload.OcrLanguage,
+                    progressToken);
+
+                channel.Writer.TryComplete();
+                await consumerTask;
+            }
+            finally
+            {
+                channel.Writer.TryComplete();
+                progressCancellation.Cancel();
+                try
                 {
-                    await channel.Writer.WriteAsync(progress, token);
-                },
-                payload.ForceOcr,
-                payload.OcrLanguage,
-                cancellationToken);
-
-            channel.Writer.Complete();
-            await consumerTask;
+                    await consumerTask;
+                }
+                catch (OperationCanceledException) when (progressToken.IsCancellationRequested)
+                {
+                    // The progress consumer is cancelled as part of pipeline cleanup.
+                }
+            }
 
             DocumentIngestionCheckpoint completedCheckpoint = new(
                 Version: 1,

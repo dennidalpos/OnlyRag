@@ -63,6 +63,15 @@ public static partial class InProcessBackend
             BackendLog.Write(descriptor.StoragePaths, $"Local SQLite schema version {storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion}: {storageStatus.SchemaStatus}.");
             startupTracer.Record($"SQLite: Schema v{storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion} ({storageStatus.SchemaStatus})");
 
+            using (EarlyBootstrapperLogger.TraceScope("Ensure_Qdrant_Runtime"))
+            {
+                await EnsureQdrantLocalRuntimeAsync(
+                    app,
+                    descriptor,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            startupTracer.Record("Qdrant: Local runtime status evaluated");
+
             int recoveredJobs = await app.Services
                 .GetRequiredService<ILocalJobQueue>()
                 .RecoverInterruptedJobsAsync(cancellationToken);
@@ -84,15 +93,6 @@ public static partial class InProcessBackend
             runtimeState.BaseUri = baseUri;
             BackendLog.Write(descriptor.StoragePaths, $"In-process backend listening on {baseUri}.");
             startupTracer.Record($"Kestrel: HTTP server listening on {baseUri}");
-
-            _ = Task.Run(async () =>
-            {
-                using (EarlyBootstrapperLogger.TraceScope("Ensure_Qdrant_Runtime"))
-                {
-                    await EnsureQdrantLocalRuntimeAsync(app, descriptor, CancellationToken.None).ConfigureAwait(false);
-                }
-                startupTracer.Record("Qdrant: Local runtime status evaluated");
-            }, CancellationToken.None);
 
             return new InProcessBackendHandle(app, baseUri, descriptor, sessionToken);
         }
@@ -144,4 +144,3 @@ public static partial class InProcessBackend
         }
     }
 }
-

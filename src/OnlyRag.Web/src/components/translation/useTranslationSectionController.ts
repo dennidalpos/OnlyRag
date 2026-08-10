@@ -34,7 +34,7 @@ export function useTranslationSectionController({
   defaultModel: string | null;
   ollamaStatus: OllamaStatusResponse | null;
 }) {
-  const [selectedLanguage, setSelectedLanguage] = useState("English");
+  const [selectedLanguage, setSelectedLanguage] = useState("Italian");
   const [selectedModel, setSelectedModel] = useState("");
   const [compareTranslationId, setCompareTranslationId] = useState<number | null>(null);
   const [comparePage, setComparePage] = useState<number | null>(null);
