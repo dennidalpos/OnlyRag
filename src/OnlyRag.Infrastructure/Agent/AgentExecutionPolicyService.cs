@@ -182,30 +182,25 @@ public sealed class AgentExecutionPolicyService : IAgentExecutionPolicyService
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
             var root = doc.RootElement;
 
-            foreach (var prop in root.EnumerateObject())
+            if (root.ValueKind is not JsonValueKind.Object)
             {
-                string nameLower = prop.Name.ToLowerInvariant();
-                if (nameLower.Contains("path") || nameLower.Contains("file") || nameLower.Contains("directory") || nameLower.Contains("folder"))
-                {
-                    if (prop.Value.ValueKind == JsonValueKind.String)
-                    {
-                        string pathValue = prop.Value.GetString()!;
-                        if (!string.IsNullOrWhiteSpace(pathValue) && Path.IsPathRooted(pathValue))
-                        {
-                            string fullPath = Path.GetFullPath(pathValue);
-                            if (!IsPathWithinRoot(fullWorkspaceRoot, fullPath))
-                            {
-                                sandboxError = $"Path '{pathValue}' is outside the authorized workspace sandbox '{workspaceRoot}'.";
-                                return false;
-                            }
-                        }
-                    }
-                }
+                sandboxError = "Tool arguments must be a JSON object.";
+                return false;
+            }
+
+            if (!ValidatePathValues(root, fullWorkspaceRoot, workspaceRoot, out sandboxError))
+            {
+                return false;
             }
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            sandboxError = $"Invalid JSON parameters or path format: {ex.Message}";
+            sandboxError = $"Invalid JSON parameters: {ex.Message}";
+            return false;
+        }
+        catch (ArgumentException ex)
+        {
+            sandboxError = $"Invalid path format: {ex.Message}";
             return false;
         }
 
@@ -218,31 +213,121 @@ public sealed class AgentExecutionPolicyService : IAgentExecutionPolicyService
         try
         {
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
-            if (doc.RootElement.TryGetProperty("commandLine", out var cmdProp) ||
-                doc.RootElement.TryGetProperty("command", out cmdProp))
+            if (doc.RootElement.ValueKind is not JsonValueKind.Object)
             {
-                string cmdText = cmdProp.GetString() ?? string.Empty;
-                string lower = cmdText.ToLowerInvariant();
+                commandError = "Tool arguments must be a JSON object.";
+                return true;
+            }
 
-                foreach (string token in DangerousCommandTokens)
+            JsonProperty? commandProperty = null;
+            foreach (JsonProperty property in doc.RootElement.EnumerateObject())
+            {
+                if (string.Equals(property.Name, "commandLine", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(property.Name, "command", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (lower.Contains(token))
-                    {
-                        commandError = $"Command contains forbidden execution token: '{token}'";
-                        return true;
-                    }
+                    commandProperty = property;
+                    break;
                 }
+            }
 
-                if (ContainsShellMetacharacters(cmdText))
+            if (commandProperty is null || commandProperty.Value.Value.ValueKind is not JsonValueKind.String)
+            {
+                commandError = "A string 'commandLine' parameter is required.";
+                return true;
+            }
+
+            string cmdText = commandProperty.Value.Value.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(cmdText))
+            {
+                commandError = "A non-empty 'commandLine' parameter is required.";
+                return true;
+            }
+
+            string lower = cmdText.ToLowerInvariant();
+            foreach (string token in DangerousCommandTokens)
+            {
+                if (lower.Contains(token))
                 {
-                    commandError = "Command contains shell metacharacters that are not permitted in this sandbox.";
+                    commandError = $"Command contains forbidden execution token: '{token}'";
                     return true;
                 }
             }
+
+            if (ContainsShellMetacharacters(cmdText))
+            {
+                commandError = "Command contains shell metacharacters that are not permitted in this sandbox.";
+                return true;
+            }
         }
-        catch { }
+        catch (JsonException ex)
+        {
+            commandError = $"Invalid JSON parameters: {ex.Message}";
+            return true;
+        }
 
         return false;
+    }
+
+    private static bool ValidatePathValues(
+        JsonElement element,
+        string workspaceRoot,
+        string originalWorkspaceRoot,
+        out string? sandboxError,
+        string? propertyName = null)
+    {
+        sandboxError = null;
+        if (element.ValueKind == JsonValueKind.String &&
+            propertyName is not null &&
+            IsPathProperty(propertyName))
+        {
+            string pathValue = element.GetString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(pathValue))
+            {
+                string fullPath = Path.IsPathRooted(pathValue)
+                    ? Path.GetFullPath(pathValue)
+                    : Path.GetFullPath(Path.Combine(workspaceRoot, pathValue));
+
+                if (!IsPathWithinRoot(workspaceRoot, fullPath))
+                {
+                    sandboxError = $"Path '{pathValue}' is outside the authorized workspace sandbox '{originalWorkspaceRoot}'.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (!ValidatePathValues(property.Value, workspaceRoot, originalWorkspaceRoot, out sandboxError, property.Name))
+                {
+                    return false;
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                if (!ValidatePathValues(item, workspaceRoot, originalWorkspaceRoot, out sandboxError, propertyName))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsPathProperty(string propertyName)
+    {
+        string nameLower = propertyName.ToLowerInvariant();
+        return nameLower.Contains("path") ||
+               nameLower.Contains("file") ||
+               nameLower.Contains("directory") ||
+               nameLower.Contains("folder");
     }
 
     private static bool ContainsShellMetacharacters(string commandText)

@@ -2,7 +2,7 @@
 
 Eseguire tutti gli script PowerShell dalla radice del repository tramite PowerShell 7 (`pwsh`). Gli script di supporto sotto `scripts\support` sono helper interni.
 
-## Flussi Canonici
+## Flussi canonici
 
 Configurazione iniziale:
 
@@ -37,7 +37,11 @@ Pulizia workspace:
 pwsh .\scripts\Clean.ps1
 ```
 
-## Inventario degli Script Pubblici
+Per la descrizione delle operazioni di sviluppo, packaging e handoff consultare
+[`docs/OPERATIONS.md`](../docs/OPERATIONS.md); questa pagina mantiene solo l'inventario
+degli script e i comandi canonici.
+
+## Inventario degli script pubblici
 
 | Script | Percorso | Scopo | Quando usare |
 |---|---|---|---|
@@ -59,5 +63,4 @@ pwsh .\scripts\Clean.ps1
 | Generate Brand Assets | `scripts\Generate-BrandAssets.ps1` | Genera asset grafici, icone e grafiche di setup dal sorgente SVG. | Aggiornamento branding. |
 | Download Qdrant | `scripts\Download-Qdrant.ps1` | Scarica e verifica l'eseguibile Qdrant dal manifest. | Quando il payload manca. |
 | Clean Generated Outputs | `scripts\Clean.ps1` | Rimuove tutti gli output di build, gli artefatti e la cache. | Pulizia locale. |
-
 

@@ -115,6 +115,44 @@ public sealed class AgentSecurityPolicyTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_RelativeTraversalPath_BlocksExecution()
+    {
+        var (service, repo, tempDir) = CreateTestService();
+        try
+        {
+            string args = JsonSerializer.Serialize(new { filePath = "..\\secret.txt" });
+            AgentPolicyDecision decision = await service.EvaluateAsync(
+                new ToolExecutionContext("call_5", "write_file", args, tempDir));
+
+            Assert.False(decision.Allowed);
+            Assert.Contains("outside the authorized workspace sandbox", decision.DenialReason);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_MalformedCommandArguments_BlocksExecution()
+    {
+        var (service, repo, tempDir) = CreateTestService();
+        try
+        {
+            AgentPolicyDecision decision = await service.EvaluateAsync(
+                new ToolExecutionContext("call_6", "run_command", "{", tempDir));
+
+            Assert.False(decision.Allowed);
+            Assert.Equal(AgentRiskLevel.Critical, decision.RiskLevel);
+            Assert.Contains("Invalid JSON parameters", decision.DenialReason);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task PostExecutionVerify_LogsResultToAudit()
     {
         var (service, repo, tempDir) = CreateTestService();

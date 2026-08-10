@@ -1,7 +1,3 @@
 {
-  "todos": [
-    "Audit del core e hardening della policy di esecuzione agentica",
-    "Rafforzare il sandbox dei tool filesystem e dei comandi shell",
-    "Verificare la stabilità con i test di sicurezza e integrazione"
-  ]
+  "todos": []
 }

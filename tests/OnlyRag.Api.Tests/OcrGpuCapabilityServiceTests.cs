@@ -59,7 +59,11 @@ public sealed class OcrGpuCapabilityServiceTests
             OcrPagePreparationRequest request,
             CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(new OcrPagePreparation(
+                request.SourcePath,
+                $"hash-{request.PageNumber}",
+                1,
+                1));
         }
 
         public Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(
@@ -67,14 +71,25 @@ public sealed class OcrGpuCapabilityServiceTests
             int maxConcurrency = 4,
             CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.FromResult<IReadOnlyList<OcrPagePreparation>>(
+                requests.Select(request => new OcrPagePreparation(
+                    request.SourcePath,
+                    $"hash-{request.PageNumber}",
+                    1,
+                    1)).ToArray());
         }
 
         public Task<OcrPageResult> RecognizeAsync(
             OcrRecognitionRequest request,
             CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(new OcrPageResult(
+                string.Empty,
+                [],
+                null,
+                EngineName,
+                EngineVersion,
+                request.Language));
         }
 
         public Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(
@@ -82,7 +97,14 @@ public sealed class OcrGpuCapabilityServiceTests
             int maxConcurrency = 4,
             CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.FromResult<IReadOnlyList<OcrPageResult>>(
+                requests.Select(request => new OcrPageResult(
+                    string.Empty,
+                    [],
+                    null,
+                    EngineName,
+                    EngineVersion,
+                    request.Language)).ToArray());
         }
     }
 

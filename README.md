@@ -60,16 +60,8 @@ dotnet run --project .\src\OnlyRag.App\OnlyRag.App.csproj --configuration Debug
 
 - [Indice Documentazione](docs/README.md)
 - [Operazioni e Handoff](docs/OPERATIONS.md)
-- [Architettura Systema](docs/ARCHITECTURE.md)
-- [Flusso Applicazione](docs/APP_FLOW.md)
 - [Inventario Script](scripts/README.md)
-- [Motore Agenti Autonomi](docs/AGENT_ENGINE.md)
-- [Pipeline RAG & Knowledge Graph](docs/RAG_PIPELINE.md)
-- [Pipeline OCR Dual-Engine](docs/OCR_PIPELINE.md)
-- [Generazione Immagini](docs/IMAGE_GENERATION.md)
-- [Pipeline Traduzione](docs/TRANSLATION_PIPELINE.md)
-- [Firma Digitale Authenticode](docs/SIGNING.md)
-- [Packaging Installer NSIS](packaging/README.md)
-- [Asset di Marca](docs/BRAND_ASSETS.md)
 - [Tracker Operativo](PROJECT_STATUS.json)
 
+L'indice in [`docs/README.md`](docs/README.md) raccoglie architettura, flussi applicativi,
+pipeline, packaging, firma e asset senza duplicare questo README.
