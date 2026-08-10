@@ -62,9 +62,33 @@ public sealed partial class OcrPipelineTests
             return new OcrPagePreparation(output, hash, 100, 100);
         }
 
-        public Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(IReadOnlyList<OcrPagePreparationRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<OcrPagePreparation>> PreparePageBatchAsync(
+            IReadOnlyList<OcrPagePreparationRequest> requests,
+            int maxConcurrency = 4,
+            CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            ArgumentNullException.ThrowIfNull(requests);
+            if (requests.Count == 0)
+            {
+                return [];
+            }
+
+            int concurrency = Math.Clamp(maxConcurrency, 1, 16);
+            using SemaphoreSlim semaphore = new(concurrency, concurrency);
+            Task<OcrPagePreparation>[] tasks = requests.Select(async request =>
+            {
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    return await PreparePageAsync(request, cancellationToken);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToArray();
+
+            return await Task.WhenAll(tasks);
         }
 
         public Task<OcrPageResult> RecognizeAsync(
@@ -77,9 +101,33 @@ public sealed partial class OcrPipelineTests
             return Task.FromResult(new OcrPageResult(text, [], confidence, EngineName, EngineVersion, request.Language));
         }
 
-        public Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(IReadOnlyList<OcrRecognitionRequest> requests, int maxConcurrency = 4, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<OcrPageResult>> RecognizeBatchAsync(
+            IReadOnlyList<OcrRecognitionRequest> requests,
+            int maxConcurrency = 4,
+            CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            ArgumentNullException.ThrowIfNull(requests);
+            if (requests.Count == 0)
+            {
+                return [];
+            }
+
+            int concurrency = Math.Clamp(maxConcurrency, 1, 16);
+            using SemaphoreSlim semaphore = new(concurrency, concurrency);
+            Task<OcrPageResult>[] tasks = requests.Select(async request =>
+            {
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    return await RecognizeAsync(request, cancellationToken);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToArray();
+
+            return await Task.WhenAll(tasks);
         }
     }
 

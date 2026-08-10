@@ -302,7 +302,7 @@ public sealed partial class InProcessBackendTests
 
         public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.CompletedTask;
         }
 
         private sealed record StoredVector(

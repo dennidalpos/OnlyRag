@@ -438,7 +438,7 @@ public sealed class HybridRetrievalServiceTests
 
         public Task OptimizeCollectionAsync(string model, int dimensions, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            return Task.CompletedTask;
         }
     }
 }

@@ -43,7 +43,10 @@ internal static class AgentWorkspaceContextEnricher
                             sb.AppendLine(statusJson.Trim());
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        sb.AppendLine($"\n[PROJECT_STATUS READ FAILED] {ex.Message}");
+                    }
                 }
 
                 string settingsPath = Path.Combine(workspaceRoot, "workspace_settings.json");
@@ -58,11 +61,17 @@ internal static class AgentWorkspaceContextEnricher
                             sb.AppendLine(settingsJson.Trim());
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        sb.AppendLine($"\n[WORKSPACE SETTINGS READ FAILED] {ex.Message}");
+                    }
                 }
             }
         }
-        catch { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            sb.AppendLine($"\n[WORKSPACE CONTEXT READ FAILED] {ex.Message}");
+        }
 
         sb.AppendLine("\nAGENT INSTRUCTIONS:");
         sb.AppendLine("1. Explore files and project structure only when strictly necessary. If the structure is already known or provided in context, skip list_dir and proceed directly with the task.");

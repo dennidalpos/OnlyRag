@@ -26,7 +26,7 @@ Il file [README](../README.md) nella radice è la guida rapida e la mappa dei co
 
 - [Asset di Marca](BRAND_ASSETS.md): Posizione degli asset generati e comandi di rigenerazione.
 
-## File Tracciati
+## Riferimenti di progetto
 
 - [Tracker Operativo](../PROJECT_STATUS.json)
 - [File Soluzione Visual Studio](../OnlyRag.sln)
@@ -35,3 +35,5 @@ Il file [README](../README.md) nella radice è la guida rapida e la mappa dei co
 - [Manifest Runtime Qdrant](../packaging/qdrant/manifest.json)
 - [Manifest Runtime OCR](../scripts/ocr/runtime-manifest.json)
 
+Il tracker contiene esclusivamente attività aperte; quando è vuoto, la scansione corrente
+non ha individuato lavoro residuo da registrare.

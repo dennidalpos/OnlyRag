@@ -72,7 +72,7 @@ public sealed class TaskAndCommandToolHandler : IToolHandler
         var psi = new ProcessStartInfo
         {
             FileName = shellExe,
-            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encodedCmd}",
+            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -EncodedCommand {encodedCmd}",
             WorkingDirectory = rootPath,
             UseShellExecute = false,
             RedirectStandardOutput = true,
