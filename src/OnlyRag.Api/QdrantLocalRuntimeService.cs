@@ -8,9 +8,10 @@ namespace OnlyRag.Api;
 internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
 {
     private const string QdrantExeName = "qdrant.exe";
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AvailabilityProbeTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan HealthFailureGracePeriod = TimeSpan.FromSeconds(30);
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
     private readonly QdrantProcessSupervisor processSupervisor = new();
@@ -114,7 +115,10 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             try
             {
                 QdrantStatusResponse status = await WaitForAvailabilityAsync(vectorStore, existingPid.Value, StartupTimeout, cancellationToken);
-                StartAutoHealingSupervisor(vectorStore);
+                if (status.IsReachable)
+                {
+                    StartAutoHealingSupervisor(vectorStore);
+                }
                 return status;
             }
             finally
@@ -134,7 +138,10 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             await StartLocalProcessAsync(settings, cancellationToken);
             int? startedPid = ReadPid();
             QdrantStatusResponse startedStatus = await WaitForAvailabilityAsync(vectorStore, startedPid, StartupTimeout, cancellationToken);
-            StartAutoHealingSupervisor(vectorStore);
+            if (startedStatus.IsReachable)
+            {
+                StartAutoHealingSupervisor(vectorStore);
+            }
             return startedStatus;
         }
         finally
@@ -229,6 +236,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         IQdrantVectorStore vectorStore,
         CancellationToken cancellationToken)
     {
+        DateTimeOffset? gRpcUnavailableSinceUtc = null;
         while (!cancellationToken.IsCancellationRequested)
         {
             try
@@ -257,20 +265,25 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
                     {
                         await vectorStore.VerifyAvailabilityAsync(cancellationToken);
                         gRpcReachable = true;
+                        gRpcUnavailableSinceUtc = null;
                     }
                     catch
                     {
                         gRpcReachable = false;
+                        gRpcUnavailableSinceUtc ??= DateTimeOffset.UtcNow;
                     }
                 }
 
-                if (!processAlive || !gRpcReachable)
+                bool healthFailureExpired = gRpcUnavailableSinceUtc is not null
+                    && DateTimeOffset.UtcNow - gRpcUnavailableSinceUtc >= HealthFailureGracePeriod;
+                if (!processAlive || (!gRpcReachable && healthFailureExpired && !isStartupInProgress))
                 {
                     BackendLog.Write(descriptor.StoragePaths, $"[Qdrant Auto-Healing] Sidecar process or gRPC endpoint unavailable (processAlive={processAlive}, gRpcReachable={gRpcReachable}). Restarting sidecar...");
 
                     await healingLock.WaitAsync(cancellationToken);
                     try
                     {
+                        gRpcUnavailableSinceUtc = null;
                         await processSupervisor.StopAsync(ReadPid(), ResolveBinaryPath(), cancellationToken);
                         DeletePidFile();
 

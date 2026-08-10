@@ -372,6 +372,10 @@ public static partial class InProcessBackend
                 : ex.Kind.ToString();
             return (status, false, null, []);
         }
+        catch (Exception ex) when (ex is HttpRequestException or TimeoutException or IOException)
+        {
+            return ("Offline", false, null, []);
+        }
         catch (OperationCanceledException)
         {
             return ("Timeout", false, null, []);

@@ -25,6 +25,10 @@ public static partial class InProcessBackend
             {
                 apiReachable = false;
             }
+            catch (Exception ex) when (ex is HttpRequestException or TimeoutException or IOException)
+            {
+                apiReachable = false;
+            }
 
             return Results.Ok(dependencies.CreateOllamaStatus(apiReachable));
         });

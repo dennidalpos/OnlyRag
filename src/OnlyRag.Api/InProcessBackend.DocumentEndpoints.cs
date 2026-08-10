@@ -452,6 +452,10 @@ public static partial class InProcessBackend
                 reference.Dimensions,
                 documentId,
                 cancellationToken);
+            await vectorSearch.OptimizeCollectionAsync(
+                reference.Model,
+                reference.Dimensions,
+                cancellationToken);
         }
     }
 }

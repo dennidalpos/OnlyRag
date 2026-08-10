@@ -126,6 +126,37 @@ public sealed class SqliteMaintenanceService : ISqliteMaintenanceService
                 }
             }
 
+            await using (SqliteCommand orphanChatTablesCommand = connection.CreateCommand())
+            {
+                orphanChatTablesCommand.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM sqlite_master
+                    WHERE type = 'table'
+                      AND name IN ('chat_messages', 'chat_conversations');
+                    """;
+                var chatTableCount = await orphanChatTablesCommand.ExecuteScalarAsync(cancellationToken);
+                if (chatTableCount is long count && count == 2)
+                {
+                    await using SqliteCommand orphanChatCommand = connection.CreateCommand();
+                    orphanChatCommand.CommandText =
+                        """
+                        DELETE FROM chat_messages
+                        WHERE conversation_id NOT IN (
+                            SELECT conversation_id
+                            FROM chat_conversations
+                        );
+                        """;
+                    await orphanChatCommand.ExecuteNonQueryAsync(cancellationToken);
+                }
+            }
+
+            await using (SqliteCommand checkpointCommand = connection.CreateCommand())
+            {
+                checkpointCommand.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                await checkpointCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+
             // 4. Run Incremental Vacuum and full Vacuum
             await using (SqliteCommand incVacCmd = connection.CreateCommand())
             {
