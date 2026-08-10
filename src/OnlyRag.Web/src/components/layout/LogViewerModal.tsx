@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { apiRequest } from "../../api";
+import { apiEventStream, apiRequest } from "../../api";
 import type { AppLogLevel, LogEntry } from "../../apiTypes/settings";
 
 import { ConfirmDialog } from "../common/ConfirmDialog";
@@ -37,43 +37,41 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
 
     if (!isLiveStreaming) return;
 
-    let eventSource: EventSource | null = null;
-    if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
-      const params = new URLSearchParams();
-      if (filterLevel !== "ALL") {
-        params.append("minLevel", filterLevel);
-      }
-      if (searchQuery.trim()) {
-        params.append("search", searchQuery.trim());
-      }
-      const query = params.toString() ? `?${params.toString()}` : "";
-      eventSource = new window.EventSource(`/api/logs/stream${query}`);
-      eventSource.onmessage = (event) => {
-        try {
-          const entry = JSON.parse(event.data) as LogEntry;
-          setLogs((previous) => {
-            if (previous.some((existing) => existing.id === entry.id)) {
-              return previous;
-            }
-            const next = [entry, ...previous];
-            return next.slice(0, 300);
-          });
-          setError(null);
-        } catch {
-          // Ignore malformed stream payloads.
-        }
-      };
-      eventSource.onerror = () => {
-        setError("Il flusso live dei log è temporaneamente non disponibile. Riprova o usa l'aggiornamento manuale.");
-      };
+    const streamAbortController = new AbortController();
+    const params = new URLSearchParams();
+    if (filterLevel !== "ALL") {
+      params.append("minLevel", filterLevel);
     }
+    if (searchQuery.trim()) {
+      params.append("search", searchQuery.trim());
+    }
+    const query = params.toString() ? `?${params.toString()}` : "";
+    void apiEventStream<LogEntry>(
+      `/api/logs/stream${query}`,
+      (entry) => {
+        setLogs((previous) => {
+          if (previous.some((existing) => existing.id === entry.id)) return previous;
+          return [entry, ...previous].slice(0, 300);
+        });
+        setError(null);
+      },
+      streamAbortController.signal
+    ).catch((streamError: unknown) => {
+      if (!streamAbortController.signal.aborted) {
+        setError(
+          streamError instanceof Error
+            ? streamError.message
+            : "Il flusso live dei log è temporaneamente non disponibile. Riprova o usa l'aggiornamento manuale."
+        );
+      }
+    });
 
     const interval = setInterval(() => {
       void fetchLogs(true);
     }, 2000);
 
     return () => {
-      eventSource?.close();
+      streamAbortController.abort();
       clearInterval(interval);
     };
   }, [filterLevel, searchQuery, isLiveStreaming]);
@@ -151,13 +149,20 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
   function normalizeLogLevel(rawLevel: unknown): AppLogLevel {
     if (typeof rawLevel === "number") {
       switch (rawLevel) {
-        case 0: return "Trace";
-        case 1: return "Debug";
-        case 2: return "Information";
-        case 3: return "Warning";
-        case 4: return "Error";
-        case 5: return "None";
-        default: return "Information";
+        case 0:
+          return "Trace";
+        case 1:
+          return "Debug";
+        case 2:
+          return "Information";
+        case 3:
+          return "Warning";
+        case 4:
+          return "Error";
+        case 5:
+          return "None";
+        default:
+          return "Information";
       }
     }
     if (typeof rawLevel === "string") {
@@ -175,11 +180,17 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
   function getLevelBadgeStyle(rawLevel: unknown) {
     const level = normalizeLogLevel(rawLevel);
     switch (level) {
-      case "Error": return { bg: "#7f1d1d", color: "#fca5a5", border: "#ef4444" };
-      case "Warning": return { bg: "#78350f", color: "#fde047", border: "#f59e0b" };
-      case "Information": return { bg: "#065f46", color: "#6ee7b7", border: "#10b981" };
-      case "Debug": return { bg: "#1e3a8a", color: "#93c5fd", border: "#3b82f6" };
-      case "Trace": default: return { bg: "#312e81", color: "#c7d2fe", border: "#6366f1" };
+      case "Error":
+        return { bg: "#7f1d1d", color: "#fca5a5", border: "#ef4444" };
+      case "Warning":
+        return { bg: "#78350f", color: "#fde047", border: "#f59e0b" };
+      case "Information":
+        return { bg: "#065f46", color: "#6ee7b7", border: "#10b981" };
+      case "Debug":
+        return { bg: "#1e3a8a", color: "#93c5fd", border: "#3b82f6" };
+      case "Trace":
+      default:
+        return { bg: "#312e81", color: "#c7d2fe", border: "#6366f1" };
     }
   }
 
@@ -222,29 +233,62 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
         }}
       >
         {/* HEADER MODALE */}
-        <div style={{
-          padding: "16px 20px",
-          background: "#1e293b",
-          borderBottom: "1px solid #334155",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}>
+        <div
+          style={{
+            padding: "16px 20px",
+            background: "#1e293b",
+            borderBottom: "1px solid #334155",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ fontSize: "1.3rem" }}>📜</span>
-            <h2 id="log-viewer-modal-title" style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem", fontWeight: 700 }}>
+            <h2
+              id="log-viewer-modal-title"
+              style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem", fontWeight: 700 }}
+            >
               Visualizzatore Log Live &amp; Diagnostica
             </h2>
-            <span style={{ background: "#334155", color: "#cbd5e1", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem" }}>
+            <span
+              style={{
+                background: "#334155",
+                color: "#cbd5e1",
+                padding: "2px 8px",
+                borderRadius: 12,
+                fontSize: "0.78rem"
+              }}
+            >
               {logs.length} voci
             </span>
             {levelCounts.errorCount > 0 && (
-              <span style={{ background: "#7f1d1d", color: "#fca5a5", border: "1px solid #ef4444", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem", fontWeight: 700 }}>
+              <span
+                style={{
+                  background: "#7f1d1d",
+                  color: "#fca5a5",
+                  border: "1px solid #ef4444",
+                  padding: "2px 8px",
+                  borderRadius: 12,
+                  fontSize: "0.78rem",
+                  fontWeight: 700
+                }}
+              >
                 {levelCounts.errorCount} Errori
               </span>
             )}
             {levelCounts.warningCount > 0 && (
-              <span style={{ background: "#78350f", color: "#fde047", border: "1px solid #f59e0b", padding: "2px 8px", borderRadius: 12, fontSize: "0.78rem", fontWeight: 700 }}>
+              <span
+                style={{
+                  background: "#78350f",
+                  color: "#fde047",
+                  border: "1px solid #f59e0b",
+                  padding: "2px 8px",
+                  borderRadius: 12,
+                  fontSize: "0.78rem",
+                  fontWeight: 700
+                }}
+              >
                 {levelCounts.warningCount} Avvisi
               </span>
             )}
@@ -338,14 +382,16 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
         </div>
 
         {/* FILTRI */}
-        <div style={{
-          padding: "12px 20px",
-          background: "#0f172a",
-          borderBottom: "1px solid #1e293b",
-          display: "flex",
-          gap: 12,
-          alignItems: "center"
-        }}>
+        <div
+          style={{
+            padding: "12px 20px",
+            background: "#0f172a",
+            borderBottom: "1px solid #1e293b",
+            display: "flex",
+            gap: 12,
+            alignItems: "center"
+          }}
+        >
           <select
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
@@ -384,16 +430,18 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
         </div>
 
         {error && (
-          <div style={{
-            background: "#450a0a",
-            color: "#fca5a5",
-            borderBottom: "1px solid #ef4444",
-            padding: "8px 20px",
-            fontSize: "0.83rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}>
+          <div
+            style={{
+              background: "#450a0a",
+              color: "#fca5a5",
+              borderBottom: "1px solid #ef4444",
+              padding: "8px 20px",
+              fontSize: "0.83rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}
+          >
             <span>⚠️ {error}</span>
             <button
               type="button"
@@ -453,22 +501,22 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{
-                        background: badge.bg,
-                        color: badge.color,
-                        border: `1px solid ${badge.border}`,
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                        fontSize: "0.72rem",
-                        fontWeight: 700,
-                        textTransform: "uppercase"
-                      }}>
+                      <span
+                        style={{
+                          background: badge.bg,
+                          color: badge.color,
+                          border: `1px solid ${badge.border}`,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          textTransform: "uppercase"
+                        }}
+                      >
                         {normalizedLevel}
                       </span>
 
-                      <span style={{ color: "#38bdf8", fontWeight: 600 }}>
-                        [{item.category}]
-                      </span>
+                      <span style={{ color: "#38bdf8", fontWeight: 600 }}>[{item.category}]</span>
 
                       <span style={{ color: "#94a3b8", fontSize: "0.78rem" }}>
                         {new Date(item.timestampUtc).toLocaleTimeString()}
@@ -497,19 +545,19 @@ export function LogViewerModal({ onClose, onLogsCleared }: LogViewerModalProps) 
                   </div>
 
                   {isExpanded && (
-                    <div style={{
-                      marginTop: 8,
-                      background: "#0f172a",
-                      border: "1px solid #475569",
-                      borderRadius: 4,
-                      padding: 10,
-                      color: "#fca5a5",
-                      overflowX: "auto"
-                    }}>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        background: "#0f172a",
+                        border: "1px solid #475569",
+                        borderRadius: 4,
+                        padding: 10,
+                        color: "#fca5a5",
+                        overflowX: "auto"
+                      }}
+                    >
                       {item.dataJson && (
-                        <div style={{ color: "#93c5fd", marginBottom: 6 }}>
-                          📊 Dati: {item.dataJson}
-                        </div>
+                        <div style={{ color: "#93c5fd", marginBottom: 6 }}>📊 Dati: {item.dataJson}</div>
                       )}
                       {item.exceptionDetails && (
                         <div>

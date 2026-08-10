@@ -14,7 +14,7 @@ This skill provides technical patterns and best practices for developing the C# 
 - **ASP.NET Core Minimal APIs**: [learn.microsoft.com/aspnet/core/fundamentals/minimal-apis](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis)
 - **Microsoft Edge WebView2**: [learn.microsoft.com/microsoft-edge/webview2](https://learn.microsoft.com/en-us/microsoft-edge/webview2/)
 - **xUnit.net Testing**: [xunit.net/docs/getting-started/netcore/cmdline](https://xunit.net/docs/getting-started/netcore/cmdline)
-- **System.Data.SQLite / Microsoft.Data.Sqlite**: [learn.microsoft.com/dotnet/standard/data/sqlite](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/)
+- **Microsoft.Data.Sqlite**: [learn.microsoft.com/dotnet/standard/data/sqlite](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/)
 
 ## 2. Architecture & Layering
 
@@ -31,15 +31,14 @@ OnlyRag enforces clear assembly boundaries:
 ## 3. Key Patterns & Conventions
 
 ### WPF + In-Process Minimal API Startup
-- The WPF application (`App.xaml.cs`) boots an ASP.NET Core `WebApplication` on a dynamically selected loopback port or named bridge handler.
+- The WPF application (`App.xaml.cs`) boots an ASP.NET Core `WebApplication` on a dynamically selected loopback port and exposes the settings through the WebView2 startup bridge.
 - WebView2 is initialized via `EnsureCoreWebView2Async` pointing to either the local built dist (`src/OnlyRag.Web/dist`) or `ONLYRAG_WEB_DEV_SERVER`.
 
 ### Clean Error Handling & Response Contracts
-- Standard response contract: `ApiResponse<T>` with `Success`, `Data`, `Error`, and `Message` fields.
-- API endpoints map domain exceptions into standardized user-facing error codes. Never expose unhandled exception stack traces to the frontend UI.
+- Endpoint contracts are defined by the records in `OnlyRag.Core` and the feature-specific endpoint mappings. Map expected domain failures to the existing user-facing error model; never expose unhandled exception stack traces to the frontend UI.
 
 ### SQLite Storage Patterns
-- SQLite connection string targets `%LOCALAPPDATA%\OnlyRag\onlyrag.db`.
+- SQLite connection and storage paths are resolved by the application storage services under `%LOCALAPPDATA%\OnlyRag`; do not hard-code a database path in a new service.
 - WAL (Write-Ahead Logging) mode is enabled (`PRAGMA journal_mode=WAL;`) for concurrent read/write throughput during ingestion.
 - FTS5 virtual tables (`documents_fts`) store tokenized content for fast keyword retrieval fallback.
 

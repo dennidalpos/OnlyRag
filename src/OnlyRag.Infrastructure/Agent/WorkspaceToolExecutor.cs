@@ -55,6 +55,16 @@ public sealed class WorkspaceToolExecutor
         logger?.LogTrace("AgentEngine", $"[TOOL EXEC START] Tool: '{toolName}', CallID: '{callId}', Args: {argumentsJson}");
 
         ToolExecutionContext context = new(callId, toolName, argumentsJson, workspaceRoot);
+        if (toolName.Equals("generate_image", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("generate_image_onnx", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("image_gen", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("create_image", StringComparison.OrdinalIgnoreCase))
+        {
+            const string error = "La generazione immagini appartiene esclusivamente alla sezione Immagini.";
+            logger?.LogWarning("AgentEngine", $"[TOOL EXEC DENIED] {error}");
+            return new AgentToolResult(callId, toolName, false, string.Empty, error);
+        }
+
         if (policyService != null)
         {
             AgentPolicyDecision decision = await policyService.EvaluateAsync(context, cancellationToken);
@@ -210,7 +220,6 @@ public sealed class WorkspaceToolExecutor
             "reflect_step" or "reflect" or "self_reflection" or
             "web_search" or "search_web" or
             "query_retrieval_index" or "search_vector_index" or
-            "generate_image_onnx" or "generate_image" or
             "invoke_subagent" or "spawn_subagent" or
             "manage_task" => false,
             _ => true

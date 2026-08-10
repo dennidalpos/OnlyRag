@@ -31,14 +31,13 @@ describe("CodingSection", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: /Coding & Vibe Hub/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sfoglia Cartella/i })).toBeInTheDocument();
-    expect(screen.getByText(/Smart Router:/i)).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Modalita prompt" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Plan" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Full" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("sends prompt in Agent mode and renders agent thought events", async () => {
+  it("sends prompt in Agent mode and renders the final answer", async () => {
     const user = userEvent.setup();
     mockApi([
       {
@@ -78,9 +77,7 @@ describe("CodingSection", () => {
     const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
     await user.click(sendBtn);
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/Analizzo il progetto/i).length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(screen.getByText("Completato!")).toBeInTheDocument());
   });
 
   it("sends prompt in chat when no project folder is set", async () => {
@@ -175,7 +172,7 @@ describe("CodingSection", () => {
     });
   });
 
-  it("triggers multi-agent orchestration inline when a complex task is submitted", async () => {
+  it("keeps complex tasks in the single Coding flow", async () => {
     const user = userEvent.setup();
     mockApi([
       {
@@ -273,11 +270,8 @@ describe("CodingSection", () => {
     const sendBtn = screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i });
     await user.click(sendBtn);
 
-    await waitFor(() => {
-      expect(screen.getByText("Orchestrazione Multi-Agenti")).toBeInTheDocument();
-      expect(screen.getByText("orch_test_123")).toBeInTheDocument();
-      expect(screen.getByText("Planner Agent")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText("Modulo creato!")).toBeInTheDocument());
+    expect(screen.queryByText("Orchestrazione Multi-Agenti")).not.toBeInTheDocument();
   });
 
   it("handles dropped files and processes them into coding pipeline", async () => {

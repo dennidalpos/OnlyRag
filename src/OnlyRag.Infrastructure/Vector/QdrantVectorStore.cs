@@ -354,47 +354,47 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
         await _collectionLock.WaitAsync(cancellationToken);
         try
         {
-                if (_knownCollections.TryGetValue(collection, out bool known) && known)
-                {
-                    return;
-                }
+            if (_knownCollections.TryGetValue(collection, out bool known) && known)
+            {
+                return;
+            }
 
-                if (await client.CollectionExistsAsync(collection, cancellationToken))
-                {
-                    _knownCollections[collection] = true;
-                    return;
-                }
-
-                QuantizationConfig? quantizationConfig = quantizationMode switch
-                {
-                    QdrantQuantizationMode.ScalarSQ8 => new QuantizationConfig
-                    {
-                        Scalar = new ScalarQuantization
-                        {
-                            Type = QuantizationType.Int8
-                        }
-                    },
-                    QdrantQuantizationMode.ProductPQ => new QuantizationConfig
-                    {
-                        Product = new ProductQuantization
-                        {
-                            Compression = CompressionRatio.X8
-                        }
-                    },
-                    _ => null
-                };
-
-                await client.CreateCollectionAsync(
-                    collection,
-                    new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
-                    hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
-                    quantizationConfig: quantizationConfig,
-                    cancellationToken: cancellationToken);
+            if (await client.CollectionExistsAsync(collection, cancellationToken))
+            {
                 _knownCollections[collection] = true;
+                return;
+            }
+
+            QuantizationConfig? quantizationConfig = quantizationMode switch
+            {
+                QdrantQuantizationMode.ScalarSQ8 => new QuantizationConfig
+                {
+                    Scalar = new ScalarQuantization
+                    {
+                        Type = QuantizationType.Int8
+                    }
+                },
+                QdrantQuantizationMode.ProductPQ => new QuantizationConfig
+                {
+                    Product = new ProductQuantization
+                    {
+                        Compression = CompressionRatio.X8
+                    }
+                },
+                _ => null
+            };
+
+            await client.CreateCollectionAsync(
+                collection,
+                new VectorParams { Size = (ulong)dimensions, Distance = Distance.Cosine },
+                hnswConfig: QdrantHnswTuner.BuildHnswConfigDiff(0),
+                quantizationConfig: quantizationConfig,
+                cancellationToken: cancellationToken);
+            _knownCollections[collection] = true;
         }
         finally
         {
-                _collectionLock.Release();
+            _collectionLock.Release();
         }
     }
 

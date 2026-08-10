@@ -42,7 +42,7 @@ OnlyRag is a local-first Windows desktop app combining:
 2. **React/Vite Web UI** ([`src/OnlyRag.Web`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Web)): Modern single-page app interface executing inside WebView2.
 3. **In-Process Backend API** ([`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api)): ASP.NET Core Minimal API hosted in-process inside the WPF app.
 4. **Core Contracts** ([`src/OnlyRag.Core`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Core)): Shared DTOs, interfaces, and settings models.
-5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v11), Qdrant vector retrieval, Ollama integration, Next-Gen 2-Stage RAG (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
+5. **Infrastructure Adapters** ([`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure)): SQLite storage (schema v11), Qdrant vector retrieval, Ollama integration, six-stage RAG retrieval (Parent-Child chunking, ONNX Cross-Encoder re-ranking, Query Transformation & Ollama LLM Query Expansion, CRAG confidence evaluation), Subagent Runner execution engine, ONNX image generation, PaddleOCR bridge, and LibreOffice PDF export.
 6. **Worker Queue** ([`src/OnlyRag.Worker`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Worker)): In-process task queue for asynchronous background jobs.
 
 
@@ -102,7 +102,7 @@ pwsh .\scripts\Test-Code.ps1 -VerboseOutput
 The repository includes porting skills checked into `skills/`:
 - [`skills/onlyrag`](file:///d:/GITHUB/OnlyRag/skills/onlyrag/SKILL.md): Primary architecture, workflows, local data paths, and gate check.
 - [`skills/dotnet-wpf-minimal-api`](file:///d:/GITHUB/OnlyRag/skills/dotnet-wpf-minimal-api/SKILL.md): C# .NET 10 WPF host shell, Minimal API backend, WebView2 interop, SQLite.
-- [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright.
+- [`skills/react-vite-frontend`](file:///d:/GITHUB/OnlyRag/skills/react-vite-frontend/SKILL.md): React 19, Vite, TypeScript, CSS custom properties, Lucide icons, Vitest, Playwright.
 - [`skills/rag-vector-retrieval`](file:///d:/GITHUB/OnlyRag/skills/rag-vector-retrieval/SKILL.md): Dual-Tier chunking, SQLite FTS5, Qdrant, Heuristic Re-ranking, CRAG evaluation.
 - [`skills/autonomous-agent-engine`](file:///d:/GITHUB/OnlyRag/skills/autonomous-agent-engine/SKILL.md): MCTS Tree-of-Thought, Plan-Act-Observe-Verify state machine, Episodic memory, Subagent DAG.
 - [`skills/onnx-directml-image-gen`](file:///d:/GITHUB/OnlyRag/skills/onnx-directml-image-gen/SKILL.md): ONNX DirectML GPU / CPU fallback, SDXL/LCM models, SHA256 integrity, Canvas editor.
@@ -166,11 +166,10 @@ pwsh .\scripts\Clean.ps1
 
 ## 5. Development Guidelines & Rules
 
-- **Official Tracker**: Keep `PROJECT_STATUS.json` strictly updated at all times as the official project status and task tracker.
-- **Greenfield Mindset**: Treat the codebase as a brand-new application. Prefer modern C# 13 / .NET 10 / React 19 standards over legacy patterns or shims.
-- **Authorized Refactoring**: Full authorization to perform destructive code changes, modify business logic, and overhaul architecture to improve code cleanliness and structure.
-- **Zero Tech Debt**: Proactively remove legacy code, unused files, dead branches, and technical debt across the repository.
-- **Windows First**: Use PowerShell 7 (`pwsh`), cross-platform path APIs in code, and relative paths.
-- **Cleanliness**: Never check in generated assets (`dist`, `node_modules`, `bin`, `obj`, `artifacts`, `payload`).
-- **No Direct Secrets**: Store no certificates or credentials in the repo; use `.env.example` where applicable.
-- **Verification Requirement**: Never declare work complete without executing the canonical gate (`Invoke-Gate.ps1 -Fast` or `Invoke-Gate.ps1 -Configuration Release`).
+- Load the narrowest applicable skill before editing a subsystem. Use the repository file reader (`view`) on `skills\<name>\SKILL.md`; do not invent a skill name or rely on a stale copy.
+- Use `skills\onlyrag\SKILL.md` for cross-cutting work, `dotnet-wpf-minimal-api` for C#/WPF/API, `react-vite-frontend` for the Web UI, `rag-vector-retrieval` for ingestion/search, `autonomous-agent-engine` for agent runs, `onnx-directml-image-gen` for image generation, `windows-packaging-signing` for release work, and `code-maintenance-automation` for quality scripts.
+- Preserve the architecture and user data by default. Remove obsolete code only when it is in scope and the replacement is verified.
+- Use PowerShell paths from the repository root, keep tests/builds/lint serial, and stop on the first regression.
+- Never store certificates or credentials in the repository. Use the Windows credential/vault integrations and documented local environment overrides.
+- Do not edit generated outputs manually; update their source or generator and rerun it.
+- Do not declare work complete without the relevant targeted check and, for cross-cutting changes, `Invoke-Gate.ps1 -Fast` or the Release gate.

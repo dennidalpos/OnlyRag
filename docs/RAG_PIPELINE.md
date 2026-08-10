@@ -1,6 +1,6 @@
-# Pipeline RAG (Next-Gen 2.0)
+# Pipeline RAG
 
-OnlyRag utilizza un'architettura RAG di ultima generazione (State-of-the-Art / SOTA) basata su acquisizione documenti locale, indicizzazione ibrida a due stadi (SQLite FTS5 + Qdrant HNSW), Re-ranking ONNX Cross-Encoder con fallback euristico, risoluzione Parent-Child, Knowledge Graph Traversal e valutazione di confidenza Self-Corrective RAG (CRAG).
+OnlyRag utilizza una pipeline RAG a 6 stadi basata su acquisizione documenti locale, ricerca ibrida (SQLite FTS5 + Qdrant HNSW), re-ranking ONNX Cross-Encoder con fallback euristico, risoluzione Parent-Child, Knowledge Graph Traversal e valutazione di confidenza Self-Corrective RAG (CRAG).
 
 ---
 
@@ -48,7 +48,7 @@ OnlyRag include un motore di indicizzazione e recupero a grafo (Knowledge Graph 
 - **Endpoints Graph**:
   - `GET /api/graph/data`: Restituisce i nodi e gli archi del grafo con filtri opzionali (`limit`, `documentId`, `entityType`).
   - `POST /api/graph/search`: Esegue ricerche con traversal multi-hop (`query`, `maxHops`, `maxNodes`).
-- **Visualizzazione UI**: Componente React dedicato [`GraphView`](../src/OnlyRag.Web/src/components/graph/) per la navigazione interattiva e visuale della rete di concetti.
+- **Visualizzazione UI**: Sezione React [`KnowledgeGraphSection`](../src/OnlyRag.Web/src/components/graph/KnowledgeGraphSection.tsx) con canvas [`KnowledgeGraphCanvas`](../src/OnlyRag.Web/src/components/graph/KnowledgeGraphCanvas.tsx) per la navigazione interattiva della rete di concetti.
 
 ---
 
@@ -84,4 +84,3 @@ pwsh .\scripts\Evaluate-Retrieval.ps1 -DatasetPath .\docs\retrieval-evaluation.s
 ## Grounding Obbligatorio
 
 Quando la chat usa documenti, gli estratti recuperati vengono prima sintetizzati nel prompt e la risposta finale passa sempre da una verifica runtime via `GroundingVerifier`. Ogni paragrafo fattuale deve includere una citazione `Source: NomeDocumento` valida e condividere termini significativi con lo snippet citato. Le risposte non supportate vengono sostituite da un’astensione esplicita; le evidenze con negazioni opposte e termini condivisi producono il notice `grounding_conflicting_evidence`.
-

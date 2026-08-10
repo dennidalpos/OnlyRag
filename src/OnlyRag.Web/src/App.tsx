@@ -36,9 +36,9 @@ const sectionLabels: Record<SectionId, string> = {
 
 export function AppContent() {
   const { theme } = useTheme();
-  const [activeSection, setActiveSection] = useState<SectionId>(
-    () => (new URLSearchParams(window.location.search).get("section") as SectionId) || "coding"
-  );
+  const initialSection = (new URLSearchParams(window.location.search).get("section") as SectionId) || "coding";
+  const [activeSection, setActiveSection] = useState<SectionId>(initialSection);
+  const [visitedSections, setVisitedSections] = useState<Set<SectionId>>(() => new Set([initialSection]));
   const [documentLibraryVersion, setDocumentLibraryVersion] = useState(0);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -48,6 +48,10 @@ export function AppContent() {
 
   const handleSectionChange = useCallback((section: SectionId) => {
     setActiveSection(section);
+    setVisitedSections((previous) => {
+      if (previous.has(section)) return previous;
+      return new Set(previous).add(section);
+    });
     setIsJobsDrawerOpen(false);
   }, []);
 
@@ -67,31 +71,31 @@ export function AppContent() {
         }
         if (key === "1" || code === "Digit1" || code === "Numpad1") {
           event.preventDefault();
-          setActiveSection("chat");
+          handleSectionChange("chat");
           setIsJobsDrawerOpen(false);
         } else if (key === "2" || code === "Digit2" || code === "Numpad2") {
           event.preventDefault();
-          setActiveSection("coding");
+          handleSectionChange("coding");
           setIsJobsDrawerOpen(false);
         } else if (key === "3" || code === "Digit3" || code === "Numpad3") {
           event.preventDefault();
-          setActiveSection("documents");
+          handleSectionChange("documents");
           setIsJobsDrawerOpen(false);
         } else if (key === "4" || code === "Digit4" || code === "Numpad4") {
           event.preventDefault();
-          setActiveSection("translation");
+          handleSectionChange("translation");
           setIsJobsDrawerOpen(false);
         } else if (key === "5" || code === "Digit5" || code === "Numpad5") {
           event.preventDefault();
-          setActiveSection("images");
+          handleSectionChange("images");
           setIsJobsDrawerOpen(false);
         } else if (key === "6" || code === "Digit6" || code === "Numpad6") {
           event.preventDefault();
-          setActiveSection("settings");
+          handleSectionChange("settings");
           setIsJobsDrawerOpen(false);
         } else if (key === "7" || code === "Digit7" || code === "Numpad7") {
           event.preventDefault();
-          setActiveSection("graph");
+          handleSectionChange("graph");
           setIsJobsDrawerOpen(false);
         }
       }
@@ -99,7 +103,7 @@ export function AppContent() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
+  }, [handleSectionChange]);
 
   const previousSectionRef = useRef<SectionId>(activeSection);
   useEffect(() => {
@@ -117,9 +121,9 @@ export function AppContent() {
       setDroppedCodingFiles(files);
     } else {
       setDroppedDocumentFiles(files);
-      setActiveSection("documents");
+      handleSectionChange("documents");
     }
-  }, [activeSection]);
+  }, [activeSection, handleSectionChange]);
 
   return (
     <div className="desktop-shell" data-theme={theme}>
@@ -147,7 +151,7 @@ export function AppContent() {
           onOpenJobsDrawer={() => setIsJobsDrawerOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
-        <section key={activeSection} className={`workspace-content workspace-content--${activeSection} workspace-section-animate`} aria-labelledby="workspace-title">
+        <section className={`workspace-content workspace-content--${activeSection} workspace-section-animate`} aria-labelledby="workspace-title">
           {setup.statusChecked && setup.backendStatus.backendTone === "offline" && (
             <div className="feedback-banner feedback-banner--error feedback-banner--spaced" role="alert">
               {shouldSurfaceRefreshFailure(setup.backendStatus.refreshStatus)
@@ -167,7 +171,7 @@ export function AppContent() {
               ocrLastCheckedAt={setup.ocrStartupPrompt.lastCheckedAt}
               isChecking={setup.isRecheckingOllama}
               isConfiguringOcr={setup.ocrStartupPrompt.isConfiguring}
-              onOpenSettings={() => setActiveSection("settings")}
+              onOpenSettings={() => handleSectionChange("settings")}
               onInstallOllama={() => void setup.handleInstallOllama()}
               onConfigureOcr={(runtimeTarget) => void setup.ocrStartupPrompt.configure(runtimeTarget)}
               onCancelOcr={() => void setup.ocrStartupPrompt.cancel()}
@@ -186,23 +190,35 @@ export function AppContent() {
             />
           </div>
           <Suspense fallback={<SkeletonSection />}>
-            {activeSection === "documents" && (
-              <DocumentsSection
-                onLibraryChanged={notifyDocumentLibraryChanged}
-                droppedFiles={droppedDocumentFiles}
-                onHandledDroppedFiles={() => setDroppedDocumentFiles(null)}
-              />
+            {visitedSections.has("documents") && (
+              <div hidden={activeSection !== "documents"} className="documents-section-wrapper">
+                <DocumentsSection
+                  onLibraryChanged={notifyDocumentLibraryChanged}
+                  droppedFiles={droppedDocumentFiles}
+                  onHandledDroppedFiles={() => setDroppedDocumentFiles(null)}
+                />
+              </div>
             )}
-            {activeSection === "graph" && <GraphSection />}
-            {activeSection === "images" && <ImagesSection />}
+            {visitedSections.has("graph") && (
+              <div hidden={activeSection !== "graph"} className="graph-section-wrapper">
+                <GraphSection />
+              </div>
+            )}
+            {visitedSections.has("images") && (
+              <div hidden={activeSection !== "images"} className="images-section-wrapper">
+                <ImagesSection />
+              </div>
+            )}
 
-            {activeSection === "translation" && (
-              <TranslationSection
-                models={setup.ollamaModels}
-                defaultModel={setup.ollamaSettings?.defaultTranslationModel ?? null}
-                ollamaStatus={setup.ollamaStatus}
-                loadError={setup.ollamaLoadError}
-              />
+            {visitedSections.has("translation") && (
+              <div hidden={activeSection !== "translation"} className="translation-section-wrapper">
+                <TranslationSection
+                  models={setup.ollamaModels}
+                  defaultModel={setup.ollamaSettings?.defaultTranslationModel ?? null}
+                  ollamaStatus={setup.ollamaStatus}
+                  loadError={setup.ollamaLoadError}
+                />
+              </div>
             )}
             <div hidden={activeSection !== "coding"} className="coding-section-wrapper">
               <CodingSection
@@ -214,21 +230,23 @@ export function AppContent() {
                 onHandledDroppedFiles={() => setDroppedCodingFiles(null)}
               />
             </div>
-            {activeSection === "settings" && (
-              <SettingsSection
-                settings={setup.ollamaSettings}
-                status={setup.ollamaStatus}
-                models={setup.ollamaModels}
-                initialDiagnostics={setup.diagnostics}
-                loadError={setup.ollamaLoadError}
-                onDataChanged={async () => {
-                  await Promise.all([
-                    setup.backendQuery.refetch(),
-                    setup.ollamaQuery.refetch(),
-                    setup.diagnosticsQuery.refetch().catch(() => {})
-                  ]);
-                }}
-              />
+            {visitedSections.has("settings") && (
+              <div hidden={activeSection !== "settings"} className="settings-section-wrapper">
+                <SettingsSection
+                  settings={setup.ollamaSettings}
+                  status={setup.ollamaStatus}
+                  models={setup.ollamaModels}
+                  initialDiagnostics={setup.diagnostics}
+                  loadError={setup.ollamaLoadError}
+                  onDataChanged={async () => {
+                    await Promise.all([
+                      setup.backendQuery.refetch(),
+                      setup.ollamaQuery.refetch(),
+                      setup.diagnosticsQuery.refetch().catch(() => {})
+                    ]);
+                  }}
+                />
+              </div>
             )}
           </Suspense>
         </section>
@@ -242,7 +260,7 @@ export function AppContent() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         onSelectSection={(section) => {
-          setActiveSection(section);
+          handleSectionChange(section);
           setIsJobsDrawerOpen(false);
         }}
       />

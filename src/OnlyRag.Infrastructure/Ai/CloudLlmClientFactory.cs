@@ -43,10 +43,10 @@ public sealed class CloudLlmClientFactory : ICloudLlmClientFactory
     {
         return config.Provider switch
         {
-            CloudLlmProvider.AzureOpenAi => new OpenAiCompatibleChatClient(_httpClient, GetAzureEndpoint(config), config.ChatModel, apiKey, isAzure: true, config.ApiVersion),
-            CloudLlmProvider.OpenAi => new OpenAiCompatibleChatClient(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "https://api.openai.com/v1" : config.Endpoint, config.ChatModel, apiKey, isAzure: false),
-            CloudLlmProvider.Anthropic => new AnthropicChatClient(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "https://api.anthropic.com/v1" : config.Endpoint, config.ChatModel, apiKey),
-            CloudLlmProvider.GoogleGemini => new GoogleGeminiChatClient(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "https://generativelanguage.googleapis.com/v1beta" : config.Endpoint, config.ChatModel, apiKey),
+            CloudLlmProvider.AzureOpenAi => new OpenAiCompatibleChatClient(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, GetAzureEndpoint(config)), config.ChatModel, apiKey, isAzure: true, config.ApiVersion),
+            CloudLlmProvider.OpenAi => new OpenAiCompatibleChatClient(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, config.Endpoint), config.ChatModel, apiKey, isAzure: false),
+            CloudLlmProvider.Anthropic => new AnthropicChatClient(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, config.Endpoint), config.ChatModel, apiKey),
+            CloudLlmProvider.GoogleGemini => new GoogleGeminiChatClient(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, config.Endpoint), config.ChatModel, apiKey),
             _ => new OllamaHttpChatClient(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "http://localhost:11434" : config.Endpoint, config.ChatModel)
         };
     }
@@ -55,9 +55,9 @@ public sealed class CloudLlmClientFactory : ICloudLlmClientFactory
     {
         return config.Provider switch
         {
-            CloudLlmProvider.AzureOpenAi => new OpenAiCompatibleEmbeddingGenerator(_httpClient, GetAzureEndpoint(config), config.EmbeddingModel, apiKey, isAzure: true, config.ApiVersion),
-            CloudLlmProvider.OpenAi => new OpenAiCompatibleEmbeddingGenerator(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "https://api.openai.com/v1" : config.Endpoint, config.EmbeddingModel, apiKey, isAzure: false),
-            CloudLlmProvider.GoogleGemini => new GoogleGeminiEmbeddingGenerator(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "https://generativelanguage.googleapis.com/v1beta" : config.Endpoint, config.EmbeddingModel, apiKey),
+            CloudLlmProvider.AzureOpenAi => new OpenAiCompatibleEmbeddingGenerator(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, GetAzureEndpoint(config)), config.EmbeddingModel, apiKey, isAzure: true, config.ApiVersion),
+            CloudLlmProvider.OpenAi => new OpenAiCompatibleEmbeddingGenerator(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, config.Endpoint), config.EmbeddingModel, apiKey, isAzure: false),
+            CloudLlmProvider.GoogleGemini => new GoogleGeminiEmbeddingGenerator(_httpClient, CloudLlmEndpointValidator.Validate(config.Provider, config.Endpoint), config.EmbeddingModel, apiKey),
             _ => new OllamaHttpEmbeddingGenerator(_httpClient, string.IsNullOrWhiteSpace(config.Endpoint) ? "http://localhost:11434" : config.Endpoint, config.EmbeddingModel)
         };
     }

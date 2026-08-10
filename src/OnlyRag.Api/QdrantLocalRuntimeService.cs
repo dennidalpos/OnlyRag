@@ -34,6 +34,15 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
         Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
+        string? binaryPath = ResolveBinaryPath();
+        if (settings.UseLocalBundledServer && binaryPath is null)
+        {
+            return CreateUnavailableStatus(
+                settings,
+                endpoint,
+                "Runtime Qdrant locale non installato: qdrant.exe non è presente nell'output dell'app. Esegui scripts\\Download-Qdrant.ps1 e ricompila.");
+        }
+
         string? error = null;
         bool reachable = false;
         try
@@ -68,7 +77,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
             endpoint.Scheme == Uri.UriSchemeHttps,
             !string.IsNullOrWhiteSpace(settings.ApiKey),
             Version: null,
-            ResolveBinaryPath(),
+            binaryPath,
             ResolveConfigPath(),
             ResolveStorageDirectory(),
             ReadPid(),
@@ -84,6 +93,11 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
+        if (!settings.UseLocalBundledServer)
+        {
+            throw new InvalidOperationException("L'avvio locale di Qdrant è disabilitato nelle impostazioni.");
+        }
+
         QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
         if (currentStatus.IsReachable)
         {

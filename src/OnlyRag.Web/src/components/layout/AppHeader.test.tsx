@@ -27,6 +27,7 @@ describe("AppHeader", () => {
     expect(status).not.toHaveTextContent("Ora");
     expect(screen.getByTitle(/Ora corrente/)).toBeInTheDocument();
     expect(container.querySelector(".status-row__operations")).toHaveTextContent(/Operazioni.*Ora/);
+    expect(screen.getByRole("button", { name: /Apri operazioni in background/ })).toBeInTheDocument();
   });
 
   it("opens theme switcher menu and changes active theme", async () => {
@@ -49,6 +50,8 @@ describe("AppHeader", () => {
     await user.click(cyberOption);
 
     expect(document.documentElement.getAttribute("data-theme")).toBe("cyber");
+    await user.click(themeButton);
+    expect(screen.getByRole("button", { name: /Cyberpunk Neon/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows detailed module failures and probe durations in the health monitor", async () => {

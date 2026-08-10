@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentStepEvent, OllamaModel } from "../../api";
-import type { MultiAgentOrchestrationStatus } from "../../apiClient";
 import type { CodingMode, FileAction } from "./CodingSection.types";
 import { useAgentStreamHandler } from "./useAgentStreamHandler";
-import { useSmartIntentRouter } from "./useSmartIntentRouter";
 import { useWorkspaceManager } from "./useWorkspaceManager";
 
 export type CodingMessage = {
@@ -16,7 +14,6 @@ export type CodingMessage = {
   attachedFile?: string;
   isStreaming?: boolean;
   agentEvents?: AgentStepEvent[];
-  orchestrationStatus?: MultiAgentOrchestrationStatus | null;
 };
 
 export type UseCodingSectionControllerOptions = {
@@ -46,12 +43,6 @@ export function useCodingSectionController({
     handleApplyCodeToFileSilently: workspace.handleApplyCodeToFileSilently,
     handleDeleteWorkspaceFileSilently: workspace.handleDeleteWorkspaceFileSilently,
     setWorkspaceStatusMessage: workspace.setWorkspaceStatusMessage
-  });
-
-  const intentMeta = useSmartIntentRouter({
-    promptInput: agentStream.promptInput,
-    selectedWorkspaceFile: workspace.selectedWorkspaceFile,
-    attachedFileContent: workspace.attachedFileContent
   });
 
   useEffect(() => {
@@ -94,10 +85,6 @@ export function useCodingSectionController({
         .map((f) => `--- FILE ALLEGATO: ${f.name} (${(f.sizeBytes / 1024).toFixed(1)} KB) ---\n${f.content}`)
         .join("\n\n");
       textToSend = `[CONTESTO FILE ALLEGATI AD-HOC:\n${filesContext}\n]\n\n${textToSend}`;
-    }
-
-    if (intentMeta.recommendedOperatingMode !== operatingMode) {
-      setOperatingMode(intentMeta.recommendedOperatingMode);
     }
 
     return agentStream.handleSendAgentMessage(textToSend);

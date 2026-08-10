@@ -1,6 +1,6 @@
-# Motore Agenti Autonomi (Edizione SOTA)
+# Motore Agenti Autonomi
 
-OnlyRag include un motore per agenti autonomi di sviluppo software e problem solving local-first integrato direttamente nel backend C# ASP.NET Core in-process (`src/OnlyRag.Api`) e supportato dalla persistenza SQLite (`src/OnlyRag.Infrastructure`).
+OnlyRag include un motore per agenti autonomi di sviluppo software e problem solving local-first integrato nel backend C# ASP.NET Core in-process (`src/OnlyRag.Api`) e supportato dalla persistenza SQLite (`src/OnlyRag.Infrastructure`).
 
 ---
 
@@ -87,4 +87,3 @@ flowchart TD
 
 - Dataset di valutazione: [`docs/agent-evaluation.dataset.json`](agent-evaluation.dataset.json).
 - Definisce obiettivi di task ripetibili, numero di passaggi previsti, limiti di latenza e criteri di successo per il testing continuo del motore agenti.
-

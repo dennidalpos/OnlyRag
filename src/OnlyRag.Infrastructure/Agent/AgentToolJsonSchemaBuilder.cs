@@ -21,7 +21,6 @@ public static class AgentToolJsonSchemaBuilder
         "git_diff_inspect",
         "web_search",
         "ingest_office_doc",
-        "generate_image_onnx",
         "query_retrieval_index",
         "plan_task",
         "reflect_step",

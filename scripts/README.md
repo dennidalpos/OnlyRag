@@ -37,6 +37,21 @@ Pulizia workspace:
 pwsh .\scripts\Clean.ps1
 ```
 
+## Utility di qualità
+
+`Format-Code.ps1` e `Lint-Code.ps1` sono gli entrypoint unici per la manutenzione automatica.
+Eseguirli dalla radice del repository e sempre in sequenza:
+
+```powershell
+pwsh .\scripts\Format-Code.ps1 -CheckOnly
+pwsh .\scripts\Lint-Code.ps1 -Configuration Release
+```
+
+Il primo controlla `dotnet format` e i controlli Prettier/testo configurati dal frontend; il
+secondo esegue typecheck TypeScript, ESLint e build .NET con gli analyzer attivi. Per applicare la
+formattazione usare `Format-Code.ps1` senza `-CheckOnly`. Nessuno dei due script avvia processi
+paralleli e ogni errore interrompe la sequenza.
+
 Per la descrizione delle operazioni di sviluppo, packaging e handoff consultare
 [`docs/OPERATIONS.md`](../docs/OPERATIONS.md); questa pagina mantiene solo l'inventario
 degli script e i comandi canonici.
@@ -63,4 +78,3 @@ degli script e i comandi canonici.
 | Generate Brand Assets | `scripts\Generate-BrandAssets.ps1` | Genera asset grafici, icone e grafiche di setup dal sorgente SVG. | Aggiornamento branding. |
 | Download Qdrant | `scripts\Download-Qdrant.ps1` | Scarica e verifica l'eseguibile Qdrant dal manifest. | Quando il payload manca. |
 | Clean Generated Outputs | `scripts\Clean.ps1` | Rimuove tutti gli output di build, gli artefatti e la cache. | Pulizia locale. |
-

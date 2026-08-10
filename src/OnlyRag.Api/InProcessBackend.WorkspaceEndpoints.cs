@@ -160,6 +160,10 @@ internal static class WorkspaceEndpoints
                 var result = await service.ExecuteCommandAsync(request, ct);
                 return Results.Ok(result);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status403Forbidden);
+            }
             catch (Exception ex)
             {
                 return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -167,5 +171,4 @@ internal static class WorkspaceEndpoints
         });
     }
 }
-
 

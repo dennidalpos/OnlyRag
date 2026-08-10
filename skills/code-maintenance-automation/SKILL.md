@@ -1,71 +1,53 @@
 ---
 name: code-maintenance-automation
-description: Technical skill for automated code maintenance, linting, formatting, and test verification across OnlyRag C# .NET 10 solution and React 19 / TypeScript frontend.
+description: Official-source guidance for the repository formatting, linting, build and serial test utilities.
 ---
 
-# Code Maintenance & Automation Skill
+# Code Maintenance Automation Skill
 
-This skill provides operational guidance for maintaining code quality, formatting, static analysis, and test verification across the OnlyRag repository.
+Use this skill for changes to `scripts/`, project quality configuration, or repository-wide verification. The utilities are PowerShell entrypoints executed from the repository root.
 
-## 1. Official Documentation Sources
+## Official sources
 
-- **Microsoft .NET Formatting & Analyzers**: [learn.microsoft.com/dotnet/core/tools/dotnet-format](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format)
-- **ESLint Documentation**: [eslint.org/docs](https://eslint.org/docs/latest/)
-- **Prettier Code Formatter**: [prettier.io/docs](https://prettier.io/docs/en/)
-- **TypeScript Compiler Options**: [typescriptlang.org/tsconfig](https://www.typescriptlang.org/tsconfig/)
-- **PowerShell Scripting Guidelines**: [learn.microsoft.com/powershell/scripting/developer/cmdlet/cmdlet-development-guidelines](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/cmdlet-development-guidelines)
+- .NET format: https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format
+- .NET analyzers and code style: https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/overview
+- PowerShell scripting: https://learn.microsoft.com/en-us/powershell/scripting/overview
+- npm scripts: https://docs.npmjs.com/cli/v11/using-npm/scripts
+- TypeScript compiler: https://www.typescriptlang.org/docs/handbook/compiler-options.html
+- ESLint: https://eslint.org/docs/latest/
+- Prettier: https://prettier.io/docs/en/
+- Vitest: https://vitest.dev/guide/
+- xUnit command line: https://xunit.net/docs/getting-started/netcore/cmdline
 
-## 2. Maintenance Commands Summary
+Only vendor or project-maintainer primary documentation may be added to this list. Do not use blogs, copied snippets or unverified benchmark claims as operational authority.
 
-All maintenance commands can be run from the repository root using PowerShell 7 (`pwsh`):
+## Utility contracts
 
-### Code Formatting
+- `scripts\Format-Code.ps1`: runs `dotnet format` for the solution and the configured frontend Prettier/text checks. Use `-CheckOnly` in CI or before handoff.
+- `scripts\Lint-Code.ps1`: runs TypeScript typecheck, ESLint and the .NET analyzer build. Use `-Configuration Release` to enforce warnings as errors.
+- `scripts\Test-Code.ps1`: runs Vitest and the .NET suite with serial execution; slow integration and Playwright runs are opt-in.
+- `scripts\test-agent.ps1`: compact PASS/FAIL runner for agent work; `-Full` enables the complete manual suite.
+- `scripts\Invoke-Gate.ps1`: canonical readiness gate. `-Fast` skips tests and audits; the Release gate runs the configured verification stages.
+
+The frontend package scripts are the source of truth for their individual commands. Do not duplicate command lists in new scripts; call the existing scripts and propagate non-zero exit codes.
+
+## Required execution order
+
+Run checks one at a time. Stop on the first failure, correct it, and rerun that check before continuing:
+
 ```powershell
-# Format all .NET C# code and Web frontend code (Prettier)
-pwsh .\scripts\Format-Code.ps1
-
-# Verify formatting without modifying files
 pwsh .\scripts\Format-Code.ps1 -CheckOnly
-```
-
-### Static Analysis & Linting
-```powershell
-# Run ESLint, TypeScript typecheck, and .NET analyzer checks
 pwsh .\scripts\Lint-Code.ps1 -Configuration Release
-```
-
-### Automated Testing
-```powershell
-# Run agent-optimized fast test suite (compact PASS/FAIL summary)
 pwsh .\scripts\test-agent.ps1
-
-# Run Vitest unit tests and .NET unit tests (default compact AI summary)
-pwsh .\scripts\Test-Code.ps1 -Fast
-
-# Run full solution integration tests
-pwsh .\scripts\Test-Code.ps1 -IncludeIntegration
-
-# Include Playwright end-to-end specifications
-pwsh .\scripts\Test-Code.ps1 -IncludeE2e
-
-# Run with full verbose console output (manual developer debugging)
-pwsh .\scripts\Test-Code.ps1 -VerboseOutput
-```
-
-### Canonical Gate Verification
-```powershell
-# Fast verification gate (preflight, typecheck, lint, builds, manifest checks - recommended for AI)
 pwsh .\scripts\Invoke-Gate.ps1 -Fast
-
-# Full release verification gate with tests (compact AI output)
-pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
-
-# Release verification gate with verbose logs
-pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release -VerboseOutput
 ```
 
-## 3. Operational Best Practices
+Use the full Release gate before packaging or release handoff. Do not start test, build or lint processes concurrently.
 
-1. **Pre-Commit / Pre-Handoff Checks**: Always execute `Format-Code.ps1` and `Lint-Code.ps1` before declaring tasks finished.
-2. **Zero Debt Principle**: Fix all linting warnings and typecheck errors; do not suppress warnings with ad-hoc comments unless strictly required by platform interop.
-3. **Cross-Platform Compatibility**: Keep all scripts compatible with PowerShell 7 (`#requires -Version 7.0`) and relative workspace paths.
+## Script implementation rules
+
+- Use `#requires -Version` consistently with the existing script (`5.1` for gate/test scripts, `7.0` for formatting/linting).
+- Resolve paths from `$PSScriptRoot`; never depend on the caller's current directory after the root entrypoint has started.
+- Set `$ErrorActionPreference = "Stop"` and propagate native command exit codes. Do not catch and ignore failures.
+- Keep output compact in agent mode and provide verbose output only through an explicit switch.
+- Do not mutate source files during check-only or gate operations.

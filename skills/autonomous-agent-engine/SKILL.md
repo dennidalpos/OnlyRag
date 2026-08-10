@@ -12,11 +12,11 @@ This skill provides operational and technical standards for developing, maintain
 - **Microsoft .NET 10 Task & Channel Concurrent Execution**: [learn.microsoft.com/dotnet/standard/threads/system-threading-channels](https://learn.microsoft.com/en-us/dotnet/standard/threads/system-threading-channels)
 - **ASP.NET Core Server-Sent Events (SSE) & SignalR Streaming**: [learn.microsoft.com/aspnet/core/signalr/streaming](https://learn.microsoft.com/en-us/aspnet/core/signalr/streaming)
 - **EF Core 10 State & Transaction Management**: [learn.microsoft.com/ef/core/saving/transactions](https://learn.microsoft.com/en-us/ef/core/saving/transactions)
-- **MCTS & Tree-of-Thought Reasoning Literature**: [arxiv.org/abs/2305.10601](https://arxiv.org/abs/2305.10601)
+- **Microsoft .NET Task Parallel Library**: [learn.microsoft.com/dotnet/standard/parallel-programming/task-parallel-library-tpl](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl)
 
 ## 2. Core Architecture & Components
 
-OnlyRag includes a state-of-the-art, local-first autonomous agent engine superior to commercial agent frameworks (e.g. AutoGPT, CrewAI, LangGraph):
+OnlyRag includes a local-first autonomous agent engine:
 
 - **MCTS Tree-of-Thought Engine** (`AgentMctsStateMachine`): Monte Carlo Tree Search branch selection and active state tracking for complex multi-step reasoning.
 - **Durable Persistent Run State Machine** (`PersistentAgentRunStateMachine`): Persisted in SQLite schema v11 (`agent_runs`, `agent_run_transitions`). Enforces the strict phase sequence: `Plan` → `Act` → `Observe` → `Verify` → `Recover` → `Finalize`.

@@ -253,6 +253,16 @@ public sealed class AgentExecutionPolicyService : IAgentExecutionPolicyService
                 }
             }
 
+            string[] commandParts = cmdText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string executable = commandParts.Length > 0 ? Path.GetFileName(commandParts[0]) : string.Empty;
+            if (commandParts.Length == 0
+                || Path.IsPathRooted(commandParts[0])
+                || !new[] { "dotnet", "npm", "node", "git" }.Contains(executable, StringComparer.OrdinalIgnoreCase))
+            {
+                commandError = "L'eseguibile non appartiene alla allowlist del workspace agent.";
+                return true;
+            }
+
             if (ContainsShellMetacharacters(cmdText))
             {
                 commandError = "Command contains shell metacharacters that are not permitted in this sandbox.";

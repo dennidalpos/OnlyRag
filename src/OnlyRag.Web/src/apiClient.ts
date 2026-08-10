@@ -300,6 +300,49 @@ export async function apiStreamRequest<T = unknown>(
   }
 }
 
+export async function apiEventStream<T = unknown>(
+  path: string,
+  onEvent: (event: T) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const baseUrl = resolveBackendBaseUrl();
+  if (!baseUrl) {
+    throw new Error(resolveBackendErrorMessage() ?? "Il backend locale non è disponibile.");
+  }
+
+  const sessionToken = resolveBackendSessionToken();
+  const headers = new Headers({ Accept: "text/event-stream" });
+  if (sessionToken) {
+    headers.set(sessionToken.headerName, sessionToken.token);
+  }
+
+  const response = await fetch(resolveBackendRequestUrl(path, baseUrl), { headers, signal });
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response, path));
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Il backend non ha restituito uno stream log.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      onEvent(JSON.parse(trimmed.slice(6)) as T);
+    }
+  }
+}
+
 export async function apiAgentStreamRequest(
   path: string,
   body: unknown,

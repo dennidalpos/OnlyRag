@@ -10,7 +10,6 @@ import {
   Wrench,
   X
 } from "lucide-react";
-import { useSmartIntentRouter } from "./useSmartIntentRouter";
 import type { CodingMode } from "./CodingSection.types";
 
 type CodingPromptBarProps = {
@@ -52,12 +51,6 @@ export function CodingPromptBar({
   onCancelGeneration,
   onClearMessages
 }: CodingPromptBarProps) {
-  const intentMeta = useSmartIntentRouter({
-    promptInput,
-    selectedWorkspaceFile,
-    attachedFileContent
-  });
-
   return (
     <div className="coding-prompt-card">
       {/* ATTACHED FILE CHIP BAR */}
@@ -120,27 +113,8 @@ export function CodingPromptBar({
 
       {/* PROMPT ACTION TOOLBAR */}
       <div className="coding-prompt-actions">
-        {/* SMART INTENT BADGE & MODE SELECTOR */}
+        {/* MODE SELECTOR */}
         <div className="segmented-mode-selector">
-          <div
-            className="smart-intent-badge"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              borderRadius: 12,
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: `1px solid ${intentMeta.badgeColor}`,
-              color: intentMeta.badgeColor,
-              fontSize: "0.78rem",
-              fontWeight: 600
-            }}
-            title={intentMeta.description}
-          >
-            {intentMeta.label}
-          </div>
-
           <div className="coding-mode-selector" role="group" aria-label="Modalita prompt">
             {([
               { mode: "ask", label: "Ask", icon: <MessageCircle size={13} />, description: "Risposta e analisi senza modifiche" },

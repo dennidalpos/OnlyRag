@@ -26,6 +26,16 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+    <Content Include="..\..\packaging\qdrant\payload\qdrant.exe" Condition="Exists('..\..\packaging\qdrant\payload\qdrant.exe')">
+      <Link>qdrant\qdrant.exe</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\packaging\qdrant\payload\LICENSE" Condition="Exists('..\..\packaging\qdrant\payload\LICENSE')">
+      <Link>qdrant\LICENSE</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <PropertyGroup>

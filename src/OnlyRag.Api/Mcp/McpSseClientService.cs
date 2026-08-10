@@ -23,12 +23,10 @@ public sealed class McpSseClientService : IMcpSseClient, IDisposable
     public async Task<McpSseSessionStatus> ConnectAsync(McpServerConfig server, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
-        if (string.IsNullOrWhiteSpace(server.ServerUrl))
-        {
-            throw new ArgumentException($"ServerUrl non valido per il server MCP SSE '{server.Name}'.");
-        }
+        await McpSecurityValidator.ValidateAsync(server, cancellationToken);
+        Uri serverUri = new(server.ServerUrl!, UriKind.Absolute);
 
-        SseSession session = _sessions.GetOrAdd(server.Id, id => new SseSession(id, server.ServerUrl));
+        SseSession session = _sessions.GetOrAdd(server.Id, id => new SseSession(id, serverUri.ToString()));
 
         await session.Lock.WaitAsync(cancellationToken);
         try
@@ -43,7 +41,7 @@ public sealed class McpSseClientService : IMcpSseClient, IDisposable
 
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, server.ServerUrl);
+                using var request = new HttpRequestMessage(HttpMethod.Get, serverUri);
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
                 using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -93,19 +91,19 @@ public sealed class McpSseClientService : IMcpSseClient, IDisposable
                 // If endpointUrl is relative, combine with base ServerUrl
                 if (!string.IsNullOrEmpty(endpointUrl))
                 {
-                    if (Uri.TryCreate(new Uri(server.ServerUrl), endpointUrl, out var combined))
+                    if (Uri.TryCreate(serverUri, endpointUrl, out var combined))
                     {
-                        session.PostEndpoint = combined.ToString();
+                        session.PostEndpoint = (await McpSecurityValidator.ValidateEndpointAsync(serverUri, combined, cancellationToken)).ToString();
                     }
                     else
                     {
-                        session.PostEndpoint = endpointUrl;
+                        throw new InvalidOperationException("Endpoint MCP SSE non valido.");
                     }
                 }
                 else
                 {
                     // Fallback to ServerUrl if endpoint event omitted
-                    session.PostEndpoint = server.ServerUrl;
+                    session.PostEndpoint = serverUri.ToString();
                 }
 
                 session.SessionId = sessionId ?? Guid.NewGuid().ToString("N");

@@ -1,11 +1,11 @@
 ---
 name: rag-vector-retrieval
-description: Specialized skill for local Retrieval-Augmented Generation (RAG 2.0) in OnlyRag. Covers Dual-Tier Parent-Child document parsing (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV), SQLite FTS5 keyword indexing, Qdrant vector database storage, Query Transformation, Reciprocal Rank Fusion (RRF), Heuristic 2nd-stage re-ranking, CRAG evaluation, Ollama embeddings/LLM inference, and retrieval evaluation metrics.
+description: Specialized skill for local Retrieval-Augmented Generation in OnlyRag. Covers Dual-Tier Parent-Child document parsing (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV), SQLite FTS5 keyword indexing, Qdrant vector database storage, Query Transformation, Reciprocal Rank Fusion (RRF), Cross-Encoder re-ranking with heuristic fallback, CRAG evaluation, Ollama embeddings/LLM inference, and retrieval evaluation metrics.
 ---
 
-# Local RAG & Vector Retrieval Skill (Next-Gen 2.0)
+# Local RAG & Vector Retrieval Skill
 
-This skill provides guidelines and operational procedures for maintaining and optimizing the document ingestion, 2-stage vector retrieval, and LLM chat pipeline in OnlyRag.
+This skill provides guidelines and operational procedures for maintaining and optimizing the document ingestion, six-stage retrieval, and LLM chat pipeline in OnlyRag.
 
 ## 1. Official Documentation Sources
 
@@ -27,7 +27,7 @@ Dual-Tier Chunking strategy:
 - **Child Chunks (~150 tokens)**: High-resolution chunks indexed in SQLite FTS5 and vectorized on Qdrant.
 - **Parent Chunks (~1000 tokens / paragraph)**: Broad contextual chunks preserved in the SQLite database (`chunks` with `parent_chunk_id`).
 
-## 3. Next-Gen 6-Stage Retrieval Pipeline
+## 3. Six-Stage Retrieval Pipeline
 
 1. **Query Transformation**: Multi-Query expansion, Sub-Query decomposition, or HyDE generation via `IQueryTransformationService` and Ollama LLM expander (`ILlmQueryExpander`).
 2. **Coarse 1st-Stage Search**: Parallel retrieval from SQLite FTS5 and Qdrant HNSW vector index.
@@ -35,7 +35,6 @@ Dual-Tier Chunking strategy:
 4. **2nd-Stage Re-ranking**: Cross-scoring `(Query, Chunk)` via `IReRankerService` (`OnnxCrossEncoderReRankerService` as primary cross-encoder, with `HeuristicReRankerService` as fallback).
 5. **Parent-Child Resolution**: Resolving high-scoring child chunks to their rich parent chunk context using `ParentChildChunkResolver`.
 6. **CRAG Evaluation & Grounded Citation**: Faithfulness confidence check via `CragEvaluator` and interactive `[Pag. X, Chunk Y]` citation badge formatting.
-7. **Subagent Execution Engine**: Background research subagent execution managed via `ISubagentRunner`.
 
 
 ## 4. Retrieval Evaluation & Metrics

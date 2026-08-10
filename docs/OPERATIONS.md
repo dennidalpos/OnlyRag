@@ -105,7 +105,7 @@ Prontezza completa dell'applicazione:
 pwsh .\scripts\Invoke-Gate.ps1 -Configuration Release
 ```
 
-Il gate esegue i controlli preflight, il ripristino delle dipendenze, typecheck/lint/format/test del frontend, test .NET, self-test prerequisiti installer, manifest OCR, build web e build .NET.
+Il gate completo esegue i controlli preflight, il ripristino delle dipendenze, typecheck/lint/format/test del frontend, test .NET, self-test prerequisiti installer, manifest OCR, build web e build .NET. Con `-Fast` i test vengono saltati.
 
 Prontezza per la creazione del pacchetto installer:
 
@@ -157,7 +157,7 @@ pwsh .\scripts\Build-Installer.ps1 -Configuration Release
 
 ## Configurazione del Runtime
 
-Perquisiti di variabile d'ambiente obbligatori: nessuno.
+Prerequisiti di variabile d'ambiente obbligatori: nessuno.
 
 Variabili d'ambiente opzionali:
 

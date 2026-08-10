@@ -46,6 +46,7 @@ public sealed class McpClientService : IMcpClientService, IDisposable
         {
             throw new ArgumentException("Server Id e Name non possono essere vuoti.");
         }
+        await McpSecurityValidator.ValidateAsync(config, cancellationToken);
 
         await _lock.WaitAsync(cancellationToken);
         try

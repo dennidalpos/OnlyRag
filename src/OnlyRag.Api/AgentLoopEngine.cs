@@ -1099,7 +1099,6 @@ internal sealed class AgentLoopEngine
             | run_command | commandLine, isAsync? | Execute PowerShell 7 command |
             | web_search | query, domain? | DuckDuckGo web search |
             | ingest_office_doc | relativePath, forceOcr? | RAG ingestion of Office/PDF documents |
-            | generate_image_onnx | prompt, aspectRatio? | ONNX DirectML image generation |
             | query_retrieval_index | query, topK? | Hybrid FTS5+Qdrant RAG search |
             | plan_task | steps[{description}] | Create or update a dynamic plan checklist |
             | reflect_step | stepId, status, learnings | Record key facts after a completed action |

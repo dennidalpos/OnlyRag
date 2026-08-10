@@ -6,19 +6,19 @@
 
 [![CI](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml/badge.svg)](https://github.com/dennidalpos/OnlyRag/actions/workflows/ci.yml)
 
-OnlyRag è un'applicazione desktop Windows per la gestione di una libreria documentale locale con ricerca guidata da Ollama e Cloud LLM, chat RAG a 6 stadi, OCR Dual-Engine, traduzione locale e generazione di immagini ONNX DirectML.
+OnlyRag è un'applicazione desktop Windows per la gestione di una libreria documentale locale con ricerca guidata da Ollama e provider Cloud LLM configurabili, chat RAG a 6 stadi, OCR Dual-Engine, traduzione locale e generazione di immagini ONNX DirectML.
 
-L'applicazione è 100% local-first. Documenti, indici, job, impostazioni, storico chat, cache OCR, log e profili WebView2 risiedono in `%LOCALAPPDATA%\OnlyRag`.
+L'applicazione è local-first: documenti, indici, job, impostazioni, storico chat, cache OCR, log e profili WebView2 risiedono in `%LOCALAPPDATA%\OnlyRag`. I provider Cloud LLM sono opzionali e si attivano esplicitamente dalle impostazioni.
 
 ## Funzionalità Supportate
 
 - Importazione di TXT, Markdown, CSV, PDF, DOCX, XLSX, PPTX, immagini e archivi (ZIP, TAR, 7Z).
 - OCR per PDF scansionati ed immagini via **motore nativo C# DirectML ONNX** (zero dipendenze Python) o bridge opzionale Python PaddleOCR.
 - Generazione di embedding con Ollama o Cloud LLM e salvataggio vettori in Qdrant locale.
-- Ricerca ibrida 2 stadi su documenti selezionati tramite SQLite FTS5, Qdrant HNSW, **Knowledge Graph Traversal** e **Re-ranking ONNX Cross-Encoder** (`OnnxCrossEncoderReRankerService`).
+- Pipeline di recupero a 6 stadi su documenti selezionati, con SQLite FTS5, Qdrant HNSW, **Knowledge Graph Traversal** e **Re-ranking ONNX Cross-Encoder** (`OnnxCrossEncoderReRankerService`).
 - Esplorazione interattiva dei concetti e delle relazioni tramite il **Visualizzatore Knowledge Graph** (`/api/graph/*`).
 - Chat sui documenti con verifica di confidenza **CRAG** e citazioni grounded `[Pag. X, Chunk Y]`.
-- Motore per **Agenti Autonomi SOTA** (ciclo a 6 fasi, orchestrazione subagenti DAG, memoria episodica).
+- Motore per agenti autonomi (ciclo a 6 fasi, orchestrazione subagenti DAG, memoria episodica).
 - Traduzione locale dei documenti indicizzati con esportazione in TXT, Markdown, HTML, DOCX o PDF.
 - Generazione immagini ONNX DirectML locale (`lcm-sdxl-olive-onnx`) con editor canvas integrato.
 

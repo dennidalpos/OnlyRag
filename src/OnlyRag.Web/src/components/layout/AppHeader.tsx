@@ -223,6 +223,7 @@ export function AppHeader({
                       setTheme(t.id);
                       setShowThemeMenu(false);
                     }}
+                    aria-pressed={t.id === theme}
                   >
                     <div className="theme-menu-item__info">
                       <span className="theme-menu-item__name">{t.name}</span>
@@ -238,6 +239,7 @@ export function AppHeader({
             className={`status-badge status-badge--${jobsBadge.tone}`}
             onClick={onOpenJobsDrawer}
             title="Apri pannello operazioni in background"
+            aria-label={`Apri operazioni in background: ${jobsBadge.value}`}
           >
             <span>{jobsBadge.label}</span>
             <strong>{jobsBadge.value}</strong>

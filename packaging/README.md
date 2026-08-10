@@ -8,7 +8,7 @@ OnlyRag utilizza NSIS (Nullsoft Scriptable Install System) su Windows per impacc
 - [`../src/OnlyRag.App/OnlyRag.App.csproj`](../src/OnlyRag.App/OnlyRag.App.csproj): Progetto WPF di output.
 - [`../src/OnlyRag.Web/dist/index.html`](../src/OnlyRag.Web/dist/index.html): Build della UI web.
 - [`qdrant/manifest.json`](qdrant/manifest.json): Metadati facoltativi del runtime Qdrant. Questo repository mantiene il manifest per packaging Qdrant opzionale separato.
-- [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): Eseguibile di Qdrant scaricato da [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1). Non è richiesto per il pacchetto installer minimale.
+- [`qdrant/payload/qdrant.exe`](qdrant/payload/qdrant.exe): Eseguibile di Qdrant scaricato da [`../scripts/Download-Qdrant.ps1`](../scripts/Download-Qdrant.ps1). Se presente, viene incluso automaticamente nell'output dell'app.
 
 ## Compilazione
 
@@ -35,5 +35,4 @@ Output generati:
 - Percorso di installazione: `%LOCALAPPDATA%\Programs\OnlyRag`.
 - Conserva i dati utente in `%LOCALAPPDATA%\OnlyRag` alla disinstallazione.
 - Include il runtime .NET autotenuto, WebView2, SQLite, ONNX/DirectML, script OCR e UI web.
-- Non include il runtime Qdrant nel pacchetto minimale. Qdrant è fornito come componente opzionale separato e viene gestito on demand dall'applicazione.
-
+- Include il runtime Qdrant quando il payload è stato preparato; se manca, la diagnostica indica di eseguire `scripts\Download-Qdrant.ps1` prima della build.

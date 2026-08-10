@@ -12,9 +12,7 @@ import {
 } from "lucide-react";
 import type { RefObject } from "react";
 import { AgentToolCallCard } from "./AgentToolCallCard";
-import { MultiAgentOrchestrationCard } from "./MultiAgentOrchestrationCard";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
-import { ReasoningTraceVisualizer } from "./ReasoningTraceVisualizer";
 import type { CodingMessage } from "./useCodingSectionController";
 
 type CodingMessageListProps = {
@@ -90,19 +88,14 @@ export function CodingMessageList({
                 </div>
               )}
 
-              {/* AGENT EVENTS RENDERING & REASONING TRACE */}
-              {msg.sender === "assistant" || (msg.agentEvents && msg.agentEvents.length > 0) ? (
+              {msg.sender === "assistant" ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {msg.orchestrationStatus && (
-                    <MultiAgentOrchestrationCard status={msg.orchestrationStatus} />
+                  {msg.content && (
+                    <div className="vibe-message-content">
+                      <MarkdownRenderer content={msg.content} />
+                    </div>
                   )}
-                  {msg.agentEvents && msg.agentEvents.length > 0 && (
-                    <ReasoningTraceVisualizer
-                      events={msg.agentEvents}
-                      isStreaming={msg.isStreaming}
-                    />
-                  )}
-                  {msg.agentEvents?.map((evt, idx) => (
+                  {msg.agentEvents?.filter((evt) => evt.type === "approval_required").map((evt, idx) => (
                     <AgentToolCallCard
                       key={`${msg.id}_evt_${idx}`}
                       event={evt}
@@ -112,35 +105,12 @@ export function CodingMessageList({
                   {msg.isStreaming && (() => {
                     const events = msg.agentEvents || [];
                     const lastEvt = events.length > 0 ? events[events.length - 1] : null;
-
-                    const stepMatch = events
-                      .map((e) => (e.content || "").match(/\[Agent Step (\d+(?:\/\d+)?)\]/))
-                      .filter(Boolean);
-                    const currentStepLabel =
-                      stepMatch.length > 0 ? stepMatch[stepMatch.length - 1]![1] : String(events.length || 1);
-
-                    let statusText = `Passo ${currentStepLabel}: Caricamento modello ed elaborazione LLM in corso...`;
-                    if (lastEvt) {
-                      if (lastEvt.type === "tool_proposed" && lastEvt.toolCall) {
-                        statusText = `Passo ${currentStepLabel}: Esecuzione strumento '${lastEvt.toolCall.toolName}'...`;
-                      } else if (lastEvt.type === "tool_result" && lastEvt.toolResult) {
-                        statusText = `Passo ${currentStepLabel}: Completato '${lastEvt.toolResult.toolName}'. Analisi del risultato...`;
-                      } else if (lastEvt.type === "thought" || lastEvt.type === "thought_chunk") {
-                        const snippet = (lastEvt.content || "").trim().slice(-140);
-                        statusText = snippet
-                          ? `Passo ${currentStepLabel}: ${snippet}`
-                          : `Passo ${currentStepLabel}: Pensiero ed elaborazione in corso...`;
-                      } else if (lastEvt.type === "approval_required" && lastEvt.toolCall) {
-                        statusText = `Passo ${currentStepLabel}: Attesa approvazione utente per '${lastEvt.toolCall.toolName}'...`;
-                      }
-                    }
+                    const waitingForApproval = lastEvt?.type === "approval_required";
                     return (
                       <div className="vibe-agent-status-card">
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <Loader2 size={18} className="animate-spin text-indigo-400" style={{ flexShrink: 0 }} />
-                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {statusText}
-                          </span>
+                          <span>{waitingForApproval ? "In attesa della tua approvazione..." : "L'agente sta lavorando..."}</span>
                         </div>
                       </div>
                     );

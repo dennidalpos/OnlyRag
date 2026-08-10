@@ -207,13 +207,16 @@ internal sealed class WorkspaceService
     public async Task<bool> OpenExternalFileAsync(string relativeOrFullPath, CancellationToken cancellationToken = default)
     {
         WorkspaceConfig config = await GetConfigAsync(cancellationToken);
-        string targetPath = relativeOrFullPath;
-
-        if (!Path.IsPathRooted(targetPath))
+        if (!config.IsAuthorized || string.IsNullOrWhiteSpace(config.RootPath))
         {
-            if (string.IsNullOrWhiteSpace(config.RootPath)) return false;
-            targetPath = Path.Combine(config.RootPath, relativeOrFullPath);
+            return false;
         }
+
+        string targetPath = await ResolveSafePathAsync(
+            Path.IsPathRooted(relativeOrFullPath)
+                ? Path.GetRelativePath(config.RootPath, relativeOrFullPath)
+                : relativeOrFullPath,
+            cancellationToken);
 
         if (!File.Exists(targetPath) && !Directory.Exists(targetPath))
         {
@@ -263,20 +266,38 @@ internal sealed class WorkspaceService
             throw new InvalidOperationException("Nessun workspace di progetto autorizzato sul sistema per l'esecuzione di comandi.");
         }
 
-        string cmd = (request.Command ?? "").Trim();
-        string args = (request.Arguments ?? "").Trim();
-        string fullCommandLine = string.IsNullOrWhiteSpace(args) ? cmd : $"{cmd} {args}";
+        string commandLine = string.IsNullOrWhiteSpace(request.Arguments)
+            ? request.Command?.Trim() ?? string.Empty
+            : $"{request.Command?.Trim()} {request.Arguments.Trim()}";
+        string[] commandParts = commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (commandParts.Length == 0 || commandParts.Any(ContainsShellMetacharacters))
+        {
+            throw new UnauthorizedAccessException("Comando non valido: sono consentiti solo eseguibili e argomenti senza shell.");
+        }
+
+        string executable = commandParts[0];
+        string executableName = Path.GetFileName(executable);
+        string[] allowedExecutables = ["dotnet", "npm", "node", "git"];
+        if (Path.IsPathRooted(executable)
+            || !allowedExecutables.Contains(executableName, StringComparer.OrdinalIgnoreCase)
+            || commandParts.Skip(1).Any(IsForbiddenCommandArgument))
+        {
+            throw new UnauthorizedAccessException("Eseguibile non autorizzato dal workspace sandbox.");
+        }
 
         var psi = new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -NonInteractive -Command \"{fullCommandLine.Replace("\"", "\\\"")}\"",
+            FileName = executable,
             WorkingDirectory = config.RootPath,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+        foreach (string argument in commandParts.Skip(1))
+        {
+            psi.ArgumentList.Add(argument);
+        }
 
         using var process = new System.Diagnostics.Process { StartInfo = psi };
         process.Start();
@@ -307,16 +328,60 @@ internal sealed class WorkspaceService
             throw new InvalidOperationException("Nessun workspace di progetto e stato autorizzato sul sistema.");
         }
 
-        string root = Path.GetFullPath(config.RootPath);
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.RootPath));
         string target = Path.GetFullPath(Path.Combine(root, relativePath.TrimStart('/', '\\')));
 
-        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        if (!IsPathWithinRoot(root, target) || ContainsReparsePointOutsideRoot(root, target))
         {
             throw new UnauthorizedAccessException("Tentativo di accesso esterno alla cartella di progetto autorizzata (Path Traversal bloccato).");
         }
 
         return target;
     }
+
+    private static bool IsPathWithinRoot(string root, string candidate)
+    {
+        string normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate));
+        return normalizedCandidate.Equals(root, StringComparison.OrdinalIgnoreCase)
+            || normalizedCandidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsReparsePointOutsideRoot(string root, string target)
+    {
+        string? current = File.Exists(target) || Directory.Exists(target)
+            ? target
+            : Path.GetDirectoryName(target);
+
+        while (!string.IsNullOrWhiteSpace(current) && IsPathWithinRoot(root, current))
+        {
+            if (File.Exists(current) || Directory.Exists(current))
+            {
+                FileAttributes attributes = File.GetAttributes(current);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return !Path.GetFullPath(current).Equals(root, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            if (Path.GetFullPath(current).Equals(root, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            current = Path.GetDirectoryName(current);
+        }
+
+        return false;
+    }
+
+    private static bool ContainsShellMetacharacters(string value) =>
+        value.IndexOfAny([';', '&', '|', '>', '<', '`', '"', '\'']) >= 0;
+
+    private static bool IsForbiddenCommandArgument(string value) =>
+        value.Equals("-c", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("--eval", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("-e", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("exec", StringComparison.OrdinalIgnoreCase);
 
     private async Task<PersistedWorkspaceData> LoadDataAsync(CancellationToken cancellationToken)
     {

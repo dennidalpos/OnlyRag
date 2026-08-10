@@ -15,7 +15,7 @@ flowchart TD
     I --> J["Operazioni utente: Chat, Documenti, Job, Traduzione, Agenti, Generazione Immagini, Impostazioni"]
 
     J --> K["Impostazioni: configurazione Ollama, Cloud LLM, Qdrant, OCR, esportazione PDF, modelli, ingestione, reset"]
-    K --> L["Endpoint esterni: Ollama, Cloud LLM (OpenAI, Anthropic, Groq, OpenRouter, DeepSeek), Qdrant, Python PaddleOCR, LibreOffice"]
+    K --> L["Dipendenze locali o configurabili: Ollama, Cloud LLM (Azure OpenAI, OpenAI, Anthropic, Google Gemini), Qdrant, Python PaddleOCR, LibreOffice"]
 
     J --> M["Documenti: importazione file con policy OCR e lingua del documento"]
     M --> N["Convalida limiti upload, quota storage, nomi file, deduplicazione hash, copia locale"]
@@ -42,7 +42,7 @@ flowchart TD
     AD --> AE["L'utente esamina/corregge le unità ed esporta in TXT/MD/HTML/DOCX/PDF"]
 
     J --> AF["Job: polling della coda, pausa/ripresa/annullamento/eliminazione job locali"]
-    J --> AI["Agenti: avvio o ripresa di un run agente autonomo SOTA (6 fasi)"]
+    J --> AI["Agenti: avvio o ripresa di un run agente autonomo (6 fasi)"]
     AI --> AJ["SQLite registra lo snapshot del run, le transizioni di fase, i budget e lo stato della conversazione"]
     AJ --> AK["PLAN → ACT → OBSERVE → VERIFY; i fallimenti passano da RECOVER"]
     AK --> AL["FINALIZE → COMPLETED, o ripresa di un run non terminale interrotto"]
@@ -57,7 +57,6 @@ L'applicazione WPF convalida l'ambiente Windows e WebView2, prepara le directory
 ## Workflow
 
 - **Importazione Documenti**: Convalida limiti locali, estrazione testo nativa (OpenXML/PDF/TXT), OCR automatico per immagini/PDF scansionati, generazione embedding via Ollama e salvataggio vettori su Qdrant.
-- **Ricerca e Chat RAG**: Retrieval ibrido a 6 stadi basato su SQLite FTS5, Qdrant HNSW, re-ranking ONNX Cross-Encoder (`OnnxCrossEncoderReRankerService`), Knowledge Graph Traversal e verifica runtime `GroundingVerifier`.
-- **Agenti Autonomi SOTA**: Ciclo a 6 fasi (`Plan` → `Act` → `Observe` → `Verify` → `Recover` → `Finalize`) guidato da `AgentLoopEngine`, memoria episodica e verifiche empiriche dei tool.
+- **Ricerca e Chat RAG**: Pipeline a 6 stadi basata su SQLite FTS5, Qdrant HNSW, re-ranking ONNX Cross-Encoder (`OnnxCrossEncoderReRankerService`), Knowledge Graph Traversal e verifica runtime `GroundingVerifier`.
+- **Agenti Autonomi**: Ciclo a 6 fasi (`Plan` → `Act` → `Observe` → `Verify` → `Recover` → `Finalize`) guidato da `AgentLoopEngine`, memoria episodica e verifiche empiriche dei tool.
 - **Chiusura**: Annullo sicuro dei job attivi, salvataggio dello stato utente e arresto controllato dei processi figli.
-backend.
