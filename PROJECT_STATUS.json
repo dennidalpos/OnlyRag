@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "lastUpdated": "2026-08-11T20:37:22+02:00",
-    "source": "Repository rescan and architecture review",
+    "lastUpdated": "2026-08-11T21:01:20+02:00",
+    "source": "Repository rescan, architecture review and installed-app log analysis",
     "statusLegend": {
       "planned": "Task identified but not started",
       "in_progress": "Implementation underway",
@@ -15,6 +15,68 @@
     }
   },
   "todos": [
+    {
+      "id": "p0-coding-chat-without-workspace",
+      "priority": "P0",
+      "status": "planned",
+      "title": "Mantenere Coding operativo come chat senza workspace",
+      "goal": "Consentire all'utente di inviare un prompt nella sezione Coding anche senza file o progetto selezionato, ottenendo una risposta appropriata dal modello scelto.",
+      "problem": "L'esecuzione dell'agente senza workspace lascia disponibili nel prompt strumenti che leggono file o eseguono comandi locali. Il modello puo quindi tentare un'operazione su disco non disponibile, produrre errori ripetuti e attivare i guard di loop invece di rispondere alla richiesta conversazionale.",
+      "scope": [
+        "Passare al system prompt lo stato esplicito del workspace, distinguendo una chat senza cartella da una run con progetto autorizzato.",
+        "Conservare l'invio al modello selezionato per richieste conversazionali, pianificazione, ricerca web e retrieval anche quando non esiste un workspace.",
+        "Intercettare prima dell'esecuzione i soli tool filesystem, repository e comandi locali che richiedono una cartella autorizzata.",
+        "Restituire per tali tool un messaggio localizzato che richieda la selezione della cartella e chiudere la run senza retry, duplicate guard o loop guard secondari.",
+        "Registrare il risultato e la motivazione nella traccia persistente della run, senza bypassare le policy di sicurezza del workspace."
+      ],
+      "acceptanceCriteria": [
+        "Una chat generica senza workspace invia il prompt al modello selezionato e visualizza la sua risposta finale.",
+        "Una richiesta che richiede file o comandi locali senza workspace informa chiaramente l'utente di selezionare una cartella e non ripete la tool call.",
+        "I tool indipendenti dal workspace restano utilizzabili senza cartella.",
+        "I test API verificano il percorso di tool locale senza workspace e i test frontend verificano la chat senza cartella.",
+        "Non sono introdotti accessi a disco fuori dal workspace autorizzato."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Api/AgentLoopEngine.cs",
+        "src/OnlyRag.Api/AgentWorkspaceContextEnricher.cs",
+        "src/OnlyRag.Infrastructure/Agent/WorkspaceToolExecutor.cs",
+        "src/OnlyRag.Web/src/components/coding/useAgentStreamHandler.ts",
+        "src/OnlyRag.Web/src/components/coding/CodingSection.test.tsx",
+        "tests/OnlyRag.Api.Tests"
+      ]
+    },
+    {
+      "id": "p1-qdrant-cold-start-observability",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Diagnosticare e ridurre il cold start di Qdrant",
+      "goal": "Rendere osservabile la fase di provisioning iniziale di Qdrant e ridurre il tempo di avvio quando il runtime e gia integro.",
+      "problem": "Il log bootstrap dell'app installata registra due avvii con Ensure_Qdrant_Runtime di circa 145 secondi, seguiti da avvii di circa 3 secondi. Il bootstrap riesce, ma il log non distingue provisioning, verifica manifest, estrazione, avvio processo e attesa health check, impedendo di localizzare il ritardo.",
+      "scope": [
+        "Aggiungere telemetria di durata strutturata per verifica manifest, provisioning, avvio del processo e health check del runtime Qdrant.",
+        "Identificare se il ritardo dipende dal primo download, dall'estrazione, dalla scansione antivirus, dalla porta o dal readiness probe.",
+        "Evitare nuovo provisioning quando binario, manifest e processo esistente sono validi, senza indebolire le verifiche di checksum.",
+        "Esporre nella diagnostica applicativa uno stato azionabile durante l'inizializzazione invece di lasciare la UI senza dettaglio fino al completamento.",
+        "Definire una soglia misurabile per distinguere cold start atteso da regressione su runtime gia disponibile."
+      ],
+      "acceptanceCriteria": [
+        "Il log identifica la fase che consuma il tempo di avvio di Qdrant.",
+        "Un runtime gia verificato non ripete download o estrazione al riavvio.",
+        "La UI o diagnostica indica che Qdrant e in provisioning e riporta un errore azionabile se il readiness check fallisce.",
+        "I test esistenti di manifest e runtime continuano a validare checksum e integrita.",
+        "Il comportamento viene misurato su almeno un cold start e un riavvio warm."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Infrastructure",
+        "src/OnlyRag.Api/StartupTracer.cs",
+        "src/OnlyRag.Api/DiagnosticsProbeCacheService.cs",
+        "src/OnlyRag.Web/src/components/settings/DiagnosticsPanel.tsx",
+        "scripts/ocr",
+        "packaging/qdrant"
+      ]
+    },
     {
       "id": "p1-split-agent-and-frontend-use-cases",
       "priority": "P1",
