@@ -4,7 +4,6 @@
     <ProjectReference Include="..\OnlyRag.Core\OnlyRag.Core.csproj" />
     <ProjectReference Include="..\OnlyRag.Infrastructure\OnlyRag.Infrastructure.csproj" />
     <ProjectReference Include="..\OnlyRag.Api\OnlyRag.Api.csproj" />
-    <ProjectReference Include="..\OnlyRag.Worker\OnlyRag.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

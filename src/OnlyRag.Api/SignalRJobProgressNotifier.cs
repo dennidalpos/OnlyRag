@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using OnlyRag.Api.Hubs;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OnlyRag.Core\OnlyRag.Core.csproj" />
-    <ProjectReference Include="..\OnlyRag.Worker\OnlyRag.Worker.csproj" />
+    <ProjectReference Include="..\OnlyRag.Jobs.Abstractions\OnlyRag.Jobs.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

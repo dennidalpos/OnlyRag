@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OnlyRag.Core;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Infrastructure.Storage;
 

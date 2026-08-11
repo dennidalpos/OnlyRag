@@ -9,7 +9,8 @@ OnlyRag è un'applicazione desktop Windows local-first composta da uno shell WPF
 - [`src/OnlyRag.Api`](../src/OnlyRag.Api): Backend Minimal API in-process, motore per agenti autonomi, endpoint dell'app, endpoint delle dipendenze, endpoint Cloud LLM, endpoint Graph, orchestrazione dei job, integrazione Ollama, gestione runtime Qdrant e mappatura errori per l'utente.
 - [`src/OnlyRag.Core`](../src/OnlyRag.Core): Contratti condivisi, DTO delle impostazioni, risposte standard (`ApiResponse<T>`), DTO del grafo e modelli di richiesta.
 - [`src/OnlyRag.Infrastructure`](../src/OnlyRag.Infrastructure): Storage SQLite schema v11, Knowledge Graph retrieval (`SqliteGraphRetrievalService`), Re-ranking Cross-Encoder ONNX (`OnnxCrossEncoderReRankerService` con fallback `HeuristicReRankerService`), Dual OCR engine (`OnnxDirectMlOcrEngine` nativo C# DirectML ONNX + `PaddleOcrEngine` bridge Python), client factory Cloud LLM (`CloudLlmClientFactory`), generazione immagini ONNX DirectML, conversione ed esportazione PDF via LibreOffice, motori di retrieval e adapter vettoriali Qdrant.
-- [`src/OnlyRag.Worker`](../src/OnlyRag.Worker): Astrazioni per la coda locale dei job e gestione dello stato dei task in background.
+- [`src/OnlyRag.Jobs.Abstractions`](../src/OnlyRag.Jobs.Abstractions): Contratti, modelli e stato persistito della coda locale dei job.
+- Il runtime hosted della coda (`LocalJobWorkerService`) vive in [`src/OnlyRag.Api`](../src/OnlyRag.Api), mentre l'implementazione SQLite è in `src/OnlyRag.Infrastructure`.
 - [`tests`](../tests): Test xUnit per i layer .NET e host backend Playwright per i test di contratto e2e del frontend.
 - [`scripts`](../scripts): Automazione PowerShell 7 per bootstrap, gate di verifica, build, packaging, firma, brand asset, OCR e pulizia workspace.
 - [`packaging`](../packaging): Script NSIS e payload/manifest del runtime Qdrant integrato.
@@ -30,5 +31,9 @@ L'ingestione di documenti a lungo termine, l'OCR, i calcoli degli embedding e la
 ## Modello delle Dipendenze
 
 Lo sviluppo richiede .NET 10, npm da Node.js e PowerShell 7. I pacchetti installer per l'utente finale sono autotenuti per i componenti runtime .NET e includono il runtime Qdrant integrato. WebView2, Ollama, Python, NSIS e strumenti di firma sono prerequisiti esterni in base al workflow. LibreOffice è opzionale ed è utilizzato per l'esportazione PDF delle traduzioni.
+
+## Guardrail Architetturali
+
+Le dipendenze tra progetti sono fissate in modo esplicito e verificate da test automatici. L'Application layer può dipendere da Core, Jobs.Abstractions e Infrastructure tramite interfacce, ma non deve puntare direttamente all'API o allo shell WPF. L'API può usare Application, Core, Infrastructure e Jobs.Abstractions, mentre Infrastructure resta limitata a Core e Jobs.Abstractions. I test di architettura sotto `tests/OnlyRag.Application.Tests` falliscono se un progetto introduce riferimenti non consentiti.
 
 Nessun codice nel repository memorizza segreti o credenziali. I file di certificato PFX per la firma devono rimanere all'esterno del repository.

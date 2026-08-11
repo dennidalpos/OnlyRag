@@ -5,8 +5,7 @@ using OnlyRag.Core;
 using OnlyRag.Core.Logging;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 
@@ -63,14 +62,7 @@ public static partial class InProcessBackend
             BackendLog.Write(descriptor.StoragePaths, $"Local SQLite schema version {storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion}: {storageStatus.SchemaStatus}.");
             startupTracer.Record($"SQLite: Schema v{storageStatus.CurrentSchemaVersion}/{storageStatus.TargetSchemaVersion} ({storageStatus.SchemaStatus})");
 
-            using (EarlyBootstrapperLogger.TraceScope("Ensure_Qdrant_Runtime"))
-            {
-                await EnsureQdrantLocalRuntimeAsync(
-                    app,
-                    descriptor,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            startupTracer.Record("Qdrant: Local runtime status evaluated");
+            startupTracer.Record("Qdrant: Local runtime initialization scheduled");
 
             int recoveredJobs = await app.Services
                 .GetRequiredService<ILocalJobQueue>()
@@ -120,27 +112,4 @@ public static partial class InProcessBackend
         }
     }
 
-    private static async Task EnsureQdrantLocalRuntimeAsync(
-        WebApplication app,
-        InProcessBackendDescriptor descriptor,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            QdrantStatusResponse status = await app.Services
-                .GetRequiredService<QdrantLocalRuntimeService>()
-                .EnsureLocalServerAsync(
-                    app.Services.GetRequiredService<IQdrantVectorStore>(),
-                    cancellationToken);
-
-            if (!status.IsReachable)
-            {
-                BackendLog.Write(descriptor.StoragePaths, $"Qdrant local runtime unavailable: {status.Error ?? status.Warning ?? status.Status}");
-            }
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or TimeoutException or Grpc.Core.RpcException)
-        {
-            BackendLog.WriteException(descriptor.StoragePaths, null, "Qdrant local runtime startup failed.", ex);
-        }
-    }
 }

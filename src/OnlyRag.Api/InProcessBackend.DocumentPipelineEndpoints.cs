@@ -4,7 +4,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

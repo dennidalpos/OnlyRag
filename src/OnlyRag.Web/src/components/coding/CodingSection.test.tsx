@@ -29,7 +29,7 @@ describe("CodingSection", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { level: 2, name: /Coding & Vibe Hub/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Coding" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sfoglia Cartella/i })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Modalita prompt" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask" })).toHaveAttribute("aria-pressed", "false");
@@ -118,6 +118,49 @@ describe("CodingSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Risposta senza cartella!")).toBeInTheDocument();
     });
+  });
+
+  it("maps Ask mode to the read-only agent request", async () => {
+    const user = userEvent.setup();
+    const { calls } = mockApi([
+      {
+        path: "/api/workspace/config",
+        method: "GET",
+        response: {
+          rootPath: null,
+          isAuthorized: false,
+          canRead: false,
+          canWrite: false,
+          fileCount: 0,
+          lastVerifiedAt: null
+        }
+      },
+      {
+        path: "/api/agent/runs/resumable",
+        method: "GET",
+        response: []
+      },
+      {
+        path: "/api/agent/run-stream",
+        method: "POST",
+        response: 'data: {"type":"final_response","content":"Risposta read-only"}\n\ndata: [DONE]\n\n'
+      }
+    ]);
+
+    render(
+      <CodingSection
+        models={[createModel({ name: "qwen2.5-coder" })]}
+        defaultModel="qwen2.5-coder"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await user.type(screen.getByPlaceholderText(/Inserisci l'obiettivo o la domanda/i), "Analizza il progetto");
+    await user.click(screen.getByRole("button", { name: /Invia \(Ctrl\+Enter\)/i }));
+
+    await waitFor(() => expect(screen.getByText("Risposta read-only")).toBeInTheDocument());
+    const request = calls.find((call) => call.path === "/api/agent/run-stream");
+    expect(JSON.parse(String(request?.body))).toMatchObject({ mode: "ask" });
   });
 
   it("allows clearing the selected workspace folder", async () => {

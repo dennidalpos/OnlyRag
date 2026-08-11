@@ -1,14 +1,11 @@
 import {
   ArrowDown,
-  Bot,
   CheckCircle2,
-  ExternalLink,
-  FileCode,
-  FileDiff,
-  Loader2,
-  Save,
-  Trash2,
-  User
+  CircleDotDashed,
+  Clock3,
+  Terminal,
+  User,
+  XCircle
 } from "lucide-react";
 import type { RefObject } from "react";
 import { AgentToolCallCard } from "./AgentToolCallCard";
@@ -17,183 +14,133 @@ import type { CodingMessage } from "./useCodingSectionController";
 
 type CodingMessageListProps = {
   messages: CodingMessage[];
-  selectedModel: string;
   chatContainerRef: RefObject<HTMLDivElement | null>;
   isUserScrolledUp?: boolean;
   onScroll?: () => void;
   onScrollToBottom?: () => void;
   onApproveAgentToolCall: (callId: string, approved: boolean) => void;
-  onOpenDiff: (file: string, code?: string, applied?: boolean) => void;
-  onApplyCodeToFile: (file: string, code: string) => void;
-  onDeleteWorkspaceFile: (file: string) => void;
-  onOpenExternalFile: (file: string) => void;
 };
+
+function eventTitle(type: string) {
+  switch (type) {
+    case "state_changed":
+      return "Stato agente";
+    case "plan_update":
+    case "plan_updated":
+      return "Piano";
+    case "tool_proposed":
+      return "Strumento richiesto";
+    case "tool_result":
+      return "Risultato strumento";
+    case "error":
+      return "Errore";
+    default:
+      return "Attivita";
+  }
+}
 
 export function CodingMessageList({
   messages,
-  selectedModel,
   chatContainerRef,
   isUserScrolledUp = false,
   onScroll,
   onScrollToBottom,
-  onApproveAgentToolCall,
-  onOpenDiff,
-  onApplyCodeToFile,
-  onDeleteWorkspaceFile,
-  onOpenExternalFile
+  onApproveAgentToolCall
 }: CodingMessageListProps) {
   return (
-    <div style={{ position: "relative", flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <div ref={chatContainerRef} className="vibe-chat-messages" onScroll={onScroll}>
+    <div className="coding-timeline-shell">
+      <div ref={chatContainerRef} className="coding-timeline" onScroll={onScroll} aria-live="polite">
         {messages.length === 0 ? (
-          <div className="vibe-chat-empty-state">
-            <div className="vibe-chat-empty-state__icon">
-              <Bot size={48} style={{ color: "#818cf8" }} />
-            </div>
-            <h3 className="vibe-chat-empty-state__title">
-              Coding &amp; Vibe Hub — Agente Autonomo
-            </h3>
-            <p className="vibe-chat-empty-state__text">
-              Inserisci un obiettivo in linguaggio naturale. L'agente esplorerà il progetto, leggerà i file, applicherà le modifiche, eseguità i comandi di compilazione/test ed effettuerà l'auto-correzione in loop.
-            </p>
+          <div className="coding-timeline__empty">
+            <Terminal size={28} aria-hidden="true" />
+            <h3>Inizia un task di coding</h3>
+            <p>Descrivi il risultato atteso. L&apos;agente esplora, modifica e verifica solo attraverso gli strumenti autorizzati.</p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`vibe-message-bubble ${
-                msg.sender === "user"
-                  ? "vibe-message-bubble--user"
-                  : msg.agentEvents && msg.agentEvents.length > 0
-                    ? "vibe-message-bubble--agent"
-                    : "vibe-message-bubble--assistant"
-              }`}
+          messages.map((message) => (
+            <article
+              key={message.id}
+              className={`coding-timeline-entry coding-timeline-entry--${message.sender}`}
             >
-              <div className="vibe-message-header">
-                <span className="vibe-message-sender" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {msg.sender === "user" ? (
-                    <><User size={14} /> Tu</>
-                  ) : msg.agentEvents ? (
-                    <><Bot size={14} style={{ color: "#4ade80" }} /> Agente ({selectedModel})</>
-                  ) : (
-                    <><Bot size={14} style={{ color: "#38bdf8" }} /> Assistant ({selectedModel})</>
-                  )}
+              <header className="coding-timeline-entry__header">
+                <span className="coding-timeline-entry__author">
+                  {message.sender === "user" ? <User size={14} aria-hidden="true" /> : <CircleDotDashed size={14} aria-hidden="true" />}
+                  {message.sender === "user" ? "Tu" : "Agente"}
                 </span>
-                <span className="vibe-message-timestamp">{msg.timestamp}</span>
-              </div>
+                <time dateTime={message.timestamp}>
+                  <Clock3 size={12} aria-hidden="true" />
+                  {message.timestamp}
+                </time>
+              </header>
 
-              {msg.attachedFile && (
-                <div className="vibe-message-attached-file" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <FileCode size={14} /> File allegato: {msg.attachedFile}
+              {message.attachedFile && <p className="coding-timeline-entry__context">Contesto: {message.attachedFile}</p>}
+
+              {message.sender === "user" && (
+                <div className="coding-timeline-entry__content">
+                  <MarkdownRenderer content={message.content} />
                 </div>
               )}
 
-              {msg.sender === "assistant" ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {msg.content && (
-                    <div className="vibe-message-content">
-                      <MarkdownRenderer content={msg.content} />
+              {message.sender === "assistant" && (
+                <div className="coding-run-events">
+                  {message.agentEvents?.filter((event) => event.type !== "thought" && event.type !== "thought_chunk" && event.type !== "final_response").map((event, index) => {
+                    const isResult = event.type === "tool_result" && event.toolResult;
+                    const isFailure = event.type === "error" || (isResult && !event.toolResult?.success);
+                    const icon = isFailure
+                      ? <XCircle size={15} aria-hidden="true" />
+                      : isResult && event.toolResult?.success
+                        ? <CheckCircle2 size={15} aria-hidden="true" />
+                        : <CircleDotDashed size={15} aria-hidden="true" />;
+                    const detail = event.planMarkdown ?? event.content ?? event.toolResult?.output ?? event.toolResult?.error;
+
+                    if (event.type === "approval_required") {
+                      return (
+                        <AgentToolCallCard
+                          key={`${message.id}-${event.toolCall?.callId ?? index}`}
+                          event={event}
+                          onApprove={onApproveAgentToolCall}
+                        />
+                      );
+                    }
+
+                    return (
+                      <details
+                        key={`${message.id}-${event.type}-${event.toolCall?.callId ?? event.toolResult?.callId ?? index}`}
+                        className={`coding-run-event ${isFailure ? "coding-run-event--failure" : ""}`}
+                      >
+                        <summary>
+                          {icon}
+                          <span>{eventTitle(event.type)}</span>
+                          {(event.toolCall?.toolName ?? event.toolResult?.toolName) && (
+                            <code>{event.toolCall?.toolName ?? event.toolResult?.toolName}</code>
+                          )}
+                        </summary>
+                        {detail && <pre>{detail}</pre>}
+                        {event.toolResult?.diffPatch && <pre className="coding-run-event__diff">{event.toolResult.diffPatch}</pre>}
+                      </details>
+                    );
+                  })}
+                  {message.isStreaming && (
+                    <div className="coding-run-event coding-run-event--running">
+                      <CircleDotDashed size={15} aria-hidden="true" />
+                      <span>In esecuzione</span>
                     </div>
                   )}
-                  {msg.agentEvents?.filter((evt) => evt.type === "approval_required").map((evt, idx) => (
-                    <AgentToolCallCard
-                      key={`${msg.id}_evt_${idx}`}
-                      event={evt}
-                      onApprove={(callId, approved) => onApproveAgentToolCall(callId, approved)}
-                    />
-                  ))}
-                  {msg.isStreaming && (() => {
-                    const events = msg.agentEvents || [];
-                    const lastEvt = events.length > 0 ? events[events.length - 1] : null;
-                    const waitingForApproval = lastEvt?.type === "approval_required";
-                    return (
-                      <div className="vibe-agent-status-card">
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Loader2 size={18} className="animate-spin text-indigo-400" style={{ flexShrink: 0 }} />
-                          <span>{waitingForApproval ? "In attesa della tua approvazione..." : "L'agente sta lavorando..."}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="vibe-message-content">
-                  <MarkdownRenderer content={msg.content} />
+                  {message.content && (
+                    <div className="coding-timeline-entry__content coding-timeline-entry__content--final">
+                      <MarkdownRenderer content={message.content} />
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* FILE ACTIONS & IMPACTED FILES */}
-              {msg.fileActions && msg.fileActions.length > 0 && (
-                <div className="file-actions-container">
-                  <div className="file-actions-header" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <FileCode size={14} /> Operazioni File Progetto:
-                  </div>
-                  <div>
-                    {msg.fileActions.map((act) => (
-                      <div key={act.file} className="file-action-card">
-                        <span className={`file-action-label ${act.action === "delete" ? "file-action-label--delete" : "file-action-label--write"}`} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          {act.action === "delete" ? <Trash2 size={13} /> : <FileCode size={13} />}
-                          <span>{act.action.toUpperCase()}: {act.file}</span>
-                          {act.applied && <span className="file-action-applied-badge" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><CheckCircle2 size={12} /> [Applicato]</span>}
-                        </span>
-                        <div className="file-action-buttons">
-                          <button
-                            type="button"
-                            className="button button--secondary button--small"
-                            style={{ fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: 4 }}
-                            onClick={() => onOpenDiff(act.file, act.code, act.applied)}
-                            title="Visualizza il confronto modifiche file"
-                          >
-                            <FileDiff size={13} /> Diff
-                          </button>
-                          {!act.applied && act.action === "write" && act.code && (
-                            <button
-                              type="button"
-                              className="button button--primary button--small"
-                              style={{ fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: 4 }}
-                              onClick={() => onApplyCodeToFile(act.file, act.code!)}
-                            >
-                              <Save size={13} /> Salva su Disco
-                            </button>
-                          )}
-                          {!act.applied && act.action === "delete" && (
-                            <button
-                              type="button"
-                              className="button button--danger button--small"
-                              style={{ fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: 4 }}
-                              onClick={() => onDeleteWorkspaceFile(act.file)}
-                            >
-                              <Trash2 size={13} /> Elimina
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="button button--secondary button--small"
-                            style={{ fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: 4 }}
-                            onClick={() => onOpenExternalFile(act.file)}
-                          >
-                            <ExternalLink size={13} /> Apri
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            </article>
           ))
         )}
       </div>
-
-      {/* FLOATING ANTIGRAVITY SCROLL TO BOTTOM BUTTON */}
       {isUserScrolledUp && onScrollToBottom && (
-        <button
-          type="button"
-          className="vibe-chat-scroll-bottom-btn"
-          onClick={onScrollToBottom}
-          title="Torna in fondo alla chat"
-        >
-          <ArrowDown size={15} /> Torna in basso
+        <button type="button" className="coding-timeline__scroll-bottom" onClick={onScrollToBottom}>
+          <ArrowDown size={15} aria-hidden="true" />
+          Vai al fondo
         </button>
       )}
     </div>

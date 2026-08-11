@@ -56,7 +56,8 @@ public sealed class QdrantVectorStore : IQdrantVectorStore, IAsyncDisposable
     {
         await ExecuteWithRetryAsync(async client =>
         {
-            await client.HealthAsync(cancellationToken);
+            // The collections RPC is supported by the Qdrant gRPC API across local and remote deployments.
+            await client.ListCollectionsAsync(cancellationToken);
         }, cancellationToken);
     }
 

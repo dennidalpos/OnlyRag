@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using OnlyRag.Api.Ollama;
+using OnlyRag.Application.Translations;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Worker;
 
 namespace OnlyRag.Api;
 
@@ -13,56 +13,23 @@ public static partial class InProcessBackend
     {
         app.MapPost("/api/translations", async (
             CreateTranslationRequest request,
-            IDocumentLibraryService documents,
             ITranslationRepository translations,
             IOllamaClient ollamaClient,
-            ILocalJobQueue jobs,
+            TranslationApplicationService translationApplicationService,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                ImportedDocument? document = await documents.GetAsync(request.DocumentId, cancellationToken);
-                if (document is null)
-                {
-                    return CreateNotFoundProblem("Document");
-                }
-
-                if (document.PageCount == 0)
-                {
-                    return CreateConflictProblem(
-                        "Document not indexed",
-                        "Ingest the document first: translation relies on indexed text units.",
-                        "document_not_indexed");
-                }
-
                 string model = OllamaSettingsService.NormalizeRequiredModelName(request.Model);
                 string targetLanguage = DocumentTranslationPromptBuilder.NormalizeLanguage(request.TargetLanguage);
                 await EnsureOllamaModelInstalledAsync(ollamaClient, model, "translation", cancellationToken);
 
-                IReadOnlyList<TranslationSourceUnit> units = await translations.BuildSourceUnitsAsync(
-                    request.DocumentId,
-                    cancellationToken);
-                StoredTranslation translation = await translations.CreateAsync(
+                StoredTranslation translation = await translationApplicationService.StartAsync(
                     request.DocumentId,
                     targetLanguage,
                     model,
-                    jobId: null,
-                    units,
+                    request.CustomGlossary,
                     cancellationToken);
-
-                string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DocumentTranslationJobPayload(
-                    translation.Id,
-                    request.DocumentId,
-                    targetLanguage,
-                    model,
-                    request.CustomGlossary));
-                LocalJob job = await jobs.CreateAsync(
-                    new CreateLocalJobRequest(
-                        DocumentTranslationJobHandler.DocumentTranslationJobType,
-                        payloadJson,
-                        Priority: 20),
-                    cancellationToken);
-                await translations.UpdateTranslationJobAsync(translation.Id, job.Id, "Queued", null, cancellationToken);
 
                 return Results.Ok(await BuildTranslationDetailAsync(translation.Id, translations, cancellationToken));
             }

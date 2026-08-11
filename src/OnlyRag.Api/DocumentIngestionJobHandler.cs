@@ -3,7 +3,7 @@ using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

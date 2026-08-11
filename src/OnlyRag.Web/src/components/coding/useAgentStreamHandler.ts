@@ -1,58 +1,66 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiAgentStreamRequest,
   apiRequest,
   type AgentRunRequest,
+  type AgentRunSnapshot,
   type AgentStepEvent,
   type ApproveToolCallRequest
 } from "../../api";
-import type { WorkspaceFileItem } from "../../apiTypes";
 import type { CodingMessage } from "./useCodingSectionController";
-import type { CodingMode, FileAction } from "./CodingSection.types";
+import type { CodingMode } from "./CodingSection.types";
 
 export type UseAgentStreamHandlerOptions = {
   selectedModel: string;
   operatingMode: CodingMode;
   autoApproveCommands: boolean;
   workspaceConfig: { isAuthorized: boolean; rootPath: string | null } | null;
-  workspaceFiles: WorkspaceFileItem[];
-  selectedWorkspaceFile: string | null;
   fetchWorkspaceFiles: () => Promise<void>;
-  handleApplyCodeToFileSilently: (relativePath: string, content: string) => Promise<void>;
-  handleDeleteWorkspaceFileSilently: (relativePath: string) => Promise<void>;
   setWorkspaceStatusMessage: (msg: string | null) => void;
 };
+
+function toAgentMode(mode: CodingMode): AgentRunRequest["mode"] {
+  return mode === "full" ? "write" : mode;
+}
 
 export function useAgentStreamHandler({
   selectedModel,
   operatingMode,
   autoApproveCommands,
   workspaceConfig,
-  workspaceFiles,
-  selectedWorkspaceFile,
   fetchWorkspaceFiles,
-  handleApplyCodeToFileSilently,
-  handleDeleteWorkspaceFileSilently,
   setWorkspaceStatusMessage
 }: UseAgentStreamHandlerOptions) {
   const [messages, setMessages] = useState<CodingMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptInput, setPromptInputState] = useState("");
+  const [resumableRuns, setResumableRuns] = useState<AgentRunSnapshot[]>([]);
   const promptInputRef = useRef("");
-
-  function setPromptInput(val: string) {
-    promptInputRef.current = val;
-    setPromptInputState(val);
-  }
-
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const refreshResumableRuns = useCallback(async () => {
+    try {
+      const runs = await apiRequest<AgentRunSnapshot[]>("/api/agent/runs/resumable");
+      setResumableRuns(runs);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Impossibile caricare le sessioni riprendibili.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshResumableRuns();
+  }, [refreshResumableRuns]);
+
+  function setPromptInput(value: string) {
+    promptInputRef.current = value;
+    setPromptInputState(value);
+  }
+
   function handleCancelGeneration() {
     abortControllerRef.current?.abort();
-    setIsGenerating(false);
-    setWorkspaceStatusMessage("Risposta interrotta dall'utente.");
+    setWorkspaceStatusMessage("Esecuzione interrotta dall'utente.");
   }
 
   function handleClearMessages() {
@@ -64,115 +72,53 @@ export function useAgentStreamHandler({
     setPromptInput("");
   }
 
-  function extractFileActionsFromResponse(text: string): FileAction[] {
-    const actions: FileAction[] = [];
-
-    const fileRegex =
-      /(?:Target File|File|File Modificato|Salva in|Modificato|Nel file|Codice per|Refattorizzato):\s*`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
-    let match;
-    while ((match = fileRegex.exec(text)) !== null) {
-      const filePath = match[1];
-      if (filePath && !actions.some((a) => a.file === filePath)) {
-        const afterText = text.slice(match.index);
-        const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
-        actions.push({
-          file: filePath,
-          action: "write",
-          code: codeBlockMatch ? codeBlockMatch[1].trim() : undefined
-        });
-      }
-    }
-
-    const headerRegex =
-      /(?:###|\*\*|`)\s*([a-zA-Z0-9_\-./\\]+\.(?:cs|ts|tsx|js|jsx|json|xml|csproj|sln|md|txt))\b/gi;
-    let headerMatch;
-    while ((headerMatch = headerRegex.exec(text)) !== null) {
-      const filePath = headerMatch[1];
-      if (filePath && !actions.some((a) => a.file === filePath)) {
-        const afterText = text.slice(headerMatch.index);
-        const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
-        if (codeBlockMatch) {
-          actions.push({
-            file: filePath,
-            action: "write",
-            code: codeBlockMatch[1].trim()
-          });
-        }
-      }
-    }
-
-    if (workspaceFiles && workspaceFiles.length > 0) {
-      for (const wf of workspaceFiles) {
-        if (!wf.isDirectory && wf.relativePath) {
-          const fileName = wf.relativePath.split("/").pop() || wf.relativePath;
-          if (!actions.some((a) => a.file === wf.relativePath || a.file === fileName)) {
-            const idx = text.indexOf(fileName);
-            if (idx !== -1) {
-              const afterText = text.slice(idx);
-              const codeBlockMatch = /```(?:\w+)?\r?\n(.*?)\r?\n```/s.exec(afterText);
-              if (codeBlockMatch) {
-                actions.push({
-                  file: wf.relativePath,
-                  action: "write",
-                  code: codeBlockMatch[1].trim()
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const deleteRegex = /ACTION:\s*DELETE\s+`?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)`?/gi;
-    let delMatch;
-    while ((delMatch = deleteRegex.exec(text)) !== null) {
-      const filePath = delMatch[1];
-      if (filePath && !actions.some((a) => a.file === filePath)) {
-        actions.push({
-          file: filePath,
-          action: "delete"
-        });
-      }
-    }
-
-    return actions;
-  }
-
   async function handleApproveAgentToolCall(callId: string, approved: boolean) {
     try {
-      await apiRequest<{ success: boolean }>("/api/agent/approve-tool", {
+      const response = await apiRequest<{ success: boolean }>("/api/agent/approve-tool", {
         method: "POST",
-        body: JSON.stringify({ callId, approved } as ApproveToolCallRequest)
+        body: JSON.stringify({ callId, approved } satisfies ApproveToolCallRequest)
       });
-    } catch {
-      // Ignorato
+      if (!response.success) {
+        throw new Error("La richiesta di approvazione non e piu attiva.");
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Impossibile registrare l'approvazione.");
     }
   }
 
-  async function handleSendAgentMessage(textToSend: string) {
+  async function handleSendAgentMessage(textToSend: string, resumedRun?: AgentRunSnapshot) {
+    const goal = resumedRun?.goal ?? textToSend;
+    const resumedMode = resumedRun?.mode.toLowerCase();
+    const mode = resumedMode === "write" || resumedMode === "full"
+      ? "write"
+      : resumedMode === "ask"
+        ? "ask"
+        : resumedRun
+          ? "plan"
+          : toAgentMode(operatingMode);
     const userMessageId = `user_${Date.now()}`;
-    const userMsg: CodingMessage = {
-      id: userMessageId,
-      sender: "user",
-      content: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      attachedFile: selectedWorkspaceFile ?? undefined
-    };
-
     const assistantMessageId = `agent_${Date.now()}`;
-    const assistantMsg: CodingMessage = {
-      id: assistantMessageId,
-      sender: "assistant",
-      content: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isStreaming: true,
-      agentEvents: []
-    };
-
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
 
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    abortControllerRef.current = abortController;
+    setMessages((current) => [
+      ...current,
+      {
+        id: userMessageId,
+        sender: "user",
+        content: resumedRun ? `Riprendi: ${goal}` : textToSend,
+        timestamp
+      },
+      {
+        id: assistantMessageId,
+        sender: "assistant",
+        content: "",
+        timestamp,
+        isStreaming: true,
+        agentEvents: []
+      }
+    ]);
     setPromptInput("");
     setIsGenerating(true);
     setError(null);
@@ -181,161 +127,70 @@ export function useAgentStreamHandler({
       await apiAgentStreamRequest(
         "/api/agent/run-stream",
         {
-          goal: textToSend,
-          model: selectedModel || null,
-          mode: operatingMode === "full" ? "write" : "plan",
-          workspaceRoot: workspaceConfig?.rootPath || null,
-          autoApproveCommands
-        } as AgentRunRequest,
+          goal,
+          model: resumedRun?.model ?? (selectedModel || null),
+          mode,
+          workspaceRoot: resumedRun?.workspaceRoot || workspaceConfig?.rootPath || null,
+          autoApproveCommands,
+          resumeRunId: resumedRun?.runId ?? null
+        } satisfies AgentRunRequest,
         (rawEvent: unknown) => {
           const event = rawEvent as AgentStepEvent;
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (msg.id !== assistantMessageId) return msg;
-
-              const existingEvents = msg.agentEvents ? [...msg.agentEvents] : [];
-
-              if (event.type === "thought_chunk" && event.content) {
-                const lastIdx = existingEvents.length - 1;
-                if (lastIdx >= 0 && existingEvents[lastIdx].type === "thought_chunk") {
-                  existingEvents[lastIdx] = {
-                    ...existingEvents[lastIdx],
-                    content: (existingEvents[lastIdx].content || "") + event.content
-                  };
-                } else {
-                  existingEvents.push(event);
-                }
-                return { ...msg, agentEvents: existingEvents };
-              }
-
-              const updatedEvents = [...existingEvents, event];
-              const currentActions = msg.fileActions ? [...msg.fileActions] : [];
-              if (event.type === "tool_result" && event.toolResult && event.toolResult.success) {
-                const tr = event.toolResult;
-                const toolName = tr.toolName.toLowerCase();
-                if (
-                  toolName === "write_file" ||
-                  toolName === "write_to_file" ||
-                  toolName === "replace_file_content"
-                ) {
-                  const matchingProp = existingEvents.find(
-                    (e) =>
-                      e.type === "tool_proposed" && e.toolCall && e.toolCall.callId === tr.callId
-                  );
-                  if (matchingProp?.toolCall) {
-                    try {
-                      const args = JSON.parse(
-                        matchingProp.toolCall.argumentsJson
-                      ) as Record<string, string>;
-                      const filePath = args.relativePath || args.path || args.file;
-                      if (filePath && !currentActions.some((a) => a.file === filePath)) {
-                        currentActions.push({
-                          file: filePath,
-                          action: "write",
-                          code: args.content || args.replacementContent,
-                          applied: true
-                        });
-                      }
-                    } catch {
-                      // Ignora se i parametri non sono JSON valido
-                    }
-                  }
-                  void fetchWorkspaceFiles();
-                }
-              }
-
-              const finalContent =
-                event.type === "final_response" && event.content
-                  ? event.content
-                  : msg.content;
-
-              const modified = currentActions.map((a) => a.file);
-
+          setMessages((current) =>
+            current.map((message) => {
+              if (message.id !== assistantMessageId) return message;
+              const events = [...(message.agentEvents ?? []), event];
               return {
-                ...msg,
-                agentEvents: updatedEvents,
-                content: finalContent,
-                fileActions: currentActions.length > 0 ? currentActions : undefined,
-                modifiedFiles: modified.length > 0 ? modified : undefined
+                ...message,
+                agentEvents: events,
+                runId: event.runId ?? message.runId,
+                content: event.type === "final_response" && event.content ? event.content : message.content
               };
             })
           );
         },
         abortController.signal
       );
-
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id !== assistantMessageId) return msg;
-
-          const actions = msg.fileActions ? [...msg.fileActions] : [];
-          if (msg.content) {
-            const extracted = extractFileActionsFromResponse(msg.content);
-            for (const ext of extracted) {
-              if (!actions.some((a) => a.file === ext.file)) {
-                actions.push({ ...ext, applied: true });
-              }
-            }
-          }
-
-          if (operatingMode === "full" && actions.length > 0 && workspaceConfig?.isAuthorized) {
-            for (const act of actions) {
-              if (!act.applied && act.action === "write" && act.code) {
-                void handleApplyCodeToFileSilently(act.file, act.code);
-                act.applied = true;
-              } else if (!act.applied && act.action === "delete") {
-                void handleDeleteWorkspaceFileSilently(act.file);
-                act.applied = true;
-              }
-            }
-          }
-
-          const modified = actions.map((a) => a.file);
-          return {
-            ...msg,
-            isStreaming: false,
-            fileActions: actions.length > 0 ? actions : undefined,
-            modifiedFiles: modified.length > 0 ? modified : undefined
-          };
-        })
-      );
-      void fetchWorkspaceFiles();
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setWorkspaceStatusMessage("Risposta agente interrotta.");
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg
-          )
+      await fetchWorkspaceFiles();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.name === "AbortError") {
+        setMessages((current) =>
+          current.map((message) => message.id === assistantMessageId ? { ...message, isStreaming: false } : message)
         );
         return;
       }
-      const errMsg = err instanceof Error ? err.message : "Errore durante l'esecuzione dell'agente.";
-      setError(errMsg);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? { ...msg, content: `⚠️ Errore: ${errMsg}`, isStreaming: false }
-            : msg
+
+      const message = requestError instanceof Error ? requestError.message : "Errore durante l'esecuzione dell'agente.";
+      setError(message);
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === assistantMessageId
+            ? { ...item, agentEvents: [...(item.agentEvents ?? []), { type: "error", content: message }], isStreaming: false }
+            : item
         )
       );
     } finally {
+      setMessages((current) =>
+        current.map((message) => message.id === assistantMessageId ? { ...message, isStreaming: false } : message)
+      );
       setIsGenerating(false);
+      void refreshResumableRuns();
     }
   }
 
   return {
     messages,
-    setMessages,
     isGenerating,
     error,
     promptInput,
     promptInputRef,
+    resumableRuns,
     setPromptInput,
     chatContainerRef,
     handleCancelGeneration,
     handleClearMessages,
     handleApproveAgentToolCall,
-    handleSendAgentMessage
+    handleSendAgentMessage,
+    refreshResumableRuns
   };
 }

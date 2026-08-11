@@ -23,10 +23,10 @@ OnlyRag enforces clear assembly boundaries:
 | Assembly | Path | Purpose | Key Dependencies |
 |---|---|---|---|
 | `OnlyRag.App` | [`src/OnlyRag.App`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.App) | WPF Desktop entrypoint, `MainWindow.xaml`, WebView2 initialization, process lifecycles | `Microsoft.Web.WebView2`, `OnlyRag.Api` |
-| `OnlyRag.Api` | [`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api) | In-process WebApplication, Minimal API route map, HTTP/bridge handlers, job endpoints | `OnlyRag.Core`, `OnlyRag.Infrastructure`, `OnlyRag.Worker` |
+| `OnlyRag.Api` | [`src/OnlyRag.Api`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Api) | In-process WebApplication, Minimal API route map, HTTP/bridge handlers, job endpoints and hosted job runtime | `OnlyRag.Core`, `OnlyRag.Infrastructure`, `OnlyRag.Jobs.Abstractions` |
 | `OnlyRag.Core` | [`src/OnlyRag.Core`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Core) | DTOs, contracts, options, standard response wrappers (`ApiResponse<T>`) | Standard Library only |
 | `OnlyRag.Infrastructure` | [`src/OnlyRag.Infrastructure`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Infrastructure) | SQLite FTS5 repositories, Qdrant client vector store, Ollama HTTP client, ONNX DirectML provider, OCR bridge | `Microsoft.Data.Sqlite`, `Qdrant.Client`, `Microsoft.ML.OnnxRuntime.DirectML` |
-| `OnlyRag.Worker` | [`src/OnlyRag.Worker`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Worker) | Local background job queue, channel-based queue execution, job status tracking | `OnlyRag.Core` |
+| `OnlyRag.Jobs.Abstractions` | [`src/OnlyRag.Jobs.Abstractions`](file:///d:/GITHUB/OnlyRag/src/OnlyRag.Jobs.Abstractions) | Shared local job queue contracts, records and status model | Standard Library only |
 
 ## 3. Key Patterns & Conventions
 

@@ -12,11 +12,16 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AvailabilityProbeTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan HealthFailureGracePeriod = TimeSpan.FromSeconds(30);
+    private static readonly HttpClient AvailabilityHttpClient = new()
+    {
+        Timeout = Timeout.InfiniteTimeSpan
+    };
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
     private readonly QdrantProcessSupervisor processSupervisor = new();
 
     private readonly SemaphoreSlim healingLock = new(1, 1);
+    private readonly SemaphoreSlim startupLock = new(1, 1);
     private CancellationTokenSource? autoHealingCts;
     private Task? autoHealingTask;
     private volatile bool isStartupInProgress;
@@ -50,14 +55,13 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         {
             using CancellationTokenSource probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             probeCts.CancelAfter(AvailabilityProbeTimeout);
-            await vectorStore.VerifyAvailabilityAsync(probeCts.Token);
-            reachable = true;
+            reachable = await VerifyAvailabilityAsync(settings, endpoint, vectorStore, probeCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             error = $"Qdrant availability probe timed out after {AvailabilityProbeTimeout.TotalSeconds:0} seconds.";
         }
-        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Grpc.Core.RpcException)
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TimeoutException or Grpc.Core.RpcException)
         {
             error = ex.Message;
         }
@@ -92,6 +96,21 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     public async Task<QdrantStatusResponse> StartAsync(
         IQdrantVectorStore vectorStore,
         CancellationToken cancellationToken = default)
+    {
+        await startupLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await StartCoreAsync(vectorStore, cancellationToken);
+        }
+        finally
+        {
+            startupLock.Release();
+        }
+    }
+
+    private async Task<QdrantStatusResponse> StartCoreAsync(
+        IQdrantVectorStore vectorStore,
+        CancellationToken cancellationToken)
     {
         QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
         if (!settings.UseLocalBundledServer)
@@ -154,38 +173,46 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         IQdrantVectorStore vectorStore,
         CancellationToken cancellationToken = default)
     {
-        QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
-        if (!settings.UseLocalBundledServer)
-        {
-            return await GetStatusAsync(vectorStore, cancellationToken);
-        }
-
-        string? binary = ResolveBinaryPath();
-        if (binary is null)
-        {
-            Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
-            return CreateUnavailableStatus(
-                settings,
-                endpoint,
-                "qdrant.exe not found in the application payload. Run Qdrant packaging before local startup.");
-        }
-
-        QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
-        if (currentStatus.IsReachable)
-        {
-            TryAdoptPersistedProcess();
-            StartAutoHealingSupervisor(vectorStore);
-            return currentStatus;
-        }
-
+        await startupLock.WaitAsync(cancellationToken);
         try
         {
-            return await StartAsync(vectorStore, cancellationToken);
+            QdrantSettings settings = await settingsStore.GetAsync(cancellationToken);
+            if (!settings.UseLocalBundledServer)
+            {
+                return await GetStatusAsync(vectorStore, cancellationToken);
+            }
+
+            string? binary = ResolveBinaryPath();
+            if (binary is null)
+            {
+                Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
+                return CreateUnavailableStatus(
+                    settings,
+                    endpoint,
+                    "qdrant.exe not found in the application payload. Run Qdrant packaging before local startup.");
+            }
+
+            QdrantStatusResponse currentStatus = await GetStatusAsync(vectorStore, cancellationToken);
+            if (currentStatus.IsReachable)
+            {
+                TryAdoptPersistedProcess();
+                StartAutoHealingSupervisor(vectorStore);
+                return currentStatus;
+            }
+
+            try
+            {
+                return await StartCoreAsync(vectorStore, cancellationToken);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                QdrantStatusResponse status = await GetStatusAsync(vectorStore, cancellationToken);
+                return status with { Error = ex.Message };
+            }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        finally
         {
-            QdrantStatusResponse status = await GetStatusAsync(vectorStore, cancellationToken);
-            return status with { Error = ex.Message };
+            startupLock.Release();
         }
     }
 
@@ -263,11 +290,11 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
                 {
                     try
                     {
-                        await vectorStore.VerifyAvailabilityAsync(cancellationToken);
-                        gRpcReachable = true;
+                        Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
+                        gRpcReachable = await VerifyAvailabilityAsync(settings, endpoint, vectorStore, cancellationToken);
                         gRpcUnavailableSinceUtc = null;
                     }
-                    catch
+                    catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TimeoutException or Grpc.Core.RpcException)
                     {
                         gRpcReachable = false;
                         gRpcUnavailableSinceUtc ??= DateTimeOffset.UtcNow;
@@ -410,6 +437,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         await StopAsync();
         await processSupervisor.DisposeAsync();
         healingLock.Dispose();
+        startupLock.Dispose();
     }
 
     private async Task<QdrantStatusResponse> WaitForAvailabilityAsync(
@@ -461,10 +489,37 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         return null;
     }
 
+    private static async Task<bool> VerifyAvailabilityAsync(
+        QdrantSettings settings,
+        Uri endpoint,
+        IQdrantVectorStore vectorStore,
+        CancellationToken cancellationToken)
+    {
+        if (settings.UseLocalBundledServer && QdrantSettingsStore.IsLoopback(endpoint))
+        {
+            int httpPort = GetLocalHttpPort(settings.LocalGrpcPort);
+            Uri readinessUri = new($"http://127.0.0.1:{httpPort}/readyz");
+            using HttpRequestMessage request = new(HttpMethod.Get, readinessUri);
+            using HttpResponseMessage response = await AvailabilityHttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+
+        await vectorStore.VerifyAvailabilityAsync(cancellationToken);
+        return true;
+    }
+
+    internal static int GetLocalHttpPort(int grpcPort)
+    {
+        return grpcPort == 6333 ? 6335 : 6333;
+    }
+
     private void WriteConfig(QdrantSettings settings)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ResolveConfigPath())!);
-        int httpPort = settings.LocalGrpcPort == 6333 ? 6335 : 6333;
+        int httpPort = GetLocalHttpPort(settings.LocalGrpcPort);
         string config = $$"""
             service:
               host: 127.0.0.1
@@ -479,13 +534,103 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
 
     private string? ResolveBinaryPath()
     {
-        string[] candidates =
-        [
-            Path.Combine(AppContext.BaseDirectory, "qdrant", QdrantExeName),
-            Path.Combine(AppContext.BaseDirectory, QdrantExeName)
-        ];
+        return FindQdrantBinary(AppContext.BaseDirectory, Environment.GetEnvironmentVariable("ONLYRAG_QDRANT_PATH") ?? Environment.GetEnvironmentVariable("QDRANT_PATH"));
+    }
 
-        return candidates.FirstOrDefault(File.Exists);
+    internal static string? FindQdrantBinary(string? baseDirectory, string? configuredPath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            foreach (string candidate in EnumerateConfiguredBinaryCandidates(configuredPath))
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        foreach (string candidate in EnumerateBinaryCandidates(baseDirectory))
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        foreach (string candidate in EnumeratePathBinaryCandidates())
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateBinaryCandidates(string? baseDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(baseDirectory))
+        {
+            yield break;
+        }
+
+        foreach (string root in EnumerateSearchRoots(baseDirectory))
+        {
+            yield return Path.Combine(root, "qdrant", QdrantExeName);
+            yield return Path.Combine(root, QdrantExeName);
+            yield return Path.Combine(root, "packaging", "qdrant", "payload", QdrantExeName);
+            yield return Path.Combine(root, "payload", "qdrant", QdrantExeName);
+            yield return Path.Combine(root, "payload", QdrantExeName);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateConfiguredBinaryCandidates(string configuredPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            yield break;
+        }
+
+        if (File.Exists(configuredPath))
+        {
+            yield return configuredPath;
+            yield break;
+        }
+
+        if (Directory.Exists(configuredPath))
+        {
+            yield return Path.Combine(configuredPath, QdrantExeName);
+            yield return Path.Combine(configuredPath, "qdrant", QdrantExeName);
+            yield return Path.Combine(configuredPath, "packaging", "qdrant", "payload", QdrantExeName);
+            yield return Path.Combine(configuredPath, "payload", QdrantExeName);
+        }
+    }
+
+    private static IEnumerable<string> EnumeratePathBinaryCandidates()
+    {
+        string? pathValue = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrWhiteSpace(pathValue))
+        {
+            yield break;
+        }
+
+        foreach (string pathEntry in pathValue.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            yield return Path.Combine(pathEntry, QdrantExeName);
+            yield return Path.Combine(pathEntry, "qdrant", QdrantExeName);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateSearchRoots(string baseDirectory)
+    {
+        DirectoryInfo? current = new(baseDirectory);
+        while (current is not null)
+        {
+            yield return current.FullName;
+            current = current.Parent;
+        }
     }
 
     private string ResolveConfigPath()

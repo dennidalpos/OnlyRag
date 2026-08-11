@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 
-namespace OnlyRag.Api;
+namespace OnlyRag.Application.Jobs;
 
-internal sealed class RunningJobCancellationRegistry
+public sealed class RunningJobCancellationRegistry
 {
     private readonly ConcurrentDictionary<string, CancellationTokenSource> runningJobs = new(StringComparer.Ordinal);
 
@@ -23,10 +23,7 @@ internal sealed class RunningJobCancellationRegistry
 
     public bool IsRunning(string jobId) => runningJobs.ContainsKey(jobId);
 
-    public IReadOnlyList<string> ListRunningJobIds()
-    {
-        return runningJobs.Keys.ToArray();
-    }
+    public IReadOnlyList<string> ListRunningJobIds() => runningJobs.Keys.ToArray();
 
     public void Unregister(string jobId)
     {

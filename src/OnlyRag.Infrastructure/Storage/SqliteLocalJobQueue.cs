@@ -1,5 +1,5 @@
 using Microsoft.Data.Sqlite;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Infrastructure.Storage;
 

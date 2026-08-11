@@ -26,6 +26,10 @@ public static partial class InProcessBackend
             {
                 return CreateBadRequestProblem("Goal required", "The goal parameter cannot be empty.", "agent_goal_required");
             }
+            if (!AgentLoopEngine.IsSupportedMode(request.Mode))
+            {
+                return CreateBadRequestProblem("Invalid mode", "The mode parameter must be ask, plan, write, or full.", "agent_mode_invalid");
+            }
 
             httpContext.Response.ContentType = "text/event-stream";
             httpContext.Response.Headers.CacheControl = "no-cache";

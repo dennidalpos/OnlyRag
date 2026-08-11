@@ -39,10 +39,10 @@ export function CodingToolbar({
       <div className="coding-hub-toolbar__main">
         <div className="coding-hub-toolbar__title">
           <h2>
-            <Bot size={20} style={{ color: "#818cf8" }} /> Coding &amp; Vibe Hub
+            <Bot size={20} style={{ color: "#818cf8" }} /> Coding
           </h2>
           <span className="coding-hub-toolbar__subtitle">
-            Agent Workbench autonomo per esplorazione, scrittura codice, refactoring e test.
+            Esplora, modifica e verifica il workspace autorizzato.
           </span>
         </div>
 

@@ -1,4 +1,4 @@
-namespace OnlyRag.Worker;
+namespace OnlyRag.Jobs.Abstractions;
 
 public sealed record CreateLocalJobRequest(
     string Type,

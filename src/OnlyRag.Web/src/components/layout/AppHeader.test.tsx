@@ -54,7 +54,7 @@ describe("AppHeader", () => {
     expect(screen.getByRole("button", { name: /Cyberpunk Neon/ })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("shows detailed module failures and probe durations in the health monitor", async () => {
+  it("shows detailed module states without probe durations in the health monitor", async () => {
     const user = userEvent.setup();
     render(
       <ThemeProvider>
@@ -74,7 +74,7 @@ describe("AppHeader", () => {
     await user.click(screen.getByRole("button", { name: "Stato sistema" }));
 
     expect(screen.getByText("Timeout")).toBeInTheDocument();
-    expect(screen.getByText("2000 ms")).toBeInTheDocument();
+    expect(screen.queryByText("2000 ms")).not.toBeInTheDocument();
     expect(screen.getAllByText("Attivo").length).toBeGreaterThan(0);
   });
 });

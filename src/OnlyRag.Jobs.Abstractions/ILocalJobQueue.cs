@@ -1,4 +1,4 @@
-namespace OnlyRag.Worker;
+namespace OnlyRag.Jobs.Abstractions;
 
 public interface ILocalJobQueue
 {
@@ -37,6 +37,5 @@ public interface ILocalJobQueue
 
     Task<int> PurgeCompletedAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Signal released when a new job is enqueued. Workers await this instead of polling.</summary>
     SemaphoreSlim EnqueueSignal { get; }
 }

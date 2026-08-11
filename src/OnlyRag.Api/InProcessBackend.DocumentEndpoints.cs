@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using OnlyRag.Application.Documents;
+using OnlyRag.Application.Jobs;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 
@@ -55,8 +57,7 @@ public static partial class InProcessBackend
             IDocumentLibraryService documents,
             IEmbeddingRepository embeddings,
             IQdrantVectorStore vectorSearch,
-            ILocalJobQueue jobs,
-            RunningJobCancellationRegistry cancellationRegistry,
+            JobApplicationService jobs,
             InProcessBackendDescriptor descriptor,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
@@ -67,7 +68,7 @@ public static partial class InProcessBackend
                 return CreateNotFoundProblem("Document");
             }
 
-            await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
+            await jobs.CancelAndWaitAsync(existing.CurrentJobId, cancellationToken);
             try
             {
                 await DeleteDocumentVectorsAsync(id, embeddings, vectorSearch, cancellationToken);
@@ -94,24 +95,15 @@ public static partial class InProcessBackend
         app.MapPost("/api/documents/{id:long}/reindex", async (
             long id,
             string? ocrLanguage,
-            IDocumentLibraryService documents,
-            ILocalJobQueue jobs,
-            RunningJobCancellationRegistry cancellationRegistry,
+            DocumentPipelineApplicationService pipeline,
             OcrSettingsStore ocrSettings,
             CancellationToken cancellationToken) =>
         {
-            ImportedDocument? existing = await documents.GetAsync(id, cancellationToken);
-            if (existing is null)
-            {
-                return CreateNotFoundProblem("Document");
-            }
-
-            await CancelDocumentJobIfNeededAsync(existing, jobs, cancellationRegistry, cancellationToken);
             string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
                 ocrLanguage,
                 ocrSettings,
                 cancellationToken);
-            ImportedDocument? queued = await documents.QueueForIndexingAsync(id, resolvedOcrLanguage, cancellationToken);
+            ImportedDocument? queued = await pipeline.QueueReindexAsync(id, resolvedOcrLanguage, cancellationToken);
             return queued is null ? CreateNotFoundProblem("Document") : Results.Ok(queued);
         });
 
@@ -140,37 +132,19 @@ public static partial class InProcessBackend
             long id,
             bool? force,
             string? ocrLanguage,
-            IDocumentLibraryService documents,
-            ILocalJobQueue jobs,
-            RunningJobCancellationRegistry cancellationRegistry,
+            DocumentPipelineApplicationService pipeline,
             OcrSettingsStore ocrSettings,
             CancellationToken cancellationToken) =>
         {
-            ImportedDocument? document = await documents.GetAsync(id, cancellationToken);
-            if (document is null)
-            {
-                return CreateNotFoundProblem("Document");
-            }
-
-            await CancelDocumentJobIfNeededAsync(document, jobs, cancellationRegistry, cancellationToken);
             string resolvedOcrLanguage = await ResolveOcrLanguageAsync(
                 ocrLanguage,
                 ocrSettings,
                 cancellationToken);
-            string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DocumentIngestionJobPayload(
-                document.Id,
-                document.DocumentUid,
-                document.OriginalFileName,
-                document.Sha256 ?? string.Empty,
-                ForceOcr: force ?? false,
-                OcrLanguage: resolvedOcrLanguage));
-            LocalJob job = await jobs.CreateAsync(
-                new CreateLocalJobRequest(
-                    LocalDocumentLibraryService.DocumentIngestionJobType,
-                    payloadJson,
-                    Priority: 30),
+            ImportedDocument? queued = await pipeline.QueueOcrAsync(
+                id,
+                force ?? false,
+                resolvedOcrLanguage,
                 cancellationToken);
-            ImportedDocument? queued = await documents.SetStatusAsync(id, DocumentStatus.Queued, job.Id, lastError: null, cancellationToken);
             return queued is null ? CreateNotFoundProblem("Document") : Results.Ok(queued);
         });
 
@@ -401,39 +375,6 @@ public static partial class InProcessBackend
         }
 
         return snapshot.EmbeddedChunkCount >= snapshot.ChunkCount ? "Complete" : "Partial";
-    }
-
-    private static async Task CancelDocumentJobIfNeededAsync(
-        ImportedDocument document,
-        ILocalJobQueue jobs,
-        RunningJobCancellationRegistry cancellationRegistry,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(document.CurrentJobId))
-        {
-            return;
-        }
-
-        LocalJob? currentJob = await jobs.GetAsync(document.CurrentJobId, cancellationToken);
-        if (currentJob?.Status.IsActive() != true)
-        {
-            return;
-        }
-
-        await jobs.CancelAsync(document.CurrentJobId, cancellationToken);
-        cancellationRegistry.Cancel(document.CurrentJobId);
-
-        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (cancellationRegistry.IsRunning(document.CurrentJobId))
-        {
-            if (timeout.Token.IsCancellationRequested)
-            {
-                throw new TimeoutException($"Il job {document.CurrentJobId} non si e fermato entro 10 secondi. Riprovare.");
-            }
-
-            await Task.Delay(80, timeout.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        }
     }
 
     private static async Task DeleteDocumentVectorsAsync(

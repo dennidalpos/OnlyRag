@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AgentStepEvent, OllamaModel } from "../../api";
-import type { CodingMode, FileAction } from "./CodingSection.types";
+import type { AgentRunSnapshot, AgentStepEvent, OllamaModel } from "../../api";
+import type { CodingMode } from "./CodingSection.types";
 import { useAgentStreamHandler } from "./useAgentStreamHandler";
 import { useWorkspaceManager } from "./useWorkspaceManager";
 
@@ -9,11 +9,10 @@ export type CodingMessage = {
   sender: "user" | "assistant";
   content: string;
   timestamp: string;
-  modifiedFiles?: string[];
-  fileActions?: FileAction[];
   attachedFile?: string;
   isStreaming?: boolean;
   agentEvents?: AgentStepEvent[];
+  runId?: string;
 };
 
 export type UseCodingSectionControllerOptions = {
@@ -37,11 +36,7 @@ export function useCodingSectionController({
     operatingMode,
     autoApproveCommands,
     workspaceConfig: workspace.workspaceConfig,
-    workspaceFiles: workspace.workspaceFiles,
-    selectedWorkspaceFile: workspace.selectedWorkspaceFile,
     fetchWorkspaceFiles: workspace.fetchWorkspaceFiles,
-    handleApplyCodeToFileSilently: workspace.handleApplyCodeToFileSilently,
-    handleDeleteWorkspaceFileSilently: workspace.handleDeleteWorkspaceFileSilently,
     setWorkspaceStatusMessage: workspace.setWorkspaceStatusMessage
   });
 
@@ -90,18 +85,9 @@ export function useCodingSectionController({
     return agentStream.handleSendAgentMessage(textToSend);
   }
 
-  function handleExecuteWorkspaceCommandWrapper(cmdToRun?: string) {
-    void workspace.handleExecuteWorkspaceCommand(cmdToRun, (logMsg) => {
-      agentStream.setMessages((prev) => [
-        ...prev,
-        {
-          id: `cmd_${Date.now()}`,
-          sender: "assistant",
-          content: logMsg,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        }
-      ]);
-    });
+  function handleResumeRun(run: AgentRunSnapshot) {
+    if (agentStream.isGenerating) return;
+    return agentStream.handleSendAgentMessage(run.goal, run);
   }
 
   return {
@@ -116,6 +102,7 @@ export function useCodingSectionController({
     messages: agentStream.messages,
     isGenerating: agentStream.isGenerating,
     error: agentStream.error,
+    resumableRuns: agentStream.resumableRuns,
     workspaceConfig: workspace.workspaceConfig,
     workspaceFiles: workspace.workspaceFiles,
     selectedWorkspaceFile: workspace.selectedWorkspaceFile,
@@ -149,7 +136,7 @@ export function useCodingSectionController({
     handleRollbackFileContent: workspace.handleRollbackFileContent,
     handleDeleteWorkspaceFile: workspace.handleDeleteWorkspaceFile,
     handleApproveAgentToolCall: agentStream.handleApproveAgentToolCall,
-    handleExecuteWorkspaceCommand: handleExecuteWorkspaceCommandWrapper,
+    handleResumeRun,
     handleAddSingleFiles: workspace.handleAddSingleFiles,
     handleImportFileList: workspace.handleImportFileList,
     handleRemoveSingleFile: workspace.handleRemoveSingleFile,

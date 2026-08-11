@@ -7,7 +7,7 @@ using OnlyRag.Infrastructure.Ingestion;
 using OnlyRag.Infrastructure.Logging;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

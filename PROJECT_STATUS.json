@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "lastUpdated": "2026-08-11",
+    "lastUpdated": "2026-08-11T18:49:16+02:00",
     "source": "Repository architecture review",
     "statusLegend": {
       "planned": "Task identified but not started",
@@ -15,63 +15,6 @@
     }
   },
   "todos": [
-    {
-      "id": "p0-introduce-application-layer",
-      "priority": "P0",
-      "status": "planned",
-      "title": "Introdurre il modulo OnlyRag.Application",
-      "goal": "Spostare i casi d'uso e l'orchestrazione fuori dagli endpoint Minimal API, mantenendo gli endpoint sottili e facili da modificare.",
-      "problem": "AgentLoopEngine.cs, gli endpoint documenti, impostazioni e job contengono ancora coordinamento di dominio, regole operative e accesso diretto ai servizi. Questo rende ogni modifica trasversale difficile da testare e aumenta l'accoppiamento tra HTTP e dominio.",
-      "scope": [
-        "Creare src/OnlyRag.Application/OnlyRag.Application.csproj con dipendenze verso Core e verso astrazioni di job.",
-        "Definire servizi per casi d'uso distinti: agent run, document pipeline, settings/dependencies, image generation, translation e export.",
-        "Spostare nell'Application layer validazione applicativa, orchestrazione dei job, transizioni di stato e mapping dei risultati di dominio.",
-        "Ridurre InProcessBackend.*Endpoints.cs a binding HTTP, autorizzazione, CancellationToken e conversione delle risposte.",
-        "Registrare i casi d'uso tramite un'estensione DI dedicata e aggiornare i test API."
-      ],
-      "acceptanceCriteria": [
-        "Nessun endpoint contiene orchestrazione multi-step non strettamente HTTP.",
-        "I casi d'uso principali sono testabili senza avviare Kestrel o WebView2.",
-        "AgentLoopEngine non dipende da dettagli di endpoint e ha responsabilita separate per prompt, tool policy, execution e persistence.",
-        "La suite API e Infrastructure esistente continua a passare."
-      ],
-      "dependencies": [
-        "p0-extract-jobs-abstractions"
-      ],
-      "affectedAreas": [
-        "src/OnlyRag.Api",
-        "src/OnlyRag.Core",
-        "tests/OnlyRag.Api.Tests"
-      ]
-    },
-    {
-      "id": "p0-extract-jobs-abstractions",
-      "priority": "P0",
-      "status": "planned",
-      "title": "Separare i contratti dei job dal runtime Worker",
-      "goal": "Correggere la dipendenza semantica tra Infrastructure e Worker e rendere i contratti della coda riutilizzabili senza trascinare il runtime.",
-      "problem": "ILocalJobQueue, LocalJob, LocalJobCheckpoint, ILocalJobHandler e le richieste di creazione sono in OnlyRag.Worker, ma vengono usati anche da Infrastructure e API. Worker oggi rappresenta contemporaneamente contratti, modello dati e runtime esecutivo.",
-      "scope": [
-        "Creare OnlyRag.Jobs.Abstractions oppure spostare i contratti stabili in OnlyRag.Core/Jobs.",
-        "Lasciare in OnlyRag.Worker solo LocalJobWorkerService, scheduling, leasing e lifecycle del worker.",
-        "Aggiornare SqliteLocalJobQueue, job handler, API e registrazione DI alle nuove namespace.",
-        "Aggiungere test di compatibilita per create, lease, checkpoint, pause, resume, retry, complete e recovery."
-      ],
-      "acceptanceCriteria": [
-        "Infrastructure non dipende piu da un progetto nominato Worker per usare solo contratti.",
-        "Il runtime Worker puo essere sostituito in test con una fake queue.",
-        "Le transizioni di stato e il formato persistito dei job non cambiano senza migrazione esplicita.",
-        "Nessun riferimento circolare tra Core, Jobs.Abstractions, Worker, API e Infrastructure."
-      ],
-      "dependencies": [],
-      "affectedAreas": [
-        "src/OnlyRag.Worker",
-        "src/OnlyRag.Infrastructure/Storage",
-        "src/OnlyRag.Api",
-        "src/OnlyRag.Core",
-        "tests"
-      ]
-    },
     {
       "id": "p1-split-infrastructure-bounded-contexts",
       "priority": "P1",
@@ -94,10 +37,7 @@
         "Ogni estrazione conserva i test esistenti e aggiunge test di composizione DI.",
         "La registrazione backend usa un metodo AddOnlyRag* per ogni modulo."
       ],
-      "dependencies": [
-        "p0-extract-jobs-abstractions",
-        "p0-introduce-application-layer"
-      ],
+      "dependencies": [],
       "affectedAreas": [
         "src/OnlyRag.Infrastructure",
         "src/OnlyRag.Api/InProcessBackend.ServiceRegistration.cs",
@@ -124,9 +64,7 @@
         "Le viste non duplicano la logica di retry, polling o persistenza.",
         "I test frontend restano organizzati per sezione e per use case."
       ],
-      "dependencies": [
-        "p0-introduce-application-layer"
-      ],
+      "dependencies": [],
       "affectedAreas": [
         "src/OnlyRag.Api/AgentLoopEngine.cs",
         "src/OnlyRag.Web/src/components/images",
@@ -154,9 +92,7 @@
         "Le API streaming hanno tipi condivisi e test di parsing.",
         "La generazione non sovrascrive manualmente codice applicativo."
       ],
-      "dependencies": [
-        "p0-introduce-application-layer"
-      ],
+      "dependencies": [],
       "affectedAreas": [
         "src/OnlyRag.Core",
         "src/OnlyRag.Api",
@@ -185,48 +121,13 @@
         "Riavvio controllato permette di vedere job completati, falliti o recuperabili.",
         "Ogni sezione mantiene il proprio flusso senza condividere eventi o prompt."
       ],
-      "dependencies": [
-        "p0-extract-jobs-abstractions",
-        "p0-introduce-application-layer"
-      ],
+      "dependencies": [],
       "affectedAreas": [
         "src/OnlyRag.Api",
         "src/OnlyRag.Infrastructure/Storage",
-        "src/OnlyRag.Worker",
+        "src/OnlyRag.Jobs.Abstractions",
         "src/OnlyRag.Web/src/App.tsx",
         "src/OnlyRag.Web/src/components/*"
-      ]
-    },
-    {
-      "id": "p2-architecture-guardrails",
-      "priority": "P2",
-      "status": "planned",
-      "title": "Aggiungere guardrail architetturali e documentazione per manutentori",
-      "goal": "Fare in modo che la struttura resti leggibile quando altri sviluppatori aggiungeranno feature.",
-      "problem": "I confini sono documentati ma non verificati automaticamente; nel tempo e facile far crescere endpoint, controller e dipendenze trasversali senza accorgersene.",
-      "scope": [
-        "Documentare dipendenze consentite tra progetti e bounded context.",
-        "Aggiungere test o script che rilevino riferimenti vietati e cicli di dipendenza.",
-        "Definire template per nuovo endpoint, use case, adapter, controller e test.",
-        "Aggiungere una checklist di review per stato asincrono, error handling, logging, cancellation e contratti.",
-        "Registrare decisioni architetturali per Application layer, Jobs Abstractions, OpenAPI e persistenza degli stream."
-      ],
-      "acceptanceCriteria": [
-        "Un nuovo sviluppatore puo individuare il punto corretto dove inserire una feature senza conoscere tutto il repository.",
-        "Le dipendenze vietate falliscono in CI.",
-        "La documentazione descrive flusso HTTP, SignalR/SSE, job e storage senza divergenze dal codice.",
-        "I gate esistenti restano seriali e vengono eseguiti dopo ogni refactor strutturale."
-      ],
-      "dependencies": [
-        "p0-introduce-application-layer",
-        "p0-extract-jobs-abstractions",
-        "p1-split-infrastructure-bounded-contexts"
-      ],
-      "affectedAreas": [
-        "docs",
-        "scripts",
-        "Directory.Build.props",
-        "tests"
       ]
     }
   ]

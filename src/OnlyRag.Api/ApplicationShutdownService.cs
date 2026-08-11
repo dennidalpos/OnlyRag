@@ -1,5 +1,6 @@
 using OnlyRag.Core;
-using OnlyRag.Worker;
+using OnlyRag.Application.Jobs;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

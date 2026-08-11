@@ -26,7 +26,7 @@ public partial class MainWindow
             AppExitState combinedExitState = CombineExitState(exitState, backendActiveJobs);
             if (!combinedExitState.HasPendingChanges && !combinedExitState.HasActiveWork && combinedExitState.ActiveJobCount == 0)
             {
-                ((App)Application.Current).EnablePeerProcessTerminationOnExit();
+                ((App)System.Windows.Application.Current).EnablePeerProcessTerminationOnExit();
                 ConfirmClose();
                 return;
             }
@@ -59,7 +59,7 @@ public partial class MainWindow
                 return;
             }
 
-            ((App)Application.Current).EnablePeerProcessTerminationOnExit();
+            ((App)System.Windows.Application.Current).EnablePeerProcessTerminationOnExit();
             ConfirmClose();
         }
         catch (Exception ex)

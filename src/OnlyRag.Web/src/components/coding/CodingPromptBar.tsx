@@ -11,6 +11,7 @@ import {
   X
 } from "lucide-react";
 import type { CodingMode } from "./CodingSection.types";
+import type { AgentRunSnapshot } from "../../api";
 
 type CodingPromptBarProps = {
   selectedWorkspaceFile: string | null;
@@ -30,6 +31,8 @@ type CodingPromptBarProps = {
   onSendMessage: () => void;
   onCancelGeneration: () => void;
   onClearMessages: () => void;
+  resumableRuns: AgentRunSnapshot[];
+  onResumeRun: (run: AgentRunSnapshot) => void;
 };
 
 export function CodingPromptBar({
@@ -49,7 +52,9 @@ export function CodingPromptBar({
   isGenerating,
   onSendMessage,
   onCancelGeneration,
-  onClearMessages
+  onClearMessages,
+  resumableRuns,
+  onResumeRun
 }: CodingPromptBarProps) {
   return (
     <div className="coding-prompt-card">
@@ -92,6 +97,23 @@ export function CodingPromptBar({
               <X size={16} />
             </button>
           </div>
+        </div>
+      )}
+
+      {resumableRuns.length > 0 && !isGenerating && (
+        <div className="coding-resume-runs" aria-label="Esecuzioni riprendibili">
+          <span>Riprendi esecuzione:</span>
+          {resumableRuns.slice(0, 3).map((run) => (
+            <button
+              key={run.runId}
+              type="button"
+              className="button button--secondary button--small"
+              onClick={() => onResumeRun(run)}
+              title={run.goal}
+            >
+              {run.goal}
+            </button>
+          ))}
         </div>
       )}
 

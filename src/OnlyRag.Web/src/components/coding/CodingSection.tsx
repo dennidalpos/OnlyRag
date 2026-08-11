@@ -33,7 +33,7 @@ export function CodingSection({
   }, [droppedFiles, ctrl, onHandledDroppedFiles]);
 
   return (
-    <section className="coding-section" aria-label="Coding e Vibe Hub">
+    <section className="coding-section" aria-label="Coding">
       {/* TOOLBAR */}
       <CodingToolbar
         models={models}
@@ -73,7 +73,6 @@ export function CodingSection({
       {/* CHAT MESSAGES CONTAINER */}
       <CodingMessageList
         messages={ctrl.messages}
-        selectedModel={ctrl.selectedModel}
         chatContainerRef={ctrl.chatContainerRef}
         isUserScrolledUp={ctrl.isUserScrolledUp}
         onScroll={ctrl.handleScrollContainer}
@@ -81,10 +80,6 @@ export function CodingSection({
         onApproveAgentToolCall={(callId, approved) =>
           void ctrl.handleApproveAgentToolCall(callId, approved)
         }
-        onOpenDiff={(file, code, applied) => void ctrl.handleOpenDiff(file, code, applied)}
-        onApplyCodeToFile={(file, code) => void ctrl.handleApplyCodeToFile(file, code)}
-        onDeleteWorkspaceFile={(file) => void ctrl.handleDeleteWorkspaceFile(file)}
-        onOpenExternalFile={(file) => void ctrl.handleOpenExternalFile(file)}
       />
 
       {/* PROMPT CONTAINER */}
@@ -109,6 +104,8 @@ export function CodingSection({
         onSendMessage={() => void ctrl.handleSendMessage()}
         onCancelGeneration={ctrl.handleCancelGeneration}
         onClearMessages={ctrl.handleClearMessages}
+        resumableRuns={ctrl.resumableRuns}
+        onResumeRun={(run) => void ctrl.handleResumeRun(run)}
       />
 
       {/* WORKSPACE FILE PICKER MODAL */}

@@ -18,7 +18,7 @@ export type AgentToolResult = {
 export type AgentRunRequest = {
   goal: string;
   model?: string | null;
-  mode?: "plan" | "write";
+  mode?: "ask" | "plan" | "write";
   workspaceRoot?: string | null;
   autoApproveCommands?: boolean;
   maxIterations?: number | null;
@@ -69,6 +69,21 @@ export type AgentStepEvent = {
 export type ApproveToolCallRequest = {
   callId: string;
   approved: boolean;
+};
+
+export type AgentRunSnapshot = {
+  runId: string;
+  goal: string;
+  mode: string;
+  model?: string | null;
+  workspaceRoot: string;
+  phase: AgentRunPhase;
+  toolCallsUsed: number;
+  estimatedTokensUsed: number;
+  startedAtUtc: string;
+  updatedAtUtc: string;
+  lastError?: string | null;
+  finalResponse?: string | null;
 };
 
 export type BackgroundTaskInfo = {

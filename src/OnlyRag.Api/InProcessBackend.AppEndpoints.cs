@@ -10,7 +10,7 @@ using OnlyRag.Infrastructure.Retrieval;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Storage.Security;
 using OnlyRag.Infrastructure.Vector;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

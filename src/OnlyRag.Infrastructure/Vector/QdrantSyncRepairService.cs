@@ -1,6 +1,6 @@
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Infrastructure.Vector;
 

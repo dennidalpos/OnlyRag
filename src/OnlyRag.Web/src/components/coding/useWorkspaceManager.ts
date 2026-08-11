@@ -3,8 +3,6 @@ import { apiRequest } from "../../api";
 import type {
   DeleteWorkspaceFileRequest,
   DeleteWorkspaceFileResponse,
-  ExecuteWorkspaceCommandRequest,
-  ExecuteWorkspaceCommandResponse,
   OpenExternalFileRequest,
   PickWorkspaceFolderResponse,
   ReadWorkspaceFileRequest,
@@ -166,28 +164,6 @@ export function useWorkspaceManager() {
     }
   }
 
-  async function handleApplyCodeToFileSilently(relativePath: string, content: string) {
-    try {
-      await apiRequest<WriteWorkspaceFileResponse>("/api/workspace/write-file", {
-        method: "POST",
-        body: JSON.stringify({ relativePath, content } as WriteWorkspaceFileRequest)
-      });
-    } catch {
-      // Ignorato
-    }
-  }
-
-  async function handleDeleteWorkspaceFileSilently(relativePath: string) {
-    try {
-      await apiRequest<DeleteWorkspaceFileResponse>("/api/workspace/delete-file", {
-        method: "POST",
-        body: JSON.stringify({ relativePath } as DeleteWorkspaceFileRequest)
-      });
-    } catch {
-      // Ignorato
-    }
-  }
-
   async function handleOpenDiff(relativePath: string, modifiedCode?: string, isApplied?: boolean) {
     try {
       let original = "";
@@ -254,38 +230,6 @@ export function useWorkspaceManager() {
     } catch (err) {
       setWorkspaceStatusMessage(
         err instanceof Error ? err.message : "Errore durante l'eliminazione del file."
-      );
-    }
-  }
-
-  async function handleExecuteWorkspaceCommand(cmdToRun?: string, onOutput?: (msg: string) => void) {
-    const cmd = cmdToRun || "dotnet build";
-    setWorkspaceStatusMessage(`Esecuzione comando nel workspace: ${cmd}...`);
-    try {
-      const res = await apiRequest<ExecuteWorkspaceCommandResponse>(
-        "/api/workspace/execute-command",
-        {
-          method: "POST",
-          body: JSON.stringify({ command: cmd } as ExecuteWorkspaceCommandRequest)
-        }
-      );
-
-      const logMsg = `💻 **Esecuzione Comando**: \`${cmd}\`\n\n${
-        res.success
-          ? "✅ Esecuzione completata con successo (Exit 0)"
-          : `❌ Esecuzione terminata con errore (Exit ${res.exitCode})`
-      }\n\n\`\`\`text\n${res.output || res.error || "Nessun output restituito dal processo."}\n\`\`\``;
-
-      if (onOutput) onOutput(logMsg);
-
-      setWorkspaceStatusMessage(
-        res.success
-          ? `Comando eseguito con successo (${cmd})`
-          : `Comando completato con errore (${cmd})`
-      );
-    } catch (err) {
-      setWorkspaceStatusMessage(
-        err instanceof Error ? err.message : "Errore durante l'esecuzione del comando."
       );
     }
   }
@@ -389,13 +333,10 @@ export function useWorkspaceManager() {
     handleAttachWorkspaceFile,
     handleSaveAttachedFileContent,
     handleOpenExternalFile,
-    handleApplyCodeToFileSilently,
-    handleDeleteWorkspaceFileSilently,
     handleOpenDiff,
     handleApplyCodeToFile,
     handleRollbackFileContent,
     handleDeleteWorkspaceFile,
-    handleExecuteWorkspaceCommand,
     handleAddSingleFiles,
     handleImportFileList,
     handleRemoveSingleFile,

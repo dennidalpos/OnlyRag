@@ -82,6 +82,9 @@ Invoke-OnlyRagNative -FilePath $dotnetCommand.Source -WorkingDirectory $repoRoot
     "true",
     "--output",
     $publishDir,
+    "/m:1",
+    "/p:BuildInParallel=false",
+    "/p:UseSharedCompilation=false",
     "/p:Version=$Version",
     "/p:PublishSingleFile=false"
 )

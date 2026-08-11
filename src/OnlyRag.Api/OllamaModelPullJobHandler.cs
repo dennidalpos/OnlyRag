@@ -1,7 +1,7 @@
 using System.Text.Json;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Core;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 

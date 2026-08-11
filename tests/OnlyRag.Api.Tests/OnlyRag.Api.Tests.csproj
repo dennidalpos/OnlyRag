@@ -22,7 +22,7 @@
     <ProjectReference Include="..\..\src\OnlyRag.Api\OnlyRag.Api.csproj" />
     <ProjectReference Include="..\..\src\OnlyRag.Core\OnlyRag.Core.csproj" />
     <ProjectReference Include="..\..\src\OnlyRag.Infrastructure\OnlyRag.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\OnlyRag.Worker\OnlyRag.Worker.csproj" />
+    <ProjectReference Include="..\..\src\OnlyRag.Jobs.Abstractions\OnlyRag.Jobs.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

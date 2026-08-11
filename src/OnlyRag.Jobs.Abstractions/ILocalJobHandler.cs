@@ -1,4 +1,4 @@
-namespace OnlyRag.Worker;
+namespace OnlyRag.Jobs.Abstractions;
 
 public interface ILocalJobHandler
 {

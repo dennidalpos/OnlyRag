@@ -17,6 +17,18 @@ public sealed class AgentModePolicyTests
         Assert.Equal(expected, AgentLoopEngine.NormalizeMode(mode));
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("ask", true)]
+    [InlineData("plan", true)]
+    [InlineData("write", true)]
+    [InlineData("full", true)]
+    [InlineData("invalid", false)]
+    public void IsSupportedMode_ValidatesWireValues(string? mode, bool expected)
+    {
+        Assert.Equal(expected, AgentLoopEngine.IsSupportedMode(mode));
+    }
+
     [Fact]
     public void AskMode_AllowsReadOnlyToolsButDeniesMutations()
     {

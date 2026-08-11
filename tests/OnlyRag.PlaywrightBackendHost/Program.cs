@@ -4,7 +4,7 @@ using OnlyRag.Api;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure;
 using OnlyRag.Infrastructure.Storage;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 const string defaultSessionToken = "playwright-token";
 

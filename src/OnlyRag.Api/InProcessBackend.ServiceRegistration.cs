@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OnlyRag.Api.Ollama;
 using OnlyRag.Api.Services;
+using OnlyRag.Application.DependencyInjection;
 using OnlyRag.Core;
 using OnlyRag.Infrastructure.Agent;
 using OnlyRag.Infrastructure.Ai;
@@ -21,7 +22,7 @@ using OnlyRag.Infrastructure.Storage.Security;
 using OnlyRag.Infrastructure.Update;
 using OnlyRag.Infrastructure.Vector;
 using OnlyRag.Infrastructure.Vram;
-using OnlyRag.Worker;
+using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Api;
 
@@ -35,6 +36,7 @@ internal static class InProcessBackendServiceRegistration
     {
         return services
             .AddOnlyRagRuntimeServices(descriptor, options, runtimeState)
+            .AddOnlyRagApplicationServices()
             .AddOnlyRagStorageServices()
             .AddOnlyRagRetrievalServices(options)
             .AddOnlyRagDocumentServices()
@@ -142,6 +144,7 @@ internal static class InProcessBackendServiceRegistration
         }
 
         services.AddSingleton<QdrantLocalRuntimeService>();
+        services.AddHostedService<QdrantStartupService>();
         services.AddSingleton<OnlyRag.Core.IQdrantSyncRepairService, OnlyRag.Infrastructure.Vector.QdrantSyncRepairService>();
         services.AddSingleton(HybridRetrievalOptions.Default);
         services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
@@ -296,13 +299,12 @@ internal static class InProcessBackendServiceRegistration
 
     private static IServiceCollection AddOnlyRagJobServices(this IServiceCollection services)
     {
-        services.AddSingleton<Worker.IJobProgressNotifier, SignalRJobProgressNotifier>();
+        services.AddSingleton<IJobProgressNotifier, SignalRJobProgressNotifier>();
         services.AddSingleton<ILocalJobQueue, SqliteLocalJobQueue>();
         services.AddSingleton<ILocalJobHandler, DocumentIngestionJobHandler>();
         services.AddSingleton<ILocalJobHandler, DocumentEmbeddingJobHandler>();
         services.AddSingleton<ILocalJobHandler, DocumentTranslationJobHandler>();
         services.AddSingleton<ILocalJobHandler, OllamaModelPullJobHandler>();
-        services.AddSingleton<RunningJobCancellationRegistry>();
         services.AddHostedService<LocalJobWorkerService>();
         return services;
     }

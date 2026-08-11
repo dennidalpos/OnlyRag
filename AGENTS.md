@@ -16,7 +16,8 @@ OnlyRag è un'applicazione desktop Windows local-first:
 - `src/OnlyRag.Api`: backend ASP.NET Core Minimal API `net10.0` in-process. Le route sono divise in file `InProcessBackend.*.cs`, registrate da `InProcessBackend.EndpointMapping.cs`; SignalR gestisce streaming e notifiche job, REST gestisce stato e fallback.
 - `src/OnlyRag.Core`: contratti condivisi, record DTO, interfacce e modelli di impostazioni. È il confine tra API, infrastruttura e test.
 - `src/OnlyRag.Infrastructure`: SQLite cifrato tramite SQLCipher/EF Core, schema locale gestito da `LocalSqliteSchemaInitializer`, repository, ingestione, retrieval, Qdrant, OCR, ONNX DirectML, immagini, export e sicurezza delle credenziali.
-- `src/OnlyRag.Worker`: astrazioni della coda locale e stato dei job in background.
+- `src/OnlyRag.Jobs.Abstractions`: contratti della coda locale, modelli e stato dei job.
+- `src/OnlyRag.Api`: runtime hosted della coda e gestione del lifecycle dei job.
 - `src/OnlyRag.Web`: React 19 + TypeScript + Vite. Usa React Query, SignalR, Lucide, React Markdown, CSS globale suddiviso in `src/styles`; non usa Tailwind. Le sezioni sono caricate lazy da `src/App.tsx`.
 - `tests`: test xUnit per Core/API/Infrastructure e host backend Playwright; `src/OnlyRag.Web` contiene test Vitest/Testing Library e test e2e Playwright.
 

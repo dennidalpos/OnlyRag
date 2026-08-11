@@ -178,7 +178,6 @@ export function AppHeader({
                         <span className="status-menu-item__label">{module.module}</span>
                         <span className={`status-badge status-badge--${moduleTone(module)}`} title={module.error ?? undefined}>
                           <strong>{moduleStateLabel(module)}</strong>
-                          <small>{module.durationMs} ms</small>
                         </span>
                       </div>
                     ))}
