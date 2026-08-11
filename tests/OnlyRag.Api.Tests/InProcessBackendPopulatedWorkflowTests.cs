@@ -11,6 +11,44 @@ namespace OnlyRag.Api.Tests;
 public sealed partial class InProcessBackendTests
 {
     [Fact]
+    public void QdrantDiagnosticsFallback_ReportsExplicitOfflineStatus()
+    {
+        QdrantStatusResponse fallback = InProcessBackend.CreateQdrantDiagnosticsFallback();
+
+        Assert.False(fallback.IsReachable);
+        Assert.Equal("Offline", fallback.Status);
+        Assert.NotEqual("Sconosciuto", fallback.Status);
+        Assert.Equal("http://127.0.0.1:6334", fallback.GrpcEndpoint);
+        Assert.NotNull(fallback.Error);
+    }
+
+    [Fact]
+    public async Task Diagnostics_WhenQdrantUsesReachableExternalStore_ReportsOnline()
+    {
+        using TempBackendDescriptor tempDescriptor = TempBackendDescriptor.Create();
+        await using InProcessBackendHandle backend = await InProcessBackend.StartAsync(
+            tempDescriptor.Descriptor,
+            new InProcessBackendOptions { QdrantVectorStore = new FakeQdrantVectorStore() });
+        using HttpClient httpClient = CreateAuthenticatedClient(backend);
+
+        QdrantSettings settings = new(UseLocalBundledServer: false);
+        using HttpResponseMessage settingsResponse = await httpClient.PutAsJsonAsync(
+            "/api/settings/qdrant",
+            settings,
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
+
+        using HttpResponseMessage diagnosticsResponse = await httpClient.GetAsync("/api/diagnostics");
+        DiagnosticsResponse? diagnostics = await diagnosticsResponse.Content.ReadFromJsonAsync<DiagnosticsResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, diagnosticsResponse.StatusCode);
+        Assert.NotNull(diagnostics);
+        Assert.True(diagnostics.Qdrant.IsReachable);
+        Assert.Equal("Online", diagnostics.Qdrant.Status);
+        Assert.Equal("online", diagnostics.Modules!.Single(module => module.Module == "Qdrant").State);
+    }
+
+    [Fact]
     public async Task PopulatedWorkflow_CoversJobsRetrievalChatTranslationSettingsOcrStatusAndShutdown()
     {
         await using FakeOllamaServer ollama = await FakeOllamaServer.StartAsync();

@@ -151,7 +151,7 @@ public static partial class InProcessBackend
                 RunTimedSafeAsync(
                     "Qdrant",
                     token => qdrantRuntime.GetStatusAsync(qdrantVectorStore, token),
-                    new QdrantStatusResponse("Sconosciuto", false, string.Empty, false, false, false, null, null, null, null, null, null, null),
+                    CreateQdrantDiagnosticsFallback(),
                     result => result.IsReachable ? ("online", null) : result.Status is "Caricamento" or "Starting" ? ("starting", result.Status) : ("offline", result.Error ?? result.Status),
                     TimeSpan.FromSeconds(3),
                     cancellationToken);
@@ -380,6 +380,24 @@ public static partial class InProcessBackend
         {
             return ("Timeout", false, null, []);
         }
+    }
+
+    internal static QdrantStatusResponse CreateQdrantDiagnosticsFallback()
+    {
+        return new QdrantStatusResponse(
+            "Offline",
+            false,
+            "http://127.0.0.1:6334",
+            true,
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "La diagnostica Qdrant non ha completato il probe.");
     }
 
     private static async Task<ProbeResult<T>> RunTimedSafeAsync<T>(
