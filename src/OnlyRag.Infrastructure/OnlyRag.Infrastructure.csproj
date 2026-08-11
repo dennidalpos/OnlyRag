@@ -3,6 +3,15 @@
   <ItemGroup>
     <ProjectReference Include="..\OnlyRag.Core\OnlyRag.Core.csproj" />
     <ProjectReference Include="..\OnlyRag.Jobs.Abstractions\OnlyRag.Jobs.Abstractions.csproj" />
+    <ProjectReference Include="..\OnlyRag.Infrastructure.Storage\OnlyRag.Infrastructure.Storage.csproj" />
+    <ProjectReference Include="..\OnlyRag.Infrastructure.Retrieval\OnlyRag.Infrastructure.Retrieval.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="LocalSqliteStoreDescriptor.cs" />
+    <Compile Remove="Storage\**\*.cs" />
+    <Compile Remove="Retrieval\**\*.cs" />
+    <Compile Remove="Vector\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

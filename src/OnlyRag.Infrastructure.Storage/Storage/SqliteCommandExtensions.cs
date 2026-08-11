@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace OnlyRag.Infrastructure.Storage;
 
-internal static class SqliteCommandExtensions
+public static class SqliteCommandExtensions
 {
     public static async Task<int> ExecuteNonQueryAsync(
         this SqliteConnection connection,

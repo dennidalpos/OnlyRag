@@ -43,9 +43,14 @@ public sealed partial class InProcessBackendTests
 
         Assert.Equal(HttpStatusCode.OK, diagnosticsResponse.StatusCode);
         Assert.NotNull(diagnostics);
+        IReadOnlyList<DiagnosticsModuleStatus> modules =
+            Assert.IsAssignableFrom<IReadOnlyList<DiagnosticsModuleStatus>>(diagnostics.Modules);
         Assert.True(diagnostics.Qdrant.IsReachable);
         Assert.Equal("Online", diagnostics.Qdrant.Status);
-        Assert.Equal("online", diagnostics.Modules!.Single(module => module.Module == "Qdrant").State);
+        Assert.Equal("online", modules.Single(module => module.Module == "Qdrant").State);
+        Assert.Equal("online", modules.Single(module => module.Module == "Database & FTS5").State);
+        Assert.Equal("online", modules.Single(module => module.Module == "Agent Engine").State);
+        Assert.Equal("online", modules.Single(module => module.Module == "Knowledge Graph").State);
     }
 
     [Fact]

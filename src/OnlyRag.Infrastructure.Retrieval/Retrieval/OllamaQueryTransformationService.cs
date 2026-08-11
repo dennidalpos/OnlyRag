@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using OnlyRag.Core;
-using OnlyRag.Infrastructure.Logging;
 
 namespace OnlyRag.Infrastructure.Retrieval;
 
@@ -8,17 +8,13 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
 {
     private const int MaxCacheEntries = 500;
     private readonly ILlmQueryExpander? llmExpander;
-    private readonly ILoggingService? logger;
     private readonly ConcurrentDictionary<(string Query, QueryTransformationStrategy Strategy), List<string>> llmCache = new();
     private readonly LinkedList<(string Query, QueryTransformationStrategy Strategy)> cacheOrder = new();
     private readonly object cacheLock = new();
 
-    public OllamaQueryTransformationService(
-        ILlmQueryExpander? llmExpander = null,
-        ILoggingService? logger = null)
+    public OllamaQueryTransformationService(ILlmQueryExpander? llmExpander = null)
     {
         this.llmExpander = llmExpander;
-        this.logger = logger;
     }
 
     public async Task<QueryTransformationResult> TransformAsync(
@@ -49,14 +45,11 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
                 if (llmVariants.Count > 0)
                 {
                     variants.AddRange(llmVariants);
-                    logger?.LogInfo("OllamaQueryTransformationService",
-                        $"[LLM EXPANSION SUCCESS] Generated {llmVariants.Count} variants via LLM for strategy '{effectiveStrategy}'.");
                 }
             }
             catch (Exception ex)
             {
-                logger?.LogWarning("OllamaQueryTransformationService",
-                    $"Error in LLM expansion, falling back to heuristics only: {ex.Message}");
+                Trace.TraceWarning($"LLM query expansion failed; using heuristic variants. {ex.Message}");
             }
         }
 
@@ -78,8 +71,6 @@ public sealed class OllamaQueryTransformationService : IQueryTransformationServi
                 cacheOrder.Remove(cacheKey);
                 cacheOrder.AddLast(cacheKey);
 
-                logger?.LogInfo("OllamaQueryTransformationService",
-                    $"[LLM EXPANSION CACHE HIT] Found {cached.Count} cached variants for query '{query}' ({strategy}).");
                 return cached;
             }
         }

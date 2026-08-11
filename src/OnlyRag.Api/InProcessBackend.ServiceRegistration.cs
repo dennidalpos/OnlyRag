@@ -39,6 +39,8 @@ internal static class InProcessBackendServiceRegistration
             .AddOnlyRagApplicationServices()
             .AddOnlyRagStorageServices()
             .AddOnlyRagRetrievalServices(options)
+            .AddOnlyRagQdrantRuntimeServices()
+            .AddOnlyRagAgentAndWorkspaceServices()
             .AddOnlyRagDocumentServices()
             .AddOnlyRagOcrServices()
             .AddOnlyRagSettingsAndDiagnosticsServices()
@@ -143,8 +145,6 @@ internal static class InProcessBackendServiceRegistration
             services.AddSingleton<IQdrantVectorStore, QdrantVectorStore>();
         }
 
-        services.AddSingleton<QdrantLocalRuntimeService>();
-        services.AddHostedService<QdrantStartupService>();
         services.AddSingleton<OnlyRag.Core.IQdrantSyncRepairService, OnlyRag.Infrastructure.Vector.QdrantSyncRepairService>();
         services.AddSingleton(HybridRetrievalOptions.Default);
         services.AddSingleton<IKeywordSearchService, SqliteKeywordSearchService>();
@@ -160,6 +160,19 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<CragDecisionEngine>();
         services.AddSingleton<IEntityGraphExtractor, EntityGraphExtractor>();
         services.AddSingleton<IGraphRetrievalService, SqliteGraphRetrievalService>();
+        services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
+        return services;
+    }
+
+    private static IServiceCollection AddOnlyRagQdrantRuntimeServices(this IServiceCollection services)
+    {
+        services.AddSingleton<QdrantLocalRuntimeService>();
+        services.AddHostedService<QdrantStartupService>();
+        return services;
+    }
+
+    private static IServiceCollection AddOnlyRagAgentAndWorkspaceServices(this IServiceCollection services)
+    {
         services.AddSingleton<IAgentEpisodicMemoryService, SqliteQdrantEpisodicMemoryService>();
         services.AddSingleton<IAgentSkillRepository, SqliteAgentSkillRepository>();
         services.AddSingleton<IAgentSkillAutoLearner, AgentSkillAutoLearner>();
@@ -176,7 +189,6 @@ internal static class InProcessBackendServiceRegistration
         services.AddSingleton<WorkspaceSnapshotCheckpointManager>();
         services.AddSingleton<OnlyRag.Infrastructure.Agent.Memory.EpisodicMemoryIndexer>();
         services.AddSingleton<IAgentExecutionPolicyService, AgentExecutionPolicyService>();
-        services.AddSingleton<IHybridRetrievalService, HybridRetrievalService>();
         services.AddSingleton<ChatService>();
         services.AddSingleton<WorkspaceService>();
         services.AddSingleton<BackgroundTaskManager>();

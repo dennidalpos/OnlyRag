@@ -258,6 +258,12 @@ export function createDiagnostics(overrides: Partial<DiagnosticsResponse> = {}):
       hasApiKey: false,
       statusText: "Non configurato"
     },
+    modules: [
+      { module: "Qdrant", state: "online", durationMs: 10, error: null },
+      { module: "Database & FTS5", state: "online", durationMs: 10, error: null },
+      { module: "Agent Engine", state: "online", durationMs: 10, error: null },
+      { module: "Knowledge Graph", state: "online", durationMs: 10, error: null }
+    ],
     ...overrides
   };
 }
@@ -303,4 +309,3 @@ export function createRerankerModelInfo(overrides: Partial<RerankerModelInfo> = 
     ...overrides
   };
 }
-

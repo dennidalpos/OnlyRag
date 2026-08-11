@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OnlyRag.Core\OnlyRag.Core.csproj" />
     <ProjectReference Include="..\..\src\OnlyRag.Infrastructure\OnlyRag.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\OnlyRag.Infrastructure.Retrieval\OnlyRag.Infrastructure.Retrieval.csproj" />
+    <ProjectReference Include="..\..\src\OnlyRag.Infrastructure.Storage\OnlyRag.Infrastructure.Storage.csproj" />
     <ProjectReference Include="..\..\src\OnlyRag.Jobs.Abstractions\OnlyRag.Jobs.Abstractions.csproj" />
   </ItemGroup>
 

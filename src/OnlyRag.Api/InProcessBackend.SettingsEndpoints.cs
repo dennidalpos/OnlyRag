@@ -121,11 +121,16 @@ public static partial class InProcessBackend
         app.MapPut("/api/settings/qdrant", async (
             QdrantSettings request,
             QdrantSettingsStore settings,
+            QdrantLocalRuntimeService runtime,
+            IQdrantVectorStore vectorStore,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                return Results.Ok(ToQdrantSettingsResponse(await settings.UpdateAsync(request, cancellationToken)));
+                QdrantSettings previousSettings = await settings.GetAsync(cancellationToken);
+                QdrantSettings updatedSettings = await settings.UpdateAsync(request, cancellationToken);
+                await runtime.ApplySettingsAsync(previousSettings, updatedSettings, vectorStore, cancellationToken);
+                return Results.Ok(ToQdrantSettingsResponse(updatedSettings));
             }
             catch (InvalidOperationException ex)
             {

@@ -7,6 +7,7 @@ using OnlyRag.Core;
 using OnlyRag.Infrastructure.Images;
 using OnlyRag.Infrastructure.Ocr;
 using OnlyRag.Infrastructure.Retrieval;
+using OnlyRag.Infrastructure.Retrieval.Graph;
 using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Infrastructure.Storage.Security;
 using OnlyRag.Infrastructure.Vector;
@@ -126,6 +127,7 @@ public static partial class InProcessBackend
             InProcessBackendDescriptor descriptor,
             IOllamaClient ollamaClient,
             IOllamaSettingsService ollamaSettings,
+            ILocalStorageService storage,
             QdrantLocalRuntimeService qdrantRuntime,
             IQdrantVectorStore qdrantVectorStore,
             IOcrEngine ocrEngine,
@@ -134,6 +136,8 @@ public static partial class InProcessBackend
             SystemTelemetryService systemTelemetry,
             DiagnosticsProbeCacheService diagnosticsProbeCache,
             RerankerModelManager rerankerModelManager,
+            IAgentExecutionPolicyService agentPolicy,
+            IGraphRetrievalService graphRetrieval,
             ICloudApiKeyVault cloudKeyVault,
             CancellationToken cancellationToken) =>
         {
@@ -153,6 +157,43 @@ public static partial class InProcessBackend
                     token => qdrantRuntime.GetStatusAsync(qdrantVectorStore, token),
                     CreateQdrantDiagnosticsFallback(),
                     result => result.IsReachable ? ("online", null) : result.Status is "Caricamento" or "Starting" ? ("starting", result.Status) : ("offline", result.Error ?? result.Status),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
+
+            Task<ProbeResult<StorageStatusResponse>> fts5Task =
+                RunTimedSafeAsync(
+                    "Database & FTS5",
+                    storage.GetStatusAsync,
+                    new StorageStatusResponse("SQLite", string.Empty, false, 0, 0, "Unavailable", false, null),
+                    result => result.DatabaseExists && result.Fts5Available
+                        ? ("online", null)
+                        : ("offline", result.TechnicalNote ?? result.SchemaStatus),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
+
+            Task<ProbeResult<bool>> agentEngineTask =
+                RunTimedSafeAsync(
+                    "Agent Engine",
+                    async token =>
+                    {
+                        await agentPolicy.GetAuditLogsAsync(1, token);
+                        return true;
+                    },
+                    false,
+                    result => result ? ("online", null) : ("offline", "Agent Engine non raggiungibile."),
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken);
+
+            Task<ProbeResult<bool>> knowledgeGraphTask =
+                RunTimedSafeAsync(
+                    "Knowledge Graph",
+                    async token =>
+                    {
+                        await graphRetrieval.GetFullGraphAsync(1, cancellationToken: token);
+                        return true;
+                    },
+                    false,
+                    result => result ? ("online", null) : ("offline", "Knowledge Graph non raggiungibile."),
                     TimeSpan.FromSeconds(3),
                     cancellationToken);
 
@@ -215,8 +256,8 @@ public static partial class InProcessBackend
                     TimeSpan.FromSeconds(2),
                     cancellationToken);
 
-            await Task.WhenAll(ollamaTask, qdrantTask, ocrAvailabilityTask, gpuTask,
-                telemetryTask, imageGenTask, rerankerTask, cloudKeyTask);
+            await Task.WhenAll(ollamaTask, qdrantTask, fts5Task, agentEngineTask, knowledgeGraphTask,
+                ocrAvailabilityTask, gpuTask, telemetryTask, imageGenTask, rerankerTask, cloudKeyTask);
 
             var (ollamaStatus, ollamaReachable, ollamaVersion, ollamaRunningModels) = ollamaTask.Result.Value;
             QdrantStatusResponse qdrantStatus = qdrantTask.Result.Value;
@@ -258,6 +299,9 @@ public static partial class InProcessBackend
                 [
                     ollamaTask.Result.Status,
                     qdrantTask.Result.Status,
+                    fts5Task.Result.Status,
+                    agentEngineTask.Result.Status,
+                    knowledgeGraphTask.Result.Status,
                     ocrAvailabilityTask.Result.Status,
                     gpuTask.Result.Status,
                     telemetryTask.Result.Status,

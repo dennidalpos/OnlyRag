@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "lastUpdated": "2026-08-11T18:49:16+02:00",
-    "source": "Repository architecture review",
+    "lastUpdated": "2026-08-11T20:37:22+02:00",
+    "source": "Repository rescan and architecture review",
     "statusLegend": {
       "planned": "Task identified but not started",
       "in_progress": "Implementation underway",
@@ -15,35 +15,6 @@
     }
   },
   "todos": [
-    {
-      "id": "p1-split-infrastructure-bounded-contexts",
-      "priority": "P1",
-      "status": "planned",
-      "title": "Suddividere Infrastructure per bounded context tecnici",
-      "goal": "Ridurre la dimensione del progetto Infrastructure e rendere chiaro quali componenti possono evolvere indipendentemente.",
-      "problem": "Infrastructure contiene storage, retrieval, agent, OCR, immagini, integrazioni cloud, Qdrant, export e sync in un unico progetto di circa 111 file C#. Il progetto e coerente come infrastruttura, ma troppo ampio per manutenzione umana e compilazione isolata.",
-      "scope": [
-        "Estrarre progressivamente OnlyRag.Infrastructure.Storage.",
-        "Estrarre OnlyRag.Infrastructure.Retrieval con Qdrant, FTS, graph e reranking.",
-        "Estrarre OnlyRag.Infrastructure.Agent con memory, policy, tool execution e subagents.",
-        "Raggruppare OCR, immagini e hardware in un modulo Media/AI separato.",
-        "Raggruppare MCP, cloud provider, Ollama e process launcher in Integrations.",
-        "Mantenere le interfacce nei layer piu bassi necessari e impedire riferimenti tra moduli fratelli tramite dipendenze esplicite."
-      ],
-      "acceptanceCriteria": [
-        "Ogni progetto ha una responsabilita principale documentata.",
-        "Storage non conosce componenti di UI o endpoint.",
-        "Retrieval non dipende da Image/OCR e Agent non dipende da implementazioni concrete non necessarie.",
-        "Ogni estrazione conserva i test esistenti e aggiunge test di composizione DI.",
-        "La registrazione backend usa un metodo AddOnlyRag* per ogni modulo."
-      ],
-      "dependencies": [],
-      "affectedAreas": [
-        "src/OnlyRag.Infrastructure",
-        "src/OnlyRag.Api/InProcessBackend.ServiceRegistration.cs",
-        "tests"
-      ]
-    },
     {
       "id": "p1-split-agent-and-frontend-use-cases",
       "priority": "P1",
@@ -128,6 +99,31 @@
         "src/OnlyRag.Jobs.Abstractions",
         "src/OnlyRag.Web/src/App.tsx",
         "src/OnlyRag.Web/src/components/*"
+      ]
+    },
+    {
+      "id": "p2-diagnostics-observability",
+      "priority": "P2",
+      "status": "planned",
+      "title": "Esporre freschezza ed errori della salute moduli AI",
+      "goal": "Rendere ogni risultato diagnostico comprensibile e azionabile senza consultare i log.",
+      "problem": "I probe reali sono presenti, ma timestamp/cache age, dettagli d'errore accessibili e retry contestuale non sono ancora esposti nella UI.",
+      "scope": [
+        "Aggiungere timestamp e indicazione cache al contratto diagnostico.",
+        "Mostrare errore e ultimo aggiornamento nel popover e nel pannello Diagnostica.",
+        "Aggiungere retry accessibile per il singolo modulo o per l'intera diagnostica."
+      ],
+      "acceptanceCriteria": [
+        "Uno stato cacheato o scaduto e' distinguibile da uno appena verificato.",
+        "Gli errori sono leggibili da tastiera e screen reader.",
+        "I test frontend coprono errore, timeout e retry."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Core/SystemContracts.cs",
+        "src/OnlyRag.Api/InProcessBackend.AppEndpoints.cs",
+        "src/OnlyRag.Web/src/components/layout/AppHeader.tsx",
+        "src/OnlyRag.Web/src/components/settings/DiagnosticsPanel.tsx"
       ]
     }
   ]

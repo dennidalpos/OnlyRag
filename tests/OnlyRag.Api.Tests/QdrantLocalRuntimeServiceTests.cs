@@ -1,4 +1,5 @@
 using OnlyRag.Api;
+using OnlyRag.Core;
 
 namespace OnlyRag.Api.Tests;
 
@@ -56,5 +57,28 @@ public sealed class QdrantLocalRuntimeServiceTests
     public void GetLocalHttpPort_avoids_the_configured_gRpc_port(int grpcPort, int expectedHttpPort)
     {
         Assert.Equal(expectedHttpPort, QdrantLocalRuntimeService.GetLocalHttpPort(grpcPort));
+    }
+
+    [Theory]
+    [InlineData(true, true, 6334, 6335, true)]
+    [InlineData(true, false, 6334, 6334, true)]
+    [InlineData(false, false, 6334, 6335, false)]
+    public void RequiresLocalRuntimeRestart_detects_local_runtime_changes(
+        bool previousUsesLocalRuntime,
+        bool currentUsesLocalRuntime,
+        int previousGrpcPort,
+        int currentGrpcPort,
+        bool expected)
+    {
+        QdrantSettings previous = new(
+            GrpcEndpoint: $"http://127.0.0.1:{previousGrpcPort}",
+            UseLocalBundledServer: previousUsesLocalRuntime,
+            LocalGrpcPort: previousGrpcPort);
+        QdrantSettings current = new(
+            GrpcEndpoint: $"http://127.0.0.1:{currentGrpcPort}",
+            UseLocalBundledServer: currentUsesLocalRuntime,
+            LocalGrpcPort: currentGrpcPort);
+
+        Assert.Equal(expected, QdrantLocalRuntimeService.RequiresLocalRuntimeRestart(previous, current));
     }
 }

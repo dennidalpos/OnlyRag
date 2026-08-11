@@ -12,10 +12,6 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AvailabilityProbeTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan HealthFailureGracePeriod = TimeSpan.FromSeconds(30);
-    private static readonly HttpClient AvailabilityHttpClient = new()
-    {
-        Timeout = Timeout.InfiniteTimeSpan
-    };
     private readonly InProcessBackendDescriptor descriptor;
     private readonly QdrantSettingsStore settingsStore;
     private readonly QdrantProcessSupervisor processSupervisor = new();
@@ -55,7 +51,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         {
             using CancellationTokenSource probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             probeCts.CancelAfter(AvailabilityProbeTimeout);
-            reachable = await VerifyAvailabilityAsync(settings, endpoint, vectorStore, probeCts.Token);
+            reachable = await VerifyAvailabilityAsync(vectorStore, probeCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -216,6 +212,31 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
         }
     }
 
+    public async Task<QdrantStatusResponse> ApplySettingsAsync(
+        QdrantSettings previousSettings,
+        QdrantSettings currentSettings,
+        IQdrantVectorStore vectorStore,
+        CancellationToken cancellationToken = default)
+    {
+        if (!RequiresLocalRuntimeRestart(previousSettings, currentSettings))
+        {
+            return await GetStatusAsync(vectorStore, cancellationToken);
+        }
+
+        await startupLock.WaitAsync(cancellationToken);
+        try
+        {
+            await StopCoreAsync(cancellationToken);
+            return currentSettings.UseLocalBundledServer
+                ? await StartCoreAsync(vectorStore, cancellationToken)
+                : await GetStatusAsync(vectorStore, cancellationToken);
+        }
+        finally
+        {
+            startupLock.Release();
+        }
+    }
+
     public void StartAutoHealingSupervisor(IQdrantVectorStore vectorStore)
     {
         lock (processSupervisor)
@@ -291,7 +312,7 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
                     try
                     {
                         Uri endpoint = QdrantSettingsStore.ParseEndpoint(settings.GrpcEndpoint);
-                        gRpcReachable = await VerifyAvailabilityAsync(settings, endpoint, vectorStore, cancellationToken);
+                        gRpcReachable = await VerifyAvailabilityAsync(vectorStore, cancellationToken);
                         gRpcUnavailableSinceUtc = null;
                     }
                     catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TimeoutException or Grpc.Core.RpcException)
@@ -421,6 +442,19 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        await startupLock.WaitAsync(cancellationToken);
+        try
+        {
+            await StopCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            startupLock.Release();
+        }
+    }
+
+    private async Task StopCoreAsync(CancellationToken cancellationToken)
+    {
         await StopAutoHealingSupervisorAsync();
         try
         {
@@ -490,25 +524,22 @@ internal sealed class QdrantLocalRuntimeService : IAsyncDisposable
     }
 
     private static async Task<bool> VerifyAvailabilityAsync(
-        QdrantSettings settings,
-        Uri endpoint,
         IQdrantVectorStore vectorStore,
         CancellationToken cancellationToken)
     {
-        if (settings.UseLocalBundledServer && QdrantSettingsStore.IsLoopback(endpoint))
-        {
-            int httpPort = GetLocalHttpPort(settings.LocalGrpcPort);
-            Uri readinessUri = new($"http://127.0.0.1:{httpPort}/readyz");
-            using HttpRequestMessage request = new(HttpMethod.Get, readinessUri);
-            using HttpResponseMessage response = await AvailabilityHttpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-
         await vectorStore.VerifyAvailabilityAsync(cancellationToken);
         return true;
+    }
+
+    internal static bool RequiresLocalRuntimeRestart(
+        QdrantSettings previousSettings,
+        QdrantSettings currentSettings)
+    {
+        return previousSettings.UseLocalBundledServer || currentSettings.UseLocalBundledServer
+            ? previousSettings.UseLocalBundledServer != currentSettings.UseLocalBundledServer
+                || previousSettings.LocalGrpcPort != currentSettings.LocalGrpcPort
+                || !string.Equals(previousSettings.GrpcEndpoint, currentSettings.GrpcEndpoint, StringComparison.OrdinalIgnoreCase)
+            : false;
     }
 
     internal static int GetLocalHttpPort(int grpcPort)

@@ -53,13 +53,13 @@ export function AppHeader({
     { label: "Ollama", value: backendStatus.ollamaValue, tone: backendStatus.ollamaTone },
     buildCloudLlmBadge(diagnostics, backendStatus.backendTone),
     buildQdrantBadge(diagnostics, backendStatus.backendTone, isInitialChecking),
-    buildSqliteBadge(backendStatus.backendTone),
+    buildSqliteBadge(diagnostics, backendStatus.backendTone),
     buildRerankerBadge(diagnostics, backendStatus.backendTone),
     buildOcrBadge(diagnostics, ocrProvisionStatus, backendStatus.backendTone, isInitialChecking),
     buildOcrGpuBadge(diagnostics, ocrProvisionStatus, backendStatus.backendTone),
     buildImageBadge(diagnostics, backendStatus.backendTone),
-    buildAgentEngineBadge(backendStatus.backendTone),
-    buildKnowledgeGraphBadge(backendStatus.backendTone)
+    buildAgentEngineBadge(diagnostics, backendStatus.backendTone),
+    buildKnowledgeGraphBadge(diagnostics, backendStatus.backendTone)
   ].filter((badge): badge is StatusBadge => badge !== null);
 
   let overallLabel: string;
@@ -84,7 +84,11 @@ export function AppHeader({
     const hasCriticalIssues =
       backendStatus.ollamaTone !== "online" ||
       (diagnostics !== null && !diagnostics.ocrIsConfigured) ||
-      (diagnostics !== null && !diagnostics.qdrant.isReachable && !isQdrantStarting) ||
+      (diagnostics !== null && diagnostics.modules?.some((module) =>
+        ["Qdrant", "Database & FTS5", "Agent Engine", "Knowledge Graph"].includes(module.module)
+        && module.state !== "online"
+        && module.state !== "starting"
+      )) ||
       statusBadges.some((b) => b.tone === "offline");
 
     if (hasCriticalIssues) {
@@ -338,13 +342,10 @@ function buildQdrantBadge(
 }
 
 function buildSqliteBadge(
+  diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
 ): StatusBadge {
-  return {
-    label: "Database & FTS5",
-    value: backendTone === "offline" ? "Offline" : "Attivo",
-    tone: backendTone === "offline" ? "offline" : "online"
-  };
+  return buildModuleBadge("Database & FTS5", diagnostics, backendTone);
 }
 
 function buildRerankerBadge(
@@ -484,22 +485,45 @@ function buildImageBadge(
 }
 
 function buildAgentEngineBadge(
+  diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
 ): StatusBadge {
-  return {
-    label: "Agent Engine",
-    value: backendTone === "offline" ? "Offline" : "Attivo (MCTS)",
-    tone: backendTone === "offline" ? "offline" : "online"
-  };
+  return buildModuleBadge("Agent Engine", diagnostics, backendTone);
 }
 
 function buildKnowledgeGraphBadge(
+  diagnostics: DiagnosticsResponse | null,
   backendTone: BackendStatus["backendTone"]
 ): StatusBadge {
+  return buildModuleBadge("Knowledge Graph", diagnostics, backendTone);
+}
+
+function buildModuleBadge(
+  label: string,
+  diagnostics: DiagnosticsResponse | null,
+  backendTone: BackendStatus["backendTone"]
+): StatusBadge {
+  if (backendTone === "offline") {
+    return {
+      label,
+      value: "Offline",
+      tone: "offline"
+    };
+  }
+
+  const module = diagnostics?.modules?.find((candidate) => candidate.module === label);
+  if (!module) {
+    return {
+      label,
+      value: "In lettura",
+      tone: "warning"
+    };
+  }
+
   return {
-    label: "Knowledge Graph",
-    value: backendTone === "offline" ? "Offline" : "Attivo",
-    tone: backendTone === "offline" ? "offline" : "online"
+    label,
+    value: moduleStateLabel(module),
+    tone: moduleTone(module)
   };
 }
 

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { BackendStatus } from "../../App";
@@ -76,6 +76,32 @@ describe("AppHeader", () => {
     expect(screen.getByText("Timeout")).toBeInTheDocument();
     expect(screen.queryByText("2000 ms")).not.toBeInTheDocument();
     expect(screen.getAllByText("Attivo").length).toBeGreaterThan(0);
+  });
+
+  it("derives the system status and database badge from the FTS5 probe", async () => {
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <AppHeader
+          currentSection="Chat"
+          backendStatus={createBackendStatus()}
+          diagnostics={createDiagnostics({
+            modules: [
+              { module: "Qdrant", state: "online", durationMs: 10, error: null },
+              { module: "Database & FTS5", state: "offline", durationMs: 10, error: "FTS5 non disponibile." },
+              { module: "Agent Engine", state: "online", durationMs: 10, error: null },
+              { module: "Knowledge Graph", state: "online", durationMs: 10, error: null }
+            ]
+          })}
+        />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByRole("button", { name: "Stato sistema" })).toHaveTextContent("Incompleto");
+    await user.click(screen.getByRole("button", { name: "Stato sistema" }));
+
+    const menu = screen.getByRole("dialog", { name: "Salute Moduli AI" });
+    expect(within(menu).getAllByText("Database & FTS5")[0].parentElement).toHaveTextContent("Offline");
   });
 });
 
