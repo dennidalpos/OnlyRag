@@ -13,11 +13,14 @@ public sealed class ArchitectureGuardrailTests
         Dictionary<string, IReadOnlyCollection<string>> allowedReferences = new(StringComparer.OrdinalIgnoreCase)
         {
             ["OnlyRag.App"] = new[] { "OnlyRag.Api", "OnlyRag.Core", "OnlyRag.Infrastructure" },
-            ["OnlyRag.Api"] = new[] { "OnlyRag.Application", "OnlyRag.Core", "OnlyRag.Infrastructure", "OnlyRag.Jobs.Abstractions" },
-            ["OnlyRag.Application"] = new[] { "OnlyRag.Core", "OnlyRag.Infrastructure", "OnlyRag.Jobs.Abstractions" },
+            ["OnlyRag.Api"] = new[] { "OnlyRag.Application", "OnlyRag.Core", "OnlyRag.Infrastructure", "OnlyRag.Infrastructure.Retrieval", "OnlyRag.Infrastructure.Storage", "OnlyRag.Jobs.Abstractions" },
+            ["OnlyRag.Application"] = new[] { "OnlyRag.Core", "OnlyRag.Jobs.Abstractions" },
             ["OnlyRag.Core"] = Array.Empty<string>(),
-            ["OnlyRag.Infrastructure"] = new[] { "OnlyRag.Core", "OnlyRag.Jobs.Abstractions" },
-            ["OnlyRag.Jobs.Abstractions"] = Array.Empty<string>()
+            ["OnlyRag.Infrastructure"] = new[] { "OnlyRag.Core", "OnlyRag.Infrastructure.Retrieval", "OnlyRag.Infrastructure.Storage", "OnlyRag.Jobs.Abstractions" },
+            ["OnlyRag.Infrastructure.Retrieval"] = new[] { "OnlyRag.Core", "OnlyRag.Infrastructure.Storage", "OnlyRag.Jobs.Abstractions" },
+            ["OnlyRag.Infrastructure.Storage"] = new[] { "OnlyRag.Core", "OnlyRag.Jobs.Abstractions" },
+            ["OnlyRag.Jobs.Abstractions"] = Array.Empty<string>(),
+            ["OnlyRag.Worker"] = new[] { "OnlyRag.Core", "OnlyRag.Infrastructure", "OnlyRag.Jobs.Abstractions" }
         };
 
         string[] projectFiles = Directory.GetFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories);
@@ -27,10 +30,9 @@ public sealed class ArchitectureGuardrailTests
         {
             string projectName = Path.GetFileNameWithoutExtension(projectFile);
 
-            if (!allowedReferences.ContainsKey(projectName))
-            {
-                continue;
-            }
+            Assert.True(
+                allowedReferences.ContainsKey(projectName),
+                $"Project '{projectName}' is not configured in allowedReferences of ArchitectureGuardrailTests.");
 
             string[] referencedProjects = ReadReferencedProjects(projectFile);
             HashSet<string> allowed = new(allowedReferences[projectName], StringComparer.OrdinalIgnoreCase);
@@ -39,7 +41,7 @@ public sealed class ArchitectureGuardrailTests
             {
                 Assert.True(
                     allowed.Contains(referencedProject),
-                    $"{projectName} references {referencedProject}, but only {string.Join(", ", allowed)} are allowed.");
+                    $"{projectName} references {referencedProject}, but only [{string.Join(", ", allowed)}] are allowed.");
             }
         }
     }

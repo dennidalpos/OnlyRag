@@ -1,6 +1,9 @@
-using OnlyRag.Core;
+namespace OnlyRag.Core;
 
-namespace OnlyRag.Infrastructure.Storage;
+public static class DocumentJobTypes
+{
+    public const string DocumentIngestionJobType = "document-ingestion";
+}
 
 public interface IDocumentLibraryService
 {

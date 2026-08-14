@@ -1,7 +1,6 @@
 using System.Text.Json;
 using OnlyRag.Application.Jobs;
 using OnlyRag.Core;
-using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Application.Documents;
@@ -56,7 +55,7 @@ public sealed class DocumentPipelineApplicationService
 
         LocalJob job = await jobs.CreateAsync(
             new CreateLocalJobRequest(
-                LocalDocumentLibraryService.DocumentIngestionJobType,
+                DocumentJobTypes.DocumentIngestionJobType,
                 payloadJson,
                 Priority: 30),
             cancellationToken);

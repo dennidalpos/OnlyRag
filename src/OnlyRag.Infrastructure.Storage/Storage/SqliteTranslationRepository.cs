@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using OnlyRag.Core;
 
 namespace OnlyRag.Infrastructure.Storage;
 

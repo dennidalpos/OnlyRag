@@ -2,9 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OnlyRag.Core\OnlyRag.Core.csproj" />
-    <ProjectReference Include="..\OnlyRag.Infrastructure\OnlyRag.Infrastructure.csproj" />
-    <ProjectReference Include="..\OnlyRag.Infrastructure.Storage\OnlyRag.Infrastructure.Storage.csproj" />
     <ProjectReference Include="..\OnlyRag.Jobs.Abstractions\OnlyRag.Jobs.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "lastUpdated": "2026-08-11T21:01:20+02:00",
-    "source": "Repository rescan, architecture review and installed-app log analysis",
+    "lastUpdated": "2026-08-12T00:00:00+02:00",
+    "source": "Architecture review reconciliation and approved modular refactoring plan",
     "statusLegend": {
       "planned": "Task identified but not started",
       "in_progress": "Implementation underway",
@@ -44,6 +44,132 @@
         "src/OnlyRag.Web/src/components/coding/useAgentStreamHandler.ts",
         "src/OnlyRag.Web/src/components/coding/CodingSection.test.tsx",
         "tests/OnlyRag.Api.Tests"
+      ]
+    },
+    {
+      "id": "p0-thin-api-composition-root",
+      "priority": "P0",
+      "status": "planned",
+      "title": "Ridurre il composition root e l'orchestrazione in OnlyRag.Api",
+      "goal": "Mantenere OnlyRag.Api focalizzato su bootstrap, autenticazione, mapping e composizione, spostando gli use case e la supervisione runtime nei servizi proprietari dei relativi moduli.",
+      "problem": "OnlyRag.Api concentra bootstrap, endpoint, chat, agenti, worker, diagnostica, provider, Qdrant lifecycle e process supervision. Questo aumenta il rischio di regressioni trasversali e rende ownership e test meno chiari.",
+      "scope": [
+        "Catalogare le responsabilita attualmente distribuite nei file InProcessBackend.* e nei servizi coordinati direttamente dagli endpoint.",
+        "Estrarre in servizi applicativi dedicati chat, agent orchestration, diagnostics, Qdrant lifecycle e process supervision dove il contratto esistente lo consente.",
+        "Lasciare nel composition root solo registrazione DI, middleware, autenticazione, mapping endpoint e lifecycle del backend.",
+        "Eliminare forwarding e codice legacy dopo aver trasferito ogni comportamento e aggiornato i test.",
+        "Aggiornare il diagramma delle dipendenze e la revisione architetturale con i nuovi ownership boundary."
+      ],
+      "acceptanceCriteria": [
+        "Le route API delegano gli use case a servizi nominati e testabili senza avviare il backend completo.",
+        "Il composition root non contiene logica di dominio o coordinamento di workflow lunghi.",
+        "Qdrant lifecycle, diagnostica e process supervision hanno contratti e test propri.",
+        "I test API, Application e Infrastructure restano verdi dopo la rimozione del forwarding legacy."
+      ],
+      "dependencies": [
+        "p0-enforce-architecture-boundaries",
+        "p1-split-agent-and-frontend-use-cases"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Api/InProcessBackend.cs",
+        "src/OnlyRag.Api/InProcessBackend.*.cs",
+        "src/OnlyRag.Api/ChatService.cs",
+        "src/OnlyRag.Api/AgentLoopEngine.cs",
+        "tests/OnlyRag.Api.Tests",
+        "docs/ARCHITECTURE.md",
+        "docs/ARCHITECTURE_REVIEW.md"
+      ]
+    },
+    {
+      "id": "p1-persist-multi-agent-orchestrations",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Rimuovere l'orchestratore multi-agent duplicato",
+      "goal": "Semplificare il motore agentico mantenendo un solo percorso autorevole basato su AgentLoopEngine, tool policy, verifica e run persistenti.",
+      "problem": "MultiAgentOrchestratorService mantiene uno stato volatile, avvia Task.Run non supervisionati e produce workflow di ruolo dimostrativi duplicando il percorso AgentLoopEngine.",
+      "scope": [
+        "Verificare endpoint e usi frontend di /api/agent/orchestrate prima della rimozione.",
+        "Rimuovere servizio, contratti, endpoint, registrazioni DI e componenti frontend usati esclusivamente dal workflow duplicato.",
+        "Conservare subagent e AgentLoopEngine che appartengono al percorso agentico principale.",
+        "Aggiornare test, documentazione e guardrail senza lasciare adapter o DTO legacy."
+      ],
+      "acceptanceCriteria": [
+        "Non esiste un secondo workflow agentico dimostrativo registrato o esposto dall'API.",
+        "AgentLoopEngine e il percorso subagent principale restano operativi e testati.",
+        "La rimozione non lascia riferimenti compilabili a MultiAgentOrchestratorService o IMultiAgentOrchestratorService.",
+        "I test API, Application e Infrastructure restano verdi."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Infrastructure/Agent/MultiAgentOrchestratorService.cs",
+        "src/OnlyRag.Core/MultiAgentContracts.cs",
+        "src/OnlyRag.Api/InProcessBackend.AgentEndpoints.cs",
+        "src/OnlyRag.Api/InProcessBackend.ServiceRegistration.cs",
+        "src/OnlyRag.Web/src/components/coding",
+        "tests/OnlyRag.Api.Tests",
+        "docs/AGENT_ENGINE.md"
+      ]
+    },
+    {
+      "id": "p1-unify-api-error-contracts",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Uniformare error mapping e contratti ProblemDetails",
+      "goal": "Restituire errori API coerenti, localizzabili e privi di dettagli infrastrutturali non necessari.",
+      "problem": "Il middleware globale produce ProblemDetails e correlation ID, ma numerosi endpoint catturano Exception e restituiscono direttamente ex.Message. I codici errore e la granularità degli status HTTP non sono uniformi tra le feature.",
+      "scope": [
+        "Definire eccezioni applicative tipizzate per validazione, autorizzazione workspace, dipendenze esterne, conflitti job e storage.",
+        "Centralizzare mapping tra eccezioni, status code, error code e messaggio pubblico.",
+        "Rimuovere catch generici dagli endpoint quando il middleware globale è sufficiente.",
+        "Allineare il client TypeScript alla struttura ProblemDetails e ai codici stabili.",
+        "Aggiungere test API per errori di filesystem, provider, job, Qdrant e richieste annullate."
+      ],
+      "acceptanceCriteria": [
+        "La UI riceve un formato errore stabile per tutte le feature principali.",
+        "I messaggi pubblici non espongono stack trace, path sensibili, token o dettagli non sanitizzati.",
+        "Ogni errore operativo significativo include un error code e un correlation ID quando applicabile.",
+        "I test API coprono almeno un caso di errore per ogni macro-area."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Api/InProcessBackend.Application.cs",
+        "src/OnlyRag.Api/InProcessBackend.*Endpoints.cs",
+        "src/OnlyRag.Api/UserFacingErrorText.cs",
+        "src/OnlyRag.Core",
+        "src/OnlyRag.Web/src/apiClient.ts",
+        "tests/OnlyRag.Api.Tests"
+      ]
+    },
+    {
+      "id": "p1-verify-sqlite-qdrant-consistency",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Rendere verificabile la consistenza tra SQLite e Qdrant",
+      "goal": "Rilevare e riparare in modo osservabile i casi in cui lo stato vettoriale Qdrant diverge dai metadati SQLite.",
+      "problem": "SQLite conserva lo stato di indicizzazione e gli identificativi dei punti Qdrant, mentre Qdrant conserva i vettori. Un fallimento parziale può lasciare documenti con metadata apparentemente indicizzati ma non ricercabili o punti orfani.",
+      "scope": [
+        "Definire invarianti di consistenza tra chunk, vector index status e payload Qdrant.",
+        "Aggiungere un probe diagnostico con conteggi, mismatch e punti orfani.",
+        "Implementare repair idempotente e limitato ai record verificati, senza cancellazioni implicite dei dati utente.",
+        "Gestire modello, dimensione e collection come parte della chiave di consistenza.",
+        "Aggiungere test con vector store fake e scenari di write parziale, collection mancante e reindex."
+      ],
+      "acceptanceCriteria": [
+        "La diagnostica distingue SQLite coerente, Qdrant non disponibile e mismatch di sincronizzazione.",
+        "Il repair può essere rilanciato senza duplicare vettori o perdere metadata.",
+        "Gli errori di consistency check sono visibili tramite API e log correlati.",
+        "I test coprono almeno write parziale, punto orfano e collection errata."
+      ],
+      "dependencies": [
+        "p1-qdrant-cold-start-observability"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Infrastructure.Retrieval/Vector/QdrantSyncRepairService.cs",
+        "src/OnlyRag.Infrastructure.Retrieval/Vector/QdrantVectorStore.cs",
+        "src/OnlyRag.Infrastructure.Storage/Storage/SqliteEmbeddingRepository.cs",
+        "src/OnlyRag.Api/InProcessBackend.AppEndpoints.cs",
+        "src/OnlyRag.Core",
+        "tests/OnlyRag.Infrastructure.Tests"
       ]
     },
     {
@@ -164,6 +290,102 @@
       ]
     },
     {
+      "id": "p1-formalize-storage-schema-ownership",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Formalizzare ownership e compatibilita dello schema locale",
+      "goal": "Rendere verificabile l'evoluzione dello schema SQLite SQLCipher usato contemporaneamente da EF Core, SQL parametrizzato e initializer manuale.",
+      "problem": "OnlyRagDbContext, repository SQL diretti e LocalSqliteSchemaInitializer condividono il database senza una ownership unica chiaramente verificata. Il drift puo produrre regressioni su installazioni esistenti e rendere incerto il percorso di migrazione.",
+      "scope": [
+        "Definire la fonte autorevole per schema, versionamento e migrazione delle tabelle locali.",
+        "Documentare quali entita sono gestite da EF Core e quali da SQL diretto, inclusi indici FTS5, trigger e tabelle ausiliarie.",
+        "Aggiungere test che confrontino schema atteso, schema installato e percorso di upgrade da almeno una versione precedente.",
+        "Verificare compatibilita e rollback del cambio schema senza perdere job, chat, documenti o stato di indicizzazione.",
+        "Rimuovere initializer o mapping duplicati quando la nuova ownership e coperta dai test."
+      ],
+      "acceptanceCriteria": [
+        "Ogni tabella, indice e trigger ha una fonte di verita documentata.",
+        "Un database esistente puo essere aggiornato in modo deterministico e idempotente.",
+        "I test rilevano drift tra modello EF, SQL dei repository e schema effettivo.",
+        "La build e i test di storage verificano almeno creazione, upgrade e riapertura del database cifrato."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Infrastructure.Storage/Storage/EF/OnlyRagDbContext.cs",
+        "src/OnlyRag.Infrastructure.Storage/Storage/LocalSqliteSchemaInitializer.cs",
+        "src/OnlyRag.Infrastructure.Storage/Storage",
+        "tests/OnlyRag.Infrastructure.Tests",
+        "docs/ARCHITECTURE.md",
+        "docs/OPERATIONS.md"
+      ]
+    },
+    {
+      "id": "p1-govern-single-process-resources",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Governare risorse e concorrenza del processo desktop",
+      "goal": "Evitare che OCR, embedding, retrieval, generazione immagini, Qdrant e UI competano senza limiti nello stesso processo WPF/API.",
+      "problem": "Il modello single-process semplifica il deployment ma concentra crash risk, memoria, CPU, GPU e shutdown in un unico processo. I limiti e le priorita tra workload AI non sono descritti come una policy uniforme.",
+      "scope": [
+        "Definire budget e limiti per CPU, memoria, GPU, coda e parallelismo per ciascun workload.",
+        "Collegare i limiti al job runtime e ai probe hardware, con backpressure invece di Task.Run non supervisionati.",
+        "Esporre saturazione, throttling e motivo della coda nella diagnostica applicativa.",
+        "Verificare isolamento e cancellazione di OCR, embedding e image generation durante chat e shutdown.",
+        "Aggiungere test e misurazioni per carichi concorrenti rappresentativi su macchina minima supportata."
+      ],
+      "acceptanceCriteria": [
+        "Ogni workload intensivo ha un limite configurabile e un comportamento definito quando il budget e esaurito.",
+        "La saturazione non blocca il thread UI ne il lifecycle del backend.",
+        "Un job cancellato rilascia risorse e non lascia pipeline o processi figli attivi.",
+        "La diagnostica mostra coda, throttling e risorse principali con timestamp."
+      ],
+      "dependencies": [
+        "p1-persist-section-work-state",
+        "p2-diagnostics-observability"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Api/LocalJobWorkerService.cs",
+        "src/OnlyRag.Infrastructure",
+        "src/OnlyRag.Infrastructure.Retrieval",
+        "src/OnlyRag.Api/DiagnosticsProbeCacheService.cs",
+        "src/OnlyRag.Web/src/components/settings/DiagnosticsPanel.tsx",
+        "tests/OnlyRag.Infrastructure.Tests"
+      ]
+    },
+    {
+      "id": "p2-local-runtime-support-matrix",
+      "priority": "P2",
+      "status": "planned",
+      "title": "Mantenere una matrice operativa dei runtime locali",
+      "goal": "Rendere espliciti prerequisiti, livelli di opzionalita, versioni supportate e azioni di recovery per ogni dipendenza locale.",
+      "problem": "Windows, WebView2, .NET, Node/npm, Ollama, Qdrant, Python/PaddleOCR, LibreOffice, DirectML, NSIS e signtool hanno cicli di provisioning e failure mode diversi. La documentazione esistente non costituisce ancora una matrice unica verificabile dal prodotto e dai test.",
+      "scope": [
+        "Definire per ogni runtime versione, architettura, fonte, checksum o manifest, health check e requisito di rete.",
+        "Distinguere prerequisiti obbligatori, opzionali e fallback supportati.",
+        "Collegare la matrice ai probe diagnostici, agli script di bootstrap e al packaging senza duplicare versioni manualmente.",
+        "Aggiungere test che verifichino manifest, messaggi azionabili e comportamento quando un runtime manca o e incompatibile.",
+        "Documentare la procedura di repair e rimozione del runtime legacy quando viene sostituito."
+      ],
+      "acceptanceCriteria": [
+        "La diagnostica indica requisito mancante, versione rilevata, versione richiesta e azione correttiva.",
+        "Packaging e bootstrap usano la stessa fonte di versione e integrita.",
+        "I fallback opzionali sono distinguibili da errori bloccanti.",
+        "I test dei manifest e dei prerequisiti coprono almeno un runtime mancante e uno incompatibile."
+      ],
+      "dependencies": [
+        "p1-qdrant-cold-start-observability",
+        "p2-diagnostics-observability"
+      ],
+      "affectedAreas": [
+        "scripts",
+        "packaging",
+        "src/OnlyRag.Api/DiagnosticsProbeCacheService.cs",
+        "src/OnlyRag.Infrastructure",
+        "docs/OPERATIONS.md",
+        "docs/ARCHITECTURE_REVIEW.md"
+      ]
+    },
+    {
       "id": "p2-diagnostics-observability",
       "priority": "P2",
       "status": "planned",
@@ -186,6 +408,298 @@
         "src/OnlyRag.Api/InProcessBackend.AppEndpoints.cs",
         "src/OnlyRag.Web/src/components/layout/AppHeader.tsx",
         "src/OnlyRag.Web/src/components/settings/DiagnosticsPanel.tsx"
+      ]
+    },
+    {
+      "id": "p2-async-shutdown-and-blocking-calls",
+      "priority": "P2",
+      "status": "planned",
+      "title": "Eliminare i blocchi sincroni nei percorsi di lifecycle",
+      "goal": "Rendere avvio, shutdown e callback di runtime non bloccanti e osservabili.",
+      "problem": "Sono presenti Wait sincroni durante OnExit, GetAwaiter().GetResult nella registrazione DI e callback sincrone per unload di pipeline immagini. Le eccezioni vengono in alcuni casi soppresse, rendendo incompleto il controllo del lifecycle.",
+      "scope": [
+        "Sostituire l'attesa sincrona di App.OnExit con un protocollo di shutdown asincrono compatibile con WPF.",
+        "Evitare I/O asincrono durante la costruzione del container DI; caricare settings tramite servizi inizializzati esplicitamente.",
+        "Rendere asincrone le callback di unload e cleanup delle pipeline ONNX dove il contratto lo consente.",
+        "Registrare timeout, componente coinvolto e outcome del shutdown senza perdere l'eccezione originale.",
+        "Aggiungere test per shutdown durante job attivi, stream chat e generazione immagini."
+      ],
+      "acceptanceCriteria": [
+        "Il thread UI non resta bloccato da una Wait durante la chiusura ordinaria.",
+        "Il bootstrap DI non esegue GetAwaiter().GetResult su servizi applicativi.",
+        "Ogni timeout di shutdown produce un evento di log strutturato e uno stato finale esplicito.",
+        "I job attivi risultano recoverable, cancellati o completati secondo il protocollo previsto.",
+        "I test coprono almeno un'interruzione durante ingestion e una durante streaming."
+      ],
+      "dependencies": [
+        "p1-persist-section-work-state"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.App/App.xaml.cs",
+        "src/OnlyRag.Api/InProcessBackend.ServiceRegistration.cs",
+        "src/OnlyRag.Infrastructure/Images/OnnxStableDiffusionImageGenerationEngine.cs",
+        "src/OnlyRag.Api/ApplicationShutdownService.cs",
+        "tests/OnlyRag.Api.Tests",
+        "tests/OnlyRag.Infrastructure.Tests"
+      ]
+    },
+    {
+      "id": "p0-simplify-prerequisites-experience",
+      "priority": "P0",
+      "status": "planned",
+      "title": "Semplificare prerequisiti, badge e banner informativi",
+      "goal": "Rendere i prerequisiti leggibili senza interrompere il lavoro dell'utente e spostare ogni azione correttiva nella sezione Settings proprietaria.",
+      "problem": "La UI dei prerequisiti concentra stato, spiegazioni e azioni in una modal/pannello complesso, duplicando le impostazioni e aumentando il codice legacy da mantenere.",
+      "scope": [
+        "Rimuovere la modal legacy e i pannelli con azioni operative inline.",
+        "Mostrare solo badge warning negli header e banner informativi non bloccanti.",
+        "Collegare ogni banner a uno shortcut accessibile verso la sezione Settings che risolve il problema.",
+        "Mantenere le azioni di installazione, riparazione e configurazione solo nelle impostazioni del modulo interessato.",
+        "Eliminare componenti, route, helper e stato legacy non piu referenziati."
+      ],
+      "acceptanceCriteria": [
+        "Nessun percorso principale apre una modal prerequisiti con azioni operative.",
+        "Un warning mostra modulo, problema sintetico e shortcut alla sezione corretta.",
+        "Un prerequisito risolto rimuove il badge e il banner senza stato UI obsoleto.",
+        "I test frontend verificano tastiera, screen reader, shortcut e assenza del componente legacy."
+      ],
+      "dependencies": [
+        "p2-diagnostics-observability",
+        "p2-local-runtime-support-matrix"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Web/src/components/layout/PrerequisitesModal.tsx",
+        "src/OnlyRag.Web/src/components/layout/SetupBanner.logic.ts",
+        "src/OnlyRag.Web/src/components/layout/AppHeader.tsx",
+        "src/OnlyRag.Web/src/components/settings",
+        "src/OnlyRag.Api/InProcessBackend.DependencyEndpoints.cs",
+        "tests/OnlyRag.Api.Tests",
+        "src/OnlyRag.Web/src/components/**/*.test.tsx"
+      ]
+    },
+    {
+      "id": "p1-unify-ocr-engines-and-default",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Unificare PaddleOCR CPU/GPU e Vision con default globale",
+      "goal": "Offrire un solo punto di configurazione per il motore OCR predefinito dei file e una selezione affidabile tra PaddleOCR CPU, PaddleOCR GPU e Vision.",
+      "problem": "I motori OCR e il provisioning sono distribuiti tra factory, runtime e impostazioni senza un contratto globale chiaro; la scelta effettiva e il fallback non sono uniformemente persistiti o osservabili.",
+      "scope": [
+        "Definire un contratto Core per Paddle CPU, Paddle GPU e Vision, includendo disponibilita e motore effettivo.",
+        "Consolidare la factory/registry OCR e rimuovere selezioni duplicate o obsolete.",
+        "Aggiungere l'impostazione globale del motore predefinito per i file da trattare con OCR.",
+        "Usare fallback automatico al motore disponibile con warning e registrazione della decisione.",
+        "Collegare ingestion, re-OCR, provisioning e diagnostica al motore globale senza legare la scelta alla feature immagini."
+      ],
+      "acceptanceCriteria": [
+        "Settings permette di selezionare Paddle CPU, Paddle GPU o Vision come default globale.",
+        "Paddle GPU verifica driver/runtime e ricade automaticamente su Paddle CPU o Vision secondo disponibilita.",
+        "Ogni documento OCR registra il motore richiesto e quello effettivamente utilizzato.",
+        "Il cambio del default non altera documenti gia trattati finche non viene richiesto re-OCR.",
+        "I test coprono motore disponibile, runtime assente, fallback, cancellazione e re-OCR."
+      ],
+      "dependencies": [
+        "p1-formalize-storage-schema-ownership",
+        "p2-local-runtime-support-matrix"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Core",
+        "src/OnlyRag.Infrastructure/Ocr",
+        "src/OnlyRag.Infrastructure/Ingestion",
+        "src/OnlyRag.Infrastructure.Storage/Storage",
+        "src/OnlyRag.Api/OcrStartupAnalysisService.cs",
+        "src/OnlyRag.Api/InProcessBackend.DependencyEndpoints.cs",
+        "src/OnlyRag.Web/src/components/settings",
+        "tests/OnlyRag.Infrastructure.Tests",
+        "tests/OnlyRag.Api.Tests",
+        "docs/OCR_PIPELINE.md"
+      ]
+    },
+    {
+      "id": "p1-configure-warning-error-log-level",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Configurare e verificare il livello minimo Warning/Error dei log",
+      "goal": "Garantire che il livello scelto nelle impostazioni governi tutte le scritture persistenti dei log e sia verificabile con read-back.",
+      "problem": "Il logging e distribuito tra BackendLog e servizi applicativi; alcuni percorsi possono bypassare il livello configurato o non dimostrare che l'evento sia stato salvato correttamente nel file locale.",
+      "scope": [
+        "Definire il livello minimo configurabile con Warning = Warning + Error ed Error = solo Error.",
+        "Centralizzare il filtro prima della scrittura e rimuovere bypass legacy.",
+        "Persistire il livello nelle impostazioni e applicarlo al backend senza riavvii incoerenti.",
+        "Verificare append, flush, read-back, rotazione e retention del file di log esistente.",
+        "Esporre nella diagnostica il livello attivo e l'esito dell'ultima verifica di scrittura."
+      ],
+      "acceptanceCriteria": [
+        "Con livello Warning vengono persistiti warning ed errori, ma non gli eventi informativi.",
+        "Con livello Error vengono persistiti solo errori.",
+        "Un test legge il file dopo la scrittura e verifica presenza/assenza degli eventi attesi.",
+        "Tutti i percorsi principali usano il logger centralizzato e non scrivono bypassando il filtro.",
+        "Il cambio di livello e il salvataggio sono visibili nella diagnostica."
+      ],
+      "dependencies": [
+        "p1-unify-api-error-contracts",
+        "p1-formalize-storage-schema-ownership"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Core",
+        "src/OnlyRag.Api/BackendLog.cs",
+        "src/OnlyRag.Api/StartupTracer.cs",
+        "src/OnlyRag.Infrastructure/Logging",
+        "src/OnlyRag.Infrastructure.Storage/Storage",
+        "src/OnlyRag.Web/src/components/settings",
+        "tests/OnlyRag.Api.Tests",
+        "tests/OnlyRag.Infrastructure.Tests"
+      ]
+    },
+    {
+      "id": "p1-coding-conversations-and-workspace-scope",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Aggiungere conversazioni Coding persistenti con scope Codex",
+      "goal": "Permettere di riprendere, eliminare e gestire conversazioni Coding come in Codex, distinguendo chat globali da chat legate a un progetto.",
+      "problem": "Coding conserva lo stato principalmente nella WebView e non offre una lista persistente uniforme per resume, delete, cambio modello e associazione a workspace.",
+      "scope": [
+        "Persistire conversazione, messaggi, ultimo modello, stato run e workspace/project scope.",
+        "Associare la conversazione a una cartella o progetto solo quando un workspace e selezionato esplicitamente.",
+        "Mantenere globali le conversazioni senza workspace e quelle con soli file allegati.",
+        "Aggiungere API per list, resume, delete e cambio modello senza duplicare il repository chat esistente.",
+        "Aggiungere una vista Coding con lista conversazioni, nuova chat, resume, delete e selezione modello."
+      ],
+      "acceptanceCriteria": [
+        "Una chat con progetto selezionato e recuperabile filtrando per quel progetto.",
+        "Una chat senza workspace resta globale anche se contiene file allegati.",
+        "Resume ripristina messaggi, run e modello senza creare una conversazione duplicata.",
+        "Delete rimuove messaggi e metadati secondo una politica esplicita e testata.",
+        "Il cambio modello vale per la conversazione selezionata e viene persistito.",
+        "Reconnect WebView2 e SignalR ricostruiscono lista e stato tramite REST."
+      ],
+      "dependencies": [
+        "p1-persist-section-work-state",
+        "p1-formalize-storage-schema-ownership",
+        "p1-single-source-api-contracts"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Core",
+        "src/OnlyRag.Infrastructure.Storage/Storage/SqliteChatHistoryRepository.cs",
+        "src/OnlyRag.Infrastructure.Storage/Storage/EF/OnlyRagDbContext.cs",
+        "src/OnlyRag.Api/ChatService.cs",
+        "src/OnlyRag.Api/InProcessBackend.*Endpoints.cs",
+        "src/OnlyRag.Web/src/components/coding",
+        "src/OnlyRag.Web/src/api.ts",
+        "tests/OnlyRag.Api.Tests",
+        "src/OnlyRag.Web/src/components/coding/**/*.test.tsx"
+      ]
+    },
+    {
+      "id": "p1-centralize-system-prompts",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Centralizzare e rendere consultabili i system prompt",
+      "goal": "Mostrare in una sezione dedicata tutti i system prompt usati dall'app e consentire override custom versionati senza modificare i builtin.",
+      "problem": "I prompt sono costruiti in ChatService, AgentLoopEngine, traduzione e componenti frontend; la duplicazione rende difficile sapere quale prompt sia effettivamente attivo.",
+      "scope": [
+        "Catalogare i prompt effettivi per Chat RAG/direct, Coding, Translation e altri flussi che usano un system prompt.",
+        "Persistire identificativo, categoria, versione, builtin e override custom nello storage applicativo.",
+        "Introdurre SystemPromptManager come fonte unica consumata dai servizi e non dalla UI.",
+        "Aggiungere API e sezione Settings con builtin readonly e override custom modificabili.",
+        "Applicare fallback al builtin e audit/versionamento quando un override viene modificato."
+      ],
+      "acceptanceCriteria": [
+        "La sezione dedicata elenca tutti i prompt effettivamente usati dalle sezioni attive.",
+        "I builtin sono readonly e gli override custom sono distinguibili e versionati.",
+        "Un prompt mancante o invalido usa il builtin senza interrompere il flusso.",
+        "Chat, Coding e Translation leggono dal manager centralizzato senza stringhe duplicate operative.",
+        "I test coprono catalogo, override, fallback e persistenza della versione."
+      ],
+      "dependencies": [
+        "p1-formalize-storage-schema-ownership",
+        "p1-single-source-api-contracts"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Core",
+        "src/OnlyRag.Infrastructure.Storage/Storage",
+        "src/OnlyRag.Api/ChatService.cs",
+        "src/OnlyRag.Api/AgentLoopEngine.cs",
+        "src/OnlyRag.Api/DocumentTranslationPromptBuilder.cs",
+        "src/OnlyRag.Api/InProcessBackend.*Endpoints.cs",
+        "src/OnlyRag.Web/src/components/settings",
+        "src/OnlyRag.Web/src/components/chat",
+        "tests/OnlyRag.Api.Tests",
+        "tests/OnlyRag.Infrastructure.Tests"
+      ]
+    },
+    {
+      "id": "p1-isolate-image-module",
+      "priority": "P1",
+      "status": "planned",
+      "title": "Isolare il modulo immagini dai flussi applicativi principali",
+      "goal": "Mantenere la generazione immagini come feature completa ma separata, impedendo che il suo runtime e i suoi contratti appesantiscano chat, documenti, OCR e Coding.",
+      "problem": "La feature immagini richiede ONNX, DirectML/CPU, VRAM, modelli, pipeline cached, job e storage propri; se il wiring e condiviso con i flussi base aumenta cold start e accoppiamento.",
+      "scope": [
+        "Mantenere endpoint, UI, job, repository, contratti e runtime immagini sotto un boundary dedicato.",
+        "Impedire riferimenti da immagini verso chat, documenti, OCR, agenti e workspace salvo contratti generici autorizzati.",
+        "Caricare il runtime immagini solo quando la feature viene aperta o il job viene richiesto.",
+        "Separare lifecycle, memoria VRAM, cleanup e diagnostica immagini dagli altri workload.",
+        "Aggiungere guardrail di dipendenza e test che verifichino l'isolamento senza rimuovere la feature."
+      ],
+      "acceptanceCriteria": [
+        "L'avvio dei flussi base non inizializza pipeline o modelli immagini.",
+        "Il modulo immagini continua a generare, salvare, modificare ed eliminare immagini senza dipendenze cross-domain.",
+        "Il guardrail architetturale fallisce su nuovi riferimenti non autorizzati verso il modulo immagini.",
+        "I test immagini possono essere eseguiti con fake engine senza avviare chat, OCR o ingestion."
+      ],
+      "dependencies": [
+        "p0-enforce-architecture-boundaries",
+        "p1-govern-single-process-resources"
+      ],
+      "affectedAreas": [
+        "src/OnlyRag.Core/ImageContracts.cs",
+        "src/OnlyRag.Infrastructure/Images",
+        "src/OnlyRag.Api/InProcessBackend.ImageEndpoints.cs",
+        "src/OnlyRag.Web/src/components/images",
+        "tests/OnlyRag.Infrastructure.Tests",
+        "tests/OnlyRag.Api.Tests",
+        "docs/IMAGE_GENERATION.md",
+        "docs/ARCHITECTURE_REVIEW.md"
+      ]
+    },
+    {
+      "id": "p2-remove-refactoring-legacy",
+      "priority": "P2",
+      "status": "planned",
+      "title": "Rimuovere codice legacy e doppie fonti dopo il refactoring",
+      "goal": "Chiudere ogni migrazione eliminando il codice sostituito invece di mantenerlo come adapter permanente.",
+      "problem": "Le nuove UX e i nuovi contratti rischiano di lasciare modal, endpoint, DTO, factory, cache, prompt e registrazioni DI obsolete accanto ai percorsi nuovi.",
+      "scope": [
+        "Rimuovere solo dopo test verdi i vecchi percorsi prerequisiti e i relativi componenti UI.",
+        "Eliminare factory OCR, DTO, prompt e repository duplicati sostituiti dai contratti unificati.",
+        "Rimuovere endpoint e registrazioni DI del multi-agent orchestrator se il controllo usi conferma la sostituzione.",
+        "Aggiornare script, packaging e documentazione per non distribuire runtime o asset non piu usati.",
+        "Aggiungere un controllo di riferimenti inutilizzati e mantenere PROJECT_STATUS e ARCHITECTURE_REVIEW coerenti."
+      ],
+      "acceptanceCriteria": [
+        "Nessun componente legacy rimosso ha riferimenti compilabili o import frontend residui.",
+        "La solution, il typecheck web e i test seriali restano verdi.",
+        "Gli asset e runtime non usati non vengono piu inclusi nel packaging.",
+        "La revisione architetturale descrive solo percorsi effettivamente presenti."
+      ],
+      "dependencies": [
+        "p0-simplify-prerequisites-experience",
+        "p1-unify-ocr-engines-and-default",
+        "p1-configure-warning-error-log-level",
+        "p1-coding-conversations-and-workspace-scope",
+        "p1-centralize-system-prompts",
+        "p1-isolate-image-module",
+        "p1-persist-multi-agent-orchestrations"
+      ],
+      "affectedAreas": [
+        "src",
+        "tests",
+        "scripts",
+        "packaging",
+        "docs/ARCHITECTURE_REVIEW.md",
+        "docs/ARCHITECTURE.md",
+        "docs/OPERATIONS.md"
       ]
     }
   ]

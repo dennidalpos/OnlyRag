@@ -1,7 +1,6 @@
-using OnlyRag.Core;
 using System.Text.Json;
 
-namespace OnlyRag.Infrastructure.Storage;
+namespace OnlyRag.Core;
 
 public sealed record TranslationSourceUnit(
     int UnitIndex,

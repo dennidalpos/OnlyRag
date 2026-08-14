@@ -2,7 +2,6 @@ using NSubstitute;
 using OnlyRag.Application.Documents;
 using OnlyRag.Application.Jobs;
 using OnlyRag.Core;
-using OnlyRag.Infrastructure.Storage;
 using OnlyRag.Jobs.Abstractions;
 
 namespace OnlyRag.Application.Tests;

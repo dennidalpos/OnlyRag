@@ -1,4 +1,4 @@
-namespace OnlyRag.Infrastructure.Storage;
+namespace OnlyRag.Core;
 
 public interface ITranslationRepository
 {
