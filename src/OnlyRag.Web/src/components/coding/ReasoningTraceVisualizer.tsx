@@ -41,6 +41,10 @@ export function ReasoningTraceVisualizer({
     });
   }
 
+  const latestStepThought = events.slice().reverse().find((e) => e.content?.includes("[Agent Step"));
+  const stepMatch = latestStepThought?.content?.match(/\[Agent Step ([0-9]+\/[0-9]+)\]/);
+  const currentStepLabel = stepMatch ? `Passo ${stepMatch[1]}` : null;
+
   return (
     <div className="reasoning-trace-visualizer">
       <div className="reasoning-trace-visualizer__header">
@@ -53,7 +57,7 @@ export function ReasoningTraceVisualizer({
             {isStreaming ? <Sparkles size={16} className="text-amber-400" /> : <Brain size={16} className="text-indigo-400" />}
           </span>
           <span className="reasoning-trace-visualizer__title">
-            Traccia di Ragionamento Agentico ({events.length} eventi{subagentEvents.length > 0 ? ` • ${subagentEvents.length} subagente` : ""})
+            Traccia di Ragionamento Agentico ({currentStepLabel ? `${currentStepLabel} • ` : ""}{events.length} eventi{subagentEvents.length > 0 ? ` • ${subagentEvents.length} subagente` : ""})
           </span>
           {isStreaming && (
             <span className="reasoning-trace-visualizer__live-badge">

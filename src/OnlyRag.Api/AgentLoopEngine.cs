@@ -208,21 +208,34 @@ internal sealed class AgentLoopEngine
             if (!string.IsNullOrWhiteSpace(request.ResumeRunId))
             {
                 AgentRunSnapshot? resumed = await runStateRepository.GetAsync(runId, cancellationToken);
-                if (resumed is null || resumed.Phase is AgentRunPhase.Completed or AgentRunPhase.Failed or AgentRunPhase.Cancelled)
+                if (resumed is null)
                 {
-                    yield return new AgentStepEvent("error", "The requested agent run cannot be resumed.", RunId: runId);
+                    yield return new AgentStepEvent("error", "The requested agent run snapshot was not found.", RunId: runId);
                     yield break;
                 }
 
-                if (resumed.Messages.Count == 1)
+                if (resumed.Messages is { Count: > 0 })
                 {
-                    List<OllamaChatMessage>? restoredMessages = JsonSerializer.Deserialize<List<OllamaChatMessage>>(resumed.Messages[0]);
-                    if (restoredMessages is { Count: > 0 }) messages = restoredMessages;
+                    try
+                    {
+                        var restored = JsonSerializer.Deserialize<List<OllamaChatMessage>>(resumed.Messages[0]);
+                        if (restored is { Count: > 0 })
+                        {
+                            messages = restored;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.Goal) && !messages.Any(m => m.Role == "user" && m.Content.Equals(request.Goal, StringComparison.Ordinal)))
+                {
+                    messages.Add(new OllamaChatMessage("user", request.Goal));
                 }
 
                 model = resumed.Model ?? model;
-                workspaceRoot = resumed.WorkspaceRoot;
+                workspaceRoot = resumed.WorkspaceRoot ?? workspaceRoot;
                 durableStateMachine = new PersistentAgentRunStateMachine(resumed);
+                await TransitionAndPersistAsync(durableStateMachine, AgentRunPhase.Plan, "Run resumed by user instruction.", messages, cancellationToken);
             }
             else
             {
@@ -649,6 +662,19 @@ internal sealed class AgentLoopEngine
                         continue;
                     }
 
+                    if ((toolCall.ToolName.Equals("ask", StringComparison.OrdinalIgnoreCase) ||
+                         toolCall.ToolName.Equals("ask_question", StringComparison.OrdinalIgnoreCase)) &&
+                        (NormalizeMode(request.Mode) is "FULL" or "PLAN"))
+                    {
+                        string askNotice = "[AUTONOMOUS AGENT DIRECTIVE] The 'ask' tool cannot be used to surrender or pause execution during autonomous runs. " +
+                            "You MUST proceed with self-correction: use 'read_file' to inspect the target files, fix parameters, or conclude with a final summary if done.";
+                        logger?.LogWarning("AgentEngine", $"[AUTONOMOUS ASK INTERCEPTED] Prevented surrender via ask in '{request.Mode}' mode for callId {toolCall.CallId}");
+                        var askDeniedResult = new AgentToolResult(toolCall.CallId, toolCall.ToolName, false, string.Empty, askNotice);
+                        yield return new AgentStepEvent("tool_result", ToolResult: askDeniedResult, RunId: runId, Phase: durableStateMachine?.Snapshot.Phase);
+                        messages.Add(new("user", $"[TOOL RESULT ({toolCall.ToolName})]\nSuccess: False\nError: {askNotice}"));
+                        continue;
+                    }
+
                     if (!IsToolAllowedForMode(toolCall, request.Mode))
                     {
                         string modeName = NormalizeMode(request.Mode);
@@ -833,6 +859,7 @@ internal sealed class AgentLoopEngine
                         else if (toolCall.ToolName == "reflect_step")
                         {
                             memoryManager.AddKeyFact(result.Output);
+                            bool planUpdated = false;
                             try
                             {
                                 using var doc = JsonDocument.Parse(toolCall.ArgumentsJson);
@@ -840,8 +867,14 @@ internal sealed class AgentLoopEngine
                                 string status = doc.RootElement.TryGetProperty("status", out var st) ? st.GetString() ?? "completed" : "completed";
                                 string learnings = doc.RootElement.TryGetProperty("learnings", out var lr) ? lr.GetString() ?? "" : "";
                                 memoryManager.UpdateStepStatus(stepId, status, learnings);
+                                planUpdated = true;
                             }
                             catch { }
+
+                            if (planUpdated)
+                            {
+                                yield return new AgentStepEvent("plan_update", PlanMarkdown: memoryManager.CurrentPlan.ToMarkdownSummary());
+                            }
                         }
                         else if (toolCall.ToolName.Contains("write") || toolCall.ToolName.Contains("replace"))
                         {
@@ -879,13 +912,32 @@ internal sealed class AgentLoopEngine
                 if (!res.Success && !string.IsNullOrEmpty(res.Error))
                 {
                     batchMsgSb.AppendLine($"Error: {res.Error}");
-                    batchMsgSb.AppendLine("\n[SYSTEM DIAGNOSTIC & MANDATORY ERROR EVALUATION]");
-                    batchMsgSb.AppendLine($"The action '{res.ToolName}' encountered an error or non-zero exit status.");
-                    batchMsgSb.AppendLine("CRITICAL REQUIREMENT: Evaluate and resolve this error immediately before continuing!");
-                    batchMsgSb.AppendLine("1. Analyze the exact error message and stack trace above to identify the root cause.");
-                    batchMsgSb.AppendLine("2. Inspect affected code files using read_file or grep_search to understand the issue.");
-                    batchMsgSb.AppendLine("3. Apply a targeted code or environment fix to resolve the root cause.");
-                    batchMsgSb.AppendLine("4. Re-run verification (e.g. dotnet build, npm test via run_command) to verify the fix before moving to next steps.");
+                    if (res.Error.Contains("Nessuna cartella di progetto selezionata", StringComparison.OrdinalIgnoreCase))
+                    {
+                        batchMsgSb.AppendLine("\n[MANDATORY SYSTEM DIRECTIVE - NO WORKSPACE SELECTED]");
+                        batchMsgSb.AppendLine("The user has NOT authorized a workspace directory for this session.");
+                        batchMsgSb.AppendLine("DO NOT repeat local file or terminal tool calls.");
+                        batchMsgSb.AppendLine("Provide your response to the user's prompt directly in text.");
+                    }
+                    else if (res.ToolName.Equals("replace_file_content", StringComparison.OrdinalIgnoreCase) ||
+                        res.ToolName.Equals("multi_replace_file_content", StringComparison.OrdinalIgnoreCase))
+                    {
+                        batchMsgSb.AppendLine("\n[MANDATORY SELF-CORRECTION DIRECTIVE - FILE EDITING FAILURE]");
+                        batchMsgSb.AppendLine("The file replacement failed because TargetContent was not found in the file.");
+                        batchMsgSb.AppendLine("DO NOT repeat the exact same tool call with the same TargetContent parameters.");
+                        batchMsgSb.AppendLine("1. Use 'read_file' immediately to inspect the exact current lines and syntax of the target file.");
+                        batchMsgSb.AppendLine("2. Re-attempt 'replace_file_content' with exact matching lines or use 'write_file' if replacing the file.");
+                    }
+                    else
+                    {
+                        batchMsgSb.AppendLine("\n[SYSTEM DIAGNOSTIC & MANDATORY ERROR EVALUATION]");
+                        batchMsgSb.AppendLine($"The action '{res.ToolName}' encountered an error or non-zero exit status.");
+                        batchMsgSb.AppendLine("CRITICAL REQUIREMENT: Evaluate and resolve this error immediately before continuing!");
+                        batchMsgSb.AppendLine("1. Analyze the exact error message and stack trace above to identify the root cause.");
+                        batchMsgSb.AppendLine("2. Inspect affected code files using read_file or grep_search to understand the issue.");
+                        batchMsgSb.AppendLine("3. Apply a targeted code or environment fix to resolve the root cause.");
+                        batchMsgSb.AppendLine("4. Re-run verification (e.g. dotnet build, npm test via run_command) to verify the fix before moving to next steps.");
+                    }
                 }
                 batchMsgSb.AppendLine();
             }

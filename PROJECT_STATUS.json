@@ -16,34 +16,69 @@
   },
   "todos": [
     {
-      "id": "p0-coding-chat-without-workspace",
+      "id": "p0-coding-live-step-counter-and-plan-checklist",
       "priority": "P0",
-      "status": "planned",
-      "title": "Mantenere Coding operativo come chat senza workspace",
-      "goal": "Consentire all'utente di inviare un prompt nella sezione Coding anche senza file o progetto selezionato, ottenendo una risposta appropriata dal modello scelto.",
-      "problem": "L'esecuzione dell'agente senza workspace lascia disponibili nel prompt strumenti che leggono file o eseguono comandi locali. Il modello puo quindi tentare un'operazione su disco non disponibile, produrre errori ripetuti e attivare i guard di loop invece di rispondere alla richiesta conversazionale.",
+      "status": "done",
+      "title": "Coding Agent Studio: Aggiornamento dinamico Step count e rigenerazione checklist operativa del plan",
+      "goal": "Garantire l'aggiornamento in tempo reale del contatore degli Step {current}/{max} e la rigenerazione immediata del piano con checklist visiva all'approvazione.",
+      "problem": "Il contatore degli step dell'agente resta talvolta fermo sul valore iniziale e l'approvazione del piano non rigenerava visivamente la checklist con gli stati degli step.",
       "scope": [
-        "Passare al system prompt lo stato esplicito del workspace, distinguendo una chat senza cartella da una run con progetto autorizzato.",
-        "Conservare l'invio al modello selezionato per richieste conversazionali, pianificazione, ricerca web e retrieval anche quando non esiste un workspace.",
-        "Intercettare prima dell'esecuzione i soli tool filesystem, repository e comandi locali che richiedono una cartella autorizzata.",
-        "Restituire per tali tool un messaggio localizzato che richieda la selezione della cartella e chiudere la run senza retry, duplicate guard o loop guard secondari.",
-        "Registrare il risultato e la motivazione nella traccia persistente della run, senza bypassare le policy di sicurezza del workspace."
+        "Inviare ed aggiornare in tempo reale iterLabel e progress degli step nell'AgentLoopEngine.",
+        "Generare ed emettere la checklist visiva aggiornata [x]/[>]/[ ] alla creazione ed approvazione del piano.",
+        "Aggiornare la resa visiva dei messaggi di chiarimento in AgentToolCallCard.tsx per evitare schede fuorvianti."
       ],
       "acceptanceCriteria": [
-        "Una chat generica senza workspace invia il prompt al modello selezionato e visualizza la sua risposta finale.",
-        "Una richiesta che richiede file o comandi locali senza workspace informa chiaramente l'utente di selezionare una cartella e non ripete la tool call.",
-        "I tool indipendenti dal workspace restano utilizzabili senza cartella.",
-        "I test API verificano il percorso di tool locale senza workspace e i test frontend verificano la chat senza cartella.",
-        "Non sono introdotti accessi a disco fuori dal workspace autorizzato."
+        "Il contatore Step X/Y si incrementa live ad ogni iterazione nell'interfaccia.",
+        "La checklist del piano si aggiorna in tempo reale mostrando lo stato dei passaggi.",
+        "Test frontend ed API verdi."
       ],
       "dependencies": [],
       "affectedAreas": [
         "src/OnlyRag.Api/AgentLoopEngine.cs",
-        "src/OnlyRag.Api/AgentWorkspaceContextEnricher.cs",
-        "src/OnlyRag.Infrastructure/Agent/WorkspaceToolExecutor.cs",
-        "src/OnlyRag.Web/src/components/coding/useAgentStreamHandler.ts",
-        "src/OnlyRag.Web/src/components/coding/CodingSection.test.tsx",
-        "tests/OnlyRag.Api.Tests"
+        "src/OnlyRag.Web/src/components/coding/AgentToolCallCard.tsx",
+        "src/OnlyRag.Web/src/components/coding/ReasoningTraceVisualizer.tsx"
+      ]
+    },
+    {
+      "id": "p1-diagnostics-ollama-telemetry-modal",
+      "priority": "P1",
+      "status": "done",
+      "title": "System Diagnostics & Telemetry: Modale dedicato per Parametri OS/Ollama e rimozione export ridondanti",
+      "goal": "Evitare il troncamento dei testi e dei pulsanti della riga parametri/telemetria creando un modale dedicato.",
+      "problem": "Nella pannello diagnostica i parametri OS Client Ollama MIDRANGE e i pulsanti risultano tagliati o non interamente leggibili.",
+      "scope": [
+        "Creare un modale dedicato per la visualizzazione dettagliata dei parametri OS e telemetria Ollama.",
+        "Adattare il layout di DiagnosticsPanel.tsx con un pulsante pulito 'Parametri Avanzati...'.",
+        "Pulire eventuali pulsanti/azioni di export ridondanti dato che i log sono consultabili nella cartella log."
+      ],
+      "acceptanceCriteria": [
+        "I parametri OS ed i dati telemetrici si leggono distintamente senza scritte o pulsanti troncati.",
+        "Tutti i test di DiagnosticsPanel restano verdi."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Web/src/components/settings/DiagnosticsPanel.tsx",
+        "src/OnlyRag.Web/src/components/settings/SettingsSection.panels.tsx"
+      ]
+    },
+    {
+      "id": "p1-clarify-disassociate-workspace-action",
+      "priority": "P1",
+      "status": "done",
+      "title": "Coding Agent Studio: Chiarire l'azione di disassociazione workspace",
+      "goal": "Rendere immediatamente chiaro all'utente che la rimozione del workspace disassocia solo il progetto dalla sessione senza eliminare alcun file su disco.",
+      "problem": "Il pulsante per cancellare/rimuovere il workspace crea dubbi nell'utente sul fatto che possa eliminare fisicamente i file del progetto su disco.",
+      "scope": [
+        "Aggiornare tooltip, aria-label e testo del pulsante in CodingToolbar.tsx con la dicitura 'Disassocia workspace (nessun file verrà eliminato da disco)'.",
+        "Aggiungere nota o tooltip informativo chiaro."
+      ],
+      "acceptanceCriteria": [
+        "L'azione indica chiaramente la sola disassociazione senza perdita di file.",
+        "I test di CodingToolbar restano verdi."
+      ],
+      "dependencies": [],
+      "affectedAreas": [
+        "src/OnlyRag.Web/src/components/coding/CodingToolbar.tsx"
       ]
     },
     {

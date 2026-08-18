@@ -100,17 +100,6 @@ function SectionIcon({ section }: { section: SectionId }) {
   }
 }
 
-const sectionShortcuts: Record<SectionId, string> = {
-  chat: "Ctrl+1",
-  coding: "Ctrl+2",
-  documents: "Ctrl+3",
-  graph: "Ctrl+7",
-  translation: "Ctrl+4",
-  images: "Ctrl+5",
-  settings: "Ctrl+6"
-};
-
-
 export const Sidebar = memo(function SidebarComponent({
   activeSection,
   sections,
@@ -136,13 +125,12 @@ export const Sidebar = memo(function SidebarComponent({
                 type="button"
                 aria-current={section === activeSection ? "page" : undefined}
                 onClick={() => onSectionChange(section)}
-                title={`${sections[section]} (${sectionShortcuts[section]})`}
+                title={sections[section]}
               >
                 <span className="nav-item__content">
                   <SectionIcon section={section} />
                   <span className="nav-item__label">{sections[section]}</span>
                 </span>
-                <span className="nav-shortcut-badge" aria-hidden="true">{sectionShortcuts[section]}</span>
               </button>
             ))}
           </div>

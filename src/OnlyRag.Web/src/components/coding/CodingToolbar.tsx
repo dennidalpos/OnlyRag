@@ -66,8 +66,8 @@ export function CodingToolbar({
                 type="button"
                 className="workspace-badge-chip__remove-btn"
                 onClick={onClearFolder}
-                title="Rimuovi cartella di progetto"
-                aria-label="Rimuovi cartella di progetto"
+                title="Disassocia cartella di progetto dal contesto (Nessun file verrà eliminato da disco)"
+                aria-label="Disassocia cartella di progetto dal contesto (nessuna eliminazione di file)"
               >
                 <X size={15} />
               </button>

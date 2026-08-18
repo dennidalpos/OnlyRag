@@ -67,4 +67,12 @@ public sealed class AgentModePolicyTests
             new AgentToolCall("command", "run_command", "{}"),
             "full"));
     }
+
+    [Fact]
+    public void WorkspaceFreeChat_EnrichesContextWithoutWorkspace()
+    {
+        string enriched = AgentWorkspaceContextEnricher.EnrichGoalWithWorkspaceContext("Come funziona la RAG?", "");
+        Assert.Contains("[NO ACTIVE WORKSPACE]", enriched);
+        Assert.Contains("Operating in workspace-free chat mode", enriched);
+    }
 }

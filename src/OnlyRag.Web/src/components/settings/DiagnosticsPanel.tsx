@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useSettingsSectionContext } from "./SettingsSectionContext";
 import { ProgressBar } from "../common/ProgressBar";
 import { LogViewerModal } from "../layout/LogViewerModal";
+import { OllamaTelemetryModal } from "./OllamaTelemetryModal";
 import { InfoTip } from "../common/InfoTip";
 
 export function DiagnosticsPanel() {
   const [showLogViewer, setShowLogViewer] = useState(false);
+  const [showTelemetryModal, setShowTelemetryModal] = useState(false);
   const {
     diagnostics,
     diagnosticsStatus,
@@ -190,6 +192,17 @@ export function DiagnosticsPanel() {
           >
             Aggiorna
           </button>
+
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => setShowTelemetryModal(true)}
+            aria-label="Apri modale telemetria e parametri OS/Ollama"
+            title="Visualizza i dettagli completi dei parametri OS e telemetria Ollama"
+          >
+            ⚙️ Parametri OS/Ollama...
+          </button>
+
           <button
             type="button"
             className="button-secondary"
@@ -204,7 +217,7 @@ export function DiagnosticsPanel() {
             disabled={isBusy}
             title="Apre la cartella locale dei log applicativi."
           >
-            Apri cartella log
+            📁 Apri cartella log
           </button>
           <button
             type="button"
@@ -252,6 +265,14 @@ export function DiagnosticsPanel() {
       {showLogViewer && (
         <LogViewerModal
           onClose={() => setShowLogViewer(false)}
+        />
+      )}
+
+      {showTelemetryModal && (
+        <OllamaTelemetryModal
+          isOpen={showTelemetryModal}
+          onClose={() => setShowTelemetryModal(false)}
+          diagnostics={diagnostics}
         />
       )}
     </div>

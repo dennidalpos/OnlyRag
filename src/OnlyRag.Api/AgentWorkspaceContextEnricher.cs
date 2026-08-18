@@ -6,7 +6,18 @@ internal static class AgentWorkspaceContextEnricher
 {
     public static string EnrichGoalWithWorkspaceContext(string goal, string workspaceRoot)
     {
-        if (string.IsNullOrWhiteSpace(workspaceRoot)) return goal;
+        if (string.IsNullOrWhiteSpace(workspaceRoot) || !Directory.Exists(workspaceRoot))
+        {
+            var noWsSb = new StringBuilder();
+            noWsSb.AppendLine(goal);
+            noWsSb.AppendLine();
+            noWsSb.AppendLine("[NO ACTIVE WORKSPACE]");
+            noWsSb.AppendLine("Operating in workspace-free chat mode. No local project directory is authorized.");
+            noWsSb.AppendLine("AGENT INSTRUCTIONS:");
+            noWsSb.AppendLine("1. Answer conversational questions, planning requests, and general coding questions directly in text.");
+            noWsSb.AppendLine("2. Do NOT attempt to read local files, list directories, or run local terminal commands on disk unless the user authorizes a workspace.");
+            return noWsSb.ToString();
+        }
 
         var sb = new StringBuilder();
         sb.AppendLine(goal);

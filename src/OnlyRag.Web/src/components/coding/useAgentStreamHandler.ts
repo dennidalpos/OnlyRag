@@ -72,6 +72,8 @@ export function useAgentStreamHandler({
     setPromptInput("");
   }
 
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+
   async function handleApproveAgentToolCall(callId: string, approved: boolean) {
     try {
       const response = await apiRequest<{ success: boolean }>("/api/agent/approve-tool", {
@@ -81,14 +83,20 @@ export function useAgentStreamHandler({
       if (!response.success) {
         throw new Error("La richiesta di approvazione non e piu attiva.");
       }
+
+      if (approved) {
+        const targetRun = resumableRuns.find((r) => r.runId === activeRunId) ?? (activeRunId ? { runId: activeRunId, goal: "Esegui il piano", mode: "write", model: selectedModel, workspaceRoot: workspaceConfig?.rootPath || null, phase: "Act", toolCallsUsed: 0, estimatedTokensUsed: 0, startedAtUtc: "", updatedAtUtc: "" } as AgentRunSnapshot : undefined);
+        void handleSendAgentMessage("Piano approvato dall'utente. Esegui le modifiche e verifica.", targetRun);
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Impossibile registrare l'approvazione.");
     }
   }
 
   async function handleSendAgentMessage(textToSend: string, resumedRun?: AgentRunSnapshot) {
+    const targetRunId = resumedRun?.runId ?? activeRunId ?? (resumableRuns.length > 0 ? resumableRuns[0].runId : null);
     const goal = resumedRun?.goal ?? textToSend;
-    const resumedMode = resumedRun?.mode.toLowerCase();
+    const resumedMode = resumedRun?.mode?.toLowerCase();
     const mode = resumedMode === "write" || resumedMode === "full"
       ? "write"
       : resumedMode === "ask"
@@ -132,10 +140,13 @@ export function useAgentStreamHandler({
           mode,
           workspaceRoot: resumedRun?.workspaceRoot || workspaceConfig?.rootPath || null,
           autoApproveCommands,
-          resumeRunId: resumedRun?.runId ?? null
+          resumeRunId: targetRunId
         } satisfies AgentRunRequest,
         (rawEvent: unknown) => {
           const event = rawEvent as AgentStepEvent;
+          if (event.runId) {
+            setActiveRunId(event.runId);
+          }
           setMessages((current) =>
             current.map((message) => {
               if (message.id !== assistantMessageId) return message;

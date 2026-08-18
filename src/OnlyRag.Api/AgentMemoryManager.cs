@@ -284,8 +284,13 @@ internal sealed class AgentMemoryManager
         return true;
     }
 
-    public void PruneHistory(List<OllamaChatMessage> messages, int maxMessagesHardLimit = 30)
+    public void PruneHistory(List<OllamaChatMessage> messages, int maxMessagesHardLimit = 20)
     {
+        if (messages.Count > maxMessagesHardLimit)
+        {
+            CompressContext(messages, maxMessagesHardLimit);
+        }
+
         if (messages.Count <= 12) return;
 
         const int maxObsLength = 800;

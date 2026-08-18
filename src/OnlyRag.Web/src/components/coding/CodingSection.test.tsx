@@ -206,7 +206,7 @@ describe("CodingSection", () => {
 
     expect(await screen.findByText("C:\\Projects\\App")).toBeInTheDocument();
 
-    const removeBtn = screen.getByRole("button", { name: /Rimuovi cartella di progetto/i });
+    const removeBtn = screen.getByRole("button", { name: /Disassocia cartella/i });
     await user.click(removeBtn);
 
     await waitFor(() => {
